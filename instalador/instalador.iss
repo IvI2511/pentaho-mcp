@@ -269,6 +269,11 @@ var
 function EnviarMensajeConEspera(Ventana: HWND; Codigo: UINT; WP: WPARAM; LP: String;
   Banderas, Espera: UINT; var Resultado: DWORD_PTR): LRESULT;
   external 'SendMessageTimeoutW@user32.dll stdcall';
+// Atributos de archivo (kernel32): para sacarle el "solo lectura" a una carpeta antes de borrarla.
+function ObtenerAtributos(Ruta: String): DWORD;
+  external 'GetFileAttributesW@kernel32.dll stdcall';
+function PonerAtributos(Ruta: String; Atributos: DWORD): BOOL;
+  external 'SetFileAttributesW@kernel32.dll stdcall';
 
 // ------------------------------------------------------------ PDI
 
@@ -681,6 +686,27 @@ begin
 end;
 
 // Deja en el log lo que quedo en una carpeta que no se pudo borrar.
+// RemoveDir de una carpeta que deberia estar vacia. OneDrive marca sus carpetas de solo lectura
+// (ReadOnly + ReparsePoint) y RemoveDirectory las rechaza con "acceso denegado" aunque esten vacias
+// (EXT-465): se les saca el atributo y se reintenta, por si OneDrive sigue sincronizando el borrado.
+function QuitarCarpetaVacia(const Carpeta: String): Boolean;
+var
+  Intento: Integer;
+  Atributos: DWORD;
+begin
+  Result := not DirExists(Carpeta);
+  Intento := 0;
+  while (not Result) and (Intento < 5) do begin
+    Intento := Intento + 1;
+    Atributos := ObtenerAtributos(Carpeta);
+    if (Atributos <> $FFFFFFFF) and ((Atributos and 1) <> 0) then
+      PonerAtributos(Carpeta, Atributos and not 1);
+    Result := RemoveDir(Carpeta) or not DirExists(Carpeta);
+    if not Result then
+      Sleep(400);
+  end;
+end;
+
 procedure LoguearLoQueQueda(const Carpeta: String);
 var
   Hallado: TFindRec;
@@ -730,9 +756,9 @@ begin
   BorrarSiEsta(Bin + '\idc-launcher.ini');
   BorrarSiEsta(Bin + '\idc-launcher.png');
   if DirExists(Bin) then
-    if not RemoveDir(Bin) then
+    if not QuitarCarpetaVacia(Bin) then
       LoguearLoQueQueda(Bin);
-  if RemoveDir(Carpeta) then
+  if QuitarCarpetaVacia(Carpeta) then
     Log('  borrada ' + Carpeta)
   else
     LoguearLoQueQueda(Carpeta);
