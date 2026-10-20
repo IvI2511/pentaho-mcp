@@ -1,0 +1,6 @@
+customer_id;name;email;city;segment
+1;Ana Pérez;ana.perez@example.com;Madrid;RETAIL
+2;Bruno Díaz;bruno.diaz@example.com;Sevilla;RETAIL
+3;Carla Núñez;carla.nunez@example.com;Valencia;PREMIUM
+4;Diego Ruiz;diego.ruiz@example.com;Bilbao;RETAIL
+5;Elena Gómez;elena.gomez@example.com;Madrid;PREMIUM

@@ -1,0 +1,4 @@
+sale_id;sale_date;customer_id;product_code;quantity;unit_price
+5003;2026-10-02;3;P-300;5;7.90
+5007;2026-10-04;2;P-100;6;4.50
+5008;2026-10-04;4;P-200;2;3.20
