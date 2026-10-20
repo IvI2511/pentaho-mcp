@@ -18,9 +18,11 @@ import org.pentaho.di.trans.step.StepMeta;
  * Auto-layout de izquierda a derecha para transformaciones y jobs (logica pura, sin Spoon).
  *
  * Columna = profundidad topologica por hops (camino mas largo desde una raiz): x = 100 + col*170.
- * Dentro de cada columna, y = 100 + indice*110. Orden en la columna: primero por el orden de sus
- * predecesores (asi las ramas no se cruzan), despues por la posicion actual. En jobs, START va
- * primero. Los ciclos (posibles en jobs) se cortan ignorando las aristas de vuelta.
+ * Orden dentro de cada columna: baricentro de los vecinos con pasadas de ida y vuelta (reduce cruces);
+ * en un empate, la rama mas larga primero y despues la posicion actual. Altura: cada nodo a la altura
+ * de su predecesor mas alto, con 110 px minimos entre nodos de la misma columna, asi la linea
+ * principal queda recta y las ramas van debajo. En jobs, START va primero. Los ciclos (posibles en
+ * jobs) se cortan ignorando las aristas de vuelta.
  */
 final class TransLayout {
 
@@ -222,32 +224,40 @@ final class TransLayout {
       prof[ i ] = Math.max( 0, min - 1 );
     }
 
-    // Filas: columna por columna, ordenando por la fila media de los predecesores ya ubicados.
+    // Largo de la cadena que sigue a cada nodo (cola esta en orden topologico): en un empate, la rama
+    // mas larga va arriba y queda en linea recta.
+    final int[] largo = new int[ n ];
+    for ( int q = cola.size() - 1; q >= 0; q-- ) {
+      int u = cola.get( q );
+      for ( int k = 0; k < sal.get( u ).size(); k++ ) {
+        if ( !vuelta[ u ][ k ] ) {
+          largo[ u ] = Math.max( largo[ u ], largo[ sal.get( u ).get( k ) ] + 1 );
+        }
+      }
+    }
+
+    // Filas, en tres etapas (el metodo de Sugiyama, simplificado):
+    //  1. orden inicial de cada columna por la fila media de los predecesores ya ubicados;
+    //  2. pasadas de ida y vuelta (baricentro) para reducir cruces;
+    //  3. alturas: cada nodo a la altura de su predecesor mas alto, asi la linea principal queda recta
+    //     y las ramas (el "falso" de un Filter rows, el stream de un lookup) quedan debajo.
     int maxCol = 0;
     for ( int i = 0; i < n; i++ ) {
       maxCol = Math.max( maxCol, prof[ i ] );
     }
     final double[] fila = new double[ n ];
     final double[] clave = new double[ n ];
-    Point[] res = new Point[ n ];
     final List<Integer> posEnOrden = new ArrayList<Integer>( Collections.<Integer>nCopies( n, 0 ) );
     for ( int k = 0; k < n; k++ ) {
       posEnOrden.set( orden[ k ], k );
     }
+    List<List<Integer>> cols = new ArrayList<List<Integer>>();
     for ( int c = 0; c <= maxCol; c++ ) {
       List<Integer> enCol = new ArrayList<Integer>();
       for ( int i = 0; i < n; i++ ) {
         if ( prof[ i ] == c ) {
           enCol.add( i );
-          double suma = 0;
-          int cuenta = 0;
-          for ( int p : ent.get( i ) ) {
-            if ( prof[ p ] < c ) {
-              suma += fila[ p ];
-              cuenta++;
-            }
-          }
-          clave[ i ] = cuenta == 0 ? Double.MAX_VALUE : suma / cuenta;
+          clave[ i ] = baricentro( ent.get( i ), prof, fila, c, true, Double.MAX_VALUE );
         }
       }
       Collections.sort( enCol, new Comparator<Integer>() {
@@ -257,25 +267,106 @@ final class TransLayout {
           if ( r != 0 ) {
             return r;
           }
+          r = Integer.compare( largo[ b ], largo[ a ] );
+          if ( r != 0 ) {
+            return r;
+          }
           Point pa = actuales.get( a );
           Point pb = actuales.get( b );
           r = Integer.compare( pa == null ? 0 : pa.y, pb == null ? 0 : pb.y );
           return r != 0 ? r : posEnOrden.get( a ).compareTo( posEnOrden.get( b ) );
         }
       } );
-      if ( c == 0 && inicio >= 0 && enCol.remove( Integer.valueOf( inicio ) ) ) {
-        enCol.add( 0, inicio );
+      numerar( enCol, fila );
+      cols.add( enCol );
+    }
+
+    for ( int pasada = 0; pasada < 4; pasada++ ) {
+      for ( int c = maxCol - 1; c >= 0; c-- ) { // vuelta: mirando a los sucesores
+        reordenar( cols.get( c ), sal, prof, fila, largo, c, false );
       }
-      for ( int k = 0; k < enCol.size(); k++ ) {
-        int i = enCol.get( k );
-        fila[ i ] = k;
-        res[ i ] = new Point( X0 + c * DX, Y0 + k * DY );
+      for ( int c = 1; c <= maxCol; c++ ) { // ida: mirando a los predecesores
+        reordenar( cols.get( c ), ent, prof, fila, largo, c, true );
+      }
+    }
+    if ( inicio >= 0 && cols.get( 0 ).remove( Integer.valueOf( inicio ) ) ) {
+      cols.get( 0 ).add( 0, inicio );
+      numerar( cols.get( 0 ), fila );
+    }
+
+    Point[] res = new Point[ n ];
+    for ( int c = 0; c <= maxCol; c++ ) {
+      int previo = Integer.MIN_VALUE;
+      for ( int i : cols.get( c ) ) {
+        // A la altura del predecesor mas alto; sin predecesores, lo mas arriba posible.
+        int deseado = Integer.MAX_VALUE;
+        for ( int p : ent.get( i ) ) {
+          if ( prof[ p ] < c && res[ p ] != null ) {
+            deseado = Math.min( deseado, res[ p ].y );
+          }
+        }
+        if ( deseado == Integer.MAX_VALUE ) {
+          deseado = Y0;
+        }
+        int y = previo == Integer.MIN_VALUE ? Math.max( deseado, Y0 ) : Math.max( deseado, previo + DY );
+        res[ i ] = new Point( X0 + c * DX, y );
+        previo = y;
         if ( col != null ) {
           col[ i ] = c;
         }
       }
     }
     return res;
+  }
+
+  /** Fila media de los vecinos (predecesores o sucesores) en otras columnas; 'sinVecinos' si no hay. */
+  private static double baricentro( List<Integer> vecinos, int[] prof, double[] fila, int c, boolean antes,
+                                    double sinVecinos ) {
+    double suma = 0;
+    int cuenta = 0;
+    for ( int v : vecinos ) {
+      if ( antes ? prof[ v ] < c : prof[ v ] > c ) {
+        suma += fila[ v ];
+        cuenta++;
+      }
+    }
+    return cuenta == 0 ? sinVecinos : suma / cuenta;
+  }
+
+  /** Ordena una columna por el baricentro de sus vecinos; los que no tienen se quedan en su fila. */
+  private static void reordenar( List<Integer> enCol, List<List<Integer>> vecinos, final int[] prof,
+                                 final double[] fila, final int[] largo, int c, boolean antes ) {
+    final double[] clave = new double[ enCol.size() ];
+    final List<Integer> copia = new ArrayList<Integer>( enCol );
+    for ( int k = 0; k < copia.size(); k++ ) {
+      int i = copia.get( k );
+      clave[ k ] = baricentro( vecinos.get( i ), prof, fila, c, antes, fila[ i ] );
+    }
+    final List<Integer> idx = new ArrayList<Integer>();
+    for ( int k = 0; k < copia.size(); k++ ) {
+      idx.add( k );
+    }
+    Collections.sort( idx, new Comparator<Integer>() { // estable: empata por fila actual
+      @Override
+      public int compare( Integer a, Integer b ) {
+        int r = Double.compare( clave[ a ], clave[ b ] );
+        if ( r == 0 ) {
+          r = Integer.compare( largo[ copia.get( b ) ], largo[ copia.get( a ) ] );
+        }
+        return r != 0 ? r : Double.compare( fila[ copia.get( a ) ], fila[ copia.get( b ) ] );
+      }
+    } );
+    enCol.clear();
+    for ( int k : idx ) {
+      enCol.add( copia.get( k ) );
+    }
+    numerar( enCol, fila );
+  }
+
+  private static void numerar( List<Integer> enCol, double[] fila ) {
+    for ( int k = 0; k < enCol.size(); k++ ) {
+      fila[ enCol.get( k ) ] = k;
+    }
   }
 
   private static void dfs( int u, List<List<Integer>> sal, int[] estado, boolean[][] vuelta ) {

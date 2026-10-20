@@ -82,24 +82,42 @@ final class TransTools {
         .str( "despues_de", "Step existente: el nuevo se ubica a su derecha y se crea el hop despues_de -> nuevo", false )
         .integer( "x", "Posicion x en el lienzo (opcional)", false )
         .integer( "y", "Posicion y en el lienzo (opcional)", false )
-        .str( "descripcion", "Descripcion del step (opcional)", false ).build(),
+        .str( "descripcion", "Descripcion del step (opcional)", false )
+        .strEnum( "modo_salida", "Si 'despues_de' queda con 2+ salidas: copiar (todas las filas a cada salida, "
+          + "por defecto) o repartir (round robin)", false, "copiar", "repartir" ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
+        String despuesDe = Tools.optStr( a, "despues_de", null );
+        StepMeta previo = despuesDe == null ? null : TransOps.paso( tm, despuesDe );
+        StepMeta previoAntes = previo == null ? null : (StepMeta) previo.clone();
         TransOps.Agregado r = TransOps.agregarStep( tm, Tools.str( a, "tipo" ), Tools.str( a, "nombre" ),
           Tools.optStr( a, "config_xml", null ), Tools.optInteger( a, "x" ), Tools.optInteger( a, "y" ),
-          Tools.optStr( a, "despues_de", null ), Tools.optStr( a, "descripcion", null ), sp.getMetaStore() );
+          despuesDe, Tools.optStr( a, "descripcion", null ), sp.getMetaStore() );
         sp.addUndoNew( tm, new Object[] { r.step }, new int[] { tm.indexOfStep( r.step ) } );
+        String notaSalida = null;
         if ( r.hop != null ) {
           sp.addUndoNew( tm, new Object[] { r.hop }, new int[] { tm.indexOfTransHop( r.hop ) }, true );
+          boolean antes = previo.isDistributes();
+          notaSalida = TransOps.aplicarModoSalida( tm, previo, Tools.optStr( a, "modo_salida", null ) );
+          if ( previo.isDistributes() != antes ) {
+            sp.addUndoChange( tm, new Object[] { previoAntes }, new Object[] { previo.clone() },
+              new int[] { tm.indexOfStep( previo ) }, true );
+          }
         }
         Docs.touched( tm );
         ObjectNode o = TransOps.ficha( r.step );
         if ( r.hop != null ) {
           o.set( "hop", TransOps.fichaHop( r.hop ) );
+          if ( TransOps.salidasNormales( tm, previo ) >= 2 ) {
+            o.put( "modo_salida_de_" + previo.getName(), TransOps.modoSalida( previo ) );
+          }
         }
         if ( r.aviso != null ) {
           o.put( "aviso", r.aviso );
+        }
+        if ( notaSalida != null ) {
+          o.put( "nota", notaSalida );
         }
         return o;
       } ) ) );
@@ -246,12 +264,16 @@ final class TransTools {
         + "Con de_error=true el hop es de errores: activa el manejo de errores del step origen con ese destino "
         + "(el step tiene que admitirlo). OJO: en Filter rows (send_true_to/send_false_to) y en Switch/case "
         + "(case_value_target, default_target_step) el destino se configura en el XML del step con "
-        + "configurar_step, y ADEMAS hace falta este hop; uno sin el otro no funciona.",
+        + "configurar_step, y ADEMAS hace falta este hop; uno sin el otro no funciona. Si 'desde' queda con 2+ "
+        + "salidas normales, Spoon preguntaria copiar o repartir: aca se elige con modo_salida (por defecto "
+        + "copiar = cada salida recibe todas las filas).",
       Tools.schema().documento()
         .str( "desde", "Step origen", true )
         .str( "hacia", "Step destino", true )
         .bool( "habilitado", "Hop habilitado (por defecto true)", false )
-        .bool( "de_error", "Hop de manejo de errores (por defecto false)", false ).build(),
+        .bool( "de_error", "Hop de manejo de errores (por defecto false)", false )
+        .strEnum( "modo_salida", "Con 2+ salidas: copiar (por defecto) o repartir (round robin)", false,
+          "copiar", "repartir" ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
@@ -260,13 +282,48 @@ final class TransTools {
         boolean deError = Tools.optBool( a, "de_error", false );
         StepMeta antes = (StepMeta) desde.clone();
         TransHopMeta h = TransOps.conectar( tm, desde, hacia, Tools.optBool( a, "habilitado", true ), deError );
-        if ( deError ) {
+        String nota = deError ? null
+          : TransOps.aplicarModoSalida( tm, desde, Tools.optStr( a, "modo_salida", null ) );
+        boolean cambioStep = deError || desde.isDistributes() != antes.isDistributes();
+        sp.addUndoNew( tm, new Object[] { h }, new int[] { tm.indexOfTransHop( h ) } );
+        if ( cambioStep ) {
           sp.addUndoChange( tm, new Object[] { antes }, new Object[] { desde.clone() },
-            new int[] { tm.indexOfStep( desde ) } );
+            new int[] { tm.indexOfStep( desde ) }, true );
         }
-        sp.addUndoNew( tm, new Object[] { h }, new int[] { tm.indexOfTransHop( h ) }, deError );
         Docs.touched( tm );
-        return TransOps.fichaHop( h );
+        ObjectNode o = TransOps.fichaHop( h );
+        if ( !deError && TransOps.salidasNormales( tm, desde ) >= 2 ) {
+          o.put( "modo_salida_de_" + desde.getName(), TransOps.modoSalida( desde ) );
+        }
+        if ( nota != null ) {
+          o.put( "nota", nota );
+        }
+        return o;
+      } ) ) );
+
+    s.add( Tools.tool( "modo_salida",
+      "Cambia como reparte las filas un step con varias salidas (lo que Spoon pregunta al dibujar el segundo "
+        + "hop): 'copiar' = cada salida recibe TODAS las filas; 'repartir' = round robin, cada fila va a una sola "
+        + "salida. No aplica a Filter rows ni Switch/case, que mandan a destinos concretos.",
+      Tools.schema().documento()
+        .str( "step", "Nombre del step", true )
+        .strEnum( "modo", "copiar o repartir", true, "copiar", "repartir" ).build(),
+      a -> Docs.ui( () -> {
+        Spoon sp = Docs.spoon();
+        TransMeta tm = Docs.trans( a );
+        StepMeta sm = TransOps.paso( tm, Tools.str( a, "step" ) );
+        StepMeta antes = (StepMeta) sm.clone();
+        TransOps.aplicarModoSalida( tm, sm, Tools.str( a, "modo" ) );
+        if ( sm.isDistributes() != antes.isDistributes() ) {
+          sp.addUndoChange( tm, new Object[] { antes }, new Object[] { sm.clone() },
+            new int[] { tm.indexOfStep( sm ) } );
+          Docs.touched( tm );
+        }
+        ObjectNode o = Tools.obj();
+        o.put( "step", sm.getName() );
+        o.put( "modo_salida", TransOps.modoSalida( sm ) );
+        o.put( "salidas", TransOps.salidasNormales( tm, sm ) );
+        return o;
       } ) ) );
 
     s.add( Tools.tool( "desconectar",

@@ -1,12 +1,12 @@
 # Compilados del plugin
-plugin/build/
-plugin/dist/
+spoon-plugin/build/
+spoon-plugin/dist/
 *.class
 
 # Salidas de los ejemplos al correrlos con Pan/Kitchen
-skills/pentaho-etl/manual/ejemplos/salida/
+claude/skills/pentaho-etl/manual/ejemplos/salida/
 
 # Generador del catalogo
 tools/generador-catalogo/build/
 
-plugin/.ruff_cache/
+spoon-plugin/.ruff_cache/

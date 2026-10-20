@@ -1,52 +1,62 @@
-# Pentaho MCP
+# Pentaho Live (unofficial)
 
-> **¿Sos un agente (Claude Code, Codex…) y te pidieron instalar esto?** Seguí [`INSTALL.md`](INSTALL.md).
+> **Are you an agent (Claude Code, Codex…) asked to install this?** Follow [`INSTALL.md`](INSTALL.md).
 
-Para que Claude arme ETLs en **Pentaho Data Integration 9.4 (Spoon)** mientras uno mira: agrega
-steps, los conecta, los configura, valida, muestra filas de preview y ejecuta, todo en la ventana de
-Spoon que tenés abierta. Cada cambio se deshace con Ctrl+Z.
+[Español](README.es.md)
 
-Son dos piezas:
+Ask Claude to build ETLs in **Pentaho Data Integration 9.4 (Spoon)** while you watch: it adds steps,
+connects and configures them, validates, previews rows and runs the transformation in the Spoon window
+you have open. Every change can be undone with Ctrl+Z.
 
-| Pieza | Qué es | Dónde |
+Independent community project, not affiliated with or endorsed by Hitachi Vantara. Pentaho is a
+trademark of Hitachi Vantara.
+
+## Two pieces
+
+| Piece | What it is | Where |
 |---|---|---|
-| **Plugin de Spoon** | Un `@LifecyclePlugin` de Kettle que al abrir Spoon levanta un servidor MCP en `127.0.0.1:8765` con ~50 herramientas | `plugin/` (Java 8, compila contra la instalación de PDI) |
-| **Plugin de Claude Code** | La skill `pentaho-etl` (formato `.ktr`/`.kjb`, catálogo de los 216 steps y 77 job entries sacado de la instalación, errores comunes verificados, ejemplos que corren) y la configuración del MCP | `.claude-plugin/`, `.mcp.json`, `skills/` |
+| **Spoon plugin** | A Kettle `@LifecyclePlugin` that starts an MCP server on `127.0.0.1:8765` (~50 tools) when Spoon opens | [`spoon-plugin/`](spoon-plugin/) (Java 8, built against a PDI install) |
+| **Claude Code plugin `pentaho-live`** | The `pentaho-etl` skill (.ktr/.kjb format, catalog of 216 steps and 77 job entries generated from a real install, verified errors, runnable examples) and the MCP connection | [`claude/`](claude/), published through this repo's marketplace `pentaho-tools` |
 
-La skill sirve sola también: sin Spoon abierto, Claude escribe el `.ktr` y lo verifica con Pan.
+The skill also works alone: without Spoon open, Claude writes the `.ktr` and checks it with Pan.
 
-## Instalar
+## Install
 
-**Lo más fácil: pedíselo a tu agente.** En Claude Code o Codex escribí:
+**Easiest: ask your agent.** In Claude Code or Codex type:
 
-> instalá IvI2511/pentaho-mcp
+> install IvI2511/pentaho-mcp
 
-El agente sigue [`INSTALL.md`](INSTALL.md): te pregunta si ya tenés Pentaho, baja lo que falta,
-instala el plugin de Spoon y se configura a sí mismo.
+It follows [`INSTALL.md`](INSTALL.md): asks whether you already have Pentaho, downloads what's missing,
+installs the Spoon plugin and configures itself.
 
-Hay dos opciones, según tengas o no PDI:
-
-| Si… | Bajás | Script |
+| If you… | Download | Script |
 |---|---|---|
-| **Ya tenés PDI** | `pentaho-mcp.zip` (el plugin, ~140 KB) → se descomprime en `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
-| **No tenés PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE entero con el plugin puesto, ~420 MB) | `instalar.ps1 -InstalarPdi` |
+| **already have PDI** | `pentaho-mcp.zip` (the Spoon plugin, ~140 KB), unzip into `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
+| **don't have PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE with the plugin in place, ~370 MB) | `instalar.ps1 -InstalarPdi` |
 
-Los dos están en el [último release](https://github.com/IvI2511/pentaho-mcp/releases/latest).
-Instalación a mano, macOS/Linux (`instalar.sh`) y problemas comunes: [`INSTALL.md`](INSTALL.md).
+Both are in the [latest release](https://github.com/IvI2511/pentaho-mcp/releases/latest). Manual
+steps, macOS/Linux (`instalar.sh`) and troubleshooting: [`INSTALL.md`](INSTALL.md).
 
-Después: abrir Spoon y pedirle al agente algo como *"armá una transformación que lea ventas.csv,
-sume el importe por ciudad y lo escriba en un CSV"*.
+Claude Code by hand:
+```
+/plugin marketplace add IvI2511/pentaho-mcp
+/plugin install pentaho-live@pentaho-tools
+```
 
-MySQL, MariaDB, SQL Server y Oracle no traen driver en PDI: copiar el `.jar` del conector a
-`data-integration/lib/`. Con MySQL Connector/J 8+ alcanza el tipo de conexión MySQL normal.
+MySQL, MariaDB, SQL Server and Oracle drivers don't ship with PDI: copy the connector `.jar` into
+`data-integration/lib/`. With MySQL Connector/J 8+ the regular MySQL connection type works.
 
-## Desarrollo
+## Development
 
-| Qué | Cómo |
+| What | How |
 |---|---|
-| Compilar el plugin | `powershell -ExecutionPolicy Bypass -File plugin\build.ps1 [-PdiHome <data-integration>]` → `plugin/dist/pentaho-mcp/` y el zip del release |
-| Regenerar el catálogo | `bash tools/generador-catalogo/generar.sh` (lee los plugins de la instalación) |
-| Validar el plugin de Claude | `claude plugin validate --strict .` |
-| Diseño interno (API de Spoon, hilos, diálogos que hay que evitar) | `docs/api-spoon.md` |
+| Build the Spoon plugin | `powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 -PdiHome <data-integration>` → `spoon-plugin/dist/` (folder + release zips) |
+| Regenerate the step catalog | `bash tools/generador-catalogo/generar.sh <data-integration>` |
+| Validate the Claude plugin | `claude plugin validate --strict claude` and `claude plugin validate --strict .` |
+| Internal design (Spoon API, threads, dialogs to avoid) | [`docs/api-spoon.md`](docs/api-spoon.md) (Spanish) |
 
-Probar a mano sin Claude: `curl http://127.0.0.1:8765/ping`.
+Quick check without Claude: `curl http://127.0.0.1:8765/ping`.
+
+## License
+
+MIT.

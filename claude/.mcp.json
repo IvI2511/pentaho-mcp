@@ -2,7 +2,7 @@
   "mcpServers": {
     "pentaho": {
       "type": "http",
-      "url": "http://127.0.0.1:${PENTAHO_MCP_PORT:-8765}/mcp"
+      "url": "${user_config.mcp_url}"
     }
   }
 }

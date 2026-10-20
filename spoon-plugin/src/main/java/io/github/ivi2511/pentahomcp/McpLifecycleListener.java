@@ -22,7 +22,7 @@ public class McpLifecycleListener implements LifecycleListener {
 
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
-  static final String VERSION = "0.2.0";
+  static final String VERSION = "0.3.0";
 
   /** Llega a la IA en el initialize de MCP: como trabajar con estas herramientas. */
   static final String INSTRUCCIONES =
@@ -32,8 +32,10 @@ public class McpLifecycleListener implements LifecycleListener {
       + "encontrar el id, plantilla_step para ver su XML de configuracion, agregar_step con solo los tags que "
       + "cambian (lo demas queda por defecto) y 'despues_de' para que se ubique y conecte solo; (4) "
       + "campos_step para confirmar que columnas salen de cada step antes de configurar el siguiente; (5) "
-      + "validar y preview_step para ver filas reales; (6) guardar con una ruta .ktr/.kjb. Ubica los steps "
-      + "de izquierda a derecha, ~150 px entre uno y otro. Todo cambio se puede deshacer con Ctrl+Z en Spoon.";
+      + "validar y preview_step para ver filas reales; (6) ordenar_lienzo si hay ramas o lookups, para que "
+      + "no queden lineas cruzadas; (7) guardar con una ruta .ktr/.kjb. Ubica los steps de izquierda a "
+      + "derecha, ~150 px entre uno y otro. Si un step tiene varias salidas, por defecto cada una recibe todas "
+      + "las filas (modo_salida). Todo cambio se puede deshacer con Ctrl+Z en Spoon.";
 
   private McpHttpServer server;
 

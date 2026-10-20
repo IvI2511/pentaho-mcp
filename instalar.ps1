@@ -127,16 +127,17 @@ Paso 4 "agentes (Claude Code / Codex)"
 $url = "http://127.0.0.1:$Puerto/mcp"
 if ($Puerto -ne 8765) {
   [Environment]::SetEnvironmentVariable("PENTAHO_MCP_PORT", "$Puerto", "User")
-  Write-Host "   PENTAHO_MCP_PORT=$Puerto guardado en las variables del usuario (lo leen Spoon y Claude Code)"
+  Write-Host "   PENTAHO_MCP_PORT=$Puerto guardado en las variables del usuario (lo lee Spoon)"
+  Write-Host "   En Claude Code cambiar la opcion 'mcp_url' del plugin pentaho-live a $url (en /config)"
 }
 
 if (-not $SinClaude -and (Get-Command claude -ErrorAction SilentlyContinue)) {
   $lista = (cmd /c "claude plugin list 2>&1") | Out-String
-  if ($lista -match "pentaho@pentaho-tools") {
-    Write-Host "   Claude Code: el plugin ya estaba instalado (para actualizarlo: claude plugin update pentaho@pentaho-tools)"
+  if ($lista -match "pentaho-live@pentaho-tools") {
+    Write-Host "   Claude Code: el plugin ya estaba instalado (para actualizarlo: claude plugin update pentaho-live@pentaho-tools)"
   } else {
     cmd /c "claude plugin marketplace add $repo 2>&1" | ForEach-Object { "   $_" }
-    cmd /c "claude plugin install pentaho@pentaho-tools --scope user 2>&1" | ForEach-Object { "   $_" }
+    cmd /c "claude plugin install pentaho-live@pentaho-tools --scope user 2>&1" | ForEach-Object { "   $_" }
   }
 } elseif (-not $SinClaude) {
   Write-Host "   Claude Code no esta en el PATH: se saltea (desde la app: Plugins > Agregar > marketplace $repo)"
@@ -156,7 +157,7 @@ if (-not $SinCodex -and (Get-Command codex -ErrorAction SilentlyContinue)) {
   $skillDest = Join-Path $codexHome "skills\pentaho-etl"
   if (Test-Path $skillDest) { Remove-Item -Recurse -Force $skillDest }
   New-Item -ItemType Directory -Force (Split-Path $skillDest) | Out-Null
-  Copy-Item -Recurse (Join-Path $tmp "pentaho-mcp-main\skills\pentaho-etl") $skillDest
+  Copy-Item -Recurse (Join-Path $tmp "pentaho-mcp-main\claude\skills\pentaho-etl") $skillDest
   Write-Host "   Codex: skill en $skillDest (si no aparece, activar skills en config.toml y reiniciar Codex)"
 } elseif (-not $SinCodex) {
   Write-Host "   Codex no esta en el PATH: se saltea"

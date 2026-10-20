@@ -1,100 +1,101 @@
-# Instalar Pentaho MCP — guía para agentes (Claude Code, Codex…) y personas
+# Installing Pentaho Live — guide for agents (Claude Code, Codex…) and people
 
-> **Agente:** si el usuario te pidió "instalá IvI2511/pentaho-mcp" (o parecido), seguí esta guía de
-> punta a punta. Explicale cada paso en una línea antes de hacerlo. Ejecutá los comandos vos si
-> tenés permiso; si no, dáselos para que los pegue. No le pidas contraseñas ni tokens.
+> **Agent:** if the user asked you to "install IvI2511/pentaho-mcp" (or similar), follow this guide end
+> to end. Talk to the user in their language. Explain each step in one line before doing it. Run the
+> commands yourself if you have permission; otherwise give them to the user to paste. Never ask for
+> passwords or tokens.
 
-## Qué se instala
+## What gets installed
 
-| Pieza | Para qué | Dónde queda |
+| Piece | Purpose | Where it ends up |
 |---|---|---|
-| **Plugin de Spoon** (`pentaho-mcp.zip`) | Al abrir Spoon levanta el servidor MCP en `http://127.0.0.1:8765/mcp`: el agente edita la transformación abierta y el usuario ve aparecer los nodos | `data-integration/plugins/pentaho-mcp/` |
-| **Plugin de Claude Code** (marketplace `pentaho-tools`, plugin `pentaho`) | La skill `pentaho-etl` (formato .ktr/.kjb, catálogo de 216 steps) + la conexión al MCP | lo maneja Claude Code |
-| **Codex** (opcional) | El MCP por URL + la misma skill | `~/.codex/config.toml`, `~/.codex/skills/pentaho-etl/` |
+| **Spoon plugin** (`pentaho-mcp.zip`) | When Spoon opens, it starts the MCP server at `http://127.0.0.1:8765/mcp`: the agent edits the open transformation and the user watches the nodes appear | `data-integration/plugins/pentaho-mcp/` |
+| **Claude Code plugin** (marketplace `pentaho-tools`, plugin `pentaho-live`) | The `pentaho-etl` skill (.ktr/.kjb format, 216-step catalog) + the MCP connection | managed by Claude Code |
+| **Codex** (optional) | The MCP by URL + the same skill | `~/.codex/config.toml`, `~/.codex/skills/pentaho-etl/` |
 
-Requisitos: **Java 11 o posterior** (probado con 21) y, si no tiene PDI, ~450 MB de disco.
+Requirements: **Java 11 or later** (tested with 21) and, without PDI, ~450 MB of disk.
 
-## Paso 0 — Preguntale al usuario (una sola pregunta)
+## Step 0 — Ask the user (one question)
 
-**"¿Ya tenés Pentaho Data Integration (Spoon) instalado? Si sí, ¿dónde está la carpeta `data-integration`?"**
+**"Do you already have Pentaho Data Integration (Spoon) installed? If so, where is the `data-integration` folder?"**
 
-- **Sí, y sabe dónde** → Opción A con `-PdiHome`.
-- **Sí, pero no sabe dónde** → Opción A sin ruta (el script lo busca).
-- **No** → Opción B (baja PDI 9.4 CE con el plugin ya puesto).
+- **Yes, and knows where** → Option A with `-PdiHome`.
+- **Yes, but doesn't know where** → Option A without a path (the script searches).
+- **No** → Option B (downloads PDI 9.4 CE with the plugin already in place).
 
-Si Spoon está abierto, pedile que lo cierre antes (Windows traba el `.jar` del plugin).
+If Spoon is open, ask them to close it first (Windows locks the plugin's `.jar`).
 
-## Opción A — Ya tiene PDI: agregar el plugin
+## Option A — Has PDI: add the plugin
 
 **Windows (PowerShell):**
 ```powershell
 Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.ps1 -OutFile $env:TEMP\instalar-pentaho-mcp.ps1
-powershell -ExecutionPolicy Bypass -File $env:TEMP\instalar-pentaho-mcp.ps1 -PdiHome "C:\ruta\a\data-integration"
+powershell -ExecutionPolicy Bypass -File $env:TEMP\instalar-pentaho-mcp.ps1 -PdiHome "C:\path\to\data-integration"
 ```
-(sin `-PdiHome` lo busca en Descargas, Documentos, Escritorio, OneDrive, `C:\pentaho` y Archivos de programa)
+(without `-PdiHome` it searches Downloads, Documents, Desktop, OneDrive, `C:\pentaho` and Program Files)
 
 **macOS / Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.sh -o /tmp/instalar-pentaho-mcp.sh
-bash /tmp/instalar-pentaho-mcp.sh --pdi "/ruta/a/data-integration"
+bash /tmp/instalar-pentaho-mcp.sh --pdi "/path/to/data-integration"
 ```
 
-## Opción B — No tiene PDI: bajar PDI 9.4 CE con el plugin
+## Option B — No PDI: download PDI 9.4 CE with the plugin
 
-**Windows:** el mismo script con `-InstalarPdi` (por defecto en `%USERPROFILE%\Pentaho`; otra carpeta con `-Destino`):
+**Windows:** the same script with `-InstalarPdi` (default target `%USERPROFILE%\Pentaho`; change it with `-Destino`):
 ```powershell
 powershell -ExecutionPolicy Bypass -File $env:TEMP\instalar-pentaho-mcp.ps1 -InstalarPdi
 ```
 **macOS / Linux:** `bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi`
 
-Es Pentaho Data Integration 9.4.0.0-343 Community Edition (Apache 2.0, de Hitachi Vantara) sin
-cambios, salvo `plugins/pentaho-mcp/`. No trae el contenedor OSGi (karaf), así que no están los steps
-de big data/streaming que dependen de él; los 216 steps del catálogo sí.
+It is Pentaho Data Integration 9.4.0.0-343 Community Edition (Apache 2.0, by Hitachi Vantara),
+unchanged except for `plugins/pentaho-mcp/`. It has no OSGi container (karaf), so the big-data and
+streaming steps that depend on it are missing; the 216 steps in the catalog are there.
 
-## Qué devuelve el script (para el agente)
+## What the script returns (for the agent)
 
-Imprime `== Paso N - ...` en cada etapa y termina con un código:
+It prints `== Paso N - ...` for each stage and exits with a code:
 
-| Código | Qué pasó | Qué hacer |
+| Code | Meaning | What to do |
 |---|---|---|
-| 0 | Listo | Ir a "Después de instalar" |
-| 2 | Hay varias instalaciones de PDI (las lista) | Preguntar cuál y repetir con `-PdiHome` / `--pdi` |
-| 3 | No encontró PDI | Preguntar la ruta, o usar la Opción B |
-| 4 | Spoon abierto traba el plugin | Pedir que cierre Spoon y repetir |
-| 1 | Otro error (el mensaje dice cuál) | Mostrárselo al usuario |
+| 0 | Done | Go to "After installing" |
+| 2 | Several PDI installs found (it lists them) | Ask which one and rerun with `-PdiHome` / `--pdi` |
+| 3 | No PDI found | Ask for the path, or use Option B |
+| 4 | Spoon is open and locks the plugin | Ask the user to close Spoon and rerun |
+| 1 | Other error (the message says which) | Show it to the user |
 
-El paso 4 configura solo los agentes que encuentre en el PATH. Desde la app de escritorio de Claude
-(sin CLI) el plugin se agrega en **Configuración → Plugins → Agregar → marketplace** `IvI2511/pentaho-mcp`
-y después se instala **Pentaho** desde **Descubrir**.
+Step 4 configures only the agents it finds on the PATH. In the Claude desktop app (no CLI), the plugin
+is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-mcp`, then install
+**Pentaho Live** from **Discover**.
 
-## Hacerlo a mano (sin script)
+## By hand (no script)
 
-1. Bajar `pentaho-mcp.zip` de https://github.com/IvI2511/pentaho-mcp/releases/latest y descomprimirlo
-   dentro de `data-integration/plugins/` → tiene que quedar `plugins/pentaho-mcp/pentaho-mcp-core-*.jar`.
-   (Sin PDI: bajar `pdi-ce-9.4-con-pentaho-mcp.zip` del mismo release y descomprimirlo donde quiera.)
+1. Download `pentaho-mcp.zip` from https://github.com/IvI2511/pentaho-mcp/releases/latest and unzip it
+   inside `data-integration/plugins/` → you must end up with `plugins/pentaho-mcp/pentaho-mcp-core-*.jar`.
+   (No PDI: download `pdi-ce-9.4-con-pentaho-mcp.zip` from the same release and unzip it anywhere.)
 2. Claude Code:
    ```
    /plugin marketplace add IvI2511/pentaho-mcp
-   /plugin install pentaho@pentaho-tools
+   /plugin install pentaho-live@pentaho-tools
    ```
-3. Codex: `codex mcp add pentaho --url http://127.0.0.1:8765/mcp` y copiar la carpeta
-   `skills/pentaho-etl` del repo a `~/.codex/skills/pentaho-etl`.
+3. Codex: `codex mcp add pentaho --url http://127.0.0.1:8765/mcp`, and copy the repo's
+   `claude/skills/pentaho-etl` folder to `~/.codex/skills/pentaho-etl`.
 
-## Después de instalar
+## After installing
 
-1. El usuario abre Spoon (`Spoon.bat` en Windows, `spoon.sh` en macOS/Linux).
-2. Reinicia el agente (o `/reload-plugins` en Claude Code) para que conecte el MCP.
-3. Verificá: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":50}`, o llamá a la
-   herramienta `estado` del MCP `pentaho`.
-4. Proponele una prueba: *"armá una transformación que lea un CSV, filtre y escriba el resultado"*.
+1. The user opens Spoon (`Spoon.bat` on Windows, `spoon.sh` on macOS/Linux).
+2. Restart the agent (or `/reload-plugins` in Claude Code) so it connects to the MCP.
+3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":50}`, or call the
+   `estado` tool of the `pentaho` MCP.
+4. Suggest a first try: *"build a transformation that reads a CSV, filters it and writes the result"*.
 
-## Problemas comunes
+## Troubleshooting
 
-| Síntoma | Causa | Arreglo |
+| Symptom | Cause | Fix |
 |---|---|---|
-| El MCP `pentaho` dice "connection refused" | Spoon cerrado, o el plugin no está en `plugins/` | Abrir Spoon; revisar `plugins/pentaho-mcp/` |
-| `ping` responde pero el agente no ve herramientas | El agente se configuró antes de abrir Spoon | Reiniciar el agente |
-| Puerto 8765 ocupado | Otro programa lo usa | `-Puerto 8770` en el script (setea `PENTAHO_MCP_PORT` para Spoon y Claude) |
-| Spoon no abre | Falta Java | Instalar Java 11+ (`winget install EclipseAdoptium.Temurin.21.JRE`) |
-| Error de driver al conectar a MySQL / SQL Server / Oracle | PDI no trae esos drivers | Copiar el `.jar` del conector a `data-integration/lib/` y reiniciar Spoon (MySQL: `mysql-connector-j-*.jar`, tipo de conexión MySQL normal) |
-| ChatGPT (web) no conecta | ChatGPT solo usa MCP públicos por HTTPS; este escucha en `127.0.0.1` a propósito | Usar Claude Code o Codex en la misma PC |
+| The `pentaho` MCP says "connection refused" | Spoon is closed, or the plugin isn't in `plugins/` | Open Spoon; check `plugins/pentaho-mcp/` |
+| `ping` answers but the agent sees no tools | The agent connected before Spoon was open | Restart the agent |
+| Port 8765 is taken | Another program uses it | Script with `-Puerto 8770` (sets `PENTAHO_MCP_PORT` for Spoon); in Claude Code set the plugin option `mcp_url` to `http://127.0.0.1:8770/mcp` in `/config` |
+| Spoon won't open | No Java | Install Java 11+ (`winget install EclipseAdoptium.Temurin.21.JRE`) |
+| Driver error connecting to MySQL / SQL Server / Oracle | PDI doesn't ship those drivers | Copy the connector `.jar` into `data-integration/lib/` and restart Spoon (MySQL: `mysql-connector-j-*.jar`, regular MySQL connection type) |
+| ChatGPT (web) can't connect | ChatGPT only uses public HTTPS MCP servers; this one listens on `127.0.0.1` on purpose | Use Claude Code or Codex on the same computer |

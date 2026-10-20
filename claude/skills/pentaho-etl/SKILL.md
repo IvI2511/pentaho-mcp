@@ -1,6 +1,6 @@
 ---
 name: pentaho-etl
-description: Construir, modificar, revisar o depurar ETLs de Pentaho Data Integration 9.4 (Spoon/Kettle) — transformaciones .ktr y jobs .kjb. Usar cuando el usuario pida armar una transformación o un job de Pentaho/PDI/Kettle/Spoon, agregar steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), conectar a una base desde Pentaho, o entender por qué falla un .ktr/.kjb. Sirve en vivo con el MCP "pentaho" (Spoon abierto) o escribiendo el XML y verificando con Pan/Kitchen.
+description: Build, modify, review or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, or find out why a .ktr/.kjb fails. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen. Construir o depurar ETLs de Pentaho (transformaciones y jobs).
 ---
 
 # Pentaho Data Integration 9.4 — ETLs
@@ -14,10 +14,11 @@ provocados a propósito. No inventes tags: buscalos acá.
 **A. En vivo, con el MCP `pentaho`** (si sus herramientas están disponibles: `estado`, `agregar_step`…).
 El usuario tiene Spoon abierto y ve aparecer cada nodo. Es la forma preferida.
 
-Si el MCP `pentaho` figura pero falla al conectar, es que Spoon está cerrado o le falta el plugin. El
-plugin de Spoon es la carpeta `pentaho-mcp` del zip `pentaho-mcp-<versión>.zip` de los releases de
-https://github.com/IvI2511/pentaho-mcp: se descomprime en `data-integration/plugins/` y se reinicia
-Spoon. Escucha en `127.0.0.1:8765` (otro puerto: variable `PENTAHO_MCP_PORT`, igual en Spoon y en Claude).
+Si el MCP `pentaho` figura pero falla al conectar, es que Spoon está cerrado o le falta el plugin de
+Spoon: `pentaho-mcp.zip` del último release de https://github.com/IvI2511/pentaho-mcp, descomprimido en
+`data-integration/plugins/`, y reiniciar Spoon (guía completa: `INSTALL.md` del repo). Escucha en
+`127.0.0.1:8765`; con otro puerto (`PENTAHO_MCP_PORT` en Spoon) hay que cambiar la opción `mcp_url`
+del plugin en `/config`.
 
 1. `estado` → qué hay abierto (ids T1, J1…). `nueva_transformacion` / `abrir_archivo` si hace falta.
 2. Por cada step, de izquierda a derecha:
@@ -58,6 +59,10 @@ o Kitchen (ver abajo). El usuario lo abre en Spoon cuando terminás.
 - Cada `<step>` lleva `<copies>1</copies>` y `<GUI>…<draw>Y</draw></GUI>`; sin `copies` Pan falla
   sin explicar, sin `draw` el step no se ve en Spoon.
 - Nombres de step **únicos**: un duplicado hace desaparecer un step en silencio.
+- Un step con **2 o más salidas** reparte las filas entre ellas por defecto (round robin, `<distribute>Y</distribute>`):
+  cada salida recibe una parte. Si cada salida tiene que recibir todas las filas, `<distribute>N</distribute>`
+  (en vivo: `modo_salida` copiar, que es lo que el MCP deja por defecto al crear la segunda salida).
+  No aplica a Filter rows ni Switch/case, que mandan a destinos concretos.
 - **Group by** y **Merge join** necesitan la entrada **ordenada** por la clave (Sort rows antes);
   si no, dan resultados mal sin error.
 - **Stream lookup** referencia al step de búsqueda con `<from>` (no existe `<lookup_step>`) y además

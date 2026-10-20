@@ -7,7 +7,7 @@ set -euo pipefail
 
 PDI="${1:-${PDI_HOME:?pasa la ruta de data-integration o defini PDI_HOME}}"
 GEN="$(cd "$(dirname "$0")" && pwd -W 2>/dev/null || pwd)"   # ruta Windows si estamos en Git Bash
-CAT="$(cd "$GEN/../../skills/pentaho-etl/catalogo" && pwd -W 2>/dev/null || pwd)"
+CAT="$(cd "$GEN/../../claude/skills/pentaho-etl/catalogo" && pwd -W 2>/dev/null || pwd)"
 KHOME="${KETTLE_HOME_PRUEBAS:-${TMP:-/tmp}/kettle-home-pruebas}"   # nunca ~/.kettle
 mkdir -p "$KHOME/.kettle"
 

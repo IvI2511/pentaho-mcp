@@ -448,6 +448,12 @@ final class RunMotor {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
           "No tiene hops: no recibe ni manda filas a ningun step", detalle );
       }
+      int salidas = TransOps.salidasNormales( tm, s );
+      if ( salidas >= 2 && s.isDistributes() ) {
+        anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
+          "Tiene " + salidas + " salidas en modo REPARTIR: cada salida recibe solo una parte de las filas. "
+            + "Si cada una tiene que recibirlas todas, modo_salida con 'copiar'", detalle );
+      }
     }
     for ( TransHopMeta h : tm.getTransHops() ) {
       if ( h.getFromStep() == null || h.getToStep() == null ) {

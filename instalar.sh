@@ -67,13 +67,13 @@ else echo "   NO hay Java: Spoon no va a abrir. Instala Java 11+ (p.ej. Temurin 
 
 paso 4 "agentes (Claude Code / Codex)"
 URL="http://127.0.0.1:$PUERTO/mcp"
-[ "$PUERTO" != 8765 ] && echo "   Puerto $PUERTO: agrega 'export PENTAHO_MCP_PORT=$PUERTO' a tu ~/.bashrc o ~/.zshrc (lo leen Spoon y Claude Code)"
+[ "$PUERTO" != 8765 ] && echo "   Puerto $PUERTO: agrega 'export PENTAHO_MCP_PORT=$PUERTO' a tu ~/.bashrc o ~/.zshrc (lo lee Spoon); en Claude Code cambiar la opcion mcp_url del plugin a $URL (en /config)"
 if [ "$SIN_CLAUDE" = 0 ] && command -v claude >/dev/null; then
-  if claude plugin list 2>&1 | grep -q "pentaho@pentaho-tools"; then
-    echo "   Claude Code: el plugin ya estaba (actualizar: claude plugin update pentaho@pentaho-tools)"
+  if claude plugin list 2>&1 | grep -q "pentaho-live@pentaho-tools"; then
+    echo "   Claude Code: el plugin ya estaba (actualizar: claude plugin update pentaho-live@pentaho-tools)"
   else
     claude plugin marketplace add "$REPO" 2>&1 | sed 's/^/   /' || true
-    claude plugin install pentaho@pentaho-tools --scope user 2>&1 | sed 's/^/   /' || true
+    claude plugin install pentaho-live@pentaho-tools --scope user 2>&1 | sed 's/^/   /' || true
   fi
 elif [ "$SIN_CLAUDE" = 0 ]; then echo "   Claude Code no esta instalado: se saltea"; fi
 
@@ -84,7 +84,7 @@ if [ "$SIN_CODEX" = 0 ] && command -v codex >/dev/null; then
   bajar "https://github.com/$REPO/archive/refs/heads/main.zip" "$TMP/repo.zip"
   unzip -q -o "$TMP/repo.zip" -d "$TMP"
   mkdir -p "$CODEX_DIR/skills" && rm -rf "$CODEX_DIR/skills/pentaho-etl"
-  cp -R "$TMP/pentaho-mcp-main/skills/pentaho-etl" "$CODEX_DIR/skills/pentaho-etl"
+  cp -R "$TMP/pentaho-mcp-main/claude/skills/pentaho-etl" "$CODEX_DIR/skills/pentaho-etl"
   echo "   Codex: skill en $CODEX_DIR/skills/pentaho-etl (si no aparece, activar skills y reiniciar Codex)"
 elif [ "$SIN_CODEX" = 0 ]; then echo "   Codex no esta instalado: se saltea"; fi
 

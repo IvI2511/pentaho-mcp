@@ -219,6 +219,9 @@ final class DocumentTools {
         if ( st.isMissing() ) {
           x.put( "falta_plugin", true );
         }
+        if ( TransOps.salidasNormales( tm, st ) >= 2 ) {
+          x.put( "modo_salida", TransOps.modoSalida( st ) );
+        }
       }
       ArrayNode hops = o.putArray( "hops" );
       for ( int i = 0; i < tm.nrTransHops(); i++ ) {

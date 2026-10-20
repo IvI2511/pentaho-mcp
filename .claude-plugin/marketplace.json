@@ -1,12 +1,12 @@
 {
   "name": "pentaho-tools",
-  "description": "Herramientas de Claude Code para Pentaho Data Integration",
+  "description": "Claude Code tools for Pentaho Data Integration (unofficial)",
   "owner": { "name": "IvI2511" },
   "plugins": [
     {
-      "name": "pentaho",
-      "source": "./",
-      "description": "Skill + MCP en vivo para armar ETLs en Spoon (PDI 9.4)"
+      "name": "pentaho-live",
+      "source": "./claude",
+      "description": "Skill + live MCP to build ETLs in Spoon (PDI 9.4)"
     }
   ]
 }

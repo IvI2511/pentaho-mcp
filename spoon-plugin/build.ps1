@@ -1,10 +1,10 @@
 # Compila el plugin Pentaho MCP contra la instalacion de PDI 9.4 y deja la carpeta lista
 # para copiar a <PDI>\plugins\ en plugin\dist\pentaho-mcp\.
 #
-# Uso:  powershell -ExecutionPolicy Bypass -File plugin\build.ps1 [-PdiHome <ruta data-integration>]
+# Uso:  powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 [-PdiHome <ruta data-integration>]
 param(
   [string]$PdiHome = $env:PDI_HOME,
-  [string]$Version = "0.2.0"
+  [string]$Version = "0.3.0"
 )
 
 $ErrorActionPreference = "Stop"

@@ -1,0 +1,21 @@
+{
+  "name": "pentaho-live",
+  "displayName": "Pentaho Live (unofficial)",
+  "version": "0.3.0",
+  "description": "Build Pentaho Data Integration 9.4 ETLs with Claude: a skill with the verified .ktr/.kjb format and step catalog, plus a local MCP connection that edits the transformation open in Spoon live. Unofficial, not affiliated with Hitachi Vantara.",
+  "author": { "name": "IvI2511", "url": "https://github.com/IvI2511" },
+  "homepage": "https://github.com/IvI2511/pentaho-mcp",
+  "repository": "https://github.com/IvI2511/pentaho-mcp",
+  "documentationUrl": "https://github.com/IvI2511/pentaho-mcp/blob/main/INSTALL.md",
+  "supportUrl": "https://github.com/IvI2511/pentaho-mcp/issues",
+  "license": "MIT",
+  "keywords": ["pentaho", "pdi", "kettle", "spoon", "etl", "data-integration", "mcp"],
+  "userConfig": {
+    "mcp_url": {
+      "type": "string",
+      "title": "Spoon MCP address",
+      "description": "Where the Pentaho MCP plugin inside Spoon listens. Keep the default unless you changed PENTAHO_MCP_PORT in Spoon.",
+      "default": "http://127.0.0.1:8765/mcp"
+    }
+  }
+}

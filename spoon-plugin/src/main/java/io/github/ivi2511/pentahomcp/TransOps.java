@@ -435,6 +435,63 @@ final class TransOps {
     }
   }
 
+  // ---------------------------------------------------------------- modo de salida (copiar / repartir)
+
+  /**
+   * Hops normales que salen del step: sin los de error. Si el step manda las filas a destinos
+   * concretos (Filter rows, Switch/case: target streams), devuelve 0, porque ahi el modo de salida
+   * no aplica.
+   */
+  static int salidasNormales( TransMeta tm, StepMeta a ) {
+    try {
+      if ( !a.getStepMetaInterface().getStepIOMeta().getTargetStreams().isEmpty() ) {
+        return 0;
+      }
+    } catch ( Exception ignored ) {
+      // sin StepIOMeta: se cuenta como un step comun
+    }
+    int n = 0;
+    for ( int i = 0; i < tm.nrTransHops(); i++ ) {
+      TransHopMeta h = tm.getTransHop( i );
+      if ( h.getFromStep() == a && !h.isErrorHop() ) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  static String modoSalida( StepMeta a ) {
+    return a.isDistributes() ? "repartir" : "copiar";
+  }
+
+  /**
+   * Lo que en Spoon es la pregunta "copiar o repartir" al sacar un segundo hop de un step. Con modo
+   * explicito ("copiar" / "repartir") lo aplica; sin modo, si el step quedo con 2+ salidas normales y
+   * esta repartiendo, lo pasa a copiar (lo que casi siempre se quiere: si no, cada salida recibe solo
+   * una parte de las filas). Devuelve una nota para la IA, o null si no hizo nada.
+   */
+  static String aplicarModoSalida( TransMeta tm, StepMeta a, String modo ) throws ToolError {
+    if ( modo != null ) {
+      String m = modo.trim().toLowerCase();
+      if ( !m.equals( "copiar" ) && !m.equals( "repartir" ) ) {
+        throw new ToolError( "modo_salida tiene que ser 'copiar' o 'repartir', llego: " + modo );
+      }
+      boolean repartir = m.equals( "repartir" );
+      if ( a.isDistributes() != repartir ) {
+        a.setDistributes( repartir );
+        a.setChanged();
+      }
+      return null;
+    }
+    if ( salidasNormales( tm, a ) >= 2 && a.isDistributes() ) {
+      a.setDistributes( false );
+      a.setChanged();
+      return "'" + a.getName() + "' tiene varias salidas: quedo en modo COPIAR (cada salida recibe todas las "
+        + "filas). Si querias repartirlas entre las salidas, usa modo_salida con 'repartir'.";
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------- hops
 
   /**
