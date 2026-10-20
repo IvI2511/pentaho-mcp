@@ -53,9 +53,9 @@ Pregunta solo si tiene una terminal (`[ -t 0 ]`): con `curl … | bash` o desde 
 lo mismo, no instala nada e indica volver a correrlo con `--rosetta`, que instala sin preguntar. Los pasos y los
 códigos de salida son los de `instalar.ps1`: nada de esto corta la instalación (si Rosetta o el Java no se
 pueden instalar, lo dice y sigue con el paso 4, como el «NO Java» de siempre). Probado con el job
-`receta-mac-apple` (corrida 13): sin terminal avisa y no instala; en una terminal pregunta, baja el Temurin
+`receta-mac-apple` (corridas 13 y 14): sin terminal dice qué haría y no instala; en una terminal pregunta, baja el Temurin
 21 x64 (con el SHA-256 de la API verificado), deja el lanzador, y Spoon abierto con ese comando contesta `/ping` a los
-41 s con las 9 llamadas MCP bien. En esa VM de macos-26 Rosetta ya venía instalada, así que el
+31–41 s con las 9 llamadas MCP bien. En esa VM de macos-26 Rosetta ya venía instalada, así que el
 `softwareupdate` de `instalar.sh` no corrió ahí; es el mismo comando del paso 1 de abajo, que sí corrió en
 las corridas 5 y 9 y en los jobs de `probar`.
 
@@ -227,7 +227,7 @@ Probar una versión sin publicar: hoy la prueba siempre baja el último release 
 
 Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.yml?query=branch%3Aci%2Fplataformas
 (1 a 9) y https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.yml?query=branch%3Aci%2Finstalar-mac-apple
-(10 a 13, con el `instalar.sh` nuevo).
+(10 a 14, con el `instalar.sh` nuevo).
 
 | # | Corrida | Qué mostró |
 |---|---|---|
@@ -244,6 +244,7 @@ Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.ym
 | 11 | [39475832676](https://github.com/IvI2511/pentaho-mcp/actions/runs/39475832676) | pasa el `unzip`; el `cp -R` del plugin falla por la carpeta `lib` sin bit x (problema 8). El resto, en verde |
 | 12 | [39476578123](https://github.com/IvI2511/pentaho-mcp/actions/runs/39476578123) | el plugin ya se instala con `--pdi`; la «y» metida de antemano con `script(1)` no llega a la pregunta. El resto, en verde |
 | 13 | [39478185979](https://github.com/IvI2511/pentaho-mcp/actions/runs/39478185979) | **8 de 8 en verde**: `receta-mac-apple` sin los pasos 1, 2 y 4 a mano (`tools/ci/responder.py` contesta cuando aparece la pregunta); en `probar`, el paso 3 muestra de dónde sale el Java y en chip Apple deja el lanzador |
+| 14 | [39479721918](https://github.com/IvI2511/pentaho-mcp/actions/runs/39479721918) | **la de referencia de `instalar.sh`**: 8 de 8 en verde con la versión revisada por la 0.4.2 (dice qué va a instalar, `[y/N]`, SHA-256 de la API de Adoptium); en Linux y Mac Intel el paso 3 solo informa el Java |
 
 Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pentaho-mcp`).
 
