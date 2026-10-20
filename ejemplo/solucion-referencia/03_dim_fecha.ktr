@@ -40,7 +40,7 @@
       <note>Dimensión de fechas · septiembre de 2026, sin fichero de entrada&#xa;Clave inteligente sk_fecha = aaaammdd (20260901...20260930)&#xa;Para otro mes: cambiar fecha_inicio y el número de filas de «Generar 30 días»</note>
       <xloc>80</xloc>
       <yloc>16</yloc>
-      <width>500</width>
+      <width>650</width>
       <heigth>58</heigth>
       <fontname/>
       <fontsize>-1</fontsize>
@@ -210,7 +210,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>256</xloc>
+      <xloc>304</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -295,7 +295,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>512</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -352,7 +352,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>576</xloc>
+      <xloc>720</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -403,7 +403,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>736</xloc>
+      <xloc>928</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -479,7 +479,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>896</xloc>
+      <xloc>1136</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>

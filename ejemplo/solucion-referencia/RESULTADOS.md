@@ -101,6 +101,7 @@ incluye la cabecera), `R`/`W` = leídas de / escritas a otros pasos, `E` = error
 | Convertir precio a número | 0 | 0 | 3000 | 3000 | 0 |
 | Ordenar por ticket y línea | 0 | 0 | 3000 | 3000 | 0 |
 | Eliminar duplicados | 0 | 0 | 3000 | 2940 | 60 |
+| Marcar duplicado | 0 | 0 | 60 | 60 | 0 |
 | Buscar tienda | 4 | 0 | 2940 | 2940 | 0 |
 | Buscar producto | 28 | 0 | 2940 | 2940 | 0 |
 | Buscar fecha | 30 | 0 | 2940 | 2940 | 0 |
@@ -112,7 +113,7 @@ incluye la cabecera), `R`/`W` = leídas de / escritas a otros pasos, `E` = error
 | Cargar hechos_ventas | 0 | 2885 | 2885 | 2885 | 0 |
 
 Las `E=60` de «Eliminar duplicados» no son fallos: son las copias, que salen por el hop de error hacia
-«Escribir rechazos» (60 duplicados + 55 rechazos de validación = 115). Es el único paso de toda la
+«Marcar duplicado» (les pone `motivo_rechazo = DUPLICADO`) y de ahí a «Escribir rechazos» (60 duplicados + 55 rechazos de validación = 115). Es el único paso de toda la
 carga con `E` distinto de 0.
 
 El resto de transformaciones:

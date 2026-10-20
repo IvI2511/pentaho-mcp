@@ -40,7 +40,7 @@
       <note>Fase 1 · Lectura y limpieza&#xa;Fechas en dos formatos, precios con coma decimal, métodos de pago escritos de varias maneras</note>
       <xloc>80</xloc>
       <yloc>16</yloc>
-      <width>560</width>
+      <width>728</width>
       <heigth>44</heigth>
       <fontname/>
       <fontsize>-1</fontsize>
@@ -59,9 +59,9 @@
     </notepad>
     <notepad>
       <note>Fase 2 · Deduplicación, búsqueda de claves subrogadas, validación y carga&#xa;Orden de las reglas (cuenta la primera que falla): DUPLICADO, TIENDA_VACIA, CANTIDAD_NO_VALIDA,&#xa;TIENDA_DESCONOCIDA, PRODUCTO_DESCONOCIDO, FECHA_NO_VALIDA</note>
-      <xloc>896</xloc>
+      <xloc>1136</xloc>
       <yloc>200</yloc>
-      <width>640</width>
+      <width>832</width>
       <heigth>58</heigth>
       <fontname/>
       <fontsize>-1</fontsize>
@@ -163,6 +163,11 @@
     </hop>
     <hop>
       <from>Eliminar duplicados</from>
+      <to>Marcar duplicado</to>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Marcar duplicado</from>
       <to>Escribir rechazos</to>
       <enabled>Y</enabled>
     </hop>
@@ -396,7 +401,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>256</xloc>
+      <xloc>304</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -447,7 +452,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>512</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -492,7 +497,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>576</xloc>
+      <xloc>720</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -542,7 +547,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>736</xloc>
+      <xloc>928</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -583,6 +588,45 @@
     <GUI>
       <xloc>96</xloc>
       <yloc>320</yloc>
+      <draw>Y</draw>
+    </GUI>
+  </step>
+  <step>
+    <name>Marcar duplicado</name>
+    <type>Constant</type>
+    <description>Las líneas repetidas que descarta «Eliminar duplicados» salen por su hop de error; aquí reciben el motivo DUPLICADO.</description>
+    <distribute>Y</distribute>
+    <custom_distribution />
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name />
+    </partitioning>
+    <fields>
+      <field>
+        <name>motivo_rechazo</name>
+        <type>String</type>
+        <format />
+        <currency />
+        <decimal />
+        <group />
+        <nullif>DUPLICADO</nullif>
+        <length>-1</length>
+        <precision>-1</precision>
+        <set_empty_string>N</set_empty_string>
+      </field>
+    </fields>
+    <attributes />
+    <cluster_schema />
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>304</xloc>
+      <yloc>480</yloc>
       <draw>Y</draw>
     </GUI>
   </step>
@@ -629,7 +673,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>256</xloc>
+      <xloc>304</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -677,7 +721,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>512</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -725,7 +769,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>576</xloc>
+      <xloc>720</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -758,7 +802,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>736</xloc>
+      <xloc>928</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -793,7 +837,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>896</xloc>
+      <xloc>1136</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -863,7 +907,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>1056</xloc>
+      <xloc>1344</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -943,7 +987,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>1216</xloc>
+      <xloc>1552</xloc>
       <yloc>320</yloc>
       <draw>Y</draw>
     </GUI>
@@ -1025,7 +1069,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>896</xloc>
+      <xloc>1136</xloc>
       <yloc>480</yloc>
       <draw>Y</draw>
     </GUI>
@@ -1190,7 +1234,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>512</xloc>
       <yloc>480</yloc>
       <draw>Y</draw>
     </GUI>
@@ -1198,10 +1242,10 @@
   <step_error_handling>
     <error>
       <source_step>Eliminar duplicados</source_step>
-      <target_step>Escribir rechazos</target_step>
+      <target_step>Marcar duplicado</target_step>
       <is_enabled>Y</is_enabled>
       <nr_valuename/>
-      <descriptions_valuename>motivo_rechazo</descriptions_valuename>
+      <descriptions_valuename />
       <fields_valuename/>
       <codes_valuename/>
       <max_errors/>

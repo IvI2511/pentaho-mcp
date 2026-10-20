@@ -40,7 +40,7 @@
       <note>Dimensión de tiendas · fuente: datos/tiendas.json (JSON anidado)&#xa;Clave natural: id_tienda · clave subrogada: sk_tienda</note>
       <xloc>80</xloc>
       <yloc>16</yloc>
-      <width>420</width>
+      <width>780</width>
       <heigth>44</heigth>
       <fontname/>
       <fontsize>-1</fontsize>
@@ -111,6 +111,11 @@
   </connection>
   <order>
     <hop>
+      <from>Localizar tiendas.json</from>
+      <to>Leer tiendas (JSON)</to>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
       <from>Leer tiendas (JSON)</from>
       <to>Estandarizar textos</to>
       <enabled>Y</enabled>
@@ -127,9 +132,54 @@
     </hop>
   </order>
   <step>
+    <name>Localizar tiendas.json</name>
+    <type>GetFileNames</type>
+    <description>Devuelve la ruta de datos/tiendas.json en el campo filename para que «Leer tiendas (JSON)» lo lea.</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <filter>
+      <filterfiletype>only_files</filterfiletype>
+    </filter>
+    <doNotFailIfNoFile>N</doNotFailIfNoFile>
+    <rownum>N</rownum>
+    <isaddresult>N</isaddresult>
+    <filefield>N</filefield>
+    <rownum_field/>
+    <filename_Field/>
+    <wildcard_Field/>
+    <exclude_wildcard_Field/>
+    <dynamic_include_subfolders>N</dynamic_include_subfolders>
+    <limit>0</limit>
+    <file>
+      <name>${Internal.Entry.Current.Directory}/../datos/tiendas.json</name>
+      <filemask/>
+      <exclude_filemask/>
+      <file_required>Y</file_required>
+      <include_subfolders>N</include_subfolders>
+    </file>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>96</xloc>
+      <yloc>128</yloc>
+      <draw>Y</draw>
+    </GUI>
+  </step>
+  <step>
     <name>Leer tiendas (JSON)</name>
     <type>JsonInput</type>
-    <description>Una fila por tienda con JSONPath ($.tiendas[*]); la ubicación viene anidada.</description>
+    <description>Una fila por tienda con JSONPath ($.tiendas[*]); la ubicación viene anidada. El fichero llega en el campo filename desde «Localizar tiendas.json».</description>
     <distribute>Y</distribute>
     <custom_distribution/>
     <copies>1</copies>
@@ -150,7 +200,7 @@
     <includeNulls>N</includeNulls>
     <rownum_field/>
     <file>
-      <name>${Internal.Entry.Current.Directory}/../datos/tiendas.json</name>
+      <name/>
       <filemask/>
       <exclude_filemask/>
       <file_required>Y</file_required>
@@ -263,9 +313,9 @@
       </field>
     </fields>
     <limit>0</limit>
-    <IsInFields>N</IsInFields>
-    <IsAFile>N</IsAFile>
-    <valueField/>
+    <IsInFields>Y</IsInFields>
+    <IsAFile>Y</IsAFile>
+    <valueField>filename</valueField>
     <shortFileFieldName/>
     <pathFieldName/>
     <hiddenFieldName/>
@@ -283,7 +333,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>96</xloc>
+      <xloc>304</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -362,7 +412,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>256</xloc>
+      <xloc>512</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -397,7 +447,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>720</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>
@@ -477,7 +527,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>576</xloc>
+      <xloc>928</xloc>
       <yloc>128</yloc>
       <draw>Y</draw>
     </GUI>

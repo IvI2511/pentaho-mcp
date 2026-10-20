@@ -40,7 +40,7 @@
       <note>KPI de septiembre a partir del modelo estrella&#xa;Arriba: ventas por tienda y categoría · abajo: ticket medio por tienda&#xa;Los pasos con dos salidas copian cada fila a las dos (no reparten)</note>
       <xloc>80</xloc>
       <yloc>448</yloc>
-      <width>470</width>
+      <width>611</width>
       <heigth>58</heigth>
       <fontname/>
       <fontsize>-1</fontsize>
@@ -239,7 +239,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>256</xloc>
+      <xloc>304</xloc>
       <yloc>96</yloc>
       <draw>Y</draw>
     </GUI>
@@ -294,7 +294,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>512</xloc>
       <yloc>96</yloc>
       <draw>Y</draw>
     </GUI>
@@ -349,7 +349,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>576</xloc>
+      <xloc>720</xloc>
       <yloc>96</yloc>
       <draw>Y</draw>
     </GUI>
@@ -409,7 +409,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>768</xloc>
+      <xloc>968</xloc>
       <yloc>32</yloc>
       <draw>Y</draw>
     </GUI>
@@ -514,7 +514,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>768</xloc>
+      <xloc>968</xloc>
       <yloc>160</yloc>
       <draw>Y</draw>
     </GUI>
@@ -556,7 +556,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>256</xloc>
+      <xloc>304</xloc>
       <yloc>304</yloc>
       <draw>Y</draw>
     </GUI>
@@ -608,7 +608,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>416</xloc>
+      <xloc>512</xloc>
       <yloc>304</yloc>
       <draw>Y</draw>
     </GUI>
@@ -693,7 +693,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>576</xloc>
+      <xloc>720</xloc>
       <yloc>304</yloc>
       <draw>Y</draw>
     </GUI>
@@ -753,7 +753,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>768</xloc>
+      <xloc>968</xloc>
       <yloc>240</yloc>
       <draw>Y</draw>
     </GUI>
@@ -858,7 +858,7 @@
       </output>
     </remotesteps>
     <GUI>
-      <xloc>768</xloc>
+      <xloc>968</xloc>
       <yloc>368</yloc>
       <draw>Y</draw>
     </GUI>
