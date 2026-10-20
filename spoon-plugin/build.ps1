@@ -4,7 +4,7 @@
 # Uso:  powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 [-PdiHome <ruta data-integration>]
 param(
   [string]$PdiHome = $env:PDI_HOME,
-  [string]$Version = "0.3.0"
+  [string]$Version = "0.3.1"
 )
 
 $ErrorActionPreference = "Stop"

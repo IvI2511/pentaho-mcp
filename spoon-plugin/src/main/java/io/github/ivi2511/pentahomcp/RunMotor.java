@@ -393,36 +393,44 @@ final class RunMotor {
 
   private static void anotar( Map<String, ArrayNode> porStep, int[] cuenta, String fuente, int tipo, String texto,
                               boolean detalle ) {
+    int idx;
     String etiqueta;
     switch ( tipo ) {
       case CheckResultInterface.TYPE_RESULT_ERROR:
-        cuenta[ 0 ]++;
+        idx = 0;
         etiqueta = "ERROR";
         break;
       case CheckResultInterface.TYPE_RESULT_WARNING:
-        cuenta[ 1 ]++;
+        idx = 1;
         etiqueta = "ADVERTENCIA";
         break;
       case CheckResultInterface.TYPE_RESULT_OK:
-        cuenta[ 2 ]++;
+        idx = 2;
         etiqueta = "OK";
-        if ( !detalle ) {
-          return;
-        }
         break;
       default:
-        cuenta[ 3 ]++;
+        idx = 3;
         etiqueta = "COMENTARIO";
-        if ( !detalle ) {
+    }
+    String linea = etiqueta + ": " + ( texto == null ? "" : texto.trim().replaceAll( "\\s+", " " ) );
+    ArrayNode a = porStep.get( fuente );
+    if ( a != null ) {
+      // Kettle repite el mismo aviso una vez por cada step que recorre el campo: contarlo una sola vez
+      for ( int i = 0; i < a.size(); i++ ) {
+        if ( a.get( i ).asText().equals( linea ) ) {
           return;
         }
+      }
     }
-    ArrayNode a = porStep.get( fuente );
+    cuenta[ idx ]++;
+    if ( !detalle && idx >= 2 ) {
+      return;
+    }
     if ( a == null ) {
       a = Tools.arr();
       porStep.put( fuente, a );
     }
-    a.add( etiqueta + ": " + ( texto == null ? "" : texto.trim().replaceAll( "\\s+", " " ) ) );
+    a.add( linea );
   }
 
   /** Kettle ya avisa "no se utiliza este paso": no repetirlo con otras palabras. */
