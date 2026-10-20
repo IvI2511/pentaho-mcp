@@ -141,7 +141,7 @@ final class DocumentTools {
           throw new ToolError( "Could not create the folder " + dir );
         }
         // Escribimos nosotros (lo mismo que Spoon.saveMeta) para no caer en los dialogos de Spoon,
-        // por ejemplo el que rechaza rutas con acentos o enies.
+        // por ejemplo el "Guardar como" cuando el documento todavia no tiene archivo.
         String nombreAntes = m.getName();
         m.setFilename( f.getPath() );
         if ( nombreAntes == null || nombreAntes.trim().isEmpty() ) {

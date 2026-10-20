@@ -18,6 +18,8 @@ whichever you prefer, but name new tools and arguments in English.
 | `.claude-plugin/marketplace.json` | The `pentaho-tools` marketplace that publishes `claude/` |
 | `tools/generador-catalogo/` | Generates the step and job entry catalog from a PDI install |
 | `instalar.ps1`, `instalar.sh` | Installers (see [`INSTALL.md`](INSTALL.md)) |
+| `instalador/` | Windows installer (Inno Setup 7): `preparar.ps1` stages PDI, the plugin, Java 21 and the `pentaho-live` launcher; then `instalador.iss` is compiled with Inno Setup |
+| `VERSION` | The version, single source for the plugin, `plugin.json` (checked) and the installer |
 | `docs/api-spoon.md` | Internal design: Spoon API, threading, dialogs to avoid |
 
 ## Build the Spoon plugin
@@ -31,8 +33,9 @@ powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 -PdiHome "C:\pat
 
 It leaves `spoon-plugin/dist/pentaho-mcp/` (copy it into `data-integration/plugins/` and restart Spoon)
 plus the release zips `pentaho-mcp-<version>.zip` and `pentaho-mcp.zip`. `spoon-plugin\build.bat` takes
-the same parameters. The version comes from `-Version` (default in `build.ps1`); keep it in sync with
-`VERSION` in `McpLifecycleListener.java`.
+the same parameters. The version comes from the `VERSION` file at the repo root, the single source:
+`build.ps1` writes it into the jar (the plugin reads it from there) and stops if
+`claude/.claude-plugin/plugin.json` has a different `version`, and the Windows installer reads it too.
 
 Test live: open Spoon, check `curl http://127.0.0.1:8765/ping`, and try the change from Claude Code.
 Before touching how the plugin talks to Spoon, read [`docs/api-spoon.md`](docs/api-spoon.md): every

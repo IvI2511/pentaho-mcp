@@ -10,3 +10,9 @@ claude/skills/pentaho-etl/manual/ejemplos/salida/
 tools/generador-catalogo/build/
 
 spoon-plugin/.ruff_cache/
+
+# Instalador de Windows: lo que arma instalador/preparar.ps1 (staging y cache del JRE) y lo que
+# compila Inno Setup. Se versionan los scripts, el lanzador, las letras y pentaho-live.ico.
+instalador/staging/
+instalador/cache/
+instalador/*.exe

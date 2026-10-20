@@ -1,0 +1,8 @@
+# Sin conversiones de fin de linea: cada archivo se guarda tal cual esta. Los .cmd/.bat van con
+# CRLF (cmd.exe se confunde con goto/call si vienen con LF solo) y los scripts de bash con LF.
+# Ojo: nada de "eol=" ni "filter" aca; el directorio de plugins de Anthropic no valida un repo
+# con atributos que reescriben el contenido (convencion 34 F).
+*.cmd -text
+*.bat -text
+*.sh -text
+instalador/bin/pentaho-live -text

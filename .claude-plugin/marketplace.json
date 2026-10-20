@@ -1,7 +1,9 @@
 {
   "name": "pentaho-tools",
   "description": "Claude Code tools for Pentaho Data Integration (unofficial)",
-  "owner": { "name": "IvI2511" },
+  "owner": {
+    "name": "Iván Castaño · IDC Studios"
+  },
   "plugins": [
     {
       "name": "pentaho-live",

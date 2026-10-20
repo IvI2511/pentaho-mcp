@@ -6,12 +6,14 @@
     2. Downloads the Spoon plugin from the latest release into data-integration\plugins\pentaho-mcp\.
     3. Checks that Java is there.
     4. Configures the agents it finds: Claude Code (marketplace plugin) and Codex (MCP + skill).
+       With -SoloAgentes it does only this step (the Windows installer uses it).
 
   Usage:
     .\instalar.ps1                                  # finds PDI by itself
     .\instalar.ps1 -PdiHome "C:\pentaho\data-integration"
     .\instalar.ps1 -InstalarPdi [-Destino "C:\pentaho"]   # no PDI yet: downloads PDI 9.4 CE with the plugin in place
     .\instalar.ps1 -SinClaude -SinCodex             # only the Spoon plugin
+    .\instalar.ps1 -SoloAgentes [-SinCodex]         # only step 4: Claude Code / Codex, no PDI or plugin
     .\instalar.ps1 -Puerto 8770                     # another port (sets PENTAHO_MCP_PORT for Spoon)
 
   Exit codes (for agents):
@@ -27,6 +29,7 @@ param(
   [string]$Destino = (Join-Path $env:USERPROFILE "Pentaho"),
   [switch]$SinClaude,
   [switch]$SinCodex,
+  [switch]$SoloAgentes,
   [int]$Puerto = 8765
 )
 
@@ -51,6 +54,10 @@ function Salir($codigo, $mensaje) {
   exit $codigo
 }
 
+# ------------------------------------------------------------------ 1-3. PDI, plugin and Java
+if ($SoloAgentes) {
+  Write-Host "-SoloAgentes: skipping steps 1-3 (PDI, Spoon plugin, Java); only the agents are configured."
+} else {
 # ------------------------------------------------------------------ 1. PDI
 Paso 1 "Pentaho Data Integration"
 if ($InstalarPdi) {
@@ -122,6 +129,7 @@ if ($java) {
   Write-Host "   NO Java on the PATH: Spoon will not open. Install it (11 or later), for example:"
   Write-Host "   winget install EclipseAdoptium.Temurin.21.JRE"
 }
+}   # end of steps 1-3 (skipped with -SoloAgentes)
 
 # ------------------------------------------------------------------ 4. agents
 Paso 4 "agents (Claude Code / Codex)"
@@ -167,7 +175,11 @@ if (-not $SinCodex -and (Get-Command codex -ErrorAction SilentlyContinue)) {
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 Write-Host ""
 Write-Host "Done. Next:"
-Write-Host "  1. Open (or restart) Spoon: $PdiHome\Spoon.bat"
+if ($SoloAgentes) {
+  Write-Host "  1. Open (or restart) Spoon (with the Windows installer: pentaho-live, or the Pentaho Live shortcut)"
+} else {
+  Write-Host "  1. Open (or restart) Spoon: $PdiHome\Spoon.bat"
+}
 Write-Host "  2. Restart the agent (Claude Code / Codex) so it picks up the MCP."
 Write-Host "  3. Check: curl.exe http://127.0.0.1:$Puerto/ping  ->  {""ok"":true,...}"
 exit 0

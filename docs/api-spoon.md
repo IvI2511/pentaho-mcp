@@ -280,7 +280,7 @@ public void setName(String);      public String getName();   public void nameFro
   ```
   `saveMeta` escribe `XMLHandler.getXMLHeader() + meta.getXML()` vía `KettleVFS.getOutputStream`, agrega a "recientes", `clearChanged()` y `setShellText()`. Si el nombre es el por defecto, `nameFromFilename()`.
   * Si `getFilename()` es null/vacío, `saveToFile` cae en `saveAsNew` → **diálogo**.
-  * `save()` rechaza con un `MessageBox` modal nombres de archivo con caracteres no ASCII (patrón `\p{ASCII}+`). Validar antes en el plugin (acentos, ñ).
+  * `save()` tiene un chequeo `\p{ASCII}+` con un `MessageBox` modal, **pero el bytecode lo saltea para los tipos Trans y Job** (corregido el 20-oct-2026: esta línea decía que rechazaba rutas con acentos). El diálogo que sí aparece es «Guardar como» cuando el documento todavía no tiene archivo.
   * Si la perspectiva activa implementa `SpoonPerspectiveOpenSaveInterface`, delega en ella; en la perspectiva principal no aplica.
   * Con repositorio conectado (`spoon.getRepository()!=null`) `saveToFile` guarda en el repo. Este diseño asume archivos.
 * **Cerrar**: `spoon.tabClose(tabItem, true)` (force = no pregunta).
@@ -757,4 +757,4 @@ Agregar: `transMeta.addOrReplaceDatabase(new DatabaseMeta(xml)); transMeta.setCh
 * Seguridad: escuchar solo en `InetAddress.getLoopbackAddress()` y validar `Origin` (el esqueleto ya rechaza orígenes que no sean localhost: protección contra DNS rebinding, como pide la spec).
 * Cada tool de escritura = una tarea en UI (`UiThread.call`) que hace mutación + undo + refresh, y devuelve un resumen chico (nombre, id, posición) para que la IA siga.
 * Errores de Kettle (`KettleXMLException`, `KettleStepException`…) → `isError: true` en el resultado de la tool con el mensaje, no error JSON-RPC.
-* Diálogos a evitar (todos modales): `saveFileAs`, `openFile` con ruta inválida, `save` con nombre no ASCII, `executeTransformation` con `isShowDialog()==true` o sin guardar, preview/debug de la GUI, `editStep`, `checkTrans`, `tabClose(…, false)`.
+* Diálogos a evitar (todos modales): `saveFileAs`, `openFile` con ruta inválida, `executeTransformation` con `isShowDialog()==true` o sin guardar, preview/debug de la GUI, `editStep`, `checkTrans`, `tabClose(…, false)`.
