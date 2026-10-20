@@ -82,6 +82,7 @@ Kitchen (see below). The user opens it in Spoon when you are done.
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |
 | Complete examples that run | `manual/ejemplos/` (README with what each one does) |
+| A tested ETL to copy and adapt: CSV → staging, deduplication, incremental load, SCD type 2, fact with surrogate keys | `manual/05-patrones.md` (index), then `patrones/<nn>_*/README.md` |
 
 ## The pitfalls that cost the most (details in the manual)
 

@@ -5,6 +5,10 @@ spoon-plugin/dist/
 
 # Salidas de los ejemplos al correrlos con Pan/Kitchen
 claude/skills/pentaho-etl/manual/ejemplos/salida/
+# Bases SQLite, rechazos y logs de los patrones (verificar.ps1 / verificar.sh)
+claude/skills/pentaho-etl/patrones/*/salida/
+# Cache del linter de Python (lo crea ruff al chequear verificar.py)
+.ruff_cache/
 
 # Generador del catalogo
 tools/generador-catalogo/build/

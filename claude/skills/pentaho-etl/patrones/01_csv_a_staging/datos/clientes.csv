@@ -1,0 +1,13 @@
+CUST_ID;CUST_NAME;EMAIL_ADDR;CITY;SIGNUP_DT;BALANCE;LEGACY_FLAG
+1;Ana Pérez;ana.perez@example.com;Madrid;2025-01-15;1500.50;X
+2;Bruno Díaz;bruno.diaz@example.com;Sevilla;2025-02-03;320.00;
+3;Carla Núñez;carla.nunez@example.com;Valencia;2025-02-20;0.00;X
+4;  Diego Ruiz  ;diego.ruiz@example.com;  Bilbao ;2025-03-11;78.25;
+X5;Elena Gómez;elena.gomez@example.com;Madrid;2025-03-30;410.75;
+6;Fabián Torres;fabian.torres@example.com;Zaragoza;31/03/2025;95.00;
+7;Gloria Sanz;gloria.sanz@example.com;Málaga;2025-04-18;2200.10;X
+8;Héctor Vidal;hector.vidal@example.com;Madrid;2025-05-02;12,5O;
+9;Inés Moreno;ines.moreno@example.com;Granada;2025-05-27;640.00;
+10;Javier Ortiz;javier.ortiz@example.com;Sevilla;2025-06-09;15.40;
+11;Karina López;karina.lopez@example.com;Valencia;2025-06-30;980.00;X
+12;Luis Romero;luis.romero@example.com;Madrid;2025-07-14;0.99;
