@@ -300,9 +300,11 @@ jobs:
           path: ${{ runner.temp }}/evidencia
           if-no-files-found: warn
 
-  # Diagnóstico de la ventana de Spoon en macOS, que en las corridas de arriba se abre en blanco salvo la
-  # barra de arriba (el MCP anda igual). Compara una ventana SWT mínima con el mismo swt.jar contra Spoon,
-  # con Java 11, 17 y 21, y guarda lo que macOS ve dentro de la ventana (árbol de accesibilidad).
+  # Diagnóstico de la ventana de Spoon en macOS, que en estas VMs se abre en blanco salvo la barra de
+  # arriba (el MCP anda igual). Ya se descartó (corrida 3): la versión de Java (11, 17 y 21 igual) y SWT o
+  # la VM (una ventana SWT mínima con el mismo swt.jar se dibuja bien). Acá: abrir la .app como un usuario
+  # (open; en chip Apple open --arch x86_64) y probar remedios: al frente, minimizar y restaurar, pantalla
+  # completa. Guarda capturas y el árbol de accesibilidad.
   ventana-macos:
     name: ventana-macos ${{ matrix.id }}
     runs-on: ${{ matrix.runner }}
@@ -312,55 +314,62 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: intel-java11, runner: macos-15-intel, java: "11", prefijo: "" }
-          - { id: intel-java17, runner: macos-15-intel, java: "17", prefijo: "" }
-          - { id: intel-java21, runner: macos-15-intel, java: "21", prefijo: "" }
-          - { id: arm64-rosetta-java11, runner: macos-15, java: "11", prefijo: "arch -x86_64" }
+          - { id: intel-spoon-sh, runner: macos-15-intel, lanzar: spoon.sh, prefijo: "" }
+          - { id: intel-app, runner: macos-15-intel, lanzar: app, prefijo: "" }
+          - { id: arm64-app-rosetta, runner: macos-15, lanzar: app, prefijo: "arch -x86_64" }
     env:
       PREFIJO: ${{ matrix.prefijo }}
+      LANZAR: ${{ matrix.lanzar }}
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: ${{ matrix.java }}
+          java-version: "21"
           architecture: x64
 
-      - name: SWT mínima y Spoon
+      - name: Abrir Spoon y probar remedios
         run: |
           set +e +o pipefail
           EVID="$RUNNER_TEMP/evidencia"; PDI="$RUNNER_TEMP/pentaho/data-integration"
           export KETTLE_HOME="$RUNNER_TEMP/kettle-home"
           mkdir -p "$EVID" "$KETTLE_HOME/.kettle"
           printf '%s\n' ShowTips=N ShowWelcomePageOnStartup=N ShowRepositoriesAtStartup=N > "$KETTLE_HOME/.kettle/.spoonrc"
-          { sw_vers; $PREFIJO "$JAVA_HOME/bin/java" -version; } > "$EVID/sistema.txt" 2>&1
+          { sw_vers; uname -m; $PREFIJO "$JAVA_HOME/bin/java" -version; } > "$EVID/sistema.txt" 2>&1
           bash instalar.sh --instalar-pdi --destino "$RUNNER_TEMP/pentaho" --sin-claude --sin-codex > "$EVID/instalar.log" 2>&1
-          ui() {  # lo que macOS ve dentro de la ventana 1 del proceso $1
-            osascript -e "tell application \"System Events\" to tell (first process whose unix id is $1)
-              set frontmost to true
-              return {name of window 1, size of window 1, entire contents of window 1}
-            end tell" 2>&1 | head -c 30000
-          }
+          cap() { sleep 3; screencapture -x "$EVID/$1.png"; }
+          ae() { echo "> $1" >> "$EVID/acciones.txt"
+                 osascript -e "tell application \"System Events\" to tell (first process whose unix id is $PID) to $1" \
+                   >> "$EVID/acciones.txt" 2>&1; }
+          ui() { osascript -e "tell application \"System Events\" to tell (first process whose unix id is $PID) to return entire contents of window 1" 2>&1 | head -c 30000; }
 
-          echo "== 1. ventana SWT mínima con el swt.jar de PDI"
-          $PREFIJO "$JAVA_HOME/bin/java" -XstartOnFirstThread -cp "$PDI/libswt/osx64/swt.jar" tools/ci/SwtPrueba.java 30000 \
-            > "$EVID/swt-prueba.log" 2>&1 &
-          sleep 15
-          screencapture -x "$EVID/swt-prueba.png"
-          ui "$(pgrep -f SwtPrueba | head -1)" > "$EVID/swt-prueba-ui.txt"
-          wait
-          cat "$EVID/swt-prueba.log"; head -c 1500 "$EVID/swt-prueba-ui.txt"; echo
-
-          echo "== 2. Spoon"
+          echo "== Spoon con $LANZAR"
           cd "$PDI"
-          nohup $PREFIJO /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 &
+          if [ "$LANZAR" = app ]; then
+            chmod +x "Data Integration.app/Contents/MacOS/JavaApplicationStub"
+            ARCH=""; [ -n "$PREFIJO" ] && ARCH="--arch x86_64"
+            open $ARCH --env KETTLE_HOME="$KETTLE_HOME" --env JAVA_HOME="$JAVA_HOME" "$PDI/Data Integration.app" > "$EVID/open.log" 2>&1 \
+              || { launchctl setenv KETTLE_HOME "$KETTLE_HOME"; launchctl setenv JAVA_HOME "$JAVA_HOME"
+                   open $ARCH "$PDI/Data Integration.app" >> "$EVID/open.log" 2>&1; }
+            cat "$EVID/open.log"
+          else
+            nohup $PREFIJO /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 &
+          fi
           for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > "$EVID/ping.json" 2>/dev/null && break; sleep 1; done
           echo "/ping a los $i s: $(cat "$EVID/ping.json")"
           sleep 10
-          screencapture -x "$EVID/spoon.png"
-          ui "$(pgrep -f launcher/launcher.jar | head -1)" > "$EVID/spoon-ui.txt"
-          head -c 3000 "$EVID/spoon-ui.txt"; echo
+          PID=$(pgrep -f launcher/launcher.jar | head -1); echo "pid $PID"; ps -o pid,command -p "$PID" | cut -c1-300 > "$EVID/proceso.txt"
+          ae "get {frontmost, name of window 1, position of window 1, size of window 1}"
+          cap 1-al-abrir; ui > "$EVID/ui-1-al-abrir.txt"
+          ae "set frontmost to true"; ae "perform action \"AXRaise\" of window 1"; cap 2-al-frente
+          ae "set value of attribute \"AXMinimized\" of window 1 to true"; sleep 2
+          ae "set value of attribute \"AXMinimized\" of window 1 to false"; cap 3-minimizar-y-restaurar
+          ae "set value of attribute \"AXFullScreen\" of window 1 to true"; sleep 3; cap 4-pantalla-completa
+          ae "set value of attribute \"AXFullScreen\" of window 1 to false"; sleep 3
+          python3 -I tools/ci/cliente_mcp.py --salida "$EVID/mcp" --plataforma "diag-$LANZAR" | tail -1
+          cap 5-tras-mcp; ui > "$EVID/ui-5-tras-mcp.txt"
+          cat "$EVID/acciones.txt"
           pkill -f launcher/launcher.jar
           cp "$PDI"/logs/spoon.log "$EVID/" 2>/dev/null
           exit 0
