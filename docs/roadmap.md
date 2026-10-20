@@ -5,10 +5,9 @@ Decidido con Iván el 20-oct-2026. **El seguimiento vive en Linear** (team Exter
 «Pentaho Live 0.4.1» (P-EXT-34) y «Pentaho Live 0.5.0» (P-EXT-35); las ideas de 0.6 y 0.7 están en
 Triage (EXT-447 a EXT-454). Este archivo es el resumen; lo que hay que hacer está en Linear.
 
-## 0.4.1 · Instalador
+## 0.4.1 · Instalador — publicada el 20-oct-2026
 
-El instalador sale apenas Iván lo compile, sin esperar Informes (decidido el 20-oct-2026), junto con el
-autor «Iván Castaño · IDC Studios».
+Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Iván Castaño · IDC Studios».
 
 - **Instalador de Windows** (Inno Setup 7, convención 04 del portafolio): completo (PDI 9.4 CE +
   plugin + Java Temurin 21) o solo el plugin en un PDI existente; accesos directos con el ícono, sin
