@@ -1,15 +1,28 @@
 {
   "name": "pentaho-live",
   "displayName": "Pentaho Live (unofficial)",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Build Pentaho Data Integration 9.4 ETLs with Claude: a skill with the verified .ktr/.kjb format and step catalog, plus a local MCP connection that edits the transformation open in Spoon live. Unofficial, not affiliated with Hitachi Vantara.",
-  "author": { "name": "IvI2511", "url": "https://github.com/IvI2511" },
+  "author": {
+    "name": "IvI2511",
+    "url": "https://github.com/IvI2511"
+  },
   "homepage": "https://github.com/IvI2511/pentaho-mcp",
   "repository": "https://github.com/IvI2511/pentaho-mcp",
   "documentationUrl": "https://github.com/IvI2511/pentaho-mcp/blob/main/INSTALL.md",
   "supportUrl": "https://github.com/IvI2511/pentaho-mcp/issues",
+  "privacyPolicyUrl": "https://github.com/IvI2511/pentaho-mcp/blob/main/PRIVACY.md",
+  "icon": "./.claude-plugin/icon.png",
   "license": "MIT",
-  "keywords": ["pentaho", "pdi", "kettle", "spoon", "etl", "data-integration", "mcp"],
+  "keywords": [
+    "pentaho",
+    "pdi",
+    "kettle",
+    "spoon",
+    "etl",
+    "data-integration",
+    "mcp"
+  ],
   "userConfig": {
     "mcp_url": {
       "type": "string",

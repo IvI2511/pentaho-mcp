@@ -48,6 +48,10 @@ claude.ai chat only the skill is useful.
 - *"Why does this .ktr fail in Pan?"*
 - *"Add a Filter rows after the CSV input that keeps rows with saldo > 1000 and preview the result."*
 
+## Privacy
+
+No data collection of any kind. Details: [privacy policy](https://github.com/IvI2511/pentaho-mcp/blob/main/PRIVACY.md).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
