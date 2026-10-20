@@ -33,7 +33,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * claude/skills en el classpath). Se leen con getResourceAsStream sobre esta clase (classloader del
  * plugin) y se cachean: son de solo lectura y no cambian mientras Spoon esta abierto.
  *
- * resources/list trae solo los 5 documentos (indice, steps comunes y las 3 guias); los ~300 XML por
+ * resources/list trae solo los documentos (indice, steps comunes y las guias) y el catalogo del linter
+ * (pentaho://lint/rules, JSON armado en el momento: no es un archivo del classpath); los ~300 XML por
  * step / entrada van por plantilla (pentaho://catalog/steps/{id}), para no gastar tokens listandolos.
  */
 final class McpResources {
@@ -43,6 +44,12 @@ final class McpResources {
 
   private static final String MD = "text/markdown";
   private static final String XML = "application/xml";
+  private static final String JSON = "application/json";
+
+  /** El catalogo de reglas de lint_etl (LintTools.catalogo): JSON armado en el momento, cacheado. */
+  static final String LINT_REGLAS = "pentaho://lint/rules";
+  /** Clave de LINT_REGLAS en la cache (no choca con las rutas del classpath, que no empiezan con ':'). */
+  private static final String CACHE_LINT = ":lint/rules";
 
   static final String PLANTILLA_STEPS = "pentaho://catalog/steps/{id}";
   static final String PLANTILLA_ENTRADAS = "pentaho://catalog/job-entries/{id}";
@@ -112,6 +119,9 @@ final class McpResources {
   /** Ids por carpeta del catalogo, ordenados. */
   private final Map<String, List<String>> ids = new ConcurrentHashMap<String, List<String>>();
 
+  /** Por que fallo el catalogo del linter (para el texto de resources/read). */
+  private volatile String errorLint;
+
   static void register( McpHttpServer server ) {
     server.resources( new McpResources() );
     try { // nunca cortar el arranque del servidor por un aviso
@@ -141,6 +151,18 @@ final class McpResources {
       o.put( "size", texto.getBytes( StandardCharsets.UTF_8 ).length );
       items.add( o );
     }
+    String reglas = catalogoLint();
+    if ( reglas != null ) {
+      ObjectNode o = McpHttpServer.JSON.createObjectNode();
+      o.put( "uri", LINT_REGLAS );
+      o.put( "name", "lint-rules" );
+      o.put( "title", "Lint rules (catalog)" );
+      o.put( "description", "The rules of lint_etl: id, severity, category, whether it is off by default or "
+        + "depends on the computer, and what/why/how to fix in en, es and pt; plus the scoring formula." );
+      o.put( "mimeType", JSON );
+      o.put( "size", reglas.getBytes( StandardCharsets.UTF_8 ).length );
+      items.add( o );
+    }
     return pagina( items, cursor, "resources" );
   }
 
@@ -162,6 +184,18 @@ final class McpResources {
 
   /** Resultado de resources/read; null si la URI no corresponde a ningun recurso. */
   ObjectNode leer( String uri ) {
+    if ( LINT_REGLAS.equals( uri ) ) {
+      String reglas = catalogoLint();
+      ObjectNode res = McpHttpServer.JSON.createObjectNode();
+      ObjectNode c = res.putArray( "contents" ).addObject().put( "uri", uri );
+      if ( reglas != null ) {
+        c.put( "mimeType", JSON ).put( "text", reglas );
+      } else { // no deberia pasar: los textos viajan en el jar
+        c.put( "mimeType", "text/plain" ).put( "text", "The lint rule catalog could not be built: "
+          + errorLint );
+      }
+      return res;
+    }
     String ruta = null;
     String mime = MD;
     String canonica = uri;
@@ -355,6 +389,25 @@ final class McpResources {
         r.add( id );
       }
     }
+  }
+
+  /**
+   * El JSON de pentaho://lint/rules, cacheado (los textos no cambian mientras Spoon esta abierto); null si
+   * no se pudo armar. Nunca lanza: resources/list y resources/read no declaran excepciones.
+   */
+  private String catalogoLint() {
+    String t = cache.get( CACHE_LINT );
+    if ( t != null ) {
+      return t;
+    }
+    try {
+      t = LintTools.catalogo();
+    } catch ( Throwable e ) {
+      errorLint = RunMotor.primeraLinea( e );
+      return null;
+    }
+    cache.put( CACHE_LINT, t );
+    return t;
   }
 
   /** Texto UTF-8 del recurso (ruta relativa a RAIZ), cacheado; null si no esta en el classpath. */

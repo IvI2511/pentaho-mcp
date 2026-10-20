@@ -46,7 +46,7 @@ import io.github.ivi2511.pentahomcp.informes.navegador.Chromium;
 import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
- * La parte MCP de los informes (WP10, diseno §1.5): los esquemas de las 58 tools son JSON Schema
+ * La parte MCP de los informes (WP10, diseno §1.5): los esquemas de las 59 tools son JSON Schema
  * validos y las tres nuevas tienen los argumentos del diseno; generate_report no cambio; los
  * argumentos se validan antes de tocar Spoon; get_report_data devuelve el modelo en ingles y sin
  * binarios; y build_report sobre una captura de archivo (sin Spoon) escribe todos los formatos que
@@ -56,8 +56,8 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  */
 public class PruebaMcpInformes {
 
-  /** 54 tools de 0.4.0 + build_report, get_report_data y show_report. */
-  private static final int TOOLS = 58;
+  /** 54 tools de 0.4.0 + build_report, get_report_data, show_report y set_error_handling (0.5.0) + lint_etl. */
+  private static final int TOOLS = 59;
 
   private McpHttpServer server;
   private int puerto;
@@ -76,6 +76,7 @@ public class PruebaMcpInformes {
     RunTools.register( server );
     DbTools.register( server );
     ReportTools.register( server );
+    LintTools.register( server );
     server.start();
   }
 
@@ -141,7 +142,13 @@ public class PruebaMcpInformes {
     JsonNode mostrar = porNombre.get( "show_report" );
     noNulo( mostrar, "show_report registrada" );
     igual( set( "document", "sections", "narrative", "language" ), props( mostrar ), "argumentos de show_report" );
-    for ( JsonNode t : new JsonNode[] { build, datos, mostrar } ) {
+    JsonNode lint = porNombre.get( "lint_etl" );
+    noNulo( lint, "lint_etl registrada" );
+    igual( set( "document", "deep", "deep_timeout_s", "rules", "min_severity", "steps", "include_kettle_checks",
+      "language" ), props( lint ), "argumentos de lint_etl (diseno del linter §6)" );
+    igual( Arrays.asList( "info", "warning", "error" ), textos( prop( lint, "min_severity" ).path( "enum" ) ),
+      "enum de min_severity" );
+    for ( JsonNode t : new JsonNode[] { build, datos, mostrar, lint } ) {
       String json = t.toString();
       cierto( json.chars().allMatch( ch -> ch < 128 ), "la tool " + t.path( "name" ).asText() + " esta en ingles "
         + "(sin caracteres fuera de ASCII)" );
@@ -165,6 +172,17 @@ public class PruebaMcpInformes {
     r = llamar( "show_report", "{}" );
     cierto( r.path( "isError" ).asBoolean(), "show_report sin Spoon es isError" );
     contiene( texto( r ), "Spoon is not available", "show_report sin Spoon" );
+
+    r = llamar( "lint_etl", "{}" );
+    cierto( r.path( "isError" ).asBoolean(), "lint_etl sin Spoon es isError" );
+    contiene( texto( r ), "Spoon is not available", "lint_etl sin Spoon" );
+    r = llamar( "lint_etl", "{\"rules\":[\"orphan_step\",\"no_such_rule\"]}" );
+    cierto( r.path( "isError" ).asBoolean(), "regla desconocida" );
+    contiene( texto( r ), "Unknown lint rule(s): [no_such_rule]", "regla desconocida, antes de buscar Spoon" );
+    contiene( texto( r ), "absolute_path", "con la lista de los ids validos" );
+    r = llamar( "lint_etl", "{\"min_severity\":\"fatal\"}" );
+    cierto( r.path( "isError" ).asBoolean(), "min_severity desconocida" );
+    contiene( texto( r ), "'min_severity'", "min_severity desconocida, antes de buscar Spoon" );
   }
 
   // ---------------------------------------------------------------- argumentos

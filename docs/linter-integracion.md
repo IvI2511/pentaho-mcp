@@ -2,7 +2,8 @@
 
 Qué falta para que el motor del linter (rama `feat/linter`) llegue a Spoon, con los cambios exactos en los
 archivos compartidos. El diseño es `docs/linter-diseno.md`; este documento no lo repite.
-Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**; nada registrado todavía.
+Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP4 integrado** en `feat/calidad`
+(sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5.
 
 ## 1. Qué hay en la rama
 
@@ -105,6 +106,31 @@ ocultas dejan de aparecer. **Avisar a Informes**: su sección `validation` muest
 
 `LintTools.copia` usa `Docs.resolver`, que activa la pestaña. Cuando entre `Docs.resolverSinActivar`, cambiar
 esa línea (§6 del diseño: el lint no trae al usuario de vuelta a «Data Integration»).
+
+### 2.5 Cómo quedó en `feat/calidad` (21-oct-2026)
+
+- **Herramientas**: `LintTools.register` después de `ReportTools.register`: 59 tools (`PruebaMcpInformes.TOOLS`).
+  Las instrucciones del servidor nombran `lint_etl` en el paso (5). `LintTools.copia` ya usa
+  `Docs.resolverSinActivar` (`dev` lo trae).
+- **Recurso**: `McpResources.LINT_REGLAS`. Sale en `resources/list` (`application/json`, con `size`) y en
+  `resources/read`; el JSON se arma una vez y queda en la caché de la instancia. Si no se pudiera armar, `read`
+  devuelve el error como `text/plain` y `list` no lo muestra.
+- **`validate`**: un solo `chequeosPropios( AbstractMeta … )` con `RunMotor.REGLAS_DE_VALIDATE`, sin
+  supresiones y con `minSeverity = WARNING`. El código de §2.3 anotaba los `info` como advertencia, así que el
+  reparto entre steps del mismo tipo se habría seguido anotando: con el filtro deja de salir, como dice el texto.
+  `dev` ya tenía `TextosChequeo` (Informes traduce los chequeos propios): se quedó, con dos métodos `default`.
+  `idioma()` elige el idioma de `lint_*.properties` (Informes pasa el del informe) y `hallazgo(h)` arma el
+  renglón. `TEXTOS_MCP` le agrega «use set_output_mode with 'copy'» al reparto, como antes, y `texto()` solo da
+  `kettle_fallo`. Se borraron las claves `val.propio.*` de `estructura_*.properties`, salvo `kettle_fallo`.
+- **Pruebas**: `PruebaLint` (nueva): el recurso, `validate` en jobs (la entrada oculta no sale, la dibujada sí,
+  hop deshabilitado e inalcanzables, job sin START) y en transformaciones (hop roto, step suelto) y `lint_etl`
+  sin Spoon sobre el ejemplo 03. `PruebaEstructura.pruebaValidacion`: el texto esperado en castellano es el del
+  linter, y se suman pt y el texto de la tool. `PruebaMcpInformes`: 59 tools, argumentos de `lint_etl` y sus
+  errores sin Spoon.
+- **Texto nuevo** `disabled_hop.msg.job` (en/es/pt): en un job no pasan filas, así que el hop deshabilitado de
+  un job dice que el job nunca llega a la entrada por ese camino (lo muestra `validate`).
+- **Arnés**: `correr.ps1` compila también con POI 4.1.1 (desde la 0.5.0 el plugin lo importa para el PowerPoint).
+  Sobre `feat/calidad`: recall 27/27, 164 pruebas, 0 fallas, conteos iguales a `linea-base.tsv`.
 
 ## 3. Lo que falta escribir
 

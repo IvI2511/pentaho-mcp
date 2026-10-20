@@ -1,11 +1,9 @@
 package io.github.ivi2511.pentahomcp;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -64,6 +62,12 @@ import org.pentaho.di.trans.steps.dummytrans.DummyTransMeta;
 import org.pentaho.metastore.api.IMetaStore;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
+import io.github.ivi2511.pentahomcp.lint.Arreglo;
+import io.github.ivi2511.pentahomcp.lint.Hallazgo;
+import io.github.ivi2511.pentahomcp.lint.LintMotor;
+import io.github.ivi2511.pentahomcp.lint.Opciones;
+import io.github.ivi2511.pentahomcp.lint.Resultado;
+import io.github.ivi2511.pentahomcp.lint.Sev;
 
 /**
  * La parte de RunTools que no toca Spoon: trabaja sobre COPIAS (realClone) de un TransMeta/JobMeta
@@ -349,52 +353,49 @@ final class RunMotor {
   }
 
   /**
-   * Textos de los chequeos propios de Pentaho Live (los que validar agrega a los de Kettle). La tool
-   * validate usa {@link #TEXTOS_MCP} (ingles, con el nombre de la tool que lo arregla); los informes pasan
-   * los suyos, traducidos y sin hablarle a la IA.
+   * Textos de lo que validar agrega a los avisos de Kettle. Los chequeos propios salen del motor del linter
+   * ({@link #REGLAS_DE_VALIDATE}) con los textos de lint_{idioma}.properties; aca solo se elige el idioma y
+   * cada uso puede retocar el renglon. La tool validate usa {@link #TEXTOS_MCP} (ingles, con el nombre de la
+   * tool que lo arregla); los informes pasan los suyos, traducidos y sin hablarle a la IA.
    */
   interface TextosChequeo {
-    /**
-     * Claves: plugin_falta (id del plugin), sin_hops, distribuye (salidas), hop_suelto, hop_apagado (step
-     * destino), job_sin_start, job_plugin_falta, job_sin_hops, job_inalcanzable, job_hop_apagado (entrada
-     * destino), kettle_fallo (mensaje).
-     */
+    /** Claves: kettle_fallo (mensaje de la excepcion de checkSteps / checkJobEntries). */
     String texto( String clave, Object... args );
+
+    /** Idioma de los mensajes del linter: en, es o pt (cualquier otro, en). */
+    default String idioma() {
+      return "en";
+    }
+
+    /** El renglon de un hallazgo del linter (sin el "ERROR: " / "WARNING: " que agrega validar). */
+    default String hallazgo( Hallazgo h ) {
+      return h.message;
+    }
   }
 
   /** Los textos de la tool validate (MCP). */
   static final TextosChequeo TEXTOS_MCP = new TextosChequeo() {
     @Override
     public String texto( String clave, Object... a ) {
-      switch ( clave ) {
-        case "plugin_falta":
-          return "The plugin of this step is missing (type " + a[ 0 ] + "): it cannot run";
-        case "sin_hops":
-          return "Has no hops: it neither receives rows from nor sends rows to any step";
-        case "distribuye":
-          return "Has " + a[ 0 ] + " outputs in DISTRIBUTE mode: each output gets only part of the rows. If each "
-            + "one must get all of them, use set_output_mode with 'copy'";
-        case "hop_suelto":
-          return "There is a hop with an end that does not exist";
-        case "hop_apagado":
-          return "The hop to '" + a[ 0 ] + "' is disabled: no rows go through it";
-        case "job_sin_start":
-          return "The job has no START entry: it cannot run";
-        case "job_plugin_falta":
-          return "The plugin of this entry is missing: it cannot run";
-        case "job_sin_hops":
-          return "Has no hops: it never runs";
-        case "job_inalcanzable":
-          return "Cannot be reached from START through enabled hops: it never runs";
-        case "job_hop_apagado":
-          return "The hop to '" + a[ 0 ] + "' is disabled";
-        case "kettle_fallo":
-          return "Kettle's validation failed: " + a[ 0 ];
-        default:
-          return clave;
+      return "kettle_fallo".equals( clave ) ? "Kettle's validation failed: " + a[ 0 ] : clave;
+    }
+
+    @Override
+    public String hallazgo( Hallazgo h ) {
+      if ( h.fix != null && Arreglo.SET_OUTPUT_MODE.equals( h.fix.kind ) ) {
+        return h.message + " If each one must get all of them, use set_output_mode with 'copy'.";
       }
+      return h.message;
     }
   };
+
+  /**
+   * Los chequeos propios de validate: reglas del motor del linter (docs/linter-integracion.md §2.3), con el
+   * mismo criterio de antes salvo orphan_entry, que ya no marca las entradas ocultas (draw=N) de jobs viejos.
+   */
+  static final Set<String> REGLAS_DE_VALIDATE = Collections.unmodifiableSet( new LinkedHashSet<String>(
+    Arrays.asList( "missing_plugin", "orphan_step", "distribute_multiple_outputs", "broken_hop", "disabled_hop",
+      "job_without_start", "orphan_entry", "unreachable_entry" ) ) );
 
   /**
    * Igual, pero checkSteps no revisa los steps de {@code saltear} (por nombre; solo transformaciones). Lo
@@ -455,11 +456,7 @@ final class RunMotor {
       anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
         tx.texto( "kettle_fallo", falloCheck ), detalle );
     }
-    if ( copia instanceof TransMeta ) {
-      chequeosPropios( (TransMeta) copia, porStep, cuenta, detalle, tx );
-    } else {
-      chequeosPropios( (JobMeta) copia, porStep, cuenta, detalle, tx );
-    }
+    chequeosPropios( copia, porStep, cuenta, detalle, tx );
     ObjectNode o = Tools.obj();
     o.put( "valid", cuenta[ 0 ] == 0 );
     o.put( "errors", cuenta[ 0 ] );
@@ -533,84 +530,28 @@ final class RunMotor {
     return false;
   }
 
-  private static void chequeosPropios( TransMeta tm, Map<String, ArrayNode> porStep, int[] cuenta, boolean detalle,
-                                       TextosChequeo tx ) {
-    for ( StepMeta s : tm.getSteps() ) {
-      if ( s.isMissing() ) {
-        anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_ERROR,
-          tx.texto( "plugin_falta", s.getStepID() ), detalle );
+  /**
+   * Los chequeos propios (huerfanos, hops deshabilitados o rotos, reparto, plugins que faltan, job sin START,
+   * entradas inalcanzables) salen del motor del linter: las mismas reglas que lint_etl, sin supresiones (validate
+   * no se silencia) y sin los info (distribute_multiple_outputs a steps del mismo tipo es un reparto de carga).
+   */
+  private static void chequeosPropios( AbstractMeta copia, Map<String, ArrayNode> porStep, int[] cuenta,
+                                       boolean detalle, TextosChequeo tx ) {
+    Opciones op = new Opciones();
+    op.rules = REGLAS_DE_VALIDATE;
+    op.honorSuppressions = false;
+    op.minSeverity = Sev.WARNING;
+    op.lang = tx.idioma();
+    op.entorno = new LintEntorno( copia );
+    Resultado r = LintMotor.analizar( copia, op );
+    for ( Hallazgo h : r.findings ) {
+      String fuente = h.step != null ? h.step : h.entry != null ? h.entry : "(general)";
+      if ( "orphan_step".equals( h.rule ) && tieneAdvertencia( porStep, fuente ) ) {
+        continue; // Kettle ya avisa "no se utiliza este paso"
       }
-      if ( tm.nrSteps() > 1 && !tm.isStepUsedInTransHops( s ) && !tieneAdvertencia( porStep, s.getName() ) ) {
-        anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          tx.texto( "sin_hops" ), detalle );
-      }
-      int salidas = TransOps.salidasNormales( tm, s );
-      if ( salidas >= 2 && s.isDistributes() ) {
-        anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          tx.texto( "distribuye", salidas ), detalle );
-      }
-    }
-    for ( TransHopMeta h : tm.getTransHops() ) {
-      if ( h.getFromStep() == null || h.getToStep() == null ) {
-        anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-          tx.texto( "hop_suelto" ), detalle );
-      } else if ( !h.isEnabled() ) {
-        anotar( porStep, cuenta, h.getFromStep().getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          tx.texto( "hop_apagado", h.getToStep().getName() ), detalle );
-      }
-    }
-  }
-
-  private static String clave( JobEntryCopy c ) {
-    return c.getName() + "#" + c.getNr();
-  }
-
-  private static void chequeosPropios( JobMeta jm, Map<String, ArrayNode> porStep, int[] cuenta, boolean detalle,
-                                       TextosChequeo tx ) {
-    JobEntryCopy start = jm.findStart();
-    if ( start == null ) {
-      anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-        tx.texto( "job_sin_start" ), detalle );
-    }
-    // por nombre+nr y no por identidad: los hops de un clon pueden apuntar a las entradas del original
-    Set<String> alcanzables = new HashSet<String>();
-    if ( start != null ) {
-      Deque<String> cola = new ArrayDeque<String>();
-      cola.add( clave( start ) );
-      alcanzables.add( clave( start ) );
-      while ( !cola.isEmpty() ) {
-        String x = cola.poll();
-        for ( int i = 0; i < jm.nrJobHops(); i++ ) {
-          JobHopMeta h = jm.getJobHop( i );
-          if ( h.isEnabled() && h.getFromEntry() != null && h.getToEntry() != null && x.equals( clave( h.getFromEntry() ) )
-            && alcanzables.add( clave( h.getToEntry() ) ) ) {
-            cola.add( clave( h.getToEntry() ) );
-          }
-        }
-      }
-    }
-    for ( JobEntryCopy c : jm.getJobCopies() ) {
-      if ( c.isMissing() ) {
-        anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_ERROR,
-          tx.texto( "job_plugin_falta" ), detalle );
-      }
-      if ( jm.nrJobEntries() > 1 && !jm.isEntryUsedInHops( c ) ) {
-        anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          tx.texto( "job_sin_hops" ), detalle );
-      } else if ( start != null && !alcanzables.contains( clave( c ) ) ) {
-        anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          tx.texto( "job_inalcanzable" ), detalle );
-      }
-    }
-    for ( int i = 0; i < jm.nrJobHops(); i++ ) {
-      JobHopMeta h = jm.getJobHop( i );
-      if ( h.getFromEntry() == null || h.getToEntry() == null ) {
-        anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-          tx.texto( "hop_suelto" ), detalle );
-      } else if ( !h.isEnabled() ) {
-        anotar( porStep, cuenta, h.getFromEntry().getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          tx.texto( "job_hop_apagado", h.getToEntry().getName() ), detalle );
-      }
+      int tipo = h.severity == Sev.ERROR ? CheckResultInterface.TYPE_RESULT_ERROR
+        : CheckResultInterface.TYPE_RESULT_WARNING;
+      anotar( porStep, cuenta, fuente, tipo, tx.hallazgo( h ), detalle );
     }
   }
 

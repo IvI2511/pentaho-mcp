@@ -69,12 +69,18 @@ final class SecValidacion implements Recolector {
       }
     }
     final Rotulos rr = r;
-    // los chequeos propios de Pentaho Live con textos del informe (no los de la tool validate, que nombran
-    // tools del MCP y estan en ingles)
+    final String idioma = ctx.idioma();
+    // los chequeos propios de Pentaho Live (reglas del linter) en el idioma del informe y sin la tool que lo
+    // arregla (la tool validate la nombra y esta en ingles)
     final RunMotor.TextosChequeo textos = new RunMotor.TextosChequeo() {
       @Override
       public String texto( String clave, Object... args ) {
         return rr.f( "val.propio." + clave, args );
+      }
+
+      @Override
+      public String idioma() {
+        return idioma;
       }
     };
     ObjectNode v;

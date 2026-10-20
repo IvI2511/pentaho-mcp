@@ -18,9 +18,9 @@ import io.github.ivi2511.pentahomcp.lint.Resultado;
 import io.github.ivi2511.pentahomcp.lint.Sev;
 
 /**
- * Herramientas MCP del linter (docs/linter-diseno.md §6). TODAVÍA SIN REGISTRAR: se registra en la integración
- * con una línea en McpLifecycleListener (ver docs/linter-integracion.md). Por ahora solo lint_etl, estático;
- * apply_lint_fixes y suppress_lint necesitan LintArreglos (WP5) y el modo profundo, LintSondas (WP3).
+ * Herramientas MCP del linter (docs/linter-diseno.md §6), registradas en McpLifecycleListener.onStart. Por
+ * ahora solo lint_etl, estático; apply_lint_fixes y suppress_lint necesitan LintArreglos (WP5) y el modo
+ * profundo, LintSondas (WP3). El catálogo (pentaho://lint/rules) lo sirve McpResources con {@link #catalogo()}.
  */
 final class LintTools {
 
@@ -118,10 +118,13 @@ final class LintTools {
     return r.isEmpty() ? null : r;
   }
 
-  /** Igual que RunTools.copia: realClone + desligar en la UI, con el repositorio y el metastore de Spoon. */
+  /**
+   * Igual que RunTools.copia: realClone + desligar en la UI, con el repositorio y el metastore de Spoon. Sin
+   * activar la pestaña ni cambiar de perspectiva (§6): el lint no saca al usuario de Informes.
+   */
   private static Copia copia( final JsonNode a ) throws Exception {
     return Docs.ui( () -> {
-      AbstractMeta m = Docs.resolver( a );
+      AbstractMeta m = Docs.resolverSinActivar( a );
       Spoon sp = Docs.spoon();
       Copia c = new Copia();
       c.id = Docs.id( m );

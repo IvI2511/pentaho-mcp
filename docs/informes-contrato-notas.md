@@ -163,6 +163,11 @@ del zip. El zip pasa de ~0,4 MB a ~10,9 MB. La versión sigue en 0.4.0 (el cambi
       Medir) y no corta una tarea del usuario: el pedido espera a que termine.
     - `Servicio.hayNavegador(Tema)`: con la ruta del navegador del tema primero, como el PDF y el pre-render.
     - `RunMotor.validar(…, TextosChequeo)`: los chequeos propios con textos traducidos para los informes;
-      la tool `validate` sigue con los suyos (`TEXTOS_MCP`).
+      la tool `validate` sigue con los suyos (`TEXTOS_MCP`). **Desde la integración del linter (WP4)** los
+      chequeos propios son reglas del motor (`RunMotor.REGLAS_DE_VALIDATE`) con los textos de
+      `lint_{en,es,pt}.properties`: `TextosChequeo.idioma()` elige el idioma y `texto()` solo da `kettle_fallo`
+      (las demás claves `val.propio.*` se borraron). Cambia lo que muestra la sección `validation`: otras
+      palabras (y el nombre del step dentro del mensaje), el reparto a steps del mismo tipo ya no se anota y las
+      entradas ocultas (`draw=N`) de jobs viejos ya no salen como «sin hops».
     - Área de textos nueva `plugins_{en,es,pt}`: nombres de tipos de step y de entrada en el idioma del
       informe (`NombresPlugin`), porque el registro de Kettle los traduce con el idioma de Spoon.

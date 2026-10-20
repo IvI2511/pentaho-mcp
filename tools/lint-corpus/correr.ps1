@@ -37,6 +37,13 @@ $fuentes += (Join-Path $PSScriptRoot "ArnesLint.java")
 $argfile = Join-Path $Salida "fuentes.txt"
 $fuentes | ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' } | Set-Content -Encoding ASCII $argfile
 $cp = (Join-Path $PdiHome "lib\*") + ";" + (Join-Path $PdiHome "libswt\win64\*")
+# POI 4.1.1 (el PowerPoint de los informes, desde la 0.5.0): como build.ps1, de pdi-core-plugins\lib
+$poi = @("poi-4.1.1.jar", "poi-ooxml-4.1.1.jar", "poi-ooxml-schemas-4.1.1.jar") | ForEach-Object {
+  $p = Join-Path $PdiHome "plugins\pdi-core-plugins\lib\$_"
+  if (-not (Test-Path $p)) { throw "Falta $p (POI 4.1.1 de PDI 9.4)" }
+  $p
+}
+$cp = $cp + ";" + ($poi -join ";")
 Wait-Memoria $MemoriaMinGB
 & (Join-Path $jdkBin "javac.exe") -J-Xmx768m --release 8 -encoding UTF-8 -Xlint:-options -nowarn -cp $cp -d $classes "@$argfile"
 if ($LASTEXITCODE -ne 0) { throw "javac fallo ($LASTEXITCODE)" }

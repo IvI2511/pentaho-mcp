@@ -128,7 +128,8 @@ public final class ReglasEstructura {
           JobHopMeta h = jm.getJobHop( i );
           if ( h.getFromEntry() != null && h.getToEntry() != null && !h.isEnabled() ) {
             Hallazgo x = ctx.enHop( Sev.WARNING, h.getFromEntry(), h.getToEntry(), "enabled" );
-            x.message = ctx.t( "disabled_hop.msg", "from", h.getFromEntry().getName(), "to", h.getToEntry().getName() );
+            // en un job no pasan filas: la entrada de destino no corre por ese camino
+            x.message = ctx.t( "disabled_hop.msg.job", "from", h.getFromEntry().getName(), "to", h.getToEntry().getName() );
             out.add( x );
           }
         }

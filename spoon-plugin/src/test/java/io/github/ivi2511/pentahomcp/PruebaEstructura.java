@@ -347,7 +347,7 @@ public class PruebaEstructura {
     contiene( s7.motivo, "(salida/demo.sqlite)", "ruta relativa en el motivo: " + s7.motivo );
     noContiene( s7.motivo, ":\\", "sin ruta absoluta en el motivo" );
 
-    // los chequeos propios de Pentaho Live salen traducidos y sin nombres de tools del MCP
+    // los chequeos propios de Pentaho Live (reglas del linter) salen traducidos y sin nombres de tools del MCP
     ContextoKettle c3 = ctx( "03", "es" );
     TransMeta tm = (TransMeta) c3.captura().copia;
     StepMeta leer = tm.findStep( "Leer ventas" );
@@ -359,11 +359,18 @@ public class PruebaEstructura {
     Tabla msj = tabla( s3, "validation-mensajes" );
     noNulo( msj, "tabla de mensajes" );
     String todo = msj.filas.toString();
-    contiene( todo, "Tiene 2 salidas en modo «distribuir»", "el chequeo propio en castellano: " + todo );
+    contiene( todo, "manda sus filas a 2 salidas en modo REPARTIR", "el chequeo propio en castellano: " + todo );
     noContiene( todo, "set_output_mode", "sin nombres de tools del MCP" );
     noContiene( todo, "DISTRIBUTE mode", "sin el texto en ingles del MCP" );
-    // la tool validate (MCP) sigue con su texto
-    contiene( RunMotor.validar( tm, false, null, null ).toString(), "set_output_mode", "validate sin cambios" );
+    // en portugues, con los textos del linter en portugues
+    Pedido ppt = new Pedido();
+    ppt.idioma = "pt";
+    Seccion s3pt = new SecValidacion().armar( new ContextoKettle( c3.captura(), ppt, new Tema(), Progreso.NULO ) );
+    contiene( tabla( s3pt, "validation-mensajes" ).filas.toString(), "em modo DISTRIBUIR", "chequeo propio en pt" );
+    // la tool validate (MCP): en ingles y con la tool que lo arregla
+    String mcp = RunMotor.validar( tm, false, null, null ).toString();
+    contiene( mcp, "in DISTRIBUTE mode", "validate en ingles: " + mcp );
+    contiene( mcp, "set_output_mode", "validate nombra la tool que lo arregla" );
   }
 
   // ---------------------------------------------------------------- nombres de los tipos
