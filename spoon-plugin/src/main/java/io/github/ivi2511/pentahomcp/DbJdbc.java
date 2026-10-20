@@ -123,7 +123,7 @@ final class DbJdbc {
     o.put( "connection", dm.getName() );
     o.put( "type", dm.getPluginId() );
     o.put( "target", destino( dm ) );
-    String aviso = avisoArchivo( dm ); // antes de conectar: SQLite/H2 crean el archivo si no existe
+    String aviso = avisoArchivo( dm, vars ); // antes de conectar: SQLite/H2 crean el archivo si no existe
     final long t0 = System.currentTimeMillis();
     try {
       ObjectNode info = conConexionCruda( dm, vars, timeoutSeg, new Trabajo<ObjectNode>() {
@@ -165,44 +165,22 @@ final class DbJdbc {
    * archivo no esta, devuelve un aviso (una ruta mal escrita es el error tipico); si no, null.
    */
   static String avisoArchivo( DatabaseMeta dm ) {
+    return avisoArchivo( dm, dm );
+  }
+
+  /**
+   * Igual, resolviendo las variables con vars. La deteccion es la de los informes
+   * (SecDestino.archivoFaltante): SQLite, H2 embebido, HSQLDB en archivo y JDBC generico, y decodifica
+   * las rutas "file:///C:/x%20y/..." que da ${Internal.Entry.Current.Directory}.
+   */
+  static String avisoArchivo( DatabaseMeta dm, VariableSpace vars ) {
     try {
-      String tipo = dm.getPluginId();
-      if ( dm.getAccessType() != DatabaseMeta.TYPE_ACCESS_NATIVE ) {
+      File f = SecDestino.archivoFaltante( dm, vars == null ? dm : vars );
+      if ( f == null ) {
         return null;
       }
-      String base = dm.environmentSubstitute( dm.getDatabaseName() );
-      if ( base == null || base.trim().isEmpty() ) {
-        return null;
-      }
-      base = base.trim();
-      File f;
-      if ( "SQLITE".equals( tipo ) ) {
-        if ( base.startsWith( ":memory:" ) || base.startsWith( "file::memory" ) ) {
-          return null;
-        }
-        f = new File( base.replaceFirst( "^file:", "" ) );
-      } else if ( "H2".equals( tipo ) ) {
-        String h = dm.environmentSubstitute( dm.getHostname() );
-        String b = base.replaceFirst( "^file:", "" );
-        if ( ( h != null && !h.trim().isEmpty() ) || b.matches( "^(mem|tcp|ssl|zip|nio\\w*|split):.*" ) ) {
-          return null;
-        }
-        b = b.replaceFirst( ";.*$", "" );
-        if ( b.startsWith( "~" ) ) {
-          b = System.getProperty( "user.home" ) + b.substring( 1 );
-        }
-        f = new File( b + ".mv.db" );
-        if ( !f.exists() && new File( b + ".h2.db" ).exists() ) {
-          return null;
-        }
-      } else {
-        return null;
-      }
-      if ( f.exists() ) {
-        return null;
-      }
-      return "The file " + f.getAbsolutePath() + " did not exist: " + tipo + " creates an empty database when "
-        + "connecting. If the database already had data, the path is misspelled.";
+      return "The file " + f.getAbsolutePath() + " did not exist: " + dm.getPluginId() + " creates an empty "
+        + "database when connecting. If the database already had data, the path is misspelled.";
     } catch ( Throwable t ) {
       return null;
     }

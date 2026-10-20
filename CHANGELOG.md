@@ -7,6 +7,56 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Reports perspective in Spoon** (*Reports* / *Informes* / *Relatórios*, in the perspective switcher):
+  builds the report of an open transformation or job, or of a `.ktr` / `.kjb` file without opening a tab.
+  Sections: cover, summary, flow (the real canvas plus a Mermaid diagram), job flow, field lineage, data
+  dictionary, target table model (optionally reading primary and foreign keys from the database), data
+  profile, run metrics with bar, Gantt and line charts, validation, connections and parameters (never
+  passwords), and conclusions. Every section has an automatic summary in English, Spanish or Portuguese;
+  no AI is needed.
+- Export to **HTML** (one self-contained offline file, interactive diagrams), **light HTML** (no
+  JavaScript), **PDF** (through Edge or Chrome in headless mode), **Markdown** (a `.md` plus a folder
+  with the images, for Obsidian and GitHub) and **PowerPoint** (16:9, with speaker notes).
+- Report identity: author, institution, logo and colors, saved in
+  `<KETTLE_HOME>/.kettle/pentaho-live/informes.json`. One-line footer "Pentaho Live · IDC Studios" and a
+  faint IDC symbol watermark that can be turned off.
+- MCP tools:
+  - `build_report`: builds the report and writes it in one or more formats (`html`, `html_light`, `pdf`,
+    `md`, `pptx`, `json`). Returns the files, the status of each section and the warnings. It does not
+    switch tabs or perspectives. The data profile (`profile_step`) and `metrics=run_copy` run a copy of
+    the transformation, only when asked.
+  - `get_report_data`: the report data as JSON, without images, so the AI can write a narrative based on
+    the real numbers.
+  - `show_report`: opens the Reports perspective with the report of a document, only when the user asks.
+  - The AI narrative (`narrative`: summary, text per section and conclusions, up to 2,000 characters
+    each) is shown with a discreet "written with AI assistance" label that can be turned off.
+- Skill guide `manual/04-informes.md`: how to build reports and write the narrative. MCP clients without
+  the skill read it as the resource `pentaho://guide/reports`.
+- A report never creates an empty SQLite, H2 or HSQLDB file: when a step uses a database file that does
+  not exist, the fields, lineage and validation of the steps that depend on it are skipped and the
+  section says why.
+- `PENTAHO_LIVE_REPORTS=off` (system property or a line in `kettle.properties`) hides the perspective
+  without uninstalling the MCP server.
+
+### Changed
+
+- `status` and every tool without `document` work while another perspective is in front (Reports,
+  Schedule…): they read the selected Data Integration tab directly. Before, they answered "there is no
+  active transformation". `new_transformation`, `new_job` and `open_file` bring Data Integration to the
+  front first, like the editing tools.
+- The Spoon plugin zip grows from ~0.4 MB to ~11 MB: it now carries Apache POI 4.1.1 for the PowerPoint
+  export (Apache-2.0; see `THIRD-PARTY-NOTICES.md`).
+- `generate_report` and `canvas_screenshot` are unchanged.
+- At startup the plugin checks that the MCP server and the Reports perspective share one class loader,
+  and logs a clear error if they don't (typically, the jar installed in two plugin folders).
+
+### Fixed
+
+- `test_connection` no longer warns that an existing SQLite or H2 file "did not exist" when its path is
+  a `file:///…%20…` URI, as `${Internal.Entry.Current.Directory}` gives.
+
 ## [0.4.0] - 2026-10-20
 
 ### Added

@@ -99,7 +99,11 @@ final class McpResources {
     new Doc( "pentaho://guide/common-errors", "common-errors", "Common errors",
       "Real Pan/Kitchen error messages (exit codes, environment and format errors, silent errors that exit 0 "
         + "with a wrong result), what triggers each one and how to fix it, plus a pre-run checklist.",
-      "manual/03-errores-comunes.md" )
+      "manual/03-errores-comunes.md" ),
+    new Doc( "pentaho://guide/reports", "reports", "Reports (build_report, get_report_data, show_report)",
+      "Which report tool to use, the usual flow, sections, formats and languages, and how to write the "
+        + "optional narrative from get_report_data so that every statement rests on the real numbers.",
+      "manual/04-informes.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

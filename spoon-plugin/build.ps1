@@ -12,7 +12,8 @@ if (-not $PdiHome) { throw "Pasa -PdiHome <ruta a data-integration> o defini la 
 $root  = $PSScriptRoot
 $src   = Join-Path $root "src\main\java"
 $res   = Join-Path $root "src\main\resources"
-$build = Join-Path $root "build"
+# Solo build\jar: test.ps1 usa otras carpetas de build\ (una por corrida, -Salida) y no hay que borrarlas.
+$build = Join-Path $root "build\jar"
 $classes = Join-Path $build "classes"
 $dist  = Join-Path $root "dist\pentaho-mcp"
 
@@ -43,11 +44,27 @@ foreach ($p in @("lib\kettle-core-9.4.0.0-343.jar", "lib\kettle-engine-9.4.0.0-3
 }
 $cp = (Join-Path $PdiHome "lib\*") + ";" + (Join-Path $PdiHome "libswt\win64\*")
 
+# Apache POI 4.1.1 (Apache-2.0) para el PowerPoint de los informes: PDI lo trae en pdi-core-plugins\lib,
+# no en lib\. Se compila contra el y se empaqueta en el lib\ del plugin. Sus dependencias (xmlbeans 3.1.0,
+# commons-compress, collections4, math3, codec, curvesapi) ya estan en lib\ de PDI y NO se empaquetan.
+$poiDir = Join-Path $PdiHome "plugins\pdi-core-plugins\lib"
+$poiJars = @("poi-4.1.1.jar", "poi-ooxml-4.1.1.jar", "poi-ooxml-schemas-4.1.1.jar") | ForEach-Object {
+  $p = Join-Path $poiDir $_
+  if (-not (Test-Path $p)) { throw "Falta $p (POI 4.1.1 de PDI 9.4)" }
+  $p
+}
+$cp = $cp + ";" + ($poiJars -join ";")
+
 # --- limpiar
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 if (Test-Path $dist)  { Remove-Item -Recurse -Force $dist }
 New-Item -ItemType Directory -Force $classes | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $dist "lib") | Out-Null
+$poiJars | ForEach-Object { Copy-Item -Force $_ (Join-Path $dist "lib") }
+
+# avisos de terceros (Mermaid y sus dependencias, POI); lo escribe WP7
+$avisos = Join-Path $root "THIRD-PARTY-NOTICES.md"
+if (Test-Path $avisos) { Copy-Item -Force $avisos $dist }
 
 # --- compilar (bytecode Java 8: PDI 9.4 es Java 8; Spoon corre aca con Java 21, que lo acepta)
 $sources = Get-ChildItem $src -Recurse -Filter *.java | ForEach-Object { $_.FullName }
@@ -68,7 +85,7 @@ foreach ($d in @("catalogo\steps", "catalogo\job-entries", "manual")) {
   New-Item -ItemType Directory -Force (Join-Path $catJar $d) | Out-Null
 }
 foreach ($f in @("catalogo\INDICE.md", "catalogo\steps-comunes.md", "manual\01-formato-ktr.md",
-                 "manual\02-formato-kjb.md", "manual\03-errores-comunes.md")) {
+                 "manual\02-formato-kjb.md", "manual\03-errores-comunes.md", "manual\04-informes.md")) {
   $from = Join-Path $skill $f
   if (-not (Test-Path $from)) { throw "Falta $from (catalogo de la skill pentaho-etl)" }
   Copy-Item -Force $from (Join-Path $catJar $f)

@@ -1,0 +1,9 @@
+cliente_id;nombre;ciudad;fecha_alta;saldo;activo
+1;Ana Pérez;Madrid;2023-01-15;1500.50;S
+2;Bruno Díaz;Barcelona;2022-11-03;320.00;S
+3;Carla Núñez;Madrid;2024-03-22;2750.75;N
+4;Diego Castaño;Valencia;2021-07-09;980.10;S
+5;Elena Gómez;Sevilla;2023-09-30;4100.00;S
+6;Fabián Ruiz;Barcelona;2024-01-12;50.25;N
+7;Gabriela Sanz;Madrid;2022-05-18;1999.99;S
+8;Héctor López;Valencia;2023-12-01;1200.00;S

@@ -345,6 +345,71 @@ final class RunMotor {
   // ---------------------------------------------------------------- validar
 
   static ObjectNode validar( AbstractMeta copia, boolean detalle, Repository rep, IMetaStore ms ) {
+    return validar( copia, detalle, rep, ms, null );
+  }
+
+  /**
+   * Textos de los chequeos propios de Pentaho Live (los que validar agrega a los de Kettle). La tool
+   * validate usa {@link #TEXTOS_MCP} (ingles, con el nombre de la tool que lo arregla); los informes pasan
+   * los suyos, traducidos y sin hablarle a la IA.
+   */
+  interface TextosChequeo {
+    /**
+     * Claves: plugin_falta (id del plugin), sin_hops, distribuye (salidas), hop_suelto, hop_apagado (step
+     * destino), job_sin_start, job_plugin_falta, job_sin_hops, job_inalcanzable, job_hop_apagado (entrada
+     * destino), kettle_fallo (mensaje).
+     */
+    String texto( String clave, Object... args );
+  }
+
+  /** Los textos de la tool validate (MCP). */
+  static final TextosChequeo TEXTOS_MCP = new TextosChequeo() {
+    @Override
+    public String texto( String clave, Object... a ) {
+      switch ( clave ) {
+        case "plugin_falta":
+          return "The plugin of this step is missing (type " + a[ 0 ] + "): it cannot run";
+        case "sin_hops":
+          return "Has no hops: it neither receives rows from nor sends rows to any step";
+        case "distribuye":
+          return "Has " + a[ 0 ] + " outputs in DISTRIBUTE mode: each output gets only part of the rows. If each "
+            + "one must get all of them, use set_output_mode with 'copy'";
+        case "hop_suelto":
+          return "There is a hop with an end that does not exist";
+        case "hop_apagado":
+          return "The hop to '" + a[ 0 ] + "' is disabled: no rows go through it";
+        case "job_sin_start":
+          return "The job has no START entry: it cannot run";
+        case "job_plugin_falta":
+          return "The plugin of this entry is missing: it cannot run";
+        case "job_sin_hops":
+          return "Has no hops: it never runs";
+        case "job_inalcanzable":
+          return "Cannot be reached from START through enabled hops: it never runs";
+        case "job_hop_apagado":
+          return "The hop to '" + a[ 0 ] + "' is disabled";
+        case "kettle_fallo":
+          return "Kettle's validation failed: " + a[ 0 ];
+        default:
+          return clave;
+      }
+    }
+  };
+
+  /**
+   * Igual, pero checkSteps no revisa los steps de {@code saltear} (por nombre; solo transformaciones). Lo
+   * usan los informes para no validar los steps que se conectarian a una base de archivo que no existe:
+   * Kettle la crearia vacia. Usa la seleccion de la copia y la restaura al terminar.
+   */
+  static ObjectNode validar( AbstractMeta copia, boolean detalle, Repository rep, IMetaStore ms,
+                             Set<String> saltear ) {
+    return validar( copia, detalle, rep, ms, saltear, TEXTOS_MCP );
+  }
+
+  /** Igual, con los textos de los chequeos propios que da {@code textos} (los informes los traducen). */
+  static ObjectNode validar( AbstractMeta copia, boolean detalle, Repository rep, IMetaStore ms,
+                             Set<String> saltear, TextosChequeo textos ) {
+    TextosChequeo tx = textos == null ? TEXTOS_MCP : textos;
     List<CheckResultInterface> r = new ArrayList<CheckResultInterface>();
     Map<String, ArrayNode> porStep = new LinkedHashMap<String, ArrayNode>();
     int[] cuenta = new int[ 4 ]; // error, advertencia, ok, comentario
@@ -352,7 +417,29 @@ final class RunMotor {
     try {
       if ( copia instanceof TransMeta ) {
         TransMeta tm = (TransMeta) copia;
-        tm.checkSteps( r, false, null, tm, rep, ms );
+        if ( saltear == null || saltear.isEmpty() ) {
+          tm.checkSteps( r, false, null, tm, rep, ms );
+        } else {
+          List<StepMeta> pasos = tm.getSteps();
+          boolean[] antes = new boolean[ pasos.size() ];
+          try {
+            int quedan = 0;
+            for ( int i = 0; i < pasos.size(); i++ ) {
+              antes[ i ] = pasos.get( i ).isSelected();
+              boolean va = !saltear.contains( pasos.get( i ).getName() );
+              pasos.get( i ).setSelected( va );
+              quedan += va ? 1 : 0;
+            }
+            // ojo: con onlySelected y NINGUN step seleccionado, checkSteps revisa todos
+            if ( quedan > 0 ) {
+              tm.checkSteps( r, true, null, tm, rep, ms );
+            }
+          } finally {
+            for ( int i = 0; i < pasos.size() && i < antes.length; i++ ) {
+              pasos.get( i ).setSelected( antes[ i ] );
+            }
+          }
+        }
       } else {
         JobMeta jm = (JobMeta) copia;
         jm.checkJobEntries( r, false, null, jm, rep, ms );
@@ -366,12 +453,12 @@ final class RunMotor {
     }
     if ( falloCheck != null ) {
       anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-        "Kettle's validation failed: " + falloCheck, detalle );
+        tx.texto( "kettle_fallo", falloCheck ), detalle );
     }
     if ( copia instanceof TransMeta ) {
-      chequeosPropios( (TransMeta) copia, porStep, cuenta, detalle );
+      chequeosPropios( (TransMeta) copia, porStep, cuenta, detalle, tx );
     } else {
-      chequeosPropios( (JobMeta) copia, porStep, cuenta, detalle );
+      chequeosPropios( (JobMeta) copia, porStep, cuenta, detalle, tx );
     }
     ObjectNode o = Tools.obj();
     o.put( "valid", cuenta[ 0 ] == 0 );
@@ -446,30 +533,30 @@ final class RunMotor {
     return false;
   }
 
-  private static void chequeosPropios( TransMeta tm, Map<String, ArrayNode> porStep, int[] cuenta, boolean detalle ) {
+  private static void chequeosPropios( TransMeta tm, Map<String, ArrayNode> porStep, int[] cuenta, boolean detalle,
+                                       TextosChequeo tx ) {
     for ( StepMeta s : tm.getSteps() ) {
       if ( s.isMissing() ) {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_ERROR,
-          "The plugin of this step is missing (type " + s.getStepID() + "): it cannot run", detalle );
+          tx.texto( "plugin_falta", s.getStepID() ), detalle );
       }
       if ( tm.nrSteps() > 1 && !tm.isStepUsedInTransHops( s ) && !tieneAdvertencia( porStep, s.getName() ) ) {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "Has no hops: it neither receives rows from nor sends rows to any step", detalle );
+          tx.texto( "sin_hops" ), detalle );
       }
       int salidas = TransOps.salidasNormales( tm, s );
       if ( salidas >= 2 && s.isDistributes() ) {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "Has " + salidas + " outputs in DISTRIBUTE mode: each output gets only part of the rows. If each one "
-            + "must get all of them, use set_output_mode with 'copy'", detalle );
+          tx.texto( "distribuye", salidas ), detalle );
       }
     }
     for ( TransHopMeta h : tm.getTransHops() ) {
       if ( h.getFromStep() == null || h.getToStep() == null ) {
         anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-          "There is a hop with an end that does not exist", detalle );
+          tx.texto( "hop_suelto" ), detalle );
       } else if ( !h.isEnabled() ) {
         anotar( porStep, cuenta, h.getFromStep().getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "The hop to '" + h.getToStep().getName() + "' is disabled: no rows go through it", detalle );
+          tx.texto( "hop_apagado", h.getToStep().getName() ), detalle );
       }
     }
   }
@@ -478,11 +565,12 @@ final class RunMotor {
     return c.getName() + "#" + c.getNr();
   }
 
-  private static void chequeosPropios( JobMeta jm, Map<String, ArrayNode> porStep, int[] cuenta, boolean detalle ) {
+  private static void chequeosPropios( JobMeta jm, Map<String, ArrayNode> porStep, int[] cuenta, boolean detalle,
+                                       TextosChequeo tx ) {
     JobEntryCopy start = jm.findStart();
     if ( start == null ) {
       anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-        "The job has no START entry: it cannot run", detalle );
+        tx.texto( "job_sin_start" ), detalle );
     }
     // por nombre+nr y no por identidad: los hops de un clon pueden apuntar a las entradas del original
     Set<String> alcanzables = new HashSet<String>();
@@ -504,24 +592,24 @@ final class RunMotor {
     for ( JobEntryCopy c : jm.getJobCopies() ) {
       if ( c.isMissing() ) {
         anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_ERROR,
-          "The plugin of this entry is missing: it cannot run", detalle );
+          tx.texto( "job_plugin_falta" ), detalle );
       }
       if ( jm.nrJobEntries() > 1 && !jm.isEntryUsedInHops( c ) ) {
         anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "Has no hops: it never runs", detalle );
+          tx.texto( "job_sin_hops" ), detalle );
       } else if ( start != null && !alcanzables.contains( clave( c ) ) ) {
         anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "Cannot be reached from START through enabled hops: it never runs", detalle );
+          tx.texto( "job_inalcanzable" ), detalle );
       }
     }
     for ( int i = 0; i < jm.nrJobHops(); i++ ) {
       JobHopMeta h = jm.getJobHop( i );
       if ( h.getFromEntry() == null || h.getToEntry() == null ) {
         anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-          "There is a hop with an end that does not exist", detalle );
+          tx.texto( "hop_suelto" ), detalle );
       } else if ( !h.isEnabled() ) {
         anotar( porStep, cuenta, h.getFromEntry().getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "The hop to '" + h.getToEntry().getName() + "' is disabled", detalle );
+          tx.texto( "job_hop_apagado", h.getToEntry().getName() ), detalle );
       }
     }
   }

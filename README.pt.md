@@ -38,6 +38,13 @@ os steps, conecta e configura cada um, confere os campos que saem de cada step, 
 reais de preview e executa a transformação. Toda alteração passa pelo desfazer do próprio Spoon, então o
 **Ctrl+Z** sempre funciona.
 
+**Relatórios.** O Spoon ganha uma nova perspectiva, **Relatórios**, que documenta sozinha a
+transformação ou o job aberto: capa, diagrama de fluxo, linhagem de campos, dicionário de dados, modelo
+das tabelas de destino, perfil de dados, métricas de execução com gráficos, validação, conexões e
+parâmetros. Exporta para HTML, PDF, Markdown (para Obsidian ou GitHub) e PowerPoint, com seu nome,
+instituição, logo e cores. O Claude pode montar o mesmo relatório e acrescentar uma narrativa curta
+escrita a partir dos números reais.
+
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
 
@@ -51,6 +58,7 @@ Kitchen.
 | *"Crie um job que rode estas duas transformações em sequência e pare se a primeira falhar."* | monta o job com as entradas e os hops de sucesso / falha |
 | *"O canvas está uma bagunça, organize."* | alinha os steps da esquerda para a direita, sem linhas cruzadas |
 | *"Por que este `.ktr` falha no Pan?"* | lê o arquivo, encontra o problema na lista de erros verificados e corrige |
+| *"Faça um relatório desta transformação para o trabalho, em PDF e PowerPoint, com uma conclusão curta."* | monta o relatório (linhagem, dicionário de dados, métricas…), escreve a conclusão com os dados reais e exporta os dois arquivos |
 
 ## Como funciona
 
@@ -75,8 +83,9 @@ flowchart LR
 ```
 
 - O **plugin do Spoon** é um plugin de ciclo de vida do Kettle. Quando o Spoon abre, ele sobe um servidor
-  MCP em `127.0.0.1:8765` com cerca de 50 ferramentas e aplica cada alteração na thread de interface do
-  Spoon, com desfazer.
+  MCP em `127.0.0.1:8765` com cerca de 60 ferramentas e aplica cada alteração na thread de interface do
+  Spoon, com desfazer. O mesmo jar acrescenta a perspectiva **Relatórios** ao seletor de perspectivas do
+  Spoon.
 - O **plugin do Claude Code `pentaho-live`** conecta o Claude a esse servidor e inclui a skill
   `pentaho-etl`, para que o Claude use os ids de step e o XML exatos em vez de adivinhar.
 
@@ -91,7 +100,7 @@ instala o plugin do Spoon e se configura sozinho.
 
 | Se você… | Baixe da [última release](https://github.com/IvI2511/pentaho-mcp/releases/latest) | Script do Windows |
 |---|---|---|
-| **já tem o PDI** | `pentaho-mcp.zip` (o plugin do Spoon, ~140 KB): descompacte em `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
+| **já tem o PDI** | `pentaho-mcp.zip` (o plugin do Spoon, ~11 MB com a biblioteca do PowerPoint): descompacte em `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
 | **não tem o PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE com o plugin já no lugar, ~370 MB) | `instalar.ps1 -InstalarPdi` |
 
 Depois abra o Spoon, reinicie o Claude Code (ou rode `/reload-plugins`) e peça seu primeiro ETL.
@@ -142,7 +151,7 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 
 | Peça | O que é | Onde |
 |---|---|---|
-| **Plugin do Spoon** | `@LifecyclePlugin` do Kettle que sobe o servidor MCP quando o Spoon abre (bytecode Java 8, compilado contra o PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
+| **Plugin do Spoon** | `@LifecyclePlugin` do Kettle que sobe o servidor MCP quando o Spoon abre, e a perspectiva Relatórios (`@SpoonPlugin`) no mesmo jar (bytecode Java 8, compilado contra o PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
 | **Skill `pentaho-etl`** | Formato `.ktr` / `.kjb`, catálogo de 216 steps e 77 job entries gerado a partir de uma instalação real, guia comentado dos steps mais usados, exemplos que rodam e os erros que o Pan e o Kitchen realmente dão | [`claude/skills/pentaho-etl/`](claude/skills/pentaho-etl/) |
 | **Conexão MCP `pentaho`** | Aponta o Claude Code para o plugin do Spoon (endereço configurável com `mcp_url`) | [`claude/.mcp.json`](claude/.mcp.json) |
 | **Instaladores** | Encontram ou baixam o PDI, instalam o plugin do Spoon e configuram o Claude Code e o Codex | [`instalar.ps1`](instalar.ps1), [`instalar.sh`](instalar.sh) |
@@ -160,7 +169,8 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Execução | Executar uma transformação ou um job, acompanhar o status e o log, parar |
 | Bancos de dados | Listar tipos de conexão; criar, testar e excluir conexões; ver tabelas e colunas; rodar consultas SQL (somente leitura, a menos que você peça escrita) |
 | Parâmetros | Listar, definir e excluir parâmetros |
-| Canvas | Adicionar notas, selecionar steps, organizar o layout |
+| Canvas | Adicionar notas, selecionar steps, organizar o layout, tirar uma imagem do canvas |
+| Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, JSON) com linhagem, dicionário de dados, métricas e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
 
 </details>
 
@@ -174,6 +184,10 @@ Tudo roda no seu computador. Não há servidores, contas, analytics nem telemetr
   mesmo digitar as senhas no Spoon.
 - Arquivos só são gravados onde você pede ao Claude para salvar; as transformações só rodam quando você
   pede.
+- Os relatórios nunca incluem senhas. Podem incluir nomes de hosts, caminhos de arquivos e, no perfil de
+  dados, valores reais dos seus dados (dá para ocultá-los nas configurações do relatório). O perfil e a
+  opção «Medir» rodam uma cópia da transformação só quando você pede, e essa cópia grava suas saídas como
+  uma execução normal.
 - O que as ferramentas devolvem (steps, nomes de campos, logs, linhas de preview) passa a fazer parte da
   sua conversa com o Claude, como qualquer outra coisa que você compartilhe.
 
@@ -201,12 +215,17 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
   que dependem dele. Os 216 steps do catálogo estão todos lá.
 - Abra o Spoon antes de iniciar o agente; se o agente iniciou primeiro, reinicie-o para que ele veja as
   ferramentas.
+- Relatórios: o PDF e as imagens dos diagramas usam o **Microsoft Edge ou o Google Chrome** (o Windows já
+  traz o Edge). Sem nenhum dos dois, o PDF sai pela caixa de impressão do navegador e, no PowerPoint, os
+  diagramas de linhagem e de tabelas viram tabelas. A pré-visualização dentro do Spoon usa o motor do
+  Internet Explorer que vem com o PDI, então não tem diagramas interativos: **Abrir no navegador** mostra o
+  relatório completo.
 
-## O que vem aí (0.4.0)
+## Novidades da 0.5.0
 
-Em preparação para a próxima versão: um relatório do ETL em Markdown com diagrama Mermaid, uma ferramenta que
-gera uma imagem do canvas, montar vários steps em uma só chamada, um único Ctrl+Z por ferramenta, nomes
-de ferramentas em inglês e o catálogo de steps como recursos MCP. Detalhes no
+A perspectiva **Relatórios** no Spoon e três ferramentas MCP que a acompanham: `build_report` (grava o
+relatório em qualquer formato), `get_report_data` (os dados do relatório em JSON, para o Claude escrever
+uma narrativa com números reais) e `show_report` (abre o relatório no Spoon). Detalhes no
 [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Desenvolvimento

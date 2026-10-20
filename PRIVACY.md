@@ -27,7 +27,16 @@ receives any of your data.
   type passwords yourself in Spoon.
 - **Files.** The plugin writes files only when you ask Claude to save a transformation or job, to the
   path you choose. Running a transformation writes whatever that transformation's own output steps write.
-- **Nothing is stored** by the plugins beyond what Spoon itself keeps (your open documents, recent files).
+- **Reports.** The Reports perspective and `build_report` write the report files only to the folder you
+  choose (by default an `informes` folder next to the `.ktr`/`.kjb`), plus previews in `%TEMP%\plive`,
+  which are deleted after a day. A report can contain host names, file paths, parameter values and, only
+  if you add the data profile, real values from your data (most frequent values, minimum and maximum; set
+  `"mostrar_valores": false` to leave them out). It never contains passwords. To print the PDF and draw
+  the diagrams, the plugin runs the Edge or Chrome already installed on your computer in headless mode,
+  with a temporary profile, on local files only.
+- **Nothing is stored** by the plugins beyond what Spoon itself keeps (your open documents, recent files)
+  and your report settings (author, institution, colors and logo), saved in
+  `<KETTLE_HOME>\.kettle\pentaho-live\` when you click "Save as default".
 
 ## Children
 

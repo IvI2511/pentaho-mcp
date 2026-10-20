@@ -9,7 +9,7 @@
 
 | Piece | Purpose | Where it ends up |
 |---|---|---|
-| **Spoon plugin** (`pentaho-mcp.zip`) | When Spoon opens, it starts the MCP server at `http://127.0.0.1:8765/mcp`: the agent edits the open transformation and the user watches the nodes appear | `data-integration/plugins/pentaho-mcp/` |
+| **Spoon plugin** (`pentaho-mcp.zip`) | When Spoon opens, it starts the MCP server at `http://127.0.0.1:8765/mcp`: the agent edits the open transformation and the user watches the nodes appear. It also adds the **Reports** perspective (HTML, PDF, Markdown and PowerPoint reports) | `data-integration/plugins/pentaho-mcp/` (only there: Spoon does not look for perspectives in `~/.kettle/plugins`) |
 | **Claude Code plugin** (marketplace `pentaho-tools`, plugin `pentaho-live`) | The `pentaho-etl` skill (.ktr/.kjb format, 216-step catalog) + the MCP connection | managed by Claude Code |
 | **Codex** (optional) | The MCP by URL + the same skill | `~/.codex/config.toml`, `~/.codex/skills/pentaho-etl/` |
 
@@ -85,7 +85,7 @@ is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-
 
 1. The user opens Spoon (`Spoon.bat` on Windows, `spoon.sh` on macOS/Linux).
 2. Restart the agent (or `/reload-plugins` in Claude Code) so it connects to the MCP.
-3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":54}`, or call the
+3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":57}`, or call the
    `status` tool of the `pentaho` MCP.
 4. Suggest a first try: *"build a transformation that reads a CSV, filters it and writes the result"*.
 
@@ -98,4 +98,6 @@ is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-
 | Port 8765 is taken | Another program uses it | Script with `-Puerto 8770` (sets `PENTAHO_MCP_PORT` for Spoon); in Claude Code set the plugin option `mcp_url` to `http://127.0.0.1:8770/mcp` in `/config` |
 | Spoon won't open | No Java | Install Java 11+ (`winget install EclipseAdoptium.Temurin.21.JRE`) |
 | Driver error connecting to MySQL / SQL Server / Oracle | PDI doesn't ship those drivers | Copy the connector `.jar` into `data-integration/lib/` and restart Spoon (MySQL: `mysql-connector-j-*.jar`, regular MySQL connection type) |
+| Spoon shows no **Reports** perspective (or misbehaves after the update) | The plugin is outside `data-integration/plugins/`, or the perspective was turned off | Check the folder; `PENTAHO_LIVE_REPORTS=off` in `~/.kettle/kettle.properties` turns the perspective off without touching the MCP: remove that line to bring it back |
+| The PDF comes out as `<name>.imprimir.html` | No Edge or Chrome on the computer | Open that file and choose "Save as PDF" in the print dialog, or install Edge/Chrome |
 | ChatGPT (web) can't connect | ChatGPT only uses public HTTPS MCP servers; this one listens on `127.0.0.1` on purpose | Use Claude Code or Codex on the same computer |

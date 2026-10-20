@@ -56,8 +56,12 @@ final class DocumentTools {
       Tools.schema().str( "name", "Transformation name (optional)", false ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
+        // Primero Data Integration: con otra perspectiva al frente (Informes) getActiveTransformation()
+        // le pregunta a esa perspectiva y daba null. La pestania nueva se lee del tab folder.
+        Docs.perspectivaPrincipal();
         sp.newTransFile();
-        TransMeta tm = sp.getActiveTransformation();
+        AbstractMeta nuevo = Docs.activo();
+        TransMeta tm = nuevo instanceof TransMeta ? (TransMeta) nuevo : null;
         if ( tm == null ) {
           throw new ToolError( "Spoon did not create the transformation" );
         }
@@ -71,8 +75,10 @@ final class DocumentTools {
       Tools.schema().str( "name", "Job name (optional)", false ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
+        Docs.perspectivaPrincipal(); // como en new_transformation
         sp.newJobFile();
-        JobMeta jm = sp.getActiveJob();
+        AbstractMeta nuevo = Docs.activo();
+        JobMeta jm = nuevo instanceof JobMeta ? (JobMeta) nuevo : null;
         if ( jm == null ) {
           throw new ToolError( "Spoon did not create the job" );
         }
@@ -101,6 +107,7 @@ final class DocumentTools {
               return Docs.describir( m );
             }
           }
+          Docs.perspectivaPrincipal(); // el usuario ve la pestania nueva, aunque estuviera en Informes
           sp.openFile( f.getPath(), false );
           AbstractMeta m = Docs.activo();
           if ( m == null ) {

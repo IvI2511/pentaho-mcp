@@ -165,13 +165,19 @@ final class ReportMotor {
     return l;
   }
 
-  /** Texto fijo en el idioma pedido. */
-  private static final class T {
+  /**
+   * Texto fijo en el idioma pedido. Package-private para que las secciones de Informes (SecFlujo)
+   * reusen mermaidTrans, mermaidJob, queHaceStep y queHaceEntrada con los mismos rotulos.
+   */
+  static final class T {
     private final Map<String, String> m;
+    /** en | es | pt: tambien el de los nombres de los tipos de step y de entrada (NombresPlugin). */
+    final String idioma;
 
     T( String idioma ) {
       Map<String, String> x = TEXTOS.get( idioma );
       m = x == null ? TEXTOS.get( "en" ) : x;
+      this.idioma = x == null ? "en" : idioma;
     }
 
     String s( String k ) {
@@ -255,7 +261,7 @@ final class ReportMotor {
     int i = 1;
     for ( StepMeta sm : orden ) {
       md.append( "| " ).append( i++ ).append( " | " ).append( celda( sm.getName() ) ).append( " | " )
-        .append( celda( tipoStep( sm ) ) ).append( " | " ).append( queHaceStep( tm, sm, t ) ).append( " |\n" );
+        .append( celda( tipoStep( sm, t ) ) ).append( " | " ).append( queHaceStep( tm, sm, t ) ).append( " |\n" );
     }
     md.append( '\n' );
 
@@ -391,7 +397,7 @@ final class ReportMotor {
       }
       List<String> lineas = new ArrayList<String>();
       lineas.add( et.toString() );
-      lineas.add( nombrePlugin( StepPluginType.class, sm.getStepID() ) );
+      lineas.add( NombresPlugin.nombre( StepPluginType.class, sm.getStepID(), t.idioma ) );
       int salidas = TransOps.salidasNormales( tm, sm );
       if ( salidas >= 2 ) {
         lineas.add( sm.isDistributes() ? t.n( "distributes", salidas ) : t.n( "copies_to", salidas ) );
@@ -482,10 +488,8 @@ final class ReportMotor {
     }
   }
 
-  private static String tipoStep( StepMeta sm ) {
-    String id = sm.getStepID();
-    String nombre = nombrePlugin( StepPluginType.class, id );
-    return nombre.equals( id ) ? id : nombre + " (" + id + ")";
+  private static String tipoStep( StepMeta sm, T t ) {
+    return NombresPlugin.conId( StepPluginType.class, sm.getStepID(), t.idioma );
   }
 
   /** Una linea de que hace el step, desde su configuracion; si no se conoce, la descripcion del plugin. */
@@ -557,7 +561,7 @@ final class ReportMotor {
       partes.clear(); // configuracion rara: caer a la descripcion del plugin
     }
     if ( partes.isEmpty() ) {
-      return celda( descripcionPlugin( StepPluginType.class, sm.getStepID() ) );
+      return celda( descripcionPlugin( StepPluginType.class, sm.getStepID(), t ) );
     }
     return unir( partes, "; " );
   }
@@ -636,7 +640,7 @@ final class ReportMotor {
     int i = 1;
     for ( JobEntryCopy c : orden ) {
       md.append( "| " ).append( i++ ).append( " | " ).append( celda( c.getName() ) ).append( " | " )
-        .append( celda( tipoEntrada( c ) ) ).append( " | " ).append( queHaceEntrada( c, t ) ).append( " |\n" );
+        .append( celda( tipoEntrada( c, t ) ) ).append( " | " ).append( queHaceEntrada( c, t ) ).append( " |\n" );
     }
     md.append( '\n' );
   }
@@ -678,7 +682,7 @@ final class ReportMotor {
       lineas.add( c.getName() );
       String plugin = c.getEntry() == null ? null : c.getEntry().getPluginId();
       if ( !c.isStart() ) {
-        lineas.add( nombrePlugin( JobEntryPluginType.class, plugin ) );
+        lineas.add( c.isDummy() ? "Dummy" : NombresPlugin.nombre( JobEntryPluginType.class, plugin, t.idioma ) );
       }
       if ( c.isMissing() ) {
         lineas.add( t.s( "missing_plugin" ) );
@@ -732,13 +736,9 @@ final class ReportMotor {
     return sb.toString();
   }
 
-  private static String tipoEntrada( JobEntryCopy c ) {
+  private static String tipoEntrada( JobEntryCopy c, T t ) {
     String id = c.getEntry() == null ? null : c.getEntry().getPluginId();
-    if ( id == null ) {
-      return "?";
-    }
-    String nombre = nombrePlugin( JobEntryPluginType.class, id );
-    return nombre.equals( id ) ? id : nombre + " (" + id + ")";
+    return NombresPlugin.conId( JobEntryPluginType.class, id, t.idioma );
   }
 
   static String queHaceEntrada( JobEntryCopy c, T t ) {
@@ -767,7 +767,7 @@ final class ReportMotor {
       partes.clear();
     }
     if ( partes.isEmpty() ) {
-      return celda( descripcionPlugin( JobEntryPluginType.class, e == null ? null : e.getPluginId() ) );
+      return celda( descripcionPlugin( JobEntryPluginType.class, e == null ? null : e.getPluginId(), t ) );
     }
     return unir( partes, "; " );
   }
@@ -873,23 +873,17 @@ final class ReportMotor {
     return id;
   }
 
+  /**
+   * La descripcion del tipo en el idioma de t (no en el de Spoon: NombresPlugin); si Kettle no la trae
+   * traducida, el nombre del tipo en ese idioma.
+   */
   private static String descripcionPlugin( Class<? extends org.pentaho.di.core.plugins.PluginTypeInterface> tipo,
-                                           String id ) {
+                                           String id, T t ) {
     if ( id == null ) {
       return "";
     }
-    try {
-      PluginInterface p = PluginRegistry.getInstance().findPluginWithId( tipo, id );
-      if ( p != null ) {
-        // algunas descripciones traen el {0} del salto de linea de los mensajes de Kettle
-        String d = vacioANull( p.getDescription() == null ? null
-          : p.getDescription().replaceAll( "\\{\\d+\\}", " " ) );
-        return d != null ? unaLinea( d ) : nombrePlugin( tipo, id );
-      }
-    } catch ( Exception ignored ) {
-      // sin registro
-    }
-    return id;
+    String d = NombresPlugin.descripcion( tipo, id, t.idioma );
+    return d != null ? unaLinea( d ) : NombresPlugin.nombre( tipo, id, t.idioma );
   }
 
   // ---------------------------------------------------------------- escapes

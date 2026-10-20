@@ -2,8 +2,13 @@
 
 Documento de diseño. Todas las firmas salen de `javap -p` sobre los jars de
 `C:\pdi\data-integration\lib` (`kettle-core`, `kettle-engine`,
-`kettle-ui-swt` 9.4.0.0-343, SWT 3.121). Donde se describe *comportamiento* (diálogos que abre,
+`kettle-ui-swt` 9.4.0.0-343, SWT 3.115.100). Donde se describe *comportamiento* (diálogos que abre,
 orden de llamadas) se leyó el bytecode con `javap -c`. Convención: `Spoon` = `org.pentaho.di.ui.spoon.Spoon`.
+
+> **Corrección (0.5.0).** El SWT que corre Spoon es **3.115.100** (`libswt\win64\swt.jar`, 4940r23,
+> diciembre de 2020); su `Browser` solo trae IE11 y no existe `SWT.EDGE`. `lib\org.eclipse.swt-3.121.0.jar`
+> es un cascarón OSGi de 19 KB, sin clases: no es el SWT que se usa (probado fuera de Spoon). Detalle en
+> `docs/informes-diseno.md` (Anexo B).
 
 Paquetes abreviados:
 
@@ -37,7 +42,7 @@ Paquetes abreviados:
 | Opción | Anotación / interfaz | Cuándo se llama | Veredicto |
 |---|---|---|---|
 | **Lifecycle** | `@core.annotations.LifecyclePlugin(id, name, classLoaderGroup="")` + `core.lifecycle.LifecycleListener` | `onStart` en `Spoon.createContents()` (hilo UI) tras `init(null)` y `openSpoon()`, antes de `start(commandLineOptions)` y `loadLastUsedFiles()`. `onExit` en `Spoon.quitFile`. | **Elegida.** Probada por `kettle-version-checker`; tipo registrado en `KettleEnvironment.init()`; solo la usa Spoon (Pan/Kitchen/Carte no la disparan). |
-| SpoonPlugin | `@ui.spoon.SpoonPlugin(...)` + `SpoonPluginInterface { applyToContainer(String, XulDomContainer); SpoonLifecycleListener getLifecycleListener(); SpoonPerspective getPerspective(); }` | `SpoonLifecycleListener.onEvent(SpoonLifeCycleEvent.STARTUP)` vía `SpoonPluginManager.notifyLifecycleListeners` | Funciona, pero obliga a implementar XUL/perspectiva (aunque sea devolviendo null) y su registro depende de `SpoonPluginType` que Spoon agrega en `main`. Más superficie para nada. |
+| SpoonPlugin | `@ui.spoon.SpoonPlugin(...)` + `SpoonPluginInterface { applyToContainer(String, XulDomContainer); SpoonLifecycleListener getLifecycleListener(); SpoonPerspective getPerspective(); }` | `SpoonLifecycleListener.onEvent(SpoonLifeCycleEvent.STARTUP)` vía `SpoonPluginManager.notifyLifecycleListeners` | Funciona, pero obliga a implementar XUL/perspectiva (aunque sea devolviendo null) y su registro depende de `SpoonPluginType`, que Spoon agrega en `registerUIPluginObjectTypes()` antes de `KettleEnvironment.init()` (no "en `main`"). Más superficie para nada **para el servidor MCP**; desde 0.5.0 se usa para la perspectiva Informes (ver abajo). |
 | ExtensionPoint | `@core.extension.ExtensionPoint(id, extensionPointId="SpoonStart", description)` + `ExtensionPointInterface.callExtensionPoint(LogChannelInterface, Object)` | En `Spoon.start()` tras `open()`; el objeto es `CommandLineOption[]` | Viable (`KettleExtensionPoint.SpoonStart` existe), pero el tipo `ExtensionPointPluginType` se registra en `KettleClientEnvironment` y el punto se llama una vez ya abierta la ventana; no aporta nada sobre Lifecycle. Útil después para enganchar `TransChanged`/`JobChanged`/`SpoonOpenSaveNew` si hiciera falta. |
 
 Secuencia real (bytecode de `Spoon`):
@@ -73,6 +78,21 @@ public interface LifeEventHandler { void consume(LifeEventInfo info); }   // Spo
 // core.annotations
 public @interface LifecyclePlugin { String id(); String name(); String classLoaderGroup() default ""; }
 ```
+
+**`@SpoonPlugin` (perspectiva Informes, 0.5.0) [bytecode y prueba fuera de Spoon].**
+
+* `Spoon.registerUIPluginObjectTypes()` agrega `SpoonPluginType` **antes** de `KettleEnvironment.init()`, así
+  que el mismo escaneo que encuentra el `@LifecyclePlugin` encuentra también el `@SpoonPlugin` del mismo jar.
+* `SpoonPluginType` solo escanea `plugins` y `plugins/repositories`, relativos al directorio de trabajo
+  (`data-integration`). **No** mira `~/.kettle/plugins` ni `KETTLE_PLUGIN_BASE_FOLDERS`: el jar tiene que
+  estar en `data-integration\plugins\pentaho-mcp\`.
+* `SpoonPluginManager.<clinit>` instancia el plugin dentro de `Spoon.init(null)` (paso 3 de 6), antes de
+  `lifecycleSupport.onStart`. Una `RuntimeException` en su constructor o en `getPerspective()` termina en
+  `ExceptionInInitializerError` y Spoon no arranca.
+* Las dos anotaciones **sin** `classLoaderGroup` cargan en el mismo `KettleURLClassLoader` y comparten los
+  estáticos. Con grupo en una sola hay dos loaders y el estado queda partido. `McpLifecycleListener.onStart`
+  compara las system properties `pentaho.live.loader.lifecycle` y `pentaho.live.loader.spoon` y lo avisa en
+  el log.
 
 ### 1.2 Cómo escanea Kettle la carpeta `plugins/` (no OSGi)
 
@@ -139,7 +159,15 @@ static <T> T call(Callable<T> task, long timeoutMs) throws Exception {
 * **Nunca** llamar desde la UI a algo que espere al hilo HTTP (deadlock).
 * Trabajo pesado (ejecutar, `getStepFields` sobre steps de BD, `checkSteps`) fuera del hilo UI: tomar snapshot en UI (`(TransMeta) transMeta.realClone(false)`) y procesar la copia en un worker.
 
-Perspectiva: si el usuario está en otra (Schedule, Model…), `getActiveMeta()` pregunta a la perspectiva activa.
+Perspectiva: si el usuario está en otra (Schedule, Model, Informes…), `getActiveMeta()` le pregunta a la
+perspectiva activa, y `getActiveTransformation()`, `getActiveJob()` y `getActiveUndoInterface()` pasan por
+`getActiveMeta()`. La perspectiva Informes devuelve `null` (así Ctrl+S no guarda una pestaña oculta), de modo
+que con Informes al frente esos métodos dan `null` aunque haya una pestaña de DI seleccionada. Para leer la
+pestaña de DI sin importar la perspectiva: `getActiveTransGraph()` / `getActiveJobGraph()`, que leen el tab
+folder directamente (la misma lógica que `MainSpoonPerspective.getActiveMeta()`). Es lo que hace
+`Docs.activo()` desde 0.5.0. `newTransFile()` y `newJobFile()` terminan con
+`loadPerspective("001-spoon-jobs")` (= `MainSpoonPerspective.ID`); igual, `new_transformation` / `new_job`
+activan antes la perspectiva principal y leen la pestaña nueva con `Docs.activo()`.
 
 ```java
 SpoonPerspectiveManager.getInstance().activatePerspective(MainSpoonPerspective.class)   // throws KettleException
@@ -152,11 +180,11 @@ SpoonPerspectiveManager.getInstance().getActivePerspective()                    
 
 ```java
 // Spoon
-public EngineMetaInterface getActiveMeta();          // TransMeta o JobMeta de la pestaña activa (null si navegador/bienvenida)
-public TransMeta getActiveTransformation();          // null si la activa no es trans
-public JobMeta   getActiveJob();
-public TransGraph getActiveTransGraph();
-public JobGraph   getActiveJobGraph();
+public EngineMetaInterface getActiveMeta();          // se lo pregunta a la PERSPECTIVA activa: en DI, TransMeta o JobMeta de la pestaña activa (null si navegador/bienvenida); con Informes al frente, null
+public TransMeta getActiveTransformation();          // null si la activa no es trans (pasa por getActiveMeta)
+public JobMeta   getActiveJob();                     // idem
+public TransGraph getActiveTransGraph();             // lee tabfolder.getSelected() directamente: anda con cualquier perspectiva
+public JobGraph   getActiveJobGraph();               // idem
 public TabItemInterface getActiveTabitem();
 public String getActiveTabText();
 public TabSet getTabSet();
@@ -242,7 +270,7 @@ public void setFilename(String);  public String getFilename();
 public void setName(String);      public String getName();   public void nameFromFilename();
 ```
 
-* **Nueva**: `spoon.newTransFile()` (en UI) → queda activa; leer con `spoon.getActiveTransformation()`. Alternativa con control total: `TransMeta tm = new TransMeta(); tm.setName(...); tm.addObserver(spoon); tm.setRepository(spoon.getRepository()); tm.setMetaStore(spoon.getMetaStore()); spoon.addTransGraph(tm); spoon.refreshTree();` (`addObserver(PDIObserver)` hace que el `*` del título de la pestaña siga a `setChanged`).
+* **Nueva**: `spoon.newTransFile()` (en UI) → queda activa; leerla con `spoon.getActiveTransGraph().getTransMeta()` (`getActiveTransformation()` da null si hay otra perspectiva al frente, ver §2). Alternativa con control total: `TransMeta tm = new TransMeta(); tm.setName(...); tm.addObserver(spoon); tm.setRepository(spoon.getRepository()); tm.setMetaStore(spoon.getMetaStore()); spoon.addTransGraph(tm); spoon.refreshTree();` (`addObserver(PDIObserver)` hace que el `*` del título de la pestaña siga a `setChanged`).
 * **Abrir por ruta**: `spoon.openFile(path, false)`. Ojo, puede abrir modales: si el archivo no existe (`SimpleMessageDialog` "MissingRecentFile") y si la extensión/raíz XML no es conocida (`MessageBox` "UnknownFileType"). El plugin debe validar antes `new File(path).isFile()` y extensión `.ktr`/`.kjb`. Si faltan plugins de steps, se loguea `KettleMissingPluginsException` y se cargan como `MissingTrans`. Si el archivo ya estaba abierto, conviene buscarlo antes en `getTabs()` (comparando `getFilename()`) y solo activar su pestaña.
 * **Guardar sin diálogo**: con filename seteado, `saveToFile` no abre diálogo:
   ```java

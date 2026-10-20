@@ -53,6 +53,10 @@ Databases: `list_database_types`, `add_connection` (better: the user types the p
 and hops, a table of what each step does, output fields, connections (never passwords), parameters
 and notes. `language` = `en` | `es` | `pt`; with `path` it saves a `.md`, without it returns the text.
 Use it when the user wants to hand in or document the ETL (assignment, Obsidian note, README).
+For a **full report** (flow, field lineage, data dictionary, run metrics with charts, target model,
+validation) as HTML, PDF, Markdown with images or PowerPoint: `build_report`; `get_report_data` first if
+you are going to add a narrative; `show_report` only if the user asks to see it in Spoon's Reports
+perspective. How, and how to write the narrative: `manual/04-informes.md`.
 
 **Clients without this skill** (another MCP client, Codex without the skill folder): the server also
 exposes these guides and the catalog as MCP resources, `pentaho://guide/...` (the manuals) and
@@ -70,6 +74,7 @@ Kitchen (see below). The user opens it in Spoon when you are done.
 | Golden rules and the skeleton of a `.ktr` | `manual/01-formato-ktr.md` (start with §0, the checklist) |
 | Jobs: START, TRANS, hops with a condition | `manual/02-formato-kjb.md` |
 | A Pan/Kitchen error, or an odd result with exit 0 | `manual/03-errores-comunes.md` |
+| Reports (`build_report`, formats, sections) and writing the narrative | `manual/04-informes.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

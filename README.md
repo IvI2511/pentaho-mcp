@@ -37,6 +37,12 @@ Open Spoon, ask Claude for an ETL in plain words, and watch it happen on the can
 steps, connects and configures them, checks the fields each one outputs, validates, previews real rows
 and runs the transformation. Every change goes through Spoon's own undo, so **Ctrl+Z** always works.
 
+**Reports.** Spoon gets a new **Reports** perspective that documents the open transformation or job by
+itself: cover, flow diagram, field lineage, data dictionary, target table model, data profile, run
+metrics with charts, validation, connections and parameters. It exports HTML, PDF, Markdown (for
+Obsidian or GitHub) and PowerPoint, with your name, institution, logo and colors. Claude can build the
+same report for you and add a short narrative written from the real numbers.
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 
@@ -50,6 +56,7 @@ Kitchen.
 | *"Make a job that runs these two transformations in order and stops if the first one fails."* | builds the job with its entries and success / failure hops |
 | *"The canvas is a mess, tidy it up."* | lays out the steps left to right, with no crossed lines |
 | *"Why does this `.ktr` fail in Pan?"* | reads it, finds the problem with the verified error list and fixes it |
+| *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
 
 ## How it works
 
@@ -74,7 +81,8 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with about 50 tools, and applies every edit on Spoon's UI thread with undo support.
+  `127.0.0.1:8765` with about 60 tools, and applies every edit on Spoon's UI thread with undo support.
+  The same jar adds the **Reports** perspective to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.
 
@@ -89,7 +97,7 @@ installs the Spoon plugin and configures itself.
 
 | If you… | Download from the [latest release](https://github.com/IvI2511/pentaho-mcp/releases/latest) | Windows script |
 |---|---|---|
-| **already have PDI** | `pentaho-mcp.zip` (the Spoon plugin, ~140 KB): unzip into `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
+| **already have PDI** | `pentaho-mcp.zip` (the Spoon plugin, ~11 MB with the PowerPoint library): unzip into `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
 | **don't have PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE with the plugin already in place, ~370 MB) | `instalar.ps1 -InstalarPdi` |
 
 Then open Spoon, restart Claude Code (or run `/reload-plugins`) and ask for your first ETL.
@@ -140,7 +148,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 
 | Piece | What it is | Where |
 |---|---|---|
-| **Spoon plugin** | Kettle `@LifecyclePlugin` that starts the MCP server when Spoon opens (Java 8 bytecode, built against PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
+| **Spoon plugin** | Kettle `@LifecyclePlugin` that starts the MCP server when Spoon opens, and the Reports perspective (`@SpoonPlugin`) in the same jar (Java 8 bytecode, built against PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
 | **Skill `pentaho-etl`** | `.ktr` / `.kjb` format, catalog of 216 steps and 77 job entries generated from a real install, an annotated guide to the most used steps, runnable examples and the errors Pan and Kitchen actually give | [`claude/skills/pentaho-etl/`](claude/skills/pentaho-etl/) |
 | **MCP connection `pentaho`** | Points Claude Code at the Spoon plugin (address configurable with `mcp_url`) | [`claude/.mcp.json`](claude/.mcp.json) |
 | **Installers** | Find or download PDI, install the Spoon plugin, configure Claude Code and Codex | [`instalar.ps1`](instalar.ps1), [`instalar.sh`](instalar.sh) |
@@ -158,7 +166,8 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Running | Run a transformation or job, follow its status and logs, stop it |
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
-| Canvas | Add notes, select steps, tidy the layout |
+| Canvas | Add notes, select steps, tidy the layout, take a screenshot of the canvas |
+| Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, JSON) with lineage, data dictionary, metrics and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
 
 </details>
 
@@ -171,6 +180,9 @@ Everything runs on your computer. There are no servers, accounts, analytics or t
 - Database passwords are masked before anything is returned to Claude. The recommended way is to type
   passwords yourself in Spoon.
 - Files are written only where you ask Claude to save; transformations run only when you ask.
+- Reports never include passwords. They can include host names, file paths and, in the data profile, real
+  values from your data (you can hide them in the report settings). The profile and the "Measure" option
+  run a copy of the transformation only when you ask, and that copy writes its outputs like a normal run.
 - What the tools return (steps, field names, logs, preview rows) becomes part of your conversation with
   Claude, like anything else you share.
 
@@ -197,12 +209,16 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - The bundled PDI 9.4 CE has no OSGi container (karaf), so the big-data and streaming steps that depend on
   it are missing. The 216 steps in the catalog are there.
 - Open Spoon before starting the agent; if the agent started first, restart it so it sees the tools.
+- Reports: the PDF and the diagram images use **Microsoft Edge or Google Chrome** (Windows ships Edge).
+  Without either, the PDF falls back to the browser's print dialog and PowerPoint shows the lineage and
+  table diagrams as tables. The preview inside Spoon uses the old Internet Explorer engine that PDI
+  bundles, so it has no interactive diagrams: **Open in browser** shows the full report.
 
-## What's next (0.4.0)
+## New in 0.5.0
 
-In progress for the next release: an ETL report in Markdown with a Mermaid diagram, a canvas screenshot
-tool, building several steps in one call, one Ctrl+Z per tool call, tool names in English and the step
-catalog exposed as MCP resources. See [`CHANGELOG.md`](CHANGELOG.md).
+The **Reports** perspective in Spoon and three MCP tools to go with it: `build_report` (writes the report
+in any format), `get_report_data` (the report data as JSON, so Claude can write a narrative from real
+numbers) and `show_report` (opens the report in Spoon). See [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Development
 

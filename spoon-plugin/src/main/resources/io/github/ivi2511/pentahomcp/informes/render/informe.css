@@ -1,0 +1,134 @@
+/* Informe de Pentaho Live (diseno §3.1 y §4.2). Mismo CSS en el HTML interactivo, en el liviano y en la
+   vista previa IE11: sin var(), sin grid, sin flex, sin dominant-baseline. RenderHtml reemplaza las marcas
+   {{...}} con los colores del Tema (validados como #RRGGBB) y los textos (ya escapados para CSS).
+   Dueno: WP7. */
+html { background: #FFFFFF; }
+body { margin: 0; padding: 0; background: #FFFFFF; color: {{texto}}; font-family: {{fuente}};
+  font-size: 14px; line-height: 1.5; -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+.hoja { position: relative; z-index: 1; max-width: 920px; margin: 0 auto; padding: 28px 40px 24px; }
+a { color: {{acento}}; text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { font-weight: 600; line-height: 1.25; }
+p { margin: 0 0 10px; }
+ul { margin: 0 0 10px; padding-left: 22px; }
+li { margin: 2px 0; }
+code, pre { font-family: {{fuenteCodigo}}; }
+
+/* ---- portada */
+.portada { margin: 0 0 22px; }
+.portada .banda { background: {{primario}}; color: {{textoBanda}}; padding: 26px 30px 22px; }
+.portada .banda:after { content: ""; display: block; clear: both; }
+.portada .logo { float: right; margin: 0 0 8px 20px; background: #FFFFFF; padding: 6px; }
+.portada .logo img { display: block; max-width: 180px; max-height: 64px; width: auto; height: auto; }
+.portada .tipo { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: {{tenueBanda}}; margin: 0 0 6px; }
+.portada h1 { margin: 0 0 6px; font-size: 28px; color: {{textoBanda}}; }
+.portada .subtitulo { font-size: 15px; color: {{suaveBanda}}; margin: 0; }
+.portada .generado { font-size: 12px; color: {{tenueBanda}}; margin: 12px 0 0; }
+.portada .cuerpo { border: 1px solid {{borde}}; border-top: 0; padding: 14px 30px 8px; }
+.portada .cuerpo ul.datos { list-style: none; padding: 0; margin: 0 0 8px; }
+.portada .cuerpo ul.datos li { padding: 4px 0; border-bottom: 1px solid {{fondoTenue}}; }
+.portada .cuerpo ul.datos li:last-child { border-bottom: 0; }
+.portada .cuerpo .resumen-portada { margin: 0 0 8px; color: {{tenue}}; }
+
+/* ---- indice y avisos generales */
+.indice { margin: 0 0 22px; padding: 14px 20px 10px; background: {{fondoTenue}}; border-left: 3px solid {{primario}}; }
+.indice h2 { margin: 0 0 6px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: {{tenue}}; border: 0; padding: 0; }
+.indice ol { margin: 0; padding-left: 22px; }
+.indice li { margin: 3px 0; }
+.indice li.omitida { color: {{tenue}}; }
+.indice .motivo { font-size: 12px; color: {{tenue}}; }
+
+/* ---- secciones */
+.seccion { margin: 30px 0 0; }
+.seccion h2 { margin: 0 0 10px; padding: 0 0 6px; font-size: 21px; color: {{primario}}; border-bottom: 2px solid {{primario}}; }
+.seccion h3 { margin: 18px 0 8px; font-size: 15px; color: {{texto}}; }
+.estado { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 8px; font-size: 11px;
+  font-weight: 600; letter-spacing: .5px; text-transform: uppercase; border: 1px solid; }
+.estado-parcial { color: #8A5A00; border-color: #D69E2E; background: #FFF8E6; }
+.estado-error { color: #9B1C1C; border-color: #C53030; background: #FDEDED; }
+.motivo-seccion { margin: 0 0 10px; font-size: 13px; color: {{tenue}}; }
+.resumen { margin: 0 0 14px; padding: 8px 12px; color: {{texto}}; background: {{fondo}}; border-left: 3px solid {{acento}}; }
+.bloque { margin: 0 0 16px; }
+.nota { margin: 4px 0 0; font-size: 12px; color: {{tenue}}; }
+.rotulo-ia { margin: 4px 0 0; font-size: 11px; font-style: italic; color: {{tenue}}; }
+.rotulo-ia span { display: inline-block; margin-right: 6px; padding: 0 5px; font-style: normal; font-weight: 600;
+  color: {{acento}}; border: 1px solid {{acento}}; }
+.ia { border-left: 2px solid {{acento40}}; padding-left: 10px; }
+
+/* ---- tablas */
+.tabla { overflow-x: auto; }
+table.datos { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.datos th { background: {{cabecera}}; color: {{primario}}; text-align: left; font-weight: 600; padding: 6px 10px;
+  border-bottom: 2px solid {{primario}}; vertical-align: bottom; }
+table.datos td { padding: 5px 10px; border-bottom: 1px solid {{borde}}; vertical-align: top; }
+table.datos tr.par td { background: #FAFBFC; }
+table.datos .r { text-align: right; }
+table.datos .c { text-align: center; }
+.pie-tabla { margin: 4px 0 0; font-size: 12px; color: {{tenue}}; }
+.titulo-bloque { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: {{texto}}; }
+
+/* ---- indicadores (tarjetas inline-block) */
+.tarjetas { margin: 0 -6px; font-size: 0; }
+.tarjeta { display: inline-block; vertical-align: top; min-width: 144px; max-width: 280px; margin: 0 6px 12px; padding: 10px 12px 9px;
+  border: 1px solid {{borde}}; border-top: 3px solid {{primario}}; background: #FFFFFF; font-size: 14px; }
+.tarjeta .etiqueta { font-size: 11px; color: {{tenue}}; text-transform: uppercase; letter-spacing: .5px; }
+.tarjeta .valor { font-size: 22px; font-weight: 600; color: {{texto}}; line-height: 1.25; margin: 2px 0 0;
+  word-wrap: break-word; }
+.tarjeta .detalle { font-size: 12px; color: {{tenue}}; word-wrap: break-word; }
+.tarjeta.ok { border-top-color: {{secundario}}; }
+.tarjeta.warn { border-top-color: #D69E2E; }
+.tarjeta.error { border-top-color: #C53030; }
+
+/* ---- avisos */
+.aviso { margin: 0 0 12px; padding: 8px 12px; border-left: 4px solid; font-size: 13px; }
+.aviso strong.nivel { margin-right: 6px; }
+.aviso-info { border-color: {{acento}}; background: {{acento10}}; }
+.aviso-warn { border-color: #D69E2E; background: #FFF8E6; }
+.aviso-error { border-color: #C53030; background: #FDEDED; }
+
+/* ---- figuras: diagramas, graficos e imagenes */
+.figura { margin: 0 0 16px; }
+.figura img { max-width: 100%; height: auto; border: 1px solid {{borde}}; }
+.figura .lienzo { margin: 0 0 10px; }
+.figura .svg { text-align: center; overflow: hidden; }
+.figura .svg svg { max-width: 100%; overflow: hidden; }
+.figura .leyenda { margin: 4px 0 0; font-size: 12px; color: {{tenue}}; }
+pre.mermaid { margin: 0; padding: 10px; background: #FFFFFF; border: 1px solid {{borde}}; text-align: center;
+  white-space: pre-wrap; font-size: 12px; color: {{tenue}}; }
+pre.mermaid[data-processed] { color: {{texto}}; }
+.mermaid-fallo { display: none; }
+.pendiente { margin: 0 0 8px; padding: 18px 12px; text-align: center; font-size: 13px; color: {{tenue}};
+  background: {{fondoTenue}}; border: 1px dashed {{borde}}; }
+.alternativa { margin: 8px 0 0; }
+
+/* ---- pie y marca de agua */
+.pie { margin: 32px 0 0; padding: 8px 0 0; border-top: 1px solid {{borde}}; font-size: 7.5pt; color: {{tenue}}; }
+.pie svg { width: 14px; height: 8px; vertical-align: -1px; margin-right: 5px; }
+.marca { position: fixed; right: 6mm; bottom: 6mm; width: 151px; height: 86px; z-index: 0; pointer-events: none; opacity: 0.08; }
+.marca svg { width: 151px; height: 86px; }
+
+/* Chromium escala los SVG manteniendo la proporcion; IE11 no entiende @supports y se queda con el alto fijo
+   (con height:auto IE11 dibuja el SVG con 150 px de alto). */
+@supports (display: grid) {
+  .figura .svg svg { height: auto; }
+}
+
+@media print {
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hoja { max-width: none; padding: 0; }
+  a { color: {{texto}}; }
+  tr, .tarjeta, .aviso, .figura, .pendiente { page-break-inside: avoid; break-inside: avoid; }
+  h2, h3, .titulo-bloque { page-break-after: avoid; break-after: avoid; }
+  .tabla { overflow: visible; }
+}
+/*==IMPRIMIR==*/
+@page { size: {{pagina}}; margin: 18mm 16mm 20mm;
+  @bottom-left { content: "{{pie}}"; font-family: {{fuente}}; font-size: 7.5pt; color: {{tenue}}; }
+  @bottom-right { content: "{{pagina_txt}} " counter(page) " {{de_txt}} " counter(pages); font-family: {{fuente}};
+    font-size: 7.5pt; color: {{tenue}}; } }
+.seccion { page-break-before: always; break-before: page; margin-top: 0; }
+/* una seccion corta (validacion, conexiones...) sigue en la misma pagina, entera */
+.seccion.corta { page-break-before: auto; break-before: auto; page-break-inside: avoid; break-inside: avoid;
+  margin-top: 28px; }
+.pie { display: none; }
+svg { max-width: 100%; }

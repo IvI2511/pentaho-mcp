@@ -24,6 +24,7 @@ public class McpLifecycleListener implements LifecycleListener {
 
   static final String VERSION = "0.4.0";
 
+
   /** Llega a la IA en el initialize de MCP: como trabajar con estas herramientas. */
   static final String INSTRUCCIONES =
     "This server edits the transformation or job open in Spoon (Pentaho Data Integration 9.4) LIVE: the "
@@ -36,8 +37,11 @@ public class McpLifecycleListener implements LifecycleListener {
       + "if there are branches or lookups, so no lines cross; (7) save with a .ktr/.kjb path. Place steps left "
       + "to right, ~150 px apart. If a step has several outputs, by default each one gets a copy of every row "
       + "(change it with set_output_mode). generate_report writes a Markdown report of the document and "
-      + "canvas_screenshot returns an image of the canvas to check the drawing. Every change can be undone "
-      + "with Ctrl+Z in Spoon. The step catalog and the guides are also available as MCP resources "
+      + "canvas_screenshot returns an image of the canvas to check the drawing. To document or hand in an ETL "
+      + "with diagrams, lineage, data dictionary and run metrics, use build_report (HTML, PDF, Markdown, "
+      + "PowerPoint, JSON): call get_report_data first if you want to add a narrative based on the real data, "
+      + "and show_report only when the user asks to see it in Spoon's Reports perspective. Every change can be "
+      + "undone with Ctrl+Z in Spoon. The step catalog and the guides are also available as MCP resources "
       + "(pentaho://...) for clients that do not have the pentaho-etl skill.";
 
   private McpHttpServer server;
@@ -49,6 +53,11 @@ public class McpLifecycleListener implements LifecycleListener {
   @Override
   public void onStart( LifeEventHandler handler ) throws LifecycleException {
     // Nunca dejar escapar una excepcion: una LifecycleException severa muestra un MessageBox en Spoon.
+    try {
+      chequearLoaders();
+    } catch ( Throwable t ) {
+      LOG.logDebug( "Pentaho MCP: no se pudo chequear los classloaders: " + t );
+    }
     try {
       int port = McpConfig.port();
       server = new McpHttpServer( port, VERSION, INSTRUCCIONES );
@@ -64,6 +73,35 @@ public class McpLifecycleListener implements LifecycleListener {
         + server.toolCount() + " herramientas)" );
     } catch ( Throwable t ) {
       LOG.logError( "Pentaho MCP: no se pudo arrancar el servidor", t );
+    }
+  }
+
+  /**
+   * El @LifecyclePlugin (este) y el @SpoonPlugin de la perspectiva Informes tienen que cargar en el
+   * mismo KettleURLClassLoader para compartir los estaticos (Docs, InformeServicio...). Cada punto de
+   * entrada deja la identidad de su loader en una system property (Interruptor.PROP_LOADER_*: las
+   * system properties cruzan loaders; una clase compartida no serviria, porque estaria duplicada).
+   * Spoon instancia el @SpoonPlugin en Spoon.init(), antes de este onStart, asi que aca ya estan las
+   * dos (diseno §1.3). Solo deja mensajes en el log.
+   */
+  static void chequearLoaders() {
+    String yo = Interruptor.identidadLoader( McpLifecycleListener.class.getClassLoader() );
+    String previo = System.getProperty( Interruptor.PROP_LOADER_LIFECYCLE );
+    if ( previo != null && !previo.equals( yo ) ) {
+      LOG.logError( "Pentaho Live: hay DOS copias del plugin cargadas (" + previo + " y " + yo + "). Dejar "
+        + "una sola en data-integration\\plugins\\pentaho-mcp (y ninguna en ~\\.kettle\\plugins) y reiniciar "
+        + "Spoon." );
+    }
+    Interruptor.marcarLoader( Interruptor.PROP_LOADER_LIFECYCLE, McpLifecycleListener.class );
+    String spoon = System.getProperty( Interruptor.PROP_LOADER_SPOON );
+    if ( spoon == null ) {
+      LOG.logBasic( "Pentaho Live: la perspectiva Informes no se registro (el jar tiene que estar en "
+        + "data-integration\\plugins\\pentaho-mcp). Las herramientas MCP funcionan igual." );
+    } else if ( !spoon.equals( yo ) ) {
+      LOG.logError( "Pentaho Live: la perspectiva Informes y el servidor MCP cargaron con classloaders "
+        + "distintos (" + spoon + " / " + yo + "): no comparten estado y show_report no va a andar. Causa "
+        + "habitual: el jar copiado en dos carpetas de plugins, o un classLoaderGroup en una sola de las dos "
+        + "anotaciones. Reinstalar el plugin." );
     }
   }
 
