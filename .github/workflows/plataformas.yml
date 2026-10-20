@@ -378,6 +378,13 @@ jobs:
           screencapture -x "$EVID/swt-prueba.png"; wait
           head -40 "$EVID/geometria-swt-prueba.txt"
 
+          echo "== ventana SWT mínima con Java2D/AWT en el mismo proceso"
+          "$JAVA_HOME/bin/java" -XstartOnFirstThread -cp "$PDI/libswt/osx64/swt.jar" "$CI/SwtPrueba.java" 25000 awt > "$EVID/swt-prueba-awt.log" 2>&1 &
+          sleep 15
+          osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is $(pgrep -f SwtPrueba | head -1)) to true"
+          sleep 2; screencapture -x "$EVID/swt-prueba-awt.png"; wait
+          cat "$EVID/swt-prueba-awt.log"
+
           echo "== Spoon"
           ( cd "$PDI" && nohup /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 & )
           for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > "$EVID/ping.json" 2>/dev/null && break; sleep 1; done

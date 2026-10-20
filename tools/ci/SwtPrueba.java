@@ -12,15 +12,25 @@ import org.eclipse.swt.widgets.TreeItem;
 /**
  * Ventana SWT mínima con lo mismo que usa la ventana principal de Spoon (SashForm, Tree, CTabFolder,
  * Canvas pintado con GC), para separar «SWT no dibuja en esta Mac» de «Spoon no arma su ventana».
- * Se corre con el swt.jar de PDI:  java -XstartOnFirstThread -cp libswt/osx64/swt.jar SwtPrueba.java 30000
- * y se cierra sola a los N ms (por defecto 20000).
+ * Se corre con el swt.jar de PDI:  java -XstartOnFirstThread -cp libswt/osx64/swt.jar SwtPrueba.java 30000 [awt]
+ * y se cierra sola a los N ms (por defecto 20000). Con «awt», antes de armar la ventana usa Java2D y el
+ * Toolkit de AWT en el mismo proceso, como Spoon cuando Batik rasteriza los íconos SVG.
  */
 public class SwtPrueba {
   public static void main( String[] args ) {
     final Display d = new Display();
+    boolean awt = args.length > 1 && args[ 1 ].equals( "awt" );
+    if ( awt ) {
+      java.awt.image.BufferedImage img = new java.awt.image.BufferedImage( 64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB );
+      java.awt.Graphics2D g = img.createGraphics();
+      g.drawString( "awt", 4, 32 );
+      g.dispose();
+      System.out.println( "Java2D/AWT inicializado: " + java.awt.Toolkit.getDefaultToolkit().getClass().getName()
+        + ", headless=" + java.awt.GraphicsEnvironment.isHeadless() );
+    }
     final Shell s = new Shell( d );
     s.setText( "SWT " + SWT.getPlatform() + " " + SWT.getVersion() + " / Java " + System.getProperty( "java.version" )
-      + " " + System.getProperty( "os.arch" ) );
+      + " " + System.getProperty( "os.arch" ) + ( awt ? " + AWT" : "" ) );
     s.setLayout( new FillLayout() );
     SashForm sash = new SashForm( s, SWT.HORIZONTAL );
     Tree t = new Tree( sash, SWT.BORDER );
