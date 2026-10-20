@@ -75,7 +75,11 @@ you to close it first. Uninstall it from **Settings → Apps** (it also takes `p
 > Option A or B.
 
 Agents (with the user's permission): `Instalador_PentahoLive_X.Y.Z.exe /VERYSILENT /SUPPRESSMSGBOXES`
-does a full install; add `/TYPE=pluginonly /PDIHOME="C:\path\to\data-integration"` for plugin only.
+does a full install; add `/TYPE=pluginonly /PDIHOME="C:\path\to\data-integration"` for plugin only, and
+`/TASKS=""` to skip the desktop shortcut and the Claude Code / Codex setup (both are on by default). Run
+it from PowerShell or cmd: **Git Bash rewrites `/VERYSILENT` as a path** (`C:/Program Files/Git/VERYSILENT`)
+and the normal wizard opens and waits for clicks. From Git Bash, prefix the command with
+`MSYS_NO_PATHCONV=1`. Silent uninstall: `unins000.exe /VERYSILENT` in the install folder.
 
 ## What the script returns (for the agent)
 
