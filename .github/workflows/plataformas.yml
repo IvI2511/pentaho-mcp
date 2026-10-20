@@ -1,0 +1,263 @@
+# Prueba de punta a punta en macOS (chip Apple con Rosetta, Intel) y Linux: instala el PDI del último
+# release con instalar.sh, corre un ejemplo con Pan, abre Spoon, espera al servidor MCP del plugin y
+# arma, valida, previsualiza, fotografía y guarda una transformación por MCP. Deja la evidencia
+# (capturas, logs, respuestas) como artifacts. Resultados y pasos para cada plataforma: docs/plataformas.md
+name: Plataformas
+
+on:
+  push:
+    branches: ["ci/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    name: ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # SWT de PDI 9.4 para macOS es solo x86_64 y spoon.sh corta en arm64: Java x64 + Rosetta + arch
+          - id: macos-arm64-rosetta
+            runner: macos-15
+            java_arch: x64
+            prefijo: arch -x86_64
+          - id: macos-intel
+            runner: macos-15-intel
+            java_arch: x64
+            prefijo: ""
+          - id: linux-x64
+            runner: ubuntu-latest
+            java_arch: x64
+            prefijo: ""
+    env:
+      PREFIJO: ${{ matrix.prefijo }}
+      PLATAFORMA: ${{ matrix.id }}
+      HERRAMIENTAS: "54"
+      SKIP_WEBKITGTK_CHECK: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preparar carpetas
+        run: |
+          echo "EVID=$RUNNER_TEMP/evidencia" >> "$GITHUB_ENV"
+          echo "PDI=$RUNNER_TEMP/pentaho/data-integration" >> "$GITHUB_ENV"
+          echo "KETTLE_HOME=$RUNNER_TEMP/kettle-home" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/evidencia" "$RUNNER_TEMP/kettle-home/.kettle"
+          # KETTLE_HOME nuevo, sin el diálogo de tips ni la página de bienvenida (navegador embebido)
+          printf '%s\n' ShowTips=N ShowWelcomePageOnStartup=N ShowRepositoriesAtStartup=N ShowExitWarning=N \
+            > "$RUNNER_TEMP/kettle-home/.kettle/.spoonrc"
+          : > "$RUNNER_TEMP/kettle-home/.kettle/kettle.properties"
+          date +%s > "$RUNNER_TEMP/t0"
+
+      - name: Rosetta (chip Apple)
+        if: matrix.prefijo == 'arch -x86_64'
+        run: |
+          softwareupdate --install-rosetta --agree-to-license || true
+          arch -x86_64 /usr/bin/true && echo "Rosetta OK: un proceso x86_64 ve sysctl.proc_translated=$(arch -x86_64 sysctl -n sysctl.proc_translated)"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          architecture: ${{ matrix.java_arch }}
+
+      - name: Librerías de Linux (GTK 2 para SWT 4.9, Xvfb)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          # spoon.sh exporta SWT_GTK3=0: el SWT 4.9 de PDI 9.4 usa GTK 2
+          sudo apt-get install -y -qq libgtk2.0-0t64 libxtst6 xvfb imagemagick > /dev/null
+          dpkg -l libgtk2.0-0t64 xvfb | tail -2
+
+      - name: Sistema
+        run: |
+          {
+            echo "plataforma: $PLATAFORMA (runner ${{ matrix.runner }})"
+            uname -a
+            if [ "$RUNNER_OS" = macOS ]; then sw_vers; sysctl -n machdep.cpu.brand_string; fi
+            if [ "$RUNNER_OS" = Linux ]; then grep PRETTY_NAME /etc/os-release; fi
+            echo "JAVA_HOME=$JAVA_HOME"
+            file "$JAVA_HOME/bin/java"
+            $PREFIJO "$JAVA_HOME/bin/java" -version 2>&1
+          } | tee "$EVID/sistema.txt"
+
+      - name: Permisos en el zip del release
+        run: |
+          python3 -I tools/ci/permisos_zip.py \
+            https://github.com/IvI2511/pentaho-mcp/releases/latest/download/pdi-ce-9.4-con-pentaho-mcp.zip \
+            data-integration/spoon.sh data-integration/pan.sh data-integration/spoon.command \
+            "Data Integration.app/Contents/MacOS/JavaApplicationStub" | tee "$EVID/permisos-zip.txt" || true
+
+      - name: instalar.sh --instalar-pdi
+        run: |
+          t=$(date +%s)
+          bash instalar.sh --instalar-pdi --destino "$RUNNER_TEMP/pentaho" --sin-claude --sin-codex 2>&1 \
+            | tee "$EVID/instalar.log"
+          echo "instalar.sh: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
+          {
+            echo "Permisos en disco después de instalar.sh:"
+            ls -l "$PDI/spoon.sh" "$PDI/pan.sh" "$PDI/spoon.command" \
+              "$PDI/Data Integration.app/Contents/MacOS/JavaApplicationStub"
+            ls -d "$PDI"/plugins/pentaho-mcp* && ls "$PDI"/plugins/pentaho-mcp*/
+          } | tee "$EVID/permisos-disco.txt"
+          test -x "$PDI/spoon.sh"
+
+      - name: Pan con el ejemplo 01 (sin base de datos)
+        run: |
+          cp -R claude/skills/pentaho-etl/manual/ejemplos "$RUNNER_TEMP/ejemplos"
+          t=$(date +%s)
+          set +e
+          $PREFIJO /bin/sh "$PDI/pan.sh" -file="$RUNNER_TEMP/ejemplos/01_generar_constantes.ktr" -level=Basic \
+            > "$EVID/pan-ejemplo01.log" 2>&1
+          codigo=$?
+          set -e
+          echo "Pan ejemplo 01: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
+          grep -E "Finished processing|ERROR|not yet supported" "$EVID/pan-ejemplo01.log" || true
+          echo "código de salida de Pan: $codigo"
+          ls -l "$RUNNER_TEMP/ejemplos/salida/"
+          cp "$RUNNER_TEMP"/ejemplos/salida/*.csv "$EVID/" || true
+          head -3 "$RUNNER_TEMP/ejemplos/salida/01_constantes.csv"
+          filas=$(( $(wc -l < "$RUNNER_TEMP/ejemplos/salida/01_constantes.csv") - 1 ))
+          echo "filas en 01_constantes.csv: $filas"
+          test "$codigo" = 0
+          test "$filas" = 5
+          grep -qE "Escribir CSV.0 - Finished processing \(I=0, O=[0-9]+, R=5, W=5, U=0, E=0\)" "$EVID/pan-ejemplo01.log"
+
+      - name: Abrir Spoon y esperar el MCP (hasta 240 s)
+        run: |
+          cd "$PDI"
+          t=$(date +%s)
+          if [ "$RUNNER_OS" = Linux ]; then
+            nohup xvfb-run -n 99 -s "-ac -screen 0 1600x1000x24" /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 &
+          else
+            nohup $PREFIJO /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 &
+          fi
+          echo $! > "$RUNNER_TEMP/spoon.pid"
+          ok=0
+          for i in $(seq 1 240); do
+            if r=$(curl -fsS --max-time 3 http://127.0.0.1:8765/ping 2>/dev/null) && echo "$r" | grep -q '"ok":true'; then
+              ok=1; break
+            fi
+            kill -0 "$(cat "$RUNNER_TEMP/spoon.pid")" 2>/dev/null || { echo "Spoon terminó antes de contestar"; break; }
+            sleep 1
+          done
+          s=$(( $(date +%s) - t ))
+          echo "Spoon hasta /ping: $s s" >> "$EVID/tiempos.txt"
+          echo "$r" | tee "$EVID/ping.json"
+          echo "segundos hasta /ping: $s"
+          if [ "$ok" != 1 ]; then tail -60 "$EVID/spoon-salida.log"; exit 1; fi
+          echo "$r" | grep -q '"spoon":true'
+
+      - name: Cliente MCP (initialize ... save)
+        run: |
+          sleep 5   # que Spoon termine de abrir la ventana y los archivos recientes
+          t=$(date +%s)
+          python3 -I tools/ci/cliente_mcp.py --salida "$EVID" --herramientas "$HERRAMIENTAS" --plataforma "$PLATAFORMA"
+          echo "cliente MCP: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
+
+      - name: Pan con el .ktr que guardó Spoon
+        run: |
+          set +e
+          $PREFIJO /bin/sh "$PDI/pan.sh" -file="$EVID/ci_plataformas.ktr" -level=Basic > "$EVID/pan-guardado.log" 2>&1
+          codigo=$?
+          set -e
+          grep -E "Finished processing|ERROR" "$EVID/pan-guardado.log" || true
+          echo "código de salida de Pan: $codigo"
+          test "$codigo" = 0
+          grep -qE "Dummy.0 - Finished processing \(I=0, O=0, R=5, W=5, U=0, E=0\)" "$EVID/pan-guardado.log"
+
+      - name: Captura de la pantalla
+        if: always()
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            import -display :99 -window root "$EVID/pantalla.png" || true
+          else
+            screencapture -x "$EVID/pantalla.png" || true
+          fi
+          ls -l "$EVID"
+
+      - name: Cerrar Spoon y resumen
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/spoon.pid" ] && kill "$(cat "$RUNNER_TEMP/spoon.pid")" 2>/dev/null || true
+          pkill -f launcher/launcher.jar 2>/dev/null || true
+          echo "total del job: $(( $(date +%s) - $(cat "$RUNNER_TEMP/t0") )) s" >> "$EVID/tiempos.txt"
+          mkdir -p "$EVID/pdi-logs" && cp "$PDI"/logs/* "$EVID/pdi-logs/" 2>/dev/null || true
+          {
+            echo "## $PLATAFORMA"
+            echo '```'
+            cat "$EVID/tiempos.txt" 2>/dev/null
+            grep -E "^(OK|FALLA|RESULTADO)" "$EVID/cliente.log" 2>/dev/null
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evidencia-${{ matrix.id }}
+          path: ${{ runner.temp }}/evidencia
+          if-no-files-found: warn
+
+  # Documenta qué pasa con un Java arm64 nativo: spoon.sh corta («this Mac platform [arm64] is not yet
+  # supported») y, aun saltando ese control, el SWT x86_64 no carga en una JVM arm64. Pan sí corre nativo.
+  macos-arm64-nativo:
+    name: macos-arm64-nativo (se espera el corte)
+    runs-on: macos-15
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          architecture: aarch64
+
+      - name: Instalar y probar
+        run: |
+          EVID="$RUNNER_TEMP/evidencia"; PDI="$RUNNER_TEMP/pentaho/data-integration"
+          export KETTLE_HOME="$RUNNER_TEMP/kettle-home"
+          mkdir -p "$EVID" "$KETTLE_HOME/.kettle"
+          printf '%s\n' ShowTips=N ShowWelcomePageOnStartup=N > "$KETTLE_HOME/.kettle/.spoonrc"
+          file "$JAVA_HOME/bin/java" | tee "$EVID/sistema.txt"
+          bash instalar.sh --instalar-pdi --destino "$RUNNER_TEMP/pentaho" --sin-claude --sin-codex > "$EVID/instalar.log" 2>&1
+          cp -R claude/skills/pentaho-etl/manual/ejemplos "$RUNNER_TEMP/ejemplos"
+
+          # corre un comando con tope de N segundos (macOS no trae timeout)
+          tope() { s=$1; shift; "$@" & p=$!; for i in $(seq 1 "$s"); do kill -0 $p 2>/dev/null || break; sleep 1; done
+                   kill $p 2>/dev/null; pkill -f launcher/launcher.jar 2>/dev/null; wait $p; }
+
+          cd "$PDI"
+          echo "== 1. spoon.sh con Java arm64"
+          tope 60 /bin/sh ./spoon.sh > "$EVID/1-spoon-arm64.log" 2>&1; echo "código: $?" >> "$EVID/1-spoon-arm64.log"
+          cat "$EVID/1-spoon-arm64.log"
+          echo "== 2. pan.sh con Java arm64"
+          tope 120 /bin/sh ./pan.sh -file="$RUNNER_TEMP/ejemplos/01_generar_constantes.ktr" -level=Basic \
+            > "$EVID/2-pan-arm64.log" 2>&1; echo "código: $?" >> "$EVID/2-pan-arm64.log"
+          tail -5 "$EVID/2-pan-arm64.log"
+          echo "== 3. pan.sh desde un shell x86_64 (arch -x86_64) y Java arm64"
+          tope 180 arch -x86_64 /bin/sh ./pan.sh -file="$RUNNER_TEMP/ejemplos/01_generar_constantes.ktr" -level=Basic \
+            > "$EVID/3-pan-shell-x86-java-arm64.log" 2>&1; echo "código: $?" >> "$EVID/3-pan-shell-x86-java-arm64.log"
+          grep -E "Finished processing|ERROR|código" "$EVID/3-pan-shell-x86-java-arm64.log" || true
+          echo "== 4. spoon.sh desde un shell x86_64 y Java arm64"
+          tope 120 arch -x86_64 /bin/sh ./spoon.sh > "$EVID/4-spoon-shell-x86-java-arm64.log" 2>&1
+          echo "código: $?" >> "$EVID/4-spoon-shell-x86-java-arm64.log"
+          grep -iE "UnsatisfiedLink|incompatible architecture|have 'x86_64'|need 'arm64|Exception|código" \
+            "$EVID/4-spoon-shell-x86-java-arm64.log" | head -20 || true
+
+          # verde solo si todo pasa como está documentado en docs/plataformas.md
+          grep -q "this Mac platform \[arm64\] is not yet supported" "$EVID/1-spoon-arm64.log"
+          grep -q "this Mac platform \[arm64\] is not yet supported" "$EVID/2-pan-arm64.log"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evidencia-macos-arm64-nativo
+          path: ${{ runner.temp }}/evidencia
+          if-no-files-found: warn
