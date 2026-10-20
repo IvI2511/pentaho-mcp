@@ -300,31 +300,65 @@ jobs:
           path: ${{ runner.temp }}/evidencia
           if-no-files-found: warn
 
-  # Los pasos de docs/plataformas.md para un Mac con chip Apple, copiados tal cual: sin setup-java, con el
-  # instalar.sh publicado en main y sin preparar ~/.kettle (primera vez, como un usuario nuevo).
+  # Mac con chip Apple como un usuario nuevo: sin setup-java, sin Rosetta preparada y sin ~/.kettle (primera
+  # vez). Solo se corre instalar.sh, el de esta rama, como lo baja un usuario: los pasos 1, 2 y 4 de la receta
+  # de docs/plataformas.md (Rosetta 2, el Java x64 y abrir Spoon con PENTAHO_JAVA_HOME + arch -x86_64) los
+  # tiene que hacer él. Sin terminal solo avisa; en una terminal (script(1) le da una) pregunta y se le
+  # contesta «y»; Spoon se abre con el comando que imprime en «Done. Next».
   receta-mac-apple:
     name: receta-mac-apple (macos-26)
     runs-on: macos-26
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7   # solo para el cliente MCP de la prueba
+      - uses: actions/checkout@v7
 
-      - name: Pasos del documento (1 a 3)
+      - name: instalar.sh sin terminal (avisa y no instala nada)
         run: |
-          softwareupdate --install-rosetta --agree-to-license
-          mkdir -p ~/pentaho/java-x64
-          curl -fL https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse | tar -xz -C ~/pentaho/java-x64 --strip-components 1
-          curl -fsSL https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.sh -o /tmp/instalar-pentaho-mcp.sh
-          bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi
-          file ~/pentaho/java-x64/Contents/Home/bin/java
+          EVID="$RUNNER_TEMP/evidencia"; mkdir -p "$EVID"; echo "EVID=$EVID" >> "$GITHUB_ENV"
+          { echo "JAVA_HOME=${JAVA_HOME:-}"; file "${JAVA_HOME:-/nada}/bin/java"
+            arch -x86_64 /usr/bin/true 2>/dev/null && echo "Rosetta 2 ya estaba" || echo "Rosetta 2 no está"; } | tee "$EVID/sistema.txt"
+          cp instalar.sh /tmp/instalar-pentaho-mcp.sh   # lo que hace un usuario: bajarlo y correrlo con bash
+          bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi < /dev/null 2>&1 | tee "$EVID/instalar-1-sin-terminal.log"
+          grep -q "Mac with an Apple chip" "$EVID/instalar-1-sin-terminal.log"
+          grep -q "No terminal to ask: nothing installed" "$EVID/instalar-1-sin-terminal.log"
+          grep -q -- "--rosetta" "$EVID/instalar-1-sin-terminal.log"
+          test ! -e ~/pentaho/data-integration/spoon-rosetta.sh
+          test ! -e ~/pentaho/java-x64
+          # los zips 0.4.0 y 0.4.1 salieron sin permisos Unix: instalar.sh tiene que dejar la .app ejecutable
+          ls -l ~/pentaho/data-integration/"Data Integration.app"/Contents/MacOS/JavaApplicationStub ~/pentaho/data-integration/spoon.command
+          test -x ~/pentaho/data-integration/"Data Integration.app"/Contents/MacOS/JavaApplicationStub
 
-      - name: Paso 4 del documento (abrir Spoon) y prueba por MCP
+      - name: instalar.sh en una terminal, contestando «y» (Rosetta 2, Java x64 y lanzador)
         run: |
-          EVID="$RUNNER_TEMP/evidencia"; mkdir -p "$EVID"
-          PENTAHO_JAVA_HOME=~/pentaho/java-x64/Contents/Home nohup arch -x86_64 /bin/sh ~/pentaho/data-integration/spoon.sh \
-            > "$EVID/spoon-salida.log" 2>&1 &
+          # la «y» espera en la pty hasta que la pregunta del paso 3 la lee
+          printf 'y\n' | script -q "$EVID/instalar-2-terminal.typescript" \
+            bash /tmp/instalar-pentaho-mcp.sh --pdi ~/pentaho/data-integration
+          tr -d '\r' < "$EVID/instalar-2-terminal.typescript" > "$EVID/instalar-2-terminal.log"
+          cat "$EVID/instalar-2-terminal.log"
+          grep -q "Install what is missing now? \[Y/n\]" "$EVID/instalar-2-terminal.log"
+          arch -x86_64 /usr/bin/true && echo "Rosetta 2: OK"
+          file ~/pentaho/java-x64/Contents/Home/bin/java | tee -a "$EVID/sistema.txt" | grep -q x86_64
+          L=$(sed -n 's/^  1\. Open (or restart) Spoon: //p' "$EVID/instalar-2-terminal.log")
+          echo "comando de «Done. Next»: $L"
+          test "$L" = "$HOME/pentaho/data-integration/spoon-rosetta.sh"
+          test -x "$L" && cat "$L"
+          echo "LANZADOR=$L" >> "$GITHUB_ENV"
+
+      - name: instalar.sh --rosetta sin terminal (ya está todo, no baja el Java)
+        run: |
+          bash /tmp/instalar-pentaho-mcp.sh --pdi ~/pentaho/data-integration --rosetta < /dev/null 2>&1 \
+            | tee "$EVID/instalar-3-rosetta.log"
+          grep -q "Rosetta 2: installed" "$EVID/instalar-3-rosetta.log"
+          grep -q "x64 Java: $HOME/pentaho/java-x64/Contents/Home" "$EVID/instalar-3-rosetta.log"
+          if grep -q "adoptium" "$EVID/instalar-3-rosetta.log"; then echo "volvió a bajar el Java"; exit 1; fi
+          grep -q "Open (or restart) Spoon: $LANZADOR" "$EVID/instalar-3-rosetta.log"
+
+      - name: Abrir Spoon con ese comando y prueba por MCP
+        run: |
+          nohup "$LANZADOR" > "$EVID/spoon-salida.log" 2>&1 &
           for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > "$EVID/ping.json" 2>/dev/null && break; sleep 1; done
           echo "/ping a los $i s: $(cat "$EVID/ping.json")"
+          grep -q '"spoon":true' "$EVID/ping.json" || { tail -40 "$EVID/spoon-salida.log"; exit 1; }
           sleep 5
           screencapture -x "$EVID/pantalla-1-al-abrir.png" || true
           python3 -I tools/ci/cliente_mcp.py --salida "$EVID" --plataforma receta-mac-apple
