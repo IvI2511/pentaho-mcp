@@ -2,12 +2,24 @@
 # release con instalar.sh, corre un ejemplo con Pan, abre Spoon, espera al servidor MCP del plugin y
 # arma, valida, previsualiza, fotografía y guarda una transformación por MCP. Deja la evidencia
 # (capturas, logs, respuestas) como artifacts. Resultados y pasos para cada plataforma: docs/plataformas.md
+# A mano, con «plugin: rama», el job probar cambia el plugin del release por el compilado desde el código
+# de la rama y corre sobre un PDI rearmado con tools/armar-zip-pdi.py (para probar una versión sin publicar).
 name: Plataformas
 
 on:
   push:
     branches: ["ci/**"]
   workflow_dispatch:
+    inputs:
+      plugin:
+        description: "Plugin de Spoon en el job probar: el del último release o compilado desde esta rama"
+        type: choice
+        options: [release, rama]
+        default: release
+      solo_probar:
+        description: "Solo el job probar (sin arm64 nativo, la receta del documento ni el diagnóstico de la ventana)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,7 +30,7 @@ defaults:
 
 jobs:
   probar:
-    name: ${{ matrix.id }}
+    name: ${{ matrix.id }}${{ inputs.plugin == 'rama' && ' (plugin de la rama)' || '' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -50,7 +62,7 @@ jobs:
     env:
       PREFIJO: ${{ matrix.prefijo }}
       PLATAFORMA: ${{ matrix.id }}
-      HERRAMIENTAS: "54"
+      PLUGIN: ${{ inputs.plugin || 'release' }}   # en un push no hay inputs: el del release
       SKIP_WEBKITGTK_CHECK: "1"
     steps:
       - uses: actions/checkout@v7
@@ -90,7 +102,7 @@ jobs:
       - name: Sistema
         run: |
           {
-            echo "plataforma: $PLATAFORMA (runner ${{ matrix.runner }})"
+            echo "plataforma: $PLATAFORMA (runner ${{ matrix.runner }}), plugin: $PLUGIN"
             uname -a
             if [ "$RUNNER_OS" = macOS ]; then sw_vers; sysctl -n machdep.cpu.brand_string; fi
             if [ "$RUNNER_OS" = Linux ]; then grep PRETTY_NAME /etc/os-release; fi
@@ -119,6 +131,52 @@ jobs:
             ls -d "$PDI"/plugins/pentaho-mcp* && ls "$PDI"/plugins/pentaho-mcp*/
           } | tee "$EVID/permisos-disco.txt"
           test -x "$PDI/spoon.sh"
+
+      # «plugin: rama»: el plugin compilado desde el código de esta rama (lo mismo que spoon-plugin/build.ps1,
+      # contra los jars del PDI recién bajado) reemplaza al del release
+      - name: Compilar el plugin de la rama
+        if: env.PLUGIN == 'rama'
+        run: |
+          t=$(date +%s)
+          VERSION_RAMA=$(tr -d ' \r\n' < VERSION)
+          echo "VERSION_RAMA=$VERSION_RAMA" >> "$GITHUB_ENV"
+          bash tools/ci/compilar-plugin.sh "$PDI" "$RUNNER_TEMP/plugin" 2>&1 | tee "$EVID/compilar.log"
+          echo "compilar el plugin: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
+          {
+            echo "== plugin del release (plugins/pentaho-mcp)"; (cd "$PDI/plugins/pentaho-mcp" && find . -type f | sort)
+            echo "== plugin compilado de la rama"; (cd "$RUNNER_TEMP/plugin/pentaho-mcp" && find . -type f | sort)
+            echo "== jars"; shasum -a 256 "$PDI"/plugins/pentaho-mcp/*.jar "$RUNNER_TEMP"/plugin/pentaho-mcp/*.jar
+          } | tee "$EVID/plugin-archivos.txt"
+          # el jar cambia de nombre con cada versión: sin borrar antes la carpeta vieja, Spoon carga el plugin dos veces
+          rm -rf "$PDI/plugins/pentaho-mcp"
+          cp -R "$RUNNER_TEMP/plugin/pentaho-mcp" "$PDI/plugins/pentaho-mcp"
+          jars=$(find "$PDI/plugins" -name 'pentaho-mcp-core-*.jar')
+          echo "jars del plugin en plugins/: $jars"
+          test "$jars" = "$PDI/plugins/pentaho-mcp/pentaho-mcp-core-$VERSION_RAMA.jar"
+
+      # «plugin: rama»: el PDI con ese plugin, en un zip armado como el del release desde la 0.4.2
+      # (tools/armar-zip-pdi.py) y descomprimido de nuevo como lo hace instalar.sh pero sin su chmod: spoon.sh y
+      # la .app tienen que salir 0755 del zip. El resto del job corre sobre ese PDI.
+      - name: Zip de PDI armado con tools/armar-zip-pdi.py (permisos 0755)
+        if: env.PLUGIN == 'rama'
+        run: |
+          t=$(date +%s)
+          ZIP="$RUNNER_TEMP/pdi-ce-9.4-con-pentaho-mcp.zip"
+          python3 -I tools/armar-zip-pdi.py "$RUNNER_TEMP/pentaho" "$ZIP" | tee "$EVID/armar-zip.log"
+          python3 -I tools/ci/permisos_zip.py --modo 0755 "$ZIP" \
+            data-integration/spoon.sh data-integration/pan.sh data-integration/spoon.command \
+            "Data Integration.app/Contents/MacOS/JavaApplicationStub" | tee "$EVID/permisos-zip-rama.txt"
+          unzip -q "$ZIP" -d "$RUNNER_TEMP/pentaho-zip" && rm "$ZIP"
+          P="$RUNNER_TEMP/pentaho-zip/data-integration"
+          {
+            echo "Permisos en disco al descomprimir el zip armado (sin chmod):"
+            ls -l "$P/spoon.sh" "$P/pan.sh" "$P/spoon.command" "$P/Data Integration.app/Contents/MacOS/JavaApplicationStub"
+          } | tee "$EVID/permisos-disco-rama.txt"
+          for f in spoon.sh pan.sh spoon.command "Data Integration.app/Contents/MacOS/JavaApplicationStub"; do
+            test -n "$(find "$P/$f" -perm 0755)" || { echo "$f no quedó en 0755"; exit 1; }
+          done
+          echo "PDI=$P" >> "$GITHUB_ENV"
+          echo "zip armado y descomprimido: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
 
       - name: Pan con el ejemplo 01 (sin base de datos)
         run: |
@@ -165,6 +223,7 @@ jobs:
           echo "segundos hasta /ping: $s"
           if [ "$ok" != 1 ]; then tail -60 "$EVID/spoon-salida.log"; exit 1; fi
           echo "$r" | grep -q '"spoon":true'
+          echo "HERRAMIENTAS=$(echo "$r" | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["tools"])')" >> "$GITHUB_ENV"
           sleep 5   # que Spoon termine de abrir la ventana
           if [ "$RUNNER_OS" = Linux ]; then import -display :99 -window root "$EVID/pantalla-1-al-abrir.png" || true
           else screencapture -x "$EVID/pantalla-1-al-abrir.png" || true; fi
@@ -172,7 +231,10 @@ jobs:
       - name: Cliente MCP (initialize ... save)
         run: |
           t=$(date +%s)
-          python3 -I tools/ci/cliente_mcp.py --salida "$EVID" --herramientas "$HERRAMIENTAS" --plataforma "$PLATAFORMA"
+          # tools/list tiene que traer las herramientas que dice /ping (cambian con la versión); con «plugin: rama»,
+          # initialize tiene que decir la versión de VERSION: que Spoon cargó el plugin compilado y no otro
+          python3 -I tools/ci/cliente_mcp.py --salida "$EVID" --plataforma "$PLATAFORMA" \
+            ${VERSION_RAMA:+--version "$VERSION_RAMA"}
           echo "cliente MCP: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
 
       - name: Pan con el .ktr que guardó Spoon
@@ -225,6 +287,7 @@ jobs:
           mkdir -p "$EVID/pdi-logs" && cp "$PDI"/logs/* "$EVID/pdi-logs/" 2>/dev/null || true
           {
             echo "## $PLATAFORMA"
+            echo "plugin: $PLUGIN${VERSION_RAMA:+ ($VERSION_RAMA, compilado de ${{ github.ref_name }})}, herramientas: ${HERRAMIENTAS:-?}"
             echo '```'
             cat "$EVID/tiempos.txt" 2>/dev/null
             grep -E "^(OK|FALLA|RESULTADO)" "$EVID/cliente.log" 2>/dev/null
@@ -242,6 +305,7 @@ jobs:
   # supported») y, aun saltando ese control, el SWT x86_64 no carga en una JVM arm64. Pan sí corre nativo.
   macos-arm64-nativo:
     name: macos-arm64-nativo (se espera el corte)
+    if: ${{ !inputs.solo_probar }}
     runs-on: macos-15
     timeout-minutes: 20
     continue-on-error: true
@@ -307,6 +371,7 @@ jobs:
   # pregunta y se le contesta «y»; Spoon se abre con el comando que imprime en «Done. Next».
   receta-mac-apple:
     name: receta-mac-apple (macos-26)
+    if: ${{ !inputs.solo_probar }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -387,6 +452,7 @@ jobs:
   # pintan), sus hilos, y Spoon con -Djava.awt.headless=true.
   ventana-macos:
     name: ventana-macos (macos-15-intel)
+    if: ${{ !inputs.solo_probar }}
     runs-on: macos-15-intel
     timeout-minutes: 20
     continue-on-error: true

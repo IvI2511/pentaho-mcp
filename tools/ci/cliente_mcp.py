@@ -7,7 +7,10 @@ contenido de la respuesta, no solo por el código HTTP. Sigue aunque un paso fal
 diagnóstico completo) y termina con código 1 si alguno falló.
 
 Uso:  python -I tools/ci/cliente_mcp.py --salida DIR [--url http://127.0.0.1:8765/mcp]
-                                        [--herramientas 54] [--plataforma linux-x64]
+                                        [--herramientas N] [--version X.Y.Z] [--plataforma linux-x64]
+Sin --herramientas, tools/list tiene que traer las que dice GET /ping ("tools"), que cambian con la versión.
+Con --version, la que dice el servidor en initialize tiene que ser esa (la prueba con «plugin: rama»
+pasa la del archivo VERSION, para confirmar que Spoon cargó el plugin compilado).
 Deja en DIR: cliente.log (cada pedido y su respuesta), canvas.png y ci_plataformas.ktr.
 """
 from __future__ import annotations
@@ -105,7 +108,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:8765/mcp")
     ap.add_argument("--salida", required=True)
-    ap.add_argument("--herramientas", type=int, default=54, help="cuántas herramientas espera tools/list")
+    ap.add_argument("--herramientas", type=int, help="cuántas herramientas espera tools/list (sin esto: las de /ping)")
+    ap.add_argument("--version", help="versión que tiene que decir el servidor en initialize")
     ap.add_argument("--plataforma", default=sys.platform)
     a = ap.parse_args()
     os.makedirs(a.salida, exist_ok=True)
@@ -129,15 +133,22 @@ def main() -> int:
         c.avisar("notifications/initialized")
         info = r.get("serverInfo", {})
         assert info.get("name") == "pentaho", f"serverInfo inesperado: {info}"
+        assert not a.version or info.get("version") == a.version, \
+            f"el servidor dice versión {info.get('version')}, se esperaba {a.version}"
         return f"{info.get('name')} {info.get('version')}, protocolo {r.get('protocolVersion')}"
 
     def tools_list():
+        esperadas, origen = a.herramientas, "--herramientas"
+        if esperadas is None:
+            url_ping = a.url.rsplit("/", 1)[0] + "/ping"
+            with urllib.request.urlopen(url_ping, timeout=10) as r:
+                esperadas, origen = json.loads(r.read().decode("utf-8"))["tools"], "/ping"
         nombres = [t["name"] for t in c.rpc("tools/list")["tools"]]
         faltan = {"status", "new_transformation", "build_steps", "validate", "preview_step",
                   "canvas_screenshot", "save"} - set(nombres)
         assert not faltan, f"faltan herramientas: {sorted(faltan)}"
-        assert len(nombres) == a.herramientas, f"{len(nombres)} herramientas, se esperaban {a.herramientas}"
-        return f"{len(nombres)} herramientas"
+        assert len(nombres) == esperadas, f"{len(nombres)} herramientas, {origen} dice {esperadas}"
+        return f"{len(nombres)} herramientas (igual que {origen})"
 
     def status():
         _, d, _ = c.tool("status")
