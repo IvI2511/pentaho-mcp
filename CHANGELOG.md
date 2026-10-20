@@ -7,6 +7,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `instalar.sh` on a Mac with an Apple chip (M1–M4): step 3 says what it would install (Rosetta 2 and
+  Temurin 21 x64 in `~/pentaho/java-x64`, checked with the SHA-256 from the Adoptium API) and does it only
+  after an explicit `y`, or with `--rosetta`; it leaves `spoon-rosetta.sh` next to `spoon.sh`.
+- Automatic test on GitHub Actions (`.github/workflows/plataformas.yml`): install, Pan, Spoon and every MCP
+  call on macOS 15/26 (Apple chip and Intel) and Ubuntu 24.04/26.04, with the release or with the plugin
+  built from the branch (`plugin: rama`). Results in [`docs/plataformas.md`](docs/plataformas.md).
+
+### Fixed
+
+- `instalar.sh --pdi` works with the plugin zips of 0.4.0 and 0.4.1 (backslash paths, folders without the
+  execute bit) and gives the `.sh` scripts, `spoon.command` and the macOS app their permissions back.
+
 ## [0.4.2] - 2026-10-20
 
 ### Added

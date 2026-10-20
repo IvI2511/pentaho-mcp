@@ -304,7 +304,7 @@ Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pen
 
 ## Texto propuesto para INSTALL.md y los README
 
-No se editaron (los está cambiando la sesión de la 0.4.2). Propuesta, que da por hecho que el
+**Aplicado el 20-oct-2026** en INSTALL.md y los tres README (al juntar las ramas `ci/` con `dev`). Era la propuesta, que da por hecho que el
 `instalar.sh` de `ci/instalar-mac-apple` ya está en `main` (si no, el párrafo del chip Apple tiene que
 volver a los cuatro pasos a mano y el de los permisos, a pedir el `chmod` de la `.app`). En la sección de
 agentes, sumar `--rosetta` a las opciones de `instalar.sh` («Mac with an Apple chip: install Rosetta 2 and

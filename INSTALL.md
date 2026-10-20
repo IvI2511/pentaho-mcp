@@ -13,7 +13,8 @@
 | **Claude Code plugin** (marketplace `pentaho-tools`, plugin `pentaho-live`) | The `pentaho-etl` skill (.ktr/.kjb format, 216-step catalog) + the MCP connection | managed by Claude Code |
 | **Codex** (optional) | The MCP by URL + the same skill | `~/.codex/config.toml`, `~/.codex/skills/pentaho-etl/` |
 
-Requirements: **Java 11 or later** (tested with 21) and, without PDI, ~450 MB of disk.
+Requirements: **Java 11 or later** (tested with 21) and, without PDI, ~450 MB of disk. On macOS with an
+Apple chip (M1–M4), Spoon runs under Rosetta 2 with an x64 Java (see [macOS and Linux](#macos-and-linux)).
 
 ## Step 0 — Ask the user (one question)
 
@@ -94,6 +95,45 @@ it from PowerShell or cmd: **Git Bash rewrites `/VERYSILENT` as a path** (`C:/Pr
 and the normal wizard opens and waits for clicks. From Git Bash, prefix the command with
 `MSYS_NO_PATHCONV=1`. Silent uninstall: `unins000.exe /VERYSILENT` in the install folder.
 
+## macOS and Linux
+
+Tested on GitHub Actions (macOS 15 and 26 with an Apple chip, macOS 15 Intel, Ubuntu 24.04 and 26.04):
+install, Pan, opening Spoon and every MCP call work. Details: [`docs/plataformas.md`](docs/plataformas.md).
+
+**Mac with an Apple chip (M1–M4).** PDI 9.4 only ships the x86_64 graphics library for macOS, and
+`spoon.sh` stops on arm64 with *"this Mac platform [arm64] is not yet supported"* (exit code 0, so check
+the output). Spoon has to run under Rosetta 2 with an x64 Java. In step 3 the script offers to install
+both (Rosetta 2 with `softwareupdate`, which accepts Apple's license, and Temurin 21 x64 into
+`~/pentaho/java-x64`, checked with the SHA-256 from the Adoptium API) and does it only after an explicit
+`y`. Then it leaves `spoon-rosetta.sh` next to `spoon.sh`, which opens Spoon that way; "Done. Next" prints it:
+```bash
+bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi      # step 3 asks "Do it now? [y/N]": y
+~/pentaho/data-integration/spoon-rosetta.sh
+```
+It only asks when it runs in a terminal. Without one (an agent, `curl | bash`) it installs nothing and says
+so: rerun with `--rosetta` to install them without asking. By hand, the same thing is:
+```bash
+softwareupdate --install-rosetta --agree-to-license
+mkdir -p ~/pentaho/java-x64
+curl -fL https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse | tar -xz -C ~/pentaho/java-x64 --strip-components 1
+PENTAHO_JAVA_HOME=~/pentaho/java-x64/Contents/Home arch -x86_64 /bin/sh ~/pentaho/data-integration/spoon.sh
+```
+An arm64 Java fails to load SWT (`incompatible architecture`). Double-clicking `Data Integration.app`
+stops the same way; from Terminal it opens with
+`open --arch x86_64 --env PENTAHO_JAVA_HOME=$HOME/pentaho/java-x64/Contents/Home ~/pentaho/data-integration/Data\ Integration.app`.
+
+**Mac with an Intel chip.** Any 64-bit Java 11+, then `~/pentaho/data-integration/spoon.sh`.
+
+**Linux.** PDI 9.4's SWT uses GTK 2: `sudo apt install libgtk2.0-0t64` (older releases: `libgtk2.0-0`).
+At startup Spoon warns that `libwebkitgtk-1.0` is missing: click **Close**; only the built-in browser
+(welcome page, help) is unavailable, and that package no longer exists in current Ubuntu.
+
+**Releases up to 0.4.1:** the PDI zip lost its Unix permissions; `instalar.sh` gives them back to the
+`.sh` scripts, `spoon.command` and the `.app`.
+
+In GitHub's macOS VMs Spoon's main window opens blank (toolbar only) while the MCP keeps working; if
+that happens on your Mac, please [open an issue](https://github.com/IvI2511/pentaho-mcp/issues).
+
 ## What the script returns (for the agent)
 
 It prints `== Step N - ...` for each stage and exits with a code:
@@ -107,7 +147,8 @@ It prints `== Step N - ...` for each stage and exits with a code:
 | 1 | Other error (the message says which) | Show it to the user |
 
 Step 4 configures only the agents it finds on the PATH (`-SoloAgentes` runs only that step, skipping PDI
-and the plugin; `-SinClaude` / `-SinCodex` leave one out). In the Claude desktop app (no CLI), the plugin
+and the plugin; `-SinClaude` / `-SinCodex` leave one out). On a Mac with an Apple chip, `instalar.sh --rosetta`
+installs Rosetta 2 and an x64 Java without asking (without a terminal it never installs them on its own). In the Claude desktop app (no CLI), the plugin
 is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-mcp`, then install
 **Pentaho Live** from **Discover**.
 
@@ -141,6 +182,8 @@ is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-
 | `ping` answers but the agent sees no tools | The agent connected before Spoon was open | Restart the agent |
 | Port 8765 is taken | Another program uses it | Script with `-Puerto 8770` (sets `PENTAHO_MCP_PORT` for Spoon); in Claude Code set the plugin option `mcp_url` to `http://127.0.0.1:8770/mcp` in `/config` |
 | Spoon won't open | No Java | Install Java 11+ (`winget install EclipseAdoptium.Temurin.21.JRE`) |
+| `spoon.sh` prints "this Mac platform [arm64] is not yet supported" | Mac with an Apple chip | Rosetta 2 + x64 Java + `arch -x86_64` (see [macOS and Linux](#macos-and-linux)) |
+| Linux: Spoon won't open, GTK errors | PDI 9.4's SWT needs GTK 2 | `sudo apt install libgtk2.0-0t64` |
 | Opening `Spoon.bat` shows **Open File - Security Warning** ("unknown publisher") | PDI was unzipped from a zip downloaded from the internet, and Windows marks those files | The Pentaho Live shortcut and `pentaho-live` don't trigger it. For `Spoon.bat` itself: before unzipping, right-click the zip → **Properties** → tick **Unblock**; already unzipped, in PowerShell `Get-ChildItem -Recurse "C:\path\to\data-integration" \| Unblock-File`, or **Properties** → **Unblock** on each `.bat` |
 | Driver error connecting to MySQL / SQL Server / Oracle | PDI doesn't ship those drivers | Copy the connector `.jar` into `data-integration/lib/` and restart Spoon (MySQL: `mysql-connector-j-*.jar`, regular MySQL connection type) |
 | ChatGPT (web) can't connect | ChatGPT only uses public HTTPS MCP servers; this one listens on `127.0.0.1` on purpose | Use Claude Code or Codex on the same computer |
