@@ -7,8 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-21
+
 ### Added
 
+- `ejemplo/`: «Grano de Oro», a complete ETL exercise in Spanish (statement, dirty data in CSV, Excel and
+  JSON with known error counts, a reference solution checked with Kitchen, and `comprobar_resultados.py`).
+  It includes the ETL built live in Spoon by the MCP, the GIF of the build, the reports made by the Reports
+  tab and a demo script (`guion-demo.md`).
+- Skill: ready-made ETL patterns in `patrones/` (CSV to staging, deduplication, incremental load by date,
+  SCD type 2 dimension, fact load with surrogate keys), each one tested with Kitchen, indexed in
+  `manual/05-patrones.md`.
 - `set_error_handling` (58 tools): configures a step's error handling, as in Spoon's "Define error
   handling...": the target step, the extra fields of the failing rows (count, description, field names,
   codes) and the limits. It creates the error hop if needed and is a single Ctrl+Z.
@@ -251,7 +260,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.3.0...v0.4.0

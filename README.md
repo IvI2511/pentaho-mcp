@@ -222,6 +222,19 @@ The **Reports** perspective in Spoon and three MCP tools to go with it: `build_r
 in any format), `get_report_data` (the report data as JSON, so Claude can write a narrative from real
 numbers) and `show_report` (opens the report in Spoon). See [`CHANGELOG.md`](CHANGELOG.md).
 
+Also new:
+
+- **[`ejemplo/`](ejemplo/)**, a complete university-style ETL exercise («Grano de Oro», four coffee shops,
+  dirty data in CSV, Excel and JSON loaded into a SQLite star schema). It shows the whole thing: the ETL
+  built live on the Spoon canvas by the MCP ([GIF](ejemplo/capturas/construccion-en-vivo.gif)), checked to
+  the exact number, and documented by the Reports tab ([PDF](ejemplo/informes/04_hechos_ventas.pdf)).
+  In Spanish, with a [demo script](ejemplo/guion-demo.md).
+- **Ready-made patterns** in the skill (`claude/skills/pentaho-etl/patrones/`): CSV to staging,
+  deduplication, incremental load by date, SCD type 2 dimension and fact load with surrogate keys, each
+  one tested with Kitchen.
+- **`set_error_handling`** (58 tools): the error handling of a step, as in Spoon's "Define error
+  handling...", so Claude can route rejects with a reason field.
+
 ## Development
 
 | What | How |

@@ -230,6 +230,19 @@ relatório em qualquer formato), `get_report_data` (os dados do relatório em JS
 uma narrativa com números reais) e `show_report` (abre o relatório no Spoon). Detalhes no
 [`CHANGELOG.md`](CHANGELOG.md).
 
+Também novo:
+
+- **[`ejemplo/`](ejemplo/)**, um exercício de ETL completo como os da faculdade («Grano de Oro», quatro
+  cafeterias, dados sujos em CSV, Excel e JSON carregados num modelo estrela em SQLite). Mostra tudo: o
+  ETL construído ao vivo na tela do Spoon pelo MCP ([GIF](ejemplo/capturas/construccion-en-vivo.gif)),
+  conferido até o último número e documentado pela aba Relatórios ([PDF](ejemplo/informes/04_hechos_ventas.pdf)).
+  Em espanhol, com um [roteiro de demo](ejemplo/guion-demo.md).
+- **Padrões prontos** na skill (`claude/skills/pentaho-etl/patrones/`): CSV para staging, deduplicação,
+  carga incremental por data, dimensão SCD tipo 2 e carga de fatos com chaves substitutas, cada um testado
+  com o Kitchen.
+- **`set_error_handling`** (58 ferramentas): o tratamento de erros de um step, como «Definir tratamento de
+  erros...» do Spoon, para o Claude mandar as rejeições com um campo de motivo.
+
 ## Desenvolvimento
 
 | O quê | Como |
