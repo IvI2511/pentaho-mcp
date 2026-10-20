@@ -6,19 +6,33 @@
 ;
 ;  Como usar:
 ;    1) powershell -ExecutionPolicy Bypass -File instalador\preparar.ps1 -PdiHome "<...>\data-integration"
-;       -> deja todo en instalador\staging\ (PDI limpio, plugin, JRE, lanzador, imagenes)
+;       -> deja todo en instalador\staging\ (PDI limpio, plugin, JRE, lanzador
+;          IDCLauncher.exe con su splash, pentaho-live, imagenes)
 ;    2) Abrir este archivo con Inno Setup 7 -> Build > Compile (F9)
 ;    3) El instalador queda en:
 ;       instalador\Instalador_PentahoLive_<version>.exe
 ;  Lo compila Ivan (regla del portafolio): este script no se compila con ISCC
-;  desde un agente.
+;  desde un agente, salvo que Ivan lo pida.
+;
+;  Para probar sin tocar la instalacion real: ISCC /DPRUEBA instalador.iss
+;  -> Instalador_PentahoLive_<version>_prueba.exe, con otro AppId y el nombre
+;  "Pentaho Live (prueba)" (su propia carpeta, menu Inicio, acceso y clave de
+;  desinstalacion). El PATH del usuario si es el real: guardarlo antes.
 ;
 ;  Va en instalador\ y no en la raiz (la convencion 04 lo pone en la raiz de la
 ;  app): la raiz de este repo es el marketplace publico de Claude Code. Por eso
 ;  las rutas son relativas a instalador\ y la version se lee de ..\VERSION.
 ; ====================================================================
 
-#define MyAppName "Pentaho Live"
+#ifdef PRUEBA
+  #define MyAppName "Pentaho Live (prueba)"
+  #define MyAppId "{{E1982040-3618-4ADA-B1F8-BA6601BCA88A}"
+  #define MyOutputSuffix "_prueba"
+#else
+  #define MyAppName "Pentaho Live"
+  #define MyAppId "{{54C78290-359B-45E0-BB3A-2D69FB54CAE6}"
+  #define MyOutputSuffix ""
+#endif
 ; La version se lee del archivo VERSION de la raiz del repo (fuente unica:
 ; tambien la leen spoon-plugin\build.ps1 y el plugin).
 #define VerHandle FileOpen(AddBackslash(SourcePath) + "..\VERSION")
@@ -31,9 +45,12 @@
 #if !FileExists(AddBackslash(SourcePath) + "staging\data-integration\Spoon.bat")
   #error Falta instalador\staging: correr antes instalador\preparar.ps1 -PdiHome "<...>\data-integration"
 #endif
+#if !FileExists(AddBackslash(SourcePath) + "staging\bin\IDCLauncher.exe")
+  #error Falta staging\bin\IDCLauncher.exe (el lanzador): correr de nuevo instalador\preparar.ps1
+#endif
 
 [Setup]
-AppId={{54C78290-359B-45E0-BB3A-2D69FB54CAE6}
+AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -44,13 +61,21 @@ VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
 VersionInfoDescription={#MyAppName} Setup
-DefaultDirName={autopf}\Pentaho Live
+DefaultDirName={autopf}\{#MyAppName}
+; Al actualizar se reusa la carpeta de la vez anterior sin mostrar la pagina de
+; destino (UsePreviousAppDir y DisableDirPage ya son asi por defecto; van escritos
+; porque [Code] cuenta con eso). Si esa carpeta cae dentro de un PDI (la 0.4.1 lo
+; permitia), InitializeWizard la cambia por la de por defecto, que igual se ve en
+; "Listo para instalar".
+UsePreviousAppDir=yes
+DisableDirPage=auto
+AlwaysShowDirOnReadyPage=yes
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 SetupIconFile=staging\pentaho-live.ico
 UninstallDisplayIcon={app}\pentaho-live.ico
 OutputDir=.
-OutputBaseFilename=Instalador_PentahoLive_{#MyAppVersion}
+OutputBaseFilename=Instalador_PentahoLive_{#MyAppVersion}{#MyOutputSuffix}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest
@@ -75,7 +100,20 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "pt"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
+[Messages]
+; La pagina de destino sale ANTES de la del tipo: con la 0.4.1 se leia como "donde
+; va el plugin" y hubo quien eligio una carpeta dentro de su PDI.
+en.SelectDirLabel3=Setup will put [name] in this folder: the launcher, the pentaho-live command and the uninstaller (and, in the full install, PDI and Java). Use a folder of its own, not one inside Pentaho Data Integration: for “Plugin only”, the data-integration folder is asked for later.
+es.SelectDirLabel3=El instalador pondrá [name] en esta carpeta: el lanzador, el comando pentaho-live y el desinstalador (y, en la completa, PDI y Java). Use una carpeta propia, no una dentro de Pentaho Data Integration: para «Solo el plugin», la carpeta data-integration se pide después.
+pt.SelectDirLabel3=O instalador vai colocar o [name] nesta pasta: o lançador, o comando pentaho-live e o desinstalador (e, na completa, o PDI e o Java). Use uma pasta própria, não uma dentro do Pentaho Data Integration: para “Somente o plugin”, a pasta data-integration é pedida depois.
+
 [CustomMessages]
+en.DirInPdi=This folder is inside a Pentaho Data Integration:%n%n%1%n%nChoose a folder of its own for Pentaho Live (for example, the one Setup suggests). To put only the plugin into your PDI, choose “Plugin only” on the next page: the data-integration folder is asked for later.
+es.DirInPdi=Esta carpeta está dentro de un Pentaho Data Integration:%n%n%1%n%nElija una carpeta propia para Pentaho Live (por ejemplo, la que propone el instalador). Para poner solo el plugin en su PDI, elija «Solo el plugin» en la página siguiente: la carpeta data-integration se pide después.
+pt.DirInPdi=Esta pasta está dentro de um Pentaho Data Integration:%n%n%1%n%nEscolha uma pasta própria para o Pentaho Live (por exemplo, a que o instalador sugere). Para colocar somente o plugin no seu PDI, escolha “Somente o plugin” na próxima página: a pasta data-integration é pedida depois.
+en.DirHasPdi=This folder contains a Pentaho Data Integration (a data-integration folder):%n%n%1%n%nChoose a folder of its own for Pentaho Live (for example, the one Setup suggests). To put only the plugin into your PDI, choose “Plugin only” on the next page: the data-integration folder is asked for later.
+es.DirHasPdi=Esta carpeta contiene un Pentaho Data Integration (una carpeta data-integration):%n%n%1%n%nElija una carpeta propia para Pentaho Live (por ejemplo, la que propone el instalador). Para poner solo el plugin en su PDI, elija «Solo el plugin» en la página siguiente: la carpeta data-integration se pide después.
+pt.DirHasPdi=Esta pasta contém um Pentaho Data Integration (uma pasta data-integration):%n%n%1%n%nEscolha uma pasta própria para o Pentaho Live (por exemplo, a que o instalador sugere). Para colocar somente o plugin no seu PDI, escolha “Somente o plugin” na próxima página: a pasta data-integration é pedida depois.
 en.TypeFull=Full: Pentaho Data Integration 9.4 CE + Pentaho Live + Java 21 (recommended)
 es.TypeFull=Completa: Pentaho Data Integration 9.4 CE + Pentaho Live + Java 21 (recomendada)
 pt.TypeFull=Completa: Pentaho Data Integration 9.4 CE + Pentaho Live + Java 21 (recomendada)
@@ -165,6 +203,8 @@ Type: filesandordirs; Name: "{app}\data-integration\plugins\pentaho-mcp"; Compon
 Type: filesandordirs; Name: "{code:CarpetaPluginExterna}"; Components: plugin
 ; Lo reescribe [Code] si es "solo el plugin"; en la completa no tiene que quedar uno viejo.
 Type: files; Name: "{app}\bin\pdi-home.txt"
+; Si esta vez no se pidio el acceso del escritorio, no queda el de una version anterior.
+Type: files; Name: "{autodesktop}\{#MyAppName}.lnk"; Tasks: not desktopicon
 
 [Files]
 ; Primero lo chico: con SolidCompression, para llegar a un archivo hay que
@@ -172,6 +212,11 @@ Type: files; Name: "{app}\bin\pdi-home.txt"
 Source: "staging\plugin\pentaho-mcp\*"; DestDir: "{code:CarpetaPluginExterna}"; Components: plugin; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "staging\bin\pentaho-live.cmd"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "staging\bin\pentaho-live"; DestDir: "{app}\bin"; Flags: ignoreversion
+; El lanzador de los accesos (IDCLauncher, convencion 03): splash al instante y
+; corre bin\pentaho-live.cmd --launcher. Lo compila preparar.ps1.
+Source: "staging\bin\IDCLauncher.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "staging\bin\idc-launcher.ini"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "staging\bin\idc-launcher.png"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "staging\pentaho-live.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "staging\instalar.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "staging\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -181,17 +226,18 @@ Source: "staging\jre\*"; DestDir: "{app}\jre"; Components: bundle; Flags: ignore
 Source: "staging\data-integration\*"; DestDir: "{app}\data-integration"; Components: bundle; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-; El lanzador minimizado: la consola solo dura lo que tarda en arrancar Spoon.
-Name: "{group}\{#MyAppName}"; Filename: "{app}\bin\pentaho-live.cmd"; Parameters: "--gui"; WorkingDir: "{app}\bin"; IconFilename: "{app}\pentaho-live.ico"; Comment: "{cm:ShortcutComment}"; Flags: runminimized
+; Los accesos abren el lanzador: su splash se ve enseguida y se cierra cuando aparece
+; la ventana de Spoon (30-60 s). El lanzador corre pentaho-live.cmd sin consola.
+Name: "{group}\{#MyAppName}"; Filename: "{app}\bin\IDCLauncher.exe"; WorkingDir: "{app}\bin"; IconFilename: "{app}\pentaho-live.ico"; Comment: "{cm:ShortcutComment}"
 Name: "{group}\{cm:DocsShortcut}"; Filename: "{#MyDocsURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"; IconFilename: "{app}\pentaho-live.ico"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\bin\pentaho-live.cmd"; Parameters: "--gui"; WorkingDir: "{app}\bin"; IconFilename: "{app}\pentaho-live.ico"; Comment: "{cm:ShortcutComment}"; Tasks: desktopicon; Flags: runminimized
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\bin\IDCLauncher.exe"; WorkingDir: "{app}\bin"; IconFilename: "{app}\pentaho-live.ico"; Comment: "{cm:ShortcutComment}"; Tasks: desktopicon
 
 [Run]
 ; Configurar los agentes: solo el paso 4 de instalar.ps1 (sin PDI ni plugin).
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\instalar.ps1"" -SoloAgentes -SinCodex"; StatusMsg: "{cm:ConfiguringClaude}"; Tasks: claude; Flags: runhidden logoutput
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\instalar.ps1"" -SoloAgentes -SinClaude"; StatusMsg: "{cm:ConfiguringCodex}"; Tasks: codex; Flags: runhidden logoutput
-Filename: "{app}\bin\pentaho-live.cmd"; Parameters: "--gui"; WorkingDir: "{app}\bin"; Description: "{cm:LaunchNow}"; Flags: nowait postinstall skipifsilent runminimized
+Filename: "{app}\bin\IDCLauncher.exe"; WorkingDir: "{app}\bin"; Description: "{cm:LaunchNow}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: files; Name: "{app}\bin\pdi-home.txt"
@@ -215,6 +261,9 @@ const
 
 var
   PaginaPdi: TInputDirWizardPage;
+  // La carpeta de una instalacion anterior que quedo dentro de un PDI (la 0.4.1 lo
+  // permitia), o ''. Se repara en ssPostInstall.
+  AppAnterior: String;
 
 // API de Windows (user32, del sistema: ninguna DLL de terceros).
 function EnviarMensajeConEspera(Ventana: HWND; Codigo: UINT; WP: WPARAM; LP: String;
@@ -237,6 +286,73 @@ begin
   Result := FindFirst(AddBackslash(Carpeta) + 'lib\kettle-core-9.4*.jar', Hallado);
   if Result then
     FindClose(Hallado);
+end;
+
+// True si la carpeta esta dentro de un Pentaho Data Integration: ella o alguna de
+// las de arriba tiene Spoon.bat, o una carpeta de la ruta se llama data-integration.
+// La carpeta de instalacion no puede caer ahi.
+function DentroDePdi(const Ruta: String): Boolean;
+var
+  Carpeta, Arriba: String;
+  Vueltas: Integer;
+begin
+  Result := False;
+  Carpeta := Trim(Ruta);
+  StringChangeEx(Carpeta, '/', '\', True);
+  Carpeta := RemoveBackslashUnlessRoot(Carpeta);
+  if Carpeta = '' then
+    Exit;
+  if Pos('\data-integration\', LowerCase(AddBackslash(Carpeta))) > 0 then begin
+    Result := True;
+    Exit;
+  end;
+  Vueltas := 0;
+  while Vueltas < 64 do begin
+    if EsPdi(Carpeta) then begin
+      Result := True;
+      Exit;
+    end;
+    Arriba := ExtractFileDir(Carpeta);
+    if (Arriba = '') or (CompareText(Arriba, Carpeta) = 0) then
+      Exit;
+    Carpeta := Arriba;
+    Vueltas := Vueltas + 1;
+  end;
+end;
+
+// True si el unins000.dat de la carpeta es de esta app: Inno guarda el AppId en la cabecera,
+// desde el byte 64. Asi una prueba (/DPRUEBA, otro AppId) no toma por suya la instalacion
+// real, ni al reves.
+function DesinstaladorNuestro(const Carpeta: String): Boolean;
+var
+  Datos: AnsiString;
+  Texto, Id: String;
+begin
+  Result := False;
+  Id := ExpandConstant('{#MyAppId}');
+  if not LoadStringFromFile(AddBackslash(Carpeta) + 'unins000.dat', Datos) then
+    Exit;
+  Texto := Datos;
+  Result := CompareText(Copy(Texto, 65, Length(Id)), Id) = 0;
+end;
+
+// True si la carpeta tiene adentro un PDI (data-integration\Spoon.bat) que no es de una
+// instalacion anterior de Pentaho Live: con la completa, [Files] copiaria PDI encima del
+// del usuario y al desinstalar lo borraria. La completa anterior trae el suyo, y tiene
+// bin\pentaho-live.cmd o nuestro desinstalador.
+function ContienePdiAjeno(const Ruta: String): Boolean;
+var
+  Carpeta: String;
+begin
+  Result := False;
+  Carpeta := Trim(Ruta);
+  StringChangeEx(Carpeta, '/', '\', True);
+  Carpeta := RemoveBackslashUnlessRoot(Carpeta);
+  if Carpeta = '' then
+    Exit;
+  if not EsPdi(AddBackslash(Carpeta) + 'data-integration') then
+    Exit;
+  Result := not FileExists(AddBackslash(Carpeta) + 'bin\pentaho-live.cmd') and not DesinstaladorNuestro(Carpeta);
 end;
 
 // El data-integration elegido en la pagina propia ("solo el plugin").
@@ -473,6 +589,235 @@ begin
     Log('PATH del usuario: no se pudo quitar ' + Carpeta);
 end;
 
+// ------------------------------------------------------------ instalaciones dentro de un PDI
+
+// La 0.4.1 dejaba elegir una carpeta de instalacion dentro de un PDI (p. ej.
+// <PDI>\plugins\Pentaho Live). Esta version se instala en otra y repara esas: saca su
+// bin del PATH y borra lo que habia puesto ese instalador (que se queda sin su
+// desinstalador). Lo demas no se toca.
+
+procedure BorrarSiEsta(const Archivo: String);
+begin
+  if not FileExists(Archivo) then
+    Exit;
+  if DeleteFile(Archivo) then
+    Log('  borrado ' + Archivo)
+  else
+    Log('  no se pudo borrar ' + Archivo);
+end;
+
+// Borra una carpeta entera que puso el instalador anterior.
+procedure BorrarArbol(const Carpeta: String);
+var
+  Intento: Integer;
+begin
+  if not DirExists(Carpeta) then
+    Exit;
+  // DelTree con la ruta extendida (\\?\...): Setup no es longPathAware y, con la ruta normal,
+  // no borra los archivos de 260 caracteres o mas (error 3), que un PDI dentro de
+  // <PDI>\plugins\Pentaho Live tiene enseguida. Hasta 5 intentos por si algo esta en uso.
+  for Intento := 1 to 5 do begin
+    if DelTree(PathConvertNormalToSuper(Carpeta), True, True, True) or not DirExists(Carpeta) then begin
+      Log('  borrada ' + Carpeta);
+      Exit;
+    end;
+    Sleep(600);
+  end;
+  Log('  no se pudo borrar entera (archivos en uso?) ' + Carpeta);
+end;
+
+// La completa vieja: su PDI (con el plugin), su Java y sus licencias. Sin el desinstalador
+// viejo nadie las borraria, y el Spoon del PDI de arriba recorreria ese otro PDI dentro de
+// sus plugins. Solo si estan las tres senales de la completa y la carpeta no es un PDI ella
+// misma (ahi un jre\ podria ser el Java del usuario).
+procedure BorrarCompletaVieja(const Carpeta: String);
+var
+  Base: String;
+begin
+  Base := AddBackslash(Carpeta);
+  if EsPdi(Carpeta) then
+    Exit;
+  if not EsPdi(Base + 'data-integration') then
+    Exit;
+  if not DirExists(Base + 'data-integration\plugins\pentaho-mcp') then
+    Exit;
+  if not FileExists(Base + 'jre\bin\javaw.exe') then
+    Exit;
+  Log('  es una instalacion completa: se borran su PDI y su Java');
+  BorrarArbol(Base + 'data-integration');
+  BorrarArbol(Base + 'jre');
+  BorrarArbol(Base + 'licenses');
+end;
+
+// El plugin que puso la vieja ("solo el plugin") en el PDI de su bin\pdi-home.txt, si esta
+// vez no va ahi (paso a la completa, u otro PDI): sin el desinstalador viejo quedaria para
+// siempre. Solo si tiene el jar de Pentaho Live y Spoon no lo esta usando.
+procedure BorrarPluginViejo(const Carpeta: String);
+var
+  Lineas: TArrayOfString;
+  Pdi, Plugin, Trabado: String;
+  Hallado: TFindRec;
+begin
+  if not LoadStringsFromFile(AddBackslash(Carpeta) + 'bin\pdi-home.txt', Lineas) then
+    Exit;
+  if GetArrayLength(Lineas) = 0 then
+    Exit;
+  Pdi := RemoveBackslashUnlessRoot(Trim(Lineas[0]));
+  if not EsPdi(Pdi) then
+    Exit;
+  if WizardIsComponentSelected('plugin') and (NormalizarRuta(Pdi) = NormalizarRuta(PdiElegido)) then
+    Exit;
+  Plugin := AddBackslash(Pdi) + 'plugins\pentaho-mcp';
+  if not FindFirst(Plugin + '\pentaho-mcp-core-*.jar', Hallado) then
+    Exit;
+  FindClose(Hallado);
+  Trabado := JarTrabado(Pdi);
+  if Trabado <> '' then begin
+    Log('  queda el plugin viejo en ' + Plugin + ': ' + Trabado + ' esta en uso');
+    Exit;
+  end;
+  Log('  el plugin viejo no va en el PDI de esta instalacion:');
+  BorrarArbol(Plugin);
+end;
+
+// Deja en el log lo que quedo en una carpeta que no se pudo borrar.
+procedure LoguearLoQueQueda(const Carpeta: String);
+var
+  Hallado: TFindRec;
+begin
+  if not DirExists(Carpeta) then
+    Exit;
+  if EsPdi(Carpeta) then begin
+    Log('  queda ' + Carpeta + ' (es el data-integration de un PDI)');
+    Exit;
+  end;
+  if FindFirst(AddBackslash(Carpeta) + '*', Hallado) then begin
+    try
+      repeat
+        if (Hallado.Name <> '.') and (Hallado.Name <> '..') then
+          Log('  queda (no lo puso el instalador, o esta en uso; no se toca): ' + AddBackslash(Carpeta) + Hallado.Name);
+      until not FindNext(Hallado);
+    finally
+      FindClose(Hallado);
+    end;
+  end;
+end;
+
+procedure RepararCarpetaVieja(const Carpeta: String);
+var
+  Base, Bin: String;
+begin
+  Log('Instalacion anterior dentro de un PDI, se repara: ' + Carpeta);
+  Base := AddBackslash(Carpeta);
+  Bin := Base + 'bin';
+  // Solo sale del PATH el bin de esta carpeta, nunca otro "...\Pentaho Live\bin".
+  QuitarDelPath(Bin);
+  // Antes de borrar bin\pdi-home.txt, que dice en que PDI quedo el plugin viejo.
+  BorrarPluginViejo(Carpeta);
+  BorrarCompletaVieja(Carpeta);
+  BorrarSiEsta(Base + 'unins000.exe');
+  BorrarSiEsta(Base + 'unins000.dat');
+  BorrarSiEsta(Base + 'unins000.msg');
+  BorrarSiEsta(Base + 'pentaho-live.ico');
+  BorrarSiEsta(Base + 'instalar.ps1');
+  // Si la carpeta vieja es el data-integration mismo, el LICENSE.txt es el de PDI.
+  if not EsPdi(Carpeta) then
+    BorrarSiEsta(Base + 'LICENSE.txt');
+  BorrarSiEsta(Bin + '\pentaho-live.cmd');
+  BorrarSiEsta(Bin + '\pentaho-live');
+  BorrarSiEsta(Bin + '\pdi-home.txt');
+  BorrarSiEsta(Bin + '\IDCLauncher.exe');
+  BorrarSiEsta(Bin + '\idc-launcher.ini');
+  BorrarSiEsta(Bin + '\idc-launcher.png');
+  if DirExists(Bin) then
+    if not RemoveDir(Bin) then
+      LoguearLoQueQueda(Bin);
+  if RemoveDir(Carpeta) then
+    Log('  borrada ' + Carpeta)
+  else
+    LoguearLoQueQueda(Carpeta);
+end;
+
+// Repara Carpeta una sola vez (Hechas lleva las ya vistas) y nunca la de esta instalacion.
+procedure RepararUna(const Carpeta: String; var Hechas: String);
+var
+  Clave: String;
+begin
+  Clave := NormalizarRuta(Carpeta);
+  if (Clave = '') or (Pos('|' + Clave + '|', Hechas) > 0) then
+    Exit;
+  Hechas := Hechas + Clave + '|';
+  if Clave = NormalizarRuta(ExpandConstant('{app}')) then begin
+    Log('Instalacion anterior en la misma carpeta, no se repara: ' + Carpeta);
+    Exit;
+  end;
+  RepararCarpetaVieja(Carpeta);
+end;
+
+// Suma Carpeta a la lista si es una instalacion de Pentaho Live (unins000.exe y bin\pentaho-live.cmd).
+procedure SumarSiEsInstalacion(const Carpeta: String; var Halladas: TArrayOfString);
+begin
+  if FileExists(AddBackslash(Carpeta) + 'unins000.exe') and FileExists(AddBackslash(Carpeta) + 'bin\pentaho-live.cmd') then begin
+    SetArrayLength(Halladas, GetArrayLength(Halladas) + 1);
+    Halladas[GetArrayLength(Halladas) - 1] := Carpeta;
+  end;
+end;
+
+// Las carpetas viejas: la de la instalacion anterior (AppAnterior); en "solo el plugin",
+// cada subcarpeta de <PDI>\plugins\ con unins000.exe y bin\pentaho-live.cmd; y, con
+// cualquier tipo, las que siguen en el PATH del usuario (por si falta la clave de
+// desinstalacion, y con ella AppAnterior): un ...\bin cuya carpeta cae dentro de un PDI y
+// tiene el desinstalador de esta app. Del PATH no se toma nada que este fuera de un PDI.
+procedure RepararInstalacionesEnPdi;
+var
+  Hallado: TFindRec;
+  Plugins, Rutas, Item, Carpeta: String;
+  Halladas: TArrayOfString;
+  Hechas: String;
+  I, P: Integer;
+begin
+  Hechas := '|';
+  if AppAnterior <> '' then
+    RepararUna(AppAnterior, Hechas);
+  // Primero la lista y despues las reparaciones: no borrar (ni cambiar el PATH) mientras se recorre.
+  SetArrayLength(Halladas, 0);
+  if WizardIsComponentSelected('plugin') then begin
+    Plugins := AddBackslash(PdiElegido) + 'plugins\';
+    if FindFirst(Plugins + '*', Hallado) then begin
+      try
+        repeat
+          if ((Hallado.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0) and (Hallado.Name <> '.') and
+             (Hallado.Name <> '..') then
+            SumarSiEsInstalacion(Plugins + Hallado.Name, Halladas);
+        until not FindNext(Hallado);
+      finally
+        FindClose(Hallado);
+      end;
+    end;
+  end;
+  if not RegQueryStringValue(HKEY_CURRENT_USER, ClaveEntorno, 'Path', Rutas) then
+    Rutas := '';
+  while Rutas <> '' do begin
+    P := Pos(';', Rutas);
+    if P > 0 then begin
+      Item := Copy(Rutas, 1, P - 1);
+      Delete(Rutas, 1, P);
+    end else begin
+      Item := Rutas;
+      Rutas := '';
+    end;
+    StringChangeEx(Item, '"', '', True);
+    Item := RemoveBackslash(Trim(Item));
+    if (Item <> '') and (CompareText(ExtractFileName(Item), 'bin') = 0) then begin
+      Carpeta := ExtractFileDir(Item);
+      if (Carpeta <> '') and DentroDePdi(Carpeta) and DesinstaladorNuestro(Carpeta) then
+        SumarSiEsInstalacion(Carpeta, Halladas);
+    end;
+  end;
+  for I := 0 to GetArrayLength(Halladas) - 1 do
+    RepararUna(Halladas[I], Hechas);
+end;
+
 // ------------------------------------------------------------ agentes
 
 // Check de las tareas "Configurar Claude Code / Codex": el agente esta en el PATH.
@@ -487,9 +832,20 @@ end;
 
 // ------------------------------------------------------------ asistente
 
+// True si vino /DIR= por linea de comandos (instalacion desatendida).
+function VinoParametroDir: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if (CompareText(Copy(ParamStr(I), 1, 5), '/DIR=') = 0) or (CompareText(Copy(ParamStr(I), 1, 5), '-DIR=') = 0) then
+      Result := True;
+end;
+
 procedure InitializeWizard;
 var
-  Previo: String;
+  Previo, Anterior: String;
 begin
   PaginaPdi := CreateInputDirPage(wpSelectComponents, CustomMessage('PdiPageCaption'),
     CustomMessage('PdiPageDescription'), CustomMessage('PdiPageSubCaption'), False,
@@ -503,6 +859,23 @@ begin
   if Previo = '' then
     Previo := GetEnv('PDI_HOME');
   PaginaPdi.Values[0] := Previo;
+
+  // Una instalacion anterior dentro de un PDI se repara en ssPostInstall (aunque
+  // ahora venga otra carpeta con /DIR=).
+  Anterior := RemoveBackslashUnlessRoot(Trim(WizardForm.PrevAppDir));
+  if (Anterior <> '') and DentroDePdi(Anterior) then
+    AppAnterior := Anterior;
+  // Al actualizar, la pagina de destino no se muestra (DisableDirPage=auto) y DirEdit trae
+  // la carpeta de la vez anterior: si cae dentro de un PDI, va la de por defecto. La
+  // carpeta nueva se ve en "Listo para instalar". Con /DIR= manda el parametro y, si
+  // tambien cae dentro de un PDI, PrepareToInstall corta.
+  if (not VinoParametroDir) and DentroDePdi(WizardForm.DirEdit.Text) then begin
+    if AppAnterior = '' then
+      AppAnterior := RemoveBackslashUnlessRoot(Trim(WizardForm.DirEdit.Text));
+    WizardForm.DirEdit.Text := ExpandConstant('{autopf}\{#MyAppName}');
+    Log('La carpeta anterior (' + AppAnterior + ') esta dentro de un PDI: se instala en ' +
+      WizardForm.DirEdit.Text + ' y la vieja se repara al terminar.');
+  end;
 end;
 
 procedure RegisterPreviousData(PreviousDataKey: Integer);
@@ -523,6 +896,18 @@ var
   Carpeta: String;
 begin
   Result := True;
+  // La carpeta de instalacion no puede ir dentro de un PDI (el plugin va en la
+  // pagina propia, despues del tipo) ni ser la que contiene uno.
+  if CurPageID = wpSelectDir then begin
+    if DentroDePdi(WizardDirValue) then begin
+      SuppressibleMsgBox(FmtMessage(CustomMessage('DirInPdi'), [WizardDirValue]), mbError, MB_OK, IDOK);
+      Result := False;
+    end else if ContienePdiAjeno(WizardDirValue) then begin
+      SuppressibleMsgBox(FmtMessage(CustomMessage('DirHasPdi'), [WizardDirValue]), mbError, MB_OK, IDOK);
+      Result := False;
+    end;
+    Exit;
+  end;
   if CurPageID <> PaginaPdi.ID then
     Exit;
   Carpeta := PdiElegido;
@@ -562,13 +947,29 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
+  // Por si la pagina de destino no se mostro (/DIR= en una instalacion desatendida).
+  if DentroDePdi(WizardDirValue) then begin
+    Result := FmtMessage(CustomMessage('DirInPdi'), [WizardDirValue]);
+    Exit;
+  end;
+  if ContienePdiAjeno(WizardDirValue) then begin
+    Result := FmtMessage(CustomMessage('DirHasPdi'), [WizardDirValue]);
+    Exit;
+  end;
   // Por si la pagina no se mostro (instalacion desatendida con /TYPE=pluginonly).
   if WizardIsComponentSelected('plugin') and not EsPdi(PdiElegido) then begin
     Result := FmtMessage(CustomMessage('PdiNotFound'), [PdiElegido]);
     Exit;
   end;
-  if not EsperarQueCierrenSpoon(PdiDeEstaInstalacion) then
+  if not EsperarQueCierrenSpoon(PdiDeEstaInstalacion) then begin
     Result := CustomMessage('SpoonOpenAbort');
+    Exit;
+  end;
+  // Una completa anterior dentro de un PDI se borra al terminar: su Spoon tampoco puede
+  // estar abierto.
+  if (AppAnterior <> '') and EsPdi(AddBackslash(AppAnterior) + 'data-integration') then
+    if not EsperarQueCierrenSpoon(AddBackslash(AppAnterior) + 'data-integration') then
+      Result := CustomMessage('SpoonOpenAbort');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -584,6 +985,8 @@ begin
     if not SaveStringsToUTF8FileWithoutBOM(ExpandConstant('{app}\bin\pdi-home.txt'), Lineas, False) then
       Log('No se pudo escribir bin\pdi-home.txt');
   end;
+  // Antes de agregar el bin nuevo al PATH: saca los de las carpetas viejas.
+  RepararInstalacionesEnPdi;
   // pentaho-live en el PATH del usuario, para que un agente pueda abrir Spoon.
   AgregarAlPath(ExpandConstant('{app}\bin'));
   AvisarCambioDeEntorno;

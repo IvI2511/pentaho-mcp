@@ -9,6 +9,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `instalar.sh` on a Mac with an Apple chip (M1–M4): step 3 says what it would install (Rosetta 2 and
+  Temurin 21 x64 in `~/pentaho/java-x64`, checked with the SHA-256 from the Adoptium API) and does it only
+  after an explicit `y`, or with `--rosetta`; it leaves `spoon-rosetta.sh` next to `spoon.sh`.
+- Automatic test on GitHub Actions (`.github/workflows/plataformas.yml`): install, Pan, Spoon and every MCP
+  call on macOS 15/26 (Apple chip and Intel) and Ubuntu 24.04/26.04, with the release or with the plugin
+  built from the branch (`plugin: rama`). Results in [`docs/plataformas.md`](docs/plataformas.md).
+
 - **Reports perspective in Spoon** (*Reports* / *Informes* / *Relatórios*, in the perspective switcher):
   builds the report of an open transformation or job, or of a `.ktr` / `.kjb` file without opening a tab.
   Sections: cover, summary, flow (the real canvas plus a Mermaid diagram), job flow, field lineage, data
@@ -54,8 +61,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `instalar.sh --pdi` works with the plugin zips of 0.4.0 and 0.4.1 (backslash paths, folders without the
+  execute bit) and gives the `.sh` scripts, `spoon.command` and the macOS app their permissions back.
+
 - `test_connection` no longer warns that an existing SQLite or H2 file "did not exist" when its path is
   a `file:///…%20…` URI, as `${Internal.Entry.Current.Directory}` gives.
+
+## [0.4.2] - 2026-10-20
+
+### Added
+
+- Windows installer: the **Pentaho Live** shortcuts open a splash screen right away and keep it until
+  Spoon's window appears (it takes 30-60 seconds), instead of a minimized console and nothing on screen.
+  It is the launcher of the IDC Studios apps (Esc closes it); it ships compiled and is not under the
+  MIT license (see `instalador/launcher/NOTICE.md`). PDI's own splash screen is hidden only when
+  Spoon is opened this way; `Spoon.bat` and Help → About still show it.
+- `pentaho-live --launcher`, the mode the launcher uses: Spoon's plugin tells it when the window is up.
+
+### Fixed
+
+- Opening Pentaho Live no longer shows Windows' **Open File - Security Warning** ("unknown publisher")
+  for `Spoon.bat` when the PDI came from a zip downloaded from the internet: `pentaho-live` now runs
+  `Spoon.bat` through `cmd.exe`. Opening `Spoon.bat` by hand still shows it (see
+  [INSTALL.md](INSTALL.md#troubleshooting) to remove it).
+- Windows installer: the install folder can no longer be inside a PDI folder, or the folder that holds
+  a PDI's `data-integration`, and the destination page says what goes there (for **Plugin only**, the
+  `data-integration` folder is asked for on a later page). A 0.4.1 installed inside a PDI moves on update
+  to the default folder, `%LOCALAPPDATA%\Programs\Pentaho Live`: the installer takes that folder off the
+  PATH and deletes what it had put there (a full install's PDI and Java too, and the old plugin if this
+  time it goes into another PDI or you choose Full), and leaves everything else in the PDI as it is.
+- The `pdi-ce-9.4-con-pentaho-mcp.zip` of the release keeps the execute permissions, so `spoon.sh` and the
+  macOS app run after unzipping (the 0.4.0 and 0.4.1 zips, built on Windows, lost them).
+- The plugin zips (`pentaho-mcp.zip`, `pentaho-mcp-X.Y.Z.zip`) store paths with `/`: PowerShell's
+  `Compress-Archive` wrote `\`, and on macOS/Linux `unzip` extracted them but exited with code 1, so
+  `instalar.sh --pdi` stopped at step 2.
 
 ## [0.4.1] - 2026-10-20
 
@@ -203,7 +242,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.2.0...v0.3.0

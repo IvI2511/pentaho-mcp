@@ -1,7 +1,7 @@
 {
   "name": "pentaho-live",
   "displayName": "Pentaho Live (unofficial)",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Build Pentaho Data Integration 9.4 ETLs with Claude: a skill with the verified .ktr/.kjb format and step catalog, plus a local MCP connection that edits the transformation open in Spoon live. Unofficial, not affiliated with Hitachi Vantara.",
   "author": {
     "name": "Iván Castaño · IDC Studios",

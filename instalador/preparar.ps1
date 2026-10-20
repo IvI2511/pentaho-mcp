@@ -10,7 +10,10 @@
     staging\jre\                Eclipse Temurin 21 (JRE, Windows x64), bajado de la API de Adoptium
                                 y verificado con el SHA-256 que da la misma API
     staging\licenses\           la licencia y el NOTICE de Temurin
-    staging\bin\                el lanzador pentaho-live.cmd (+ el de Git Bash)
+    staging\bin\                el comando pentaho-live.cmd (+ el de Git Bash) y el lanzador de los
+                                accesos: IDCLauncher.exe, idc-launcher.ini e idc-launcher.png (su
+                                splash), de instalador\launcher\ (el .exe va compilado: su codigo es
+                                privado; -FuenteLanzador lo recompila desde la plantilla)
     staging\asistente\          las imagenes del asistente (BMP), de generar_imagenes.py
     staging\pentaho-live.ico    el icono (generar_imagenes.py tambien regenera instalador\pentaho-live.ico)
     staging\LICENSE.txt, staging\instalar.ps1   del repo
@@ -21,13 +24,17 @@
     powershell -ExecutionPolicy Bypass -File instalador\preparar.ps1 -PdiHome "<...>\data-integration"
 
   Requiere: un JDK (para compilar el plugin, ver spoon-plugin\build.ps1), Python con
-  playwright y pillow (pip install playwright pillow) y Google Chrome, y red la primera vez.
+  playwright y pillow (pip install playwright pillow) y Google Chrome, con -FuenteLanzador el csc.exe de .NET
+  Framework 4 (viene con Windows) y red la primera vez.
 #>
 param(
   [string]$PdiHome = $env:PDI_HOME,
   # Version fija de Temurin 21. Para cambiarla: ver los nombres en
   # https://api.adoptium.net/v3/info/release_names?version=[21,22)&release_type=ga&vendor=eclipse
-  [string]$JreRelease = "jdk-21.0.12.1+1"
+  [string]$JreRelease = "jdk-21.0.12.1+1",
+  # La carpeta plantillas del portafolio de IDC Studios (privada): con ella se recompilan
+  # instalador\launcher\IDCLauncher.exe e idc-launcher.png. Sin ella se usan los del repo.
+  [string]$FuenteLanzador = $env:IDC_PLANTILLAS
 )
 
 $ErrorActionPreference = "Stop"
@@ -164,9 +171,110 @@ if (-not $python) { Falla "No hay Python en el PATH (hace falta con: pip install
 if ($LASTEXITCODE -ne 0) { Falla "generar_imagenes.py fallo (codigo $LASTEXITCODE). Hace falta: pip install playwright pillow, y Google Chrome." }
 Copy-Item (Join-Path $aqui "pentaho-live.ico") (Join-Path $staging "pentaho-live.ico")
 
-# ------------------------------------------------------------------ 7. controles
-Paso "7. Controles"
+# ------------------------------------------------------------------ 7. lanzador de los accesos
+# IDCLauncher (convencion 03 del portafolio): el splash de 760x400 que se ve enseguida al abrir
+# el acceso, mientras pentaho-live.cmd --launcher arranca Spoon. Va despues de las imagenes
+# porque lleva el .ico recien generado. No se usa build_launcher.bat: espera la salida de
+# PyInstaller, copia ..\VERSION y es la copia canonica que se compara entre las apps.
+Paso "7. Lanzador IDCLauncher.exe y su splash"
+# Su codigo es privado (la plantilla del portafolio de IDC Studios, no MIT; ver
+# instalador\launcher\NOTICE.md): en el repo van el .exe ya compilado y su splash. Con
+# -FuenteLanzador <carpeta plantillas del portafolio> se recompilan los dos y se actualizan en
+# instalador\launcher\. Hay que hacerlo en cada version: los dos llevan el numero.
+$dirLanzador = Join-Path $aqui "launcher"
+$exeRepo = Join-Path $dirLanzador "IDCLauncher.exe"
+$pngRepo = Join-Path $dirLanzador "idc-launcher.png"
+$recompilado = $false
+if ($FuenteLanzador) {
+  $fuenteCs = Join-Path $FuenteLanzador "launcher\IDCLauncher.cs"
+  $fuenteSplash = Join-Path $FuenteLanzador "tools\generar_splash.py"
+  foreach ($f in @($fuenteCs, $fuenteSplash)) {
+    if (-not (Test-Path $f)) { Falla "falta $f (-FuenteLanzador es la carpeta plantillas del portafolio)" }
+  }
+  $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+  if (-not (Test-Path $csc)) { $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+  if (-not (Test-Path $csc)) { Falla "Windows no tiene el compilador de .NET Framework 4 (csc.exe)." }
+  # La version del .exe (la que muestran sus propiedades), en un .cs generado: fuente unica, VERSION.
+  New-Item -ItemType Directory -Force $cache | Out-Null
+  $asmInfo = Join-Path $cache "AssemblyInfo.cs"
+  @(
+    'using System.Reflection;',
+    '[assembly: AssemblyTitle("Pentaho Live")]',
+    '[assembly: AssemblyProduct("Pentaho Live")]',
+    '[assembly: AssemblyCompany("IDC Studios")]',
+    '[assembly: AssemblyDescription("Pentaho Live launcher")]',
+    '[assembly: AssemblyCopyright("(c) Ivan Castano - IDC Studios. Not covered by the MIT license.")]',
+    "[assembly: AssemblyVersion(""$Version.0"")]",
+    "[assembly: AssemblyFileVersion(""$Version.0"")]",
+    "[assembly: AssemblyInformationalVersion(""$Version"")]"
+  ) | Set-Content -Encoding ASCII $asmInfo
+  # csc escribe sus errores en la salida normal: se captura esa y nada de 2>&1 (con Stop, en
+  # PowerShell 5.1 una linea de stderr redirigida corta el script antes de ver el codigo).
+  $salidaCsc = & $csc /nologo /target:winexe /optimize+ /platform:anycpu `
+    /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+    "/win32icon:$(Join-Path $aqui 'pentaho-live.ico')" "/out:$exeRepo" $fuenteCs $asmInfo
+  if ($LASTEXITCODE -ne 0) { Falla ("csc no compilo IDCLauncher.cs (codigo $LASTEXITCODE):`n" + ($salidaCsc -join "`n")) }
+  # El splash, en ingles como el banner del asistente. El punto medio y los puntos suspensivos van
+  # con [char]: este .ps1 es ASCII (PowerShell 5.1 lo leeria como ANSI).
+  $punto = [char]0x00B7
+  $suspensivos = [char]0x2026
+  & $python.Source $fuenteSplash --titulo "Pentaho Live" `
+    --subtitulo "Claude builds your ETLs live, in Spoon." --version $Version `
+    --icono (Join-Path $aqui "pentaho-live.ico") --salida $pngRepo `
+    --rotulo "Pentaho Data Integration 9.4" --estado "OPENING SPOON" `
+    --espera "This takes about 30-60 seconds$suspensivos" --ficha "Windows  $punto  Spoon 9.4  $punto  MCP"
+  if ($LASTEXITCODE -ne 0) { Falla "generar_splash.py fallo (codigo $LASTEXITCODE). Hace falta: pip install pillow." }
+  $recompilado = $true
+  Write-Host "   recompilados desde $FuenteLanzador : instalador\launcher\IDCLauncher.exe e idc-launcher.png"
+}
+foreach ($f in @("IDCLauncher.exe", "idc-launcher.png", "idc-launcher.ini")) {
+  if (-not (Test-Path (Join-Path $dirLanzador $f))) { Falla "falta instalador\launcher\$f" }
+  Copy-Item (Join-Path $dirLanzador $f) (Join-Path $destBin $f)
+  Write-Host "   bin\$f"
+}
+$lanzador = Join-Path $destBin "IDCLauncher.exe"
+$splash = Join-Path $destBin "idc-launcher.png"
+# El lanzador valida su propio .ini. Es una app de ventanas: con & no se espera a que termine.
+$autoPrueba = Start-Process -FilePath $lanzador -Wait -PassThru `
+  -ArgumentList "--self-test", ('"' + (Join-Path $destBin "idc-launcher.ini") + '"')
+if ($autoPrueba.ExitCode -ne 0) { Falla "IDCLauncher.exe --self-test rechazo bin\idc-launcher.ini (codigo $($autoPrueba.ExitCode))." }
+Write-Host "   --self-test: idc-launcher.ini valido"
+
+# ------------------------------------------------------------------ 8. controles
+Paso "8. Controles"
 $problemas = @()
+
+# El lanzador: los tres archivos, el splash de 760x400 y la version en el .exe.
+foreach ($f in @("pentaho-live.cmd", "pentaho-live", "IDCLauncher.exe", "idc-launcher.ini", "idc-launcher.png")) {
+  if (-not (Test-Path (Join-Path $destBin $f))) { $problemas += "falta bin\$f" }
+}
+function TamanoPng($ruta) {
+  $b = [IO.File]::ReadAllBytes($ruta)
+  if ($b.Length -lt 24 -or $b[1] -ne 0x50 -or $b[2] -ne 0x4E -or $b[3] -ne 0x47) { return "(no es un PNG)" }
+  $ancho = ([int]$b[16] -shl 24) -bor ([int]$b[17] -shl 16) -bor ([int]$b[18] -shl 8) -bor [int]$b[19]
+  $alto = ([int]$b[20] -shl 24) -bor ([int]$b[21] -shl 16) -bor ([int]$b[22] -shl 8) -bor [int]$b[23]
+  "{0}x{1}" -f $ancho, $alto
+}
+if (Test-Path $splash) {
+  $t = TamanoPng $splash
+  Write-Host "   bin\idc-launcher.png : $t"
+  if ($t -ne "760x400") { $problemas += "bin\idc-launcher.png mide $t (se esperaba 760x400)" }
+}
+if (Test-Path $lanzador) {
+  $versionExe = (Get-Item $lanzador).VersionInfo.FileVersion
+  Write-Host "   bin\IDCLauncher.exe : version $versionExe"
+  if ($versionExe -ne "$Version.0") {
+    $texto = "IDCLauncher.exe dice version $versionExe (se esperaba $Version.0): recompilarlo con -FuenteLanzador"
+    # Sin la fuente privada no se puede: para quien arma desde el repo publico es solo un aviso.
+    if ($recompilado) { $problemas += $texto } else { Write-Host "   AVISO: $texto" }
+  }
+}
+# El splash de PDI oculto (laf-pentaho-live.properties + el PNG de 1x1) en las dos copias del plugin.
+foreach ($d in @($pluginEnPdi, $pluginSuelto)) {
+  foreach ($f in @("ui\laf-pentaho-live.properties", "ui\splash-vacio.png")) {
+    if (-not (Test-Path (Join-Path $d $f))) { $problemas += "falta $f en " + $d.Substring($staging.Length + 1) }
+  }
+}
 
 $mysql = @(Get-ChildItem -Recurse -File $staging -Filter "mysql-connector*.jar")
 if ($mysql.Count) { $problemas += "conector de MySQL en staging: " + ($mysql.FullName -join ", ") }

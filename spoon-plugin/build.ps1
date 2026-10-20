@@ -132,10 +132,35 @@ if ($LASTEXITCODE -ne 0) { throw "jar fallo ($LASTEXITCODE)" }
   "<version>$Version</version>"
 ) | Set-Content -Encoding UTF8 (Join-Path $dist "version.xml")
 
+# --- splash oculto de "pentaho-live --launcher" (-Dorg.pentaho.di.laf.alt=plugins/pentaho-mcp/ui/...):
+# el de PDI pasa a 1x1 mientras se ve el del lanzador y SenalLanzador lo deshace al arrancar. Rutas
+# relativas a data-integration (Spoon.bat hace cd ahi), asi que van en plugins\pentaho-mcp\ui\.
+$uiDist = Join-Path $dist "ui"
+New-Item -ItemType Directory -Force $uiDist | Out-Null
+foreach ($f in @("laf-pentaho-live.properties", "splash-vacio.png")) {
+  $from = Join-Path $root "ui\$f"
+  if (-not (Test-Path $from)) { throw "Falta $from (splash oculto del lanzador)" }
+  Copy-Item -Force $from (Join-Path $uiDist $f)
+}
+
 # --- zip para el release de GitHub (se descomprime tal cual dentro de plugins\)
+# Con .NET y no con Compress-Archive: el de PowerShell 5.1 guarda las rutas con "\", y en macOS/Linux
+# unzip las extrae pero sale con codigo 1, asi que instalar.sh (set -e) cortaba en el paso 2.
 $zip = Join-Path $root "dist\pentaho-mcp-$Version.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path $dist -DestinationPath $zip
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$distPadre = Split-Path $dist -Parent
+$archivo = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+try {
+  Get-ChildItem -Recurse $dist | Sort-Object FullName | ForEach-Object {
+    $nombre = $_.FullName.Substring($distPadre.Length + 1).Replace([char]92, [char]47)
+    if ($_.PSIsContainer) { [void]$archivo.CreateEntry("$nombre/") }
+    else {
+      [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+        $archivo, $_.FullName, $nombre, [IO.Compression.CompressionLevel]::Optimal)
+    }
+  }
+} finally { $archivo.Dispose() }
 # copia con nombre fijo: los instaladores la bajan de .../releases/latest/download/pentaho-mcp.zip
 Copy-Item -Force $zip (Join-Path $root "dist\pentaho-mcp.zip")
 

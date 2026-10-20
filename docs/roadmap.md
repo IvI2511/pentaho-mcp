@@ -15,6 +15,13 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   abrir Spoon (con permiso del usuario). El zip sigue disponible para quien no quiera un `.exe` sin
   firmar.
 
+## 0.4.2 · Arreglos del instalador
+
+- Lo que Iván encontró con la 0.4.1: los accesos abren el splash del lanzador de IDC mientras carga
+  Spoon, sin el aviso de seguridad de `Spoon.bat` (PDI de un zip bajado), y la carpeta de instalación
+  ya no puede quedar dentro de un PDI (la 0.4.1 instalada ahí se muda sola). Diseño:
+  `docs/lanzador-042-diseno.md`.
+
 ## 0.5.0 · Informes
 
 - **Informes** — una pestaña propia en Spoon («Reports», junto a «Data Integration») que arma sola,

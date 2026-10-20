@@ -28,7 +28,7 @@ public class McpLifecycleListener implements LifecycleListener {
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
   /** Si el jar no trae pentaho-mcp-version.txt (compilado a mano, sin build.ps1). */
-  private static final String VERSION_RESPALDO = "0.4.1";
+  private static final String VERSION_RESPALDO = "0.4.2";
 
   /** La version del plugin: la escribe build.ps1 en el jar, sacada del archivo VERSION del repo. */
   static final String VERSION = leerVersion();
@@ -93,6 +93,7 @@ public class McpLifecycleListener implements LifecycleListener {
 
   @Override
   public void onStart( LifeEventHandler handler ) throws LifecycleException {
+    SenalLanzador.programar();
     // Nunca dejar escapar una excepcion: una LifecycleException severa muestra un MessageBox en Spoon.
     try {
       chequearLoaders();

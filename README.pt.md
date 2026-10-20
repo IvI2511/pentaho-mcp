@@ -201,7 +201,8 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
 | Pentaho Data Integration | **9.4 CE** (testado com 9.4.0.0-343) |
 | Java | **11 ou superior** (testado com Java 21) |
 | Windows | Testado |
-| macOS / Linux | Deve funcionar, ainda não testado: [relatos são bem-vindos](https://github.com/IvI2511/pentaho-mcp/issues) |
+| macOS | Testado no macOS 15 e 26 (GitHub Actions): chip Apple via Rosetta 2 com um Java x64, e Intel. Instalação, Pan e todas as chamadas MCP funcionam; falta conferir a janela do Spoon num Mac de verdade. [Passos](INSTALL.md#macos-and-linux) |
+| Linux | Testado no Ubuntu 24.04 e 26.04 (GitHub Actions); precisa do GTK 2 (`libgtk2.0-0t64`) |
 | Agentes | Claude Code (CLI e app desktop); Codex com a URL do MCP e a skill |
 
 ## Limitações
