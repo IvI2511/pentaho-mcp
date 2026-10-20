@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash   # con «shell: bash» explícito GitHub agrega -o pipefail: un «instalar.sh | tee» que falla corta
+
 jobs:
   probar:
     name: ${{ matrix.id }}
@@ -22,16 +26,25 @@ jobs:
       matrix:
         include:
           # SWT de PDI 9.4 para macOS es solo x86_64 y spoon.sh corta en arm64: Java x64 + Rosetta + arch
-          - id: macos-arm64-rosetta
+          - id: macos15-arm64-rosetta
             runner: macos-15
             java_arch: x64
             prefijo: arch -x86_64
-          - id: macos-intel
+          - id: macos26-arm64-rosetta
+            runner: macos-26
+            java_arch: x64
+            prefijo: arch -x86_64
+          - id: macos15-intel
             runner: macos-15-intel
             java_arch: x64
             prefijo: ""
-          - id: linux-x64
-            runner: ubuntu-latest
+          # ubuntu-latest pasa a 26.04 entre el 19-oct y el 19-nov de 2026: se prueban las dos fijas
+          - id: ubuntu24-x64
+            runner: ubuntu-24.04
+            java_arch: x64
+            prefijo: ""
+          - id: ubuntu26-x64
+            runner: ubuntu-26.04
             java_arch: x64
             prefijo: ""
     env:
@@ -71,8 +84,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           # spoon.sh exporta SWT_GTK3=0: el SWT 4.9 de PDI 9.4 usa GTK 2
-          sudo apt-get install -y -qq libgtk2.0-0t64 libxtst6 xvfb imagemagick > /dev/null
-          dpkg -l libgtk2.0-0t64 xvfb | tail -2
+          sudo apt-get install -y -qq libgtk2.0-0t64 libxtst6 xvfb imagemagick > /dev/null             || sudo apt-get install -y -qq libgtk2.0-0 libxtst6 xvfb imagemagick > /dev/null
+          dpkg -l | grep -E " (libgtk2\.0-0|xvfb)" | awk '{print $2, $3}'
 
       - name: Sistema
         run: |
@@ -152,10 +165,12 @@ jobs:
           echo "segundos hasta /ping: $s"
           if [ "$ok" != 1 ]; then tail -60 "$EVID/spoon-salida.log"; exit 1; fi
           echo "$r" | grep -q '"spoon":true'
+          sleep 5   # que Spoon termine de abrir la ventana
+          if [ "$RUNNER_OS" = Linux ]; then import -display :99 -window root "$EVID/pantalla-1-al-abrir.png" || true
+          else screencapture -x "$EVID/pantalla-1-al-abrir.png" || true; fi
 
       - name: Cliente MCP (initialize ... save)
         run: |
-          sleep 5   # que Spoon termine de abrir la ventana y los archivos recientes
           t=$(date +%s)
           python3 -I tools/ci/cliente_mcp.py --salida "$EVID" --herramientas "$HERRAMIENTAS" --plataforma "$PLATAFORMA"
           echo "cliente MCP: $(( $(date +%s) - t )) s" >> "$EVID/tiempos.txt"
@@ -175,11 +190,31 @@ jobs:
         if: always()
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            import -display :99 -window root "$EVID/pantalla.png" || true
+            import -display :99 -window root "$EVID/pantalla-2-tras-mcp.png" || true
           else
-            screencapture -x "$EVID/pantalla.png" || true
+            screencapture -x "$EVID/pantalla-2-tras-mcp.png" || true
           fi
           ls -l "$EVID"
+
+      # En macOS la ventana de Spoon lanzada desde un shell queda detrás (el frente es Finder) y, en la
+      # primera corrida, en blanco salvo la barra de arriba. ¿Se dibuja al traerla al frente o al cambiarle
+      # el tamaño? System Events necesita permiso de accesibilidad: si no lo hay, queda anotado el error.
+      - name: Ventana de Spoon en macOS (al frente y redimensionada)
+        if: always() && runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          set +e +o pipefail
+          PID=$(pgrep -f launcher/launcher.jar | head -1); echo "pid de Spoon: $PID" | tee "$EVID/ventana.txt"
+          ae() { echo "> $1" >> "$EVID/ventana.txt"; osascript -e "tell application \"System Events\" to $1" >> "$EVID/ventana.txt" 2>&1; }
+          P="(first process whose unix id is $PID)"
+          ae "get {name, frontmost, background only} of $P"
+          ae "get {name, position, size} of every window of $P"
+          ae "set frontmost of $P to true"
+          sleep 3; screencapture -x "$EVID/pantalla-3-al-frente.png"
+          ae "set size of window 1 of $P to {1280, 800}"
+          sleep 3; screencapture -x "$EVID/pantalla-4-redimensionada.png"
+          ae "get {name, position, size} of every window of $P"
+          cat "$EVID/ventana.txt"
 
       - name: Cerrar Spoon y resumen
         if: always()
@@ -229,29 +264,32 @@ jobs:
           bash instalar.sh --instalar-pdi --destino "$RUNNER_TEMP/pentaho" --sin-claude --sin-codex > "$EVID/instalar.log" 2>&1
           cp -R claude/skills/pentaho-etl/manual/ejemplos "$RUNNER_TEMP/ejemplos"
 
-          # corre un comando con tope de N segundos (macOS no trae timeout)
+          # corre un comando con tope de N segundos (macOS no trae timeout); deja el código en $codigo
           tope() { s=$1; shift; "$@" & p=$!; for i in $(seq 1 "$s"); do kill -0 $p 2>/dev/null || break; sleep 1; done
-                   kill $p 2>/dev/null; pkill -f launcher/launcher.jar 2>/dev/null; wait $p; }
+                   kill $p 2>/dev/null; pkill -f launcher/launcher.jar 2>/dev/null; wait $p; codigo=$?; }
+          EJ="$RUNNER_TEMP/ejemplos/01_generar_constantes.ktr"
 
+          set +e
           cd "$PDI"
           echo "== 1. spoon.sh con Java arm64"
-          tope 60 /bin/sh ./spoon.sh > "$EVID/1-spoon-arm64.log" 2>&1; echo "código: $?" >> "$EVID/1-spoon-arm64.log"
-          cat "$EVID/1-spoon-arm64.log"
+          tope 60 /bin/sh ./spoon.sh > "$EVID/1-spoon-arm64.log" 2>&1
+          echo "código: $codigo" | tee -a "$EVID/1-spoon-arm64.log"; cat "$EVID/1-spoon-arm64.log"
           echo "== 2. pan.sh con Java arm64"
-          tope 120 /bin/sh ./pan.sh -file="$RUNNER_TEMP/ejemplos/01_generar_constantes.ktr" -level=Basic \
-            > "$EVID/2-pan-arm64.log" 2>&1; echo "código: $?" >> "$EVID/2-pan-arm64.log"
-          tail -5 "$EVID/2-pan-arm64.log"
+          tope 120 /bin/sh ./pan.sh -file="$EJ" -level=Basic > "$EVID/2-pan-arm64.log" 2>&1
+          echo "código: $codigo" | tee -a "$EVID/2-pan-arm64.log"; tail -4 "$EVID/2-pan-arm64.log"
           echo "== 3. pan.sh desde un shell x86_64 (arch -x86_64) y Java arm64"
-          tope 180 arch -x86_64 /bin/sh ./pan.sh -file="$RUNNER_TEMP/ejemplos/01_generar_constantes.ktr" -level=Basic \
-            > "$EVID/3-pan-shell-x86-java-arm64.log" 2>&1; echo "código: $?" >> "$EVID/3-pan-shell-x86-java-arm64.log"
-          grep -E "Finished processing|ERROR|código" "$EVID/3-pan-shell-x86-java-arm64.log" || true
+          tope 180 arch -x86_64 /bin/sh ./pan.sh -file="$EJ" -level=Basic > "$EVID/3-pan-shell-x86-java-arm64.log" 2>&1
+          echo "código: $codigo" | tee -a "$EVID/3-pan-shell-x86-java-arm64.log"
+          grep -E "Finished processing|ERROR" "$EVID/3-pan-shell-x86-java-arm64.log"
+          ls -l "$RUNNER_TEMP/ejemplos/salida/"
           echo "== 4. spoon.sh desde un shell x86_64 y Java arm64"
           tope 120 arch -x86_64 /bin/sh ./spoon.sh > "$EVID/4-spoon-shell-x86-java-arm64.log" 2>&1
-          echo "código: $?" >> "$EVID/4-spoon-shell-x86-java-arm64.log"
-          grep -iE "UnsatisfiedLink|incompatible architecture|have 'x86_64'|need 'arm64|Exception|código" \
-            "$EVID/4-spoon-shell-x86-java-arm64.log" | head -20 || true
+          echo "código: $codigo" | tee -a "$EVID/4-spoon-shell-x86-java-arm64.log"
+          grep -iE "UnsatisfiedLink|incompatible architecture|x86_64|arm64|Exception" \
+            "$EVID/4-spoon-shell-x86-java-arm64.log" | head -20
+          set -e
 
-          # verde solo si todo pasa como está documentado en docs/plataformas.md
+          # verde solo si los dos cortes salen como está documentado en docs/plataformas.md
           grep -q "this Mac platform \[arm64\] is not yet supported" "$EVID/1-spoon-arm64.log"
           grep -q "this Mac platform \[arm64\] is not yet supported" "$EVID/2-pan-arm64.log"
 
