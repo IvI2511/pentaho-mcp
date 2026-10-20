@@ -320,7 +320,8 @@ jobs:
           cp instalar.sh /tmp/instalar-pentaho-mcp.sh   # lo que hace un usuario: bajarlo y correrlo con bash
           bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi < /dev/null 2>&1 | tee "$EVID/instalar-1-sin-terminal.log"
           grep -q "Mac with an Apple chip" "$EVID/instalar-1-sin-terminal.log"
-          grep -q "No terminal to ask: nothing installed" "$EVID/instalar-1-sin-terminal.log"
+          grep -q "No terminal to ask (an agent, or curl | bash): nothing installed" "$EVID/instalar-1-sin-terminal.log"
+          grep -q "check its SHA-256" "$EVID/instalar-1-sin-terminal.log"   # dice qué haría antes de hacerlo
           grep -q -- "--rosetta" "$EVID/instalar-1-sin-terminal.log"
           test ! -e ~/pentaho/data-integration/spoon-rosetta.sh
           test ! -e ~/pentaho/java-x64
@@ -331,11 +332,12 @@ jobs:
       - name: instalar.sh en una terminal, contestando «y» (Rosetta 2, Java x64 y lanzador)
         run: |
           # una terminal (pty) y la «y» recién cuando aparece la pregunta del paso 3, como una persona
-          python3 -I tools/ci/responder.py --espera "[Y/n]" --respuesta y --log "$EVID/instalar-2-terminal.pty" \
+          python3 -I tools/ci/responder.py --espera "[y/N]" --respuesta y --log "$EVID/instalar-2-terminal.pty" \
             -- bash /tmp/instalar-pentaho-mcp.sh --pdi ~/pentaho/data-integration > /dev/null
           tr -d '\r' < "$EVID/instalar-2-terminal.pty" > "$EVID/instalar-2-terminal.log"
           cat "$EVID/instalar-2-terminal.log"
-          grep -q "Install what is missing now? \[Y/n\]" "$EVID/instalar-2-terminal.log"
+          grep -q "Do it now? \[y/N\]" "$EVID/instalar-2-terminal.log"
+          grep -q "SHA-256 verified: " "$EVID/instalar-2-terminal.log"
           arch -x86_64 /usr/bin/true && echo "Rosetta 2: OK"
           file ~/pentaho/java-x64/Contents/Home/bin/java | tee -a "$EVID/sistema.txt" | grep -q x86_64
           L=$(sed -n 's/^  1\. Open (or restart) Spoon: //p' "$EVID/instalar-2-terminal.log")

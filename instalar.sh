@@ -4,9 +4,10 @@
 #   4 Spoon is open and locks the plugin · 1 other error
 #
 # Mac with an Apple chip (M1-M4): PDI 9.4's graphics library (SWT) is x86_64 only, so Spoon has to run under
-# Rosetta 2 with an x64 Java. Step 3 offers to install what is missing (Rosetta 2, Temurin 21 x64 in
-# <destino>/java-x64) and writes data-integration/spoon-rosetta.sh, which opens Spoon that way. --rosetta
-# installs them without asking (agents, CI); with no terminal and no --rosetta, step 3 only says how.
+# Rosetta 2 with an x64 Java. Step 3 says what is missing and, only after an explicit "y" in the terminal or
+# with --rosetta, installs it: Rosetta 2 (softwareupdate) and Temurin 21 x64 into <destino>/java-x64, checked
+# with the SHA-256 of the Adoptium API. With no terminal and no --rosetta it installs nothing. Then it writes
+# data-integration/spoon-rosetta.sh, which opens Spoon that way. Linux and Intel Macs: nothing of this.
 #
 # Usage:  bash instalar.sh [--pdi <data-integration folder>] [--instalar-pdi [--destino DIR]]
 #                          [--sin-claude] [--sin-codex] [--puerto N] [--rosetta]
@@ -14,7 +15,7 @@ set -euo pipefail
 
 REPO="IvI2511/pentaho-mcp"
 BASE="https://github.com/$REPO/releases/latest/download"
-JAVA_X64_URL="https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse"
+ADOPTIUM_API="https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=mac&vendor=eclipse"
 PDI="${PDI_HOME:-}"; INSTALAR_PDI=0; DESTINO="$HOME/pentaho"; SIN_CLAUDE=0; SIN_CODEX=0; PUERTO=8765; ROSETTA=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -54,36 +55,41 @@ es_java_x64() {   # a Java home whose bin/java runs as x86_64 (also a universal 
   [ -x "$1/bin/java" ] || return 1
   case "$(file -bL "$1/bin/java" 2>/dev/null)" in *x86_64*) return 0 ;; *) return 1 ;; esac
 }
-preguntar() {   # yes/no in the terminal, yes by default; --rosetta answers yes, and with no terminal it is no
+preguntar() {   # only an explicit yes in the terminal (Enter alone is no)
   local r
-  [ "$ROSETTA" = 1 ] && return 0
-  [ -t 0 ] || return 1
-  printf '   %s [Y/n] ' "$1"; read -r r || return 1
-  case "$r" in [nN]*) return 1 ;; *) return 0 ;; esac
+  printf '   %s [y/N] ' "$1"; read -r r || return 1
+  case "$r" in [yYsS]*) return 0 ;; *) return 1 ;; esac
 }
 instalar_rosetta() {
   echo "   installing Rosetta 2: softwareupdate --install-rosetta --agree-to-license"
   softwareupdate --install-rosetta --agree-to-license 2>&1 | sed 's/^/   /'
   hay_rosetta
 }
-instalar_java_x64() {   # Temurin 21 x64 into $JAVA_X64, checked against the SHA-256 published next to it
-  local url sha
-  url=$(curl -fsS -o /dev/null -w '%{redirect_url}' "$JAVA_X64_URL") || return 1   # the GitHub release asset
-  [ -n "$url" ] || url="$JAVA_X64_URL"
-  bajar "$url" "$TMP/java-x64.tar.gz" || return 1
-  if sha=$(curl -fsSL "$url.sha256.txt" 2>/dev/null) && [ -n "$sha" ]; then
-    [ "$(shasum -a 256 "$TMP/java-x64.tar.gz" | cut -d' ' -f1)" = "${sha%% *}" ] \
-      || { echo "   the download does not match its SHA-256"; return 1; }
-  else
-    echo "   (no SHA-256 published next to it: not checked)"
+instalar_java_x64() {   # Temurin 21 x64 into $JAVA_X64, with the SHA-256 of the Adoptium API (as preparar.ps1)
+  local json par sha url
+  json=$(curl -fsSL "$ADOPTIUM_API") || { echo "   could not read $ADOPTIUM_API"; return 1; }
+  # the .tar.gz is binary.package (binary.installer is the .pkg); JavaScript for Automation reads the JSON
+  par=$(osascript -l JavaScript -e \
+    'function run(a) { var p = JSON.parse(a[0])[0].binary.package; return p.checksum + " " + p.link }' "$json" 2>/dev/null) \
+    || par=""
+  sha=$(printf '%s' "${par%% *}" | tr 'A-F' 'a-f'); url="${par#* }"
+  case "$sha" in *[!0-9a-f]*) sha="" ;; esac
+  [ ${#sha} = 64 ] || sha=""
+  case "$url" in https://github.com/adoptium/*) ;; *) url="" ;; esac
+  if [ -z "$sha" ] || [ -z "$url" ]; then
+    echo "   the Adoptium API gave no valid SHA-256 and link: nothing downloaded"; return 1
   fi
+  bajar "$url" "$TMP/java-x64.tar.gz" || return 1
+  [ "$(shasum -a 256 "$TMP/java-x64.tar.gz" | cut -d' ' -f1)" = "$sha" ] \
+    || { echo "   SHA-256 does not match (expected $sha): not installed"; return 1; }
+  echo "   SHA-256 verified: $sha"
   rm -rf "$JAVA_X64" && mkdir -p "$JAVA_X64" && tar -xzf "$TMP/java-x64.tar.gz" -C "$JAVA_X64" --strip-components 1 \
     || return 1
   es_java_x64 "$JAVA_X64/Contents/Home"
 }
 LANZADOR=""
 mac_apple() {   # Rosetta 2 + an x64 Java + spoon-rosetta.sh; leaves LANZADOR set if Spoon can open
-  local jx="" c falta_rosetta=0 falta_java=0 v
+  local jx="" c falta_rosetta=0 falta_java=0 si=0 v
   echo "   Mac with an Apple chip: PDI 9.4 ships its graphics library (SWT) for x86_64 only, so Spoon runs"
   echo "   under Rosetta 2 with an x64 Java (spoon.sh alone stops: \"this Mac platform [arm64] is not yet supported\")."
   for c in "${PENTAHO_JAVA_HOME:-}" "$JAVA_X64/Contents/Home" "${JAVA_HOME:-}" \
@@ -95,7 +101,20 @@ mac_apple() {   # Rosetta 2 + an x64 Java + spoon-rosetta.sh; leaves LANZADOR se
   else falta_java=1; echo "   x64 Java: none (Temurin 21 x64 would go to $JAVA_X64, ~190 MB)"; fi
 
   if [ $falta_rosetta = 1 ] || [ $falta_java = 1 ]; then
-    if preguntar "Install what is missing now?"; then
+    echo "   To open Spoon here, this installer can:"
+    if [ $falta_rosetta = 1 ]; then
+      echo "     - install Rosetta 2, Apple's x86_64 translator: softwareupdate --install-rosetta --agree-to-license"
+      echo "       (that accepts Apple's Rosetta license; it needs an administrator account)"
+    fi
+    if [ $falta_java = 1 ]; then
+      echo "     - download Eclipse Temurin 21 x64 (~190 MB) from Adoptium, check its SHA-256 and unpack it into"
+      echo "       $JAVA_X64 (any other Java you have stays as it is)"
+    fi
+    if [ "$ROSETTA" = 1 ]; then echo "   --rosetta: doing it."; si=1
+    elif [ ! -t 0 ]; then echo "   No terminal to ask (an agent, or curl | bash): nothing installed."
+    elif preguntar "Do it now?"; then si=1
+    else echo "   Nothing installed."; fi
+    if [ $si = 1 ]; then
       if [ $falta_rosetta = 1 ]; then
         instalar_rosetta || echo "   Could not install Rosetta 2 (it needs an administrator account)."
       fi
@@ -103,8 +122,6 @@ mac_apple() {   # Rosetta 2 + an x64 Java + spoon-rosetta.sh; leaves LANZADOR se
         if instalar_java_x64; then jx="$JAVA_X64/Contents/Home"; echo "   x64 Java: $jx"
         else echo "   Could not install the x64 Java."; fi
       fi
-    elif [ "$ROSETTA" = 0 ] && [ ! -t 0 ]; then
-      echo "   No terminal to ask: nothing installed."
     fi
   fi
 
@@ -121,7 +138,7 @@ mac_apple() {   # Rosetta 2 + an x64 Java + spoon-rosetta.sh; leaves LANZADOR se
     chmod +x "$LANZADOR"
     echo "   launcher: $LANZADOR"
   else
-    echo "   Spoon will not open on this Mac without both. To install them, rerun with --rosetta:"
+    echo "   Spoon will not open on this Mac without both. To install them as above, rerun with --rosetta:"
     echo "     bash \"$YO\" --pdi \"$PDI\" --rosetta"
   fi
 }

@@ -35,23 +35,26 @@ PDI 9.4 trae la librería gráfica de macOS (`libswt/osx64/swt.jar`, SWT 4.18) *
 
 **Con el `instalar.sh` de la rama `ci/instalar-mac-apple`** (todavía no está en `main`, que es el que bajan
 los usuarios), el script hace los pasos 1, 2 y 4 de abajo. En el paso 3 («Java») detecta el chip Apple,
-busca un Java x64 (`PENTAHO_JAVA_HOME`, `~/pentaho/java-x64`, `JAVA_HOME`, `java_home -a x86_64`), ofrece
-instalar lo que falta —Rosetta 2 con `softwareupdate` y Temurin 21 x64 en `<destino>/java-x64`, controlado
-con el SHA-256 que Adoptium publica al lado— y deja `data-integration/spoon-rosetta.sh`, que abre Spoon con
-`PENTAHO_JAVA_HOME` y `arch -x86_64`. «Done. Next» imprime ese comando en lugar de `spoon.sh`:
+busca un Java x64 (`PENTAHO_JAVA_HOME`, `~/pentaho/java-x64`, `JAVA_HOME`, `java_home -a x86_64`), dice
+qué falta y qué haría —Rosetta 2 con `softwareupdate --install-rosetta --agree-to-license` (acepta la licencia
+de Apple) y Temurin 21 x64 en `<destino>/java-x64`, con el SHA-256 y el enlace de la API de Adoptium, como
+`instalador/preparar.ps1`— y lo hace solo con una «y» explícita (Enter solo es «no») o con `--rosetta`. Si
+la API no da un SHA-256 válido o el enlace no es de `github.com/adoptium/`, no baja nada. Después deja
+`data-integration/spoon-rosetta.sh`, que abre Spoon con `PENTAHO_JAVA_HOME` y `arch -x86_64`. «Done. Next»
+imprime ese comando en lugar de `spoon.sh`. En Linux y en Mac Intel no cambia nada de esto:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.sh -o /tmp/instalar-pentaho-mcp.sh
-bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi     # en el paso 3 pregunta «Install what is missing now? [Y/n]»
+bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi     # en el paso 3: «Do it now? [y/N]» → y
 ~/pentaho/data-integration/spoon-rosetta.sh
 ```
 
-Pregunta solo si tiene una terminal (`[ -t 0 ]`): con `curl … | bash` o desde un agente no la tiene, avisa,
-no instala nada e indica volver a correrlo con `--rosetta`, que instala sin preguntar. Los pasos y los
+Pregunta solo si tiene una terminal (`[ -t 0 ]`): con `curl … | bash` o desde un agente no la tiene, dice
+lo mismo, no instala nada e indica volver a correrlo con `--rosetta`, que instala sin preguntar. Los pasos y los
 códigos de salida son los de `instalar.ps1`: nada de esto corta la instalación (si Rosetta o el Java no se
 pueden instalar, lo dice y sigue con el paso 4, como el «NO Java» de siempre). Probado con el job
 `receta-mac-apple` (corrida 13): sin terminal avisa y no instala; en una terminal pregunta, baja el Temurin
-21 x64 (controlado con su SHA-256), deja el lanzador, y Spoon abierto con ese comando contesta `/ping` a los
+21 x64 (con el SHA-256 de la API verificado), deja el lanzador, y Spoon abierto con ese comando contesta `/ping` a los
 41 s con las 9 llamadas MCP bien. En esa VM de macos-26 Rosetta ya venía instalada, así que el
 `softwareupdate` de `instalar.sh` no corrió ahí; es el mismo comando del paso 1 de abajo, que sí corrió en
 las corridas 5 y 9 y en los jobs de `probar`.
@@ -268,10 +271,11 @@ install, Pan, opening Spoon and every MCP call work. Details: [`docs/plataformas
 **Mac with an Apple chip (M1–M4).** PDI 9.4 only ships the x86_64 graphics library for macOS, and
 `spoon.sh` stops on arm64 with *"this Mac platform [arm64] is not yet supported"* (exit code 0, so check
 the output). Spoon has to run under Rosetta 2 with an x64 Java. In step 3 the script offers to install
-both (Rosetta 2, and Temurin 21 x64 into `~/pentaho/java-x64`) and leaves `spoon-rosetta.sh` next to
-`spoon.sh`, which opens Spoon that way; "Done. Next" prints it:
+both (Rosetta 2 with `softwareupdate`, which accepts Apple's license, and Temurin 21 x64 into
+`~/pentaho/java-x64`, checked with the SHA-256 from the Adoptium API) and does it only after an explicit
+`y`. Then it leaves `spoon-rosetta.sh` next to `spoon.sh`, which opens Spoon that way; "Done. Next" prints it:
 ```bash
-bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi      # step 3 asks "Install what is missing now? [Y/n]"
+bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi      # step 3 asks "Do it now? [y/N]": y
 ~/pentaho/data-integration/spoon-rosetta.sh
 ```
 It only asks when it runs in a terminal. Without one (an agent, `curl | bash`) it installs nothing and says
