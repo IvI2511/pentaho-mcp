@@ -2,19 +2,34 @@
 # para copiar a <PDI>\plugins\ en plugin\dist\pentaho-mcp\.
 #
 # Uso:  powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 [-PdiHome <ruta data-integration>]
+#
+# La version sale del archivo VERSION de la raiz del repo (fuente unica: tambien la leen
+# instalador\instalador.iss y el plugin, por el recurso pentaho-mcp-version.txt del jar).
 param(
-  [string]$PdiHome = $env:PDI_HOME,
-  [string]$Version = "0.4.0"
+  [string]$PdiHome = $env:PDI_HOME
 )
 
 $ErrorActionPreference = "Stop"
 if (-not $PdiHome) { throw "Pasa -PdiHome <ruta a data-integration> o defini la variable PDI_HOME." }
 $root  = $PSScriptRoot
+$repo  = Split-Path $root -Parent
 $src   = Join-Path $root "src\main\java"
 $res   = Join-Path $root "src\main\resources"
 $build = Join-Path $root "build"
 $classes = Join-Path $build "classes"
 $dist  = Join-Path $root "dist\pentaho-mcp"
+
+# --- version: VERSION manda; plugin.json (la ficha del plugin de Claude) tiene que decir lo mismo
+$versionFile = Join-Path $repo "VERSION"
+if (-not (Test-Path $versionFile)) { throw "Falta $versionFile (una linea con la version, ej. 0.4.0)." }
+$Version = (Get-Content -Raw $versionFile).Trim()
+if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION no tiene la forma X.Y.Z: '$Version'" }
+$pluginJson = Join-Path $repo "claude\.claude-plugin\plugin.json"
+$versionClaude = (Get-Content -Raw -Encoding UTF8 $pluginJson | ConvertFrom-Json).version
+if ($versionClaude -ne $Version) {
+  throw "claude\.claude-plugin\plugin.json dice version $versionClaude y VERSION dice $Version. Igualalas antes de compilar."
+}
+Write-Host "Version: $Version"
 
 # --- localizar el JDK (javac + jar). El shim de Oracle en PATH trae javac pero no jar.
 function Find-JdkBin {
@@ -59,10 +74,14 @@ if ($LASTEXITCODE -ne 0) { throw "javac fallo ($LASTEXITCODE)" }
 
 if (Test-Path $res) { Copy-Item -Recurse -Force (Join-Path $res "*") $classes }
 
+# --- la version, como recurso junto a las clases: McpLifecycleListener.VERSION la lee de ahi
+$paquete = Join-Path $classes "io\github\ivi2511\pentahomcp"
+[IO.File]::WriteAllText((Join-Path $paquete "pentaho-mcp-version.txt"), $Version, [Text.Encoding]::ASCII)
+
 # --- catalogo y guias de la skill pentaho-etl dentro del jar, para los recursos MCP pentaho://...
 # (McpResources los lee del classpath bajo pentaho-etl/, con la misma estructura que la skill).
 # Se copian en cada build: la fuente unica sigue siendo claude\skills\pentaho-etl, no se duplican en git.
-$skill = Join-Path (Split-Path $root -Parent) "claude\skills\pentaho-etl"
+$skill = Join-Path $repo "claude\skills\pentaho-etl"
 $catJar = Join-Path $classes "pentaho-etl"
 foreach ($d in @("catalogo\steps", "catalogo\job-entries", "manual")) {
   New-Item -ItemType Directory -Force (Join-Path $catJar $d) | Out-Null

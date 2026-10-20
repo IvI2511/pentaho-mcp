@@ -91,6 +91,7 @@ installs the Spoon plugin and configures itself.
 |---|---|---|
 | **already have PDI** | `pentaho-mcp.zip` (the Spoon plugin, ~140 KB): unzip into `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
 | **don't have PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE with the plugin already in place, ~370 MB) | `instalar.ps1 -InstalarPdi` |
+| **prefer a Windows installer** | `Instalador_PentahoLive_X.Y.Z.exe`: PDI 9.4 CE + plugin + Java 21, or just the plugin into your PDI; Start menu shortcut and the `pentaho-live` command. Not signed yet: on the SmartScreen warning, **More info → Run anyway** ([details](INSTALL.md#option-c--windows-installer-exe)) | not needed |
 
 Then open Spoon, restart Claude Code (or run `/reload-plugins`) and ask for your first ETL.
 

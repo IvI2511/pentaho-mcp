@@ -1,5 +1,10 @@
 package io.github.ivi2511.pentahomcp;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
 import org.pentaho.di.core.annotations.LifecyclePlugin;
 import org.pentaho.di.core.lifecycle.LifeEventHandler;
 import org.pentaho.di.core.lifecycle.LifecycleException;
@@ -22,7 +27,11 @@ public class McpLifecycleListener implements LifecycleListener {
 
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
-  static final String VERSION = "0.4.0";
+  /** Si el jar no trae pentaho-mcp-version.txt (compilado a mano, sin build.ps1). */
+  private static final String VERSION_RESPALDO = "0.4.1";
+
+  /** La version del plugin: la escribe build.ps1 en el jar, sacada del archivo VERSION del repo. */
+  static final String VERSION = leerVersion();
 
   /** Llega a la IA en el initialize de MCP: como trabajar con estas herramientas. */
   static final String INSTRUCCIONES =
@@ -41,6 +50,38 @@ public class McpLifecycleListener implements LifecycleListener {
       + "(pentaho://...) for clients that do not have the pentaho-etl skill.";
 
   private McpHttpServer server;
+
+  /**
+   * Lee pentaho-mcp-version.txt del classpath, en el paquete de esta clase. Cualquier problema
+   * (falta el recurso, esta vacio, error de lectura) devuelve VERSION_RESPALDO: la version no puede
+   * impedir que el plugin arranque.
+   */
+  private static String leerVersion() {
+    InputStream in = null;
+    try {
+      in = McpLifecycleListener.class.getResourceAsStream( "pentaho-mcp-version.txt" );
+      if ( in == null ) {
+        return VERSION_RESPALDO;
+      }
+      BufferedReader r = new BufferedReader( new InputStreamReader( in, "UTF-8" ) );
+      String linea = r.readLine();
+      if ( linea == null ) {
+        return VERSION_RESPALDO;
+      }
+      linea = linea.replace( "﻿", "" ).trim();
+      return linea.isEmpty() ? VERSION_RESPALDO : linea;
+    } catch ( Throwable t ) {
+      return VERSION_RESPALDO;
+    } finally {
+      if ( in != null ) {
+        try {
+          in.close();
+        } catch ( IOException ignored ) {
+          // nada que hacer
+        }
+      }
+    }
+  }
 
   public McpLifecycleListener() {
     // constructor publico sin argumentos: lo exige PluginRegistry.loadClass

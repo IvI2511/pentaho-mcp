@@ -7,6 +7,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-20
+
+### Added
+
+- Windows installer, `Instalador_PentahoLive_X.Y.Z.exe` (Inno Setup, per user, no administrator rights),
+  in English, Spanish and Portuguese. Two types: **Full** (PDI 9.4 CE with the plugin in place and Java 21,
+  Eclipse Temurin, so no Java is needed on the computer) and **Plugin only**, into an existing PDI 9.4
+  folder that it asks for. It adds Start menu (and optional desktop) shortcuts, asks to close Spoon before
+  installing or uninstalling, and, if Claude Code or Codex are on the PATH, offers to configure them. Not
+  code-signed yet: on the SmartScreen warning, **More info → Run anyway**. The zips stay in every release.
+- `pentaho-live` command, installed by the Windows installer on the user PATH: opens Spoon and returns
+  right away, and does nothing if Spoon is already open. An agent can use it to start Spoon when the MCP
+  doesn't connect (asking the user first). `PENTAHO_LIVE_DRY_RUN=1` only prints what it would do.
+- `instalar.ps1 -SoloAgentes`: configures only Claude Code / Codex, skipping PDI and the Spoon plugin.
+
+### Changed
+
+- The version lives in a single `VERSION` file. `spoon-plugin/build.ps1` reads it (its `-Version`
+  parameter is gone), stops if `claude/.claude-plugin/plugin.json` says another version, and writes it into
+  the jar, where the Spoon plugin reads it.
+- Author shown in the Claude Code plugin, the marketplace and the licence: **Iván Castaño · IDC Studios**.
+
+### Fixed
+
+- Line endings are stored as they are (`.gitattributes` with `-text`): batch files keep CRLF and the
+  bash scripts (`instalar.sh`, the `pentaho-live` launcher) keep LF, so they run on macOS/Linux.
+
 ## [0.4.0] - 2026-10-20
 
 ### Added
@@ -126,7 +153,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.1.0...v0.2.0

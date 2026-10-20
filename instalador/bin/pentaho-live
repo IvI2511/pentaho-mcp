@@ -1,0 +1,6 @@
+#!/bin/sh
+# pentaho-live for Git Bash / MSYS2 (where Claude Code runs its commands on Windows): bash does not
+# run a .cmd file by its bare name, so this forwards to pentaho-live.cmd, next to this file.
+cmd_file="$(cygpath -w "$0" 2>/dev/null).cmd"
+[ -f "$cmd_file" ] || cmd_file="pentaho-live.cmd"
+exec cmd.exe //c "$cmd_file" "$@"

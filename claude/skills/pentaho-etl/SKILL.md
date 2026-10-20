@@ -18,7 +18,8 @@ If the `pentaho` MCP is listed but fails to connect, Spoon is closed or the Spoo
 `pentaho-mcp.zip` from the latest release of https://github.com/IvI2511/pentaho-mcp, unzipped into
 `data-integration/plugins/`, then restart Spoon (full guide: the repo's `INSTALL.md`). It listens on
 `127.0.0.1:8765`; with another port (`PENTAHO_MCP_PORT` in Spoon) change the plugin option `mcp_url`
-in `/config`.
+in `/config`. If Pentaho Live was installed with the Windows installer, `pentaho-live` (on the PATH)
+starts Spoon and returns right away: ask the user first (it opens a window), wait 30-60 s, reconnect.
 
 1. `status` → what is open (ids T1, J1…). `new_transformation` / `open_file` if needed. The editing
    tools take an optional `document` (id or name); without it they work on the active tab.
