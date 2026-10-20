@@ -1,0 +1,30 @@
+# archivo	regla	severidad que tiene que salir (error/warning/info) o «none» = esa regla no tiene que salir
+# Corpus de mutar.py. Severidades del modo estático: el profundo (WP3) puede subir unsorted_input y
+# empty_decimal_symbol a error. m15 sale como info a propósito (hoy no rellena).
+m01_decimal_vacio.ktr	empty_decimal_symbol	warning
+m02_calc_entero_primero.ktr	calculator_integer_first	error
+m03_groupby_sin_ordenar.ktr	unsorted_input	warning
+m04_mergejoin_sin_ordenar.ktr	unsorted_input	warning
+m05_hop_deshabilitado.ktr	disabled_hop	warning
+m06_variable_en_constante.ktr	variable_in_constant	error
+m07_variable_de_job.ktr	job_variable_in_transformation	warning
+m08_ruta_relativa.ktr	relative_path	error
+m09_ruta_absoluta.ktr	absolute_path	warning
+m10_password_claro.ktr	password_in_file	error
+m11_start_renombrado.kjb	start_not_named_start	error
+m12_error_a_success.kjb	failure_branch_ends_in_success	error
+m13_reparto.ktr	distribute_multiple_outputs	warning
+m14_nombres_duplicados.ktr	duplicate_step_name	error
+m15_salida_sin_campos.ktr	text_output_without_fields	info
+m15b_salida_sin_campos_con_longitud.ktr	text_output_without_fields	warning
+m16_copias_antes_de_join.ktr	unsorted_input	warning
+m17_orden_otra_clave.ktr	unsorted_input	warning
+m18_ciclo.ktr	cycle	error
+m19_step_huerfano.ktr	orphan_step	warning
+m20_decimal_y_formato_vacios.ktr	empty_decimal_symbol	warning
+m21_calculadora_enteros.ktr	calculator_integer_first	error
+j01_existe_a_success.kjb	failure_branch_ends_in_success	none
+j02_rojo_a_log.kjb	failure_branch_ends_in_success	none
+j03_rojo_log_incondicional_success.kjb	failure_branch_ends_in_success	warning
+j04_rojo_log_verde_success.kjb	failure_branch_ends_in_success	none
+j05_trans_sin_rama_roja.kjb	job_entry_without_failure_hop	none

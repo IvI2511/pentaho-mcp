@@ -1,0 +1,358 @@
+# Nombres por defecto de steps (S) y entradas de job (E) de PDI 9.4 en en/es/pt, para default_step_name y
+# default_entry_name. Lo genera tools/lint-corpus/nombres.ps1 (un arranque de Kettle por idioma): no editar a mano.
+E	Abort job
+E	Add filenames to result
+E	Bulk load from MySQL into file
+E	Bulk load into MSSQL
+E	Bulk load into MySQL
+E	Check DB connections
+E	Check files locked
+E	Check if XML file is well formed
+E	Check if a folder is empty
+E	Check if connected to repository
+E	Check webservice availability
+E	Checks if files exist
+E	Columns exist in a table
+E	Compare folders
+E	Convert file between Windows and Unix
+E	Copy files
+E	Create a folder
+E	Create file
+E	DTD validator
+E	Decrypt files with PGP
+E	Delete file
+E	Delete filenames from result
+E	Delete files
+E	Delete folders
+E	Display msgbox info
+E	Encrypt files with PGP
+E	Evaluate files metrics
+E	Evaluate rows number in a table
+E	Example job (deprecated)
+E	Export repository to XML file
+E	FTP delete
+E	File compare
+E	File exists
+E	Get a file with FTP
+E	Get a file with FTPS
+E	Get a file with SFTP
+E	Get mails (POP3/IMAP)
+E	HL7 MLLP acknowledge
+E	HL7 MLLP input
+E	HTTP
+E	JavaScript
+E	Job
+E	MS Access bulk load (deprecated)
+E	Mail
+E	Mail validator
+E	Move files
+E	Palo cube create (deprecated)
+E	Palo cube delete (deprecated)
+E	Ping a host
+E	Process result filenames
+E	Put a file with FTP
+E	Put a file with SFTP
+E	SQL
+E	Send Nagios passive check
+E	Send SNMP trap
+E	Send information using syslog
+E	Set variables
+E	Shell
+E	Simple evaluation
+E	Special entries
+E	Success
+E	Table exists
+E	Talend job execution (deprecated)
+E	Telnet a host
+E	Transformation
+E	Truncate tables
+E	Unzip file
+E	Upload files to FTPS
+E	Verify file signature with PGP
+E	Wait for
+E	Wait for SQL
+E	Wait for file
+E	Write to file
+E	Write to log
+E	XSD validator
+E	XSL transformation
+E	Zip file
+S	Abort
+S	Actualizar
+S	Add XML
+S	Add a checksum
+S	Add constants
+S	Add sequence
+S	Add value fields changing sequence
+S	Agrupar por
+S	Analytic query
+S	Append streams
+S	Asignar valor a variables
+S	Automatic documentation output
+S	Avro input
+S	Avro output
+S	Añadir constantes
+S	Añadir secuencia
+S	Block this step until steps finish
+S	Blocking step
+S	Búsqueda en base de datos
+S	Búsqueda en flujo de datos
+S	Búsqueda/actualización en combinación
+S	Búsqueda/actualización en dimensión
+S	CSV file input
+S	Calculadora
+S	Calculator
+S	Call DB procedure
+S	Call endpoint
+S	Cassandra input
+S	Cassandra output
+S	Change file encoding
+S	Check if file is locked
+S	Check if webservice is available
+S	Cliente HTTP
+S	Clone row
+S	Closure generator
+S	Column exists
+S	Combination lookup/update
+S	Concat fields
+S	Consulta base de datos
+S	Copia filas a resultado
+S	Copia nombres de fichero al resultado
+S	Copy rows to result
+S	Credit card validator
+S	Data grid
+S	Data validator
+S	Database join
+S	Database lookup
+S	De-serialize from file
+S	Delay row
+S	Delete
+S	Des-Normalización de fila
+S	Des-Serializacion desde Fichero
+S	Detect empty stream
+S	Dimension lookup/update
+S	Dummy (do nothing)
+S	Dynamic SQL row
+S	EDI to XML
+S	ESRI shapefile reader
+S	ETL metadata injection
+S	Ejecutar script SQL
+S	Elasticsearch bulk insert
+S	Elasticsearch bulk insert (deprecated)
+S	Eliminar
+S	Email messages input
+S	Entrada Fichero de Texto
+S	Entrada Tabla
+S	Entrada XBase
+S	Escribir en Socket
+S	Especificación del mapeo de entrada
+S	Especificación del mapeo de salida
+S	Example step
+S	Example step (deprecated)
+S	Execute SQL script
+S	Execute a process
+S	Execute row SQL script
+S	Filas Unicas
+S	File exists
+S	Filter rows
+S	Filtrar filas
+S	Fixed file input
+S	Formula
+S	Fundir filas
+S	Fuzzy match
+S	GZIP CSV input
+S	Generar filas
+S	Generate random credit card numbers
+S	Generate random value
+S	Generate rows
+S	Get ID from slave server
+S	Get data from XML
+S	Get file names
+S	Get files from result
+S	Get files rows count
+S	Get records from stream
+S	Get repository names
+S	Get rows from result
+S	Get session variables
+S	Get subfolder names
+S	Get system info
+S	Get table names
+S	Get variables
+S	Google Analytics
+S	Greenplum bulk loader
+S	Greenplum bulk loader (deprecated)
+S	Greenplum load
+S	Group by
+S	HL7 input
+S	HTTP client
+S	HTTP post
+S	Identify last row in a stream
+S	If field value is null
+S	Infobright loader
+S	Información de sistema
+S	Ingres VectorWise bulk loader
+S	Injector
+S	Insert / update
+S	Insertar / Actualizar
+S	Inyector de fila
+S	JMS consumer
+S	JMS producer
+S	JSON input
+S	JSON output
+S	Java filter
+S	Job executor
+S	Join rows (cartesian product)
+S	Juntar filas (producto cartesiano)
+S	Kafka consumer
+S	Kafka producer
+S	LDAP input
+S	LDAP output
+S	LDIF input
+S	Leer de Socket
+S	Load file content in memory
+S	LucidDB streaming loader
+S	LucidDB streaming loader (deprecated)
+S	MQTT consumer
+S	MQTT producer
+S	Mail
+S	Mail validator
+S	Mapeo (sub-transformación)
+S	Mapeo de valores
+S	Mapping (sub-transformation)
+S	Mapping input specification
+S	Mapping output specification
+S	Memory group by
+S	Merge join
+S	Merge rows (diff)
+S	Metadata structure of stream
+S	Microsoft Access input
+S	Microsoft Access output
+S	Microsoft Excel input
+S	Microsoft Excel output
+S	Microsoft Excel writer
+S	Modified JavaScript value
+S	Mondrian input
+S	MonetDB bulk loader
+S	MongoDB input
+S	MongoDB output
+S	Multiway merge join
+S	MySQL bulk loader
+S	Normalización de fila
+S	Null if
+S	Nulo si
+S	Number range
+S	OLAP input
+S	Obtener ficheros de resultado anterior
+S	Obtener filas de resultado anterior
+S	Obtener nombres de fichero
+S	Obtener variables
+S	Oracle bulk loader
+S	Ordenar filas
+S	Output steps metrics
+S	PGP decrypt stream
+S	PGP encrypt stream
+S	Palo cell input
+S	Palo cell input (deprecated)
+S	Palo cell output
+S	Palo cell output (deprecated)
+S	Palo dim input
+S	Palo dim input (deprecated)
+S	Palo dim output
+S	Palo dim output (deprecated)
+S	Partir campos
+S	Pentaho reporting output
+S	PostgreSQL bulk loader
+S	Prioritize streams
+S	Procedimiento base de datos
+S	Process files
+S	Properties output
+S	Property input
+S	REST client
+S	RSS input
+S	RSS output
+S	Regex evaluation
+S	Replace in string
+S	Reservoir sampling
+S	Row denormaliser
+S	Row flattener
+S	Row normaliser
+S	Rules accumulator
+S	Rules executor
+S	Run SSH commands
+S	S3 CSV input
+S	S3 file output
+S	SAP input
+S	SAP input (deprecated)
+S	SAS input
+S	SFTP put
+S	SQL file output
+S	SSTable output
+S	Salesforce delete
+S	Salesforce input
+S	Salesforce insert
+S	Salesforce update
+S	Salesforce upsert
+S	Salida Access
+S	Salida Fichero de Texto
+S	Salida Tabla
+S	Sample rows
+S	Script
+S	Script (deprecated)
+S	Secret key generator
+S	Selecciona/Renombra valores
+S	Select values
+S	Send message to syslog
+S	Serialización a Fichero
+S	Serialize to file
+S	Set field value
+S	Set field value to a constant
+S	Set files in result
+S	Set session variables
+S	Set variables
+S	Simple mapping (sub-transformation)
+S	Single threader
+S	Socket reader
+S	Socket writer
+S	Sort rows
+S	Sorted merge
+S	Split field to rows
+S	Split fields
+S	Stream lookup
+S	String operations
+S	Strings cut
+S	Switch / case
+S	Symmetric cryptography
+S	Synchronize after merge
+S	Table compare
+S	Table exists
+S	Table input
+S	Table output
+S	Teradata Fastload bulk loader
+S	Teradata TPT bulk loader
+S	Text file input
+S	Text file input (deprecated)
+S	Text file output
+S	Text file output (deprecated)
+S	Transformación simulada (no hace nada)
+S	Transformation executor
+S	Unique rows
+S	Unique rows (HashSet)
+S	Univariate statistics
+S	Unión ordenada
+S	Unión por clave
+S	Update
+S	User defined Java class
+S	User defined Java expression
+S	Valor JavaScript modificado
+S	Value mapper
+S	Vertica bulk loader
+S	Web services lookup
+S	Write to log
+S	XBase input
+S	XML input stream (StAX)
+S	XML join
+S	XML output
+S	XSD validator
+S	XSL transformation
+S	YAML input
+S	Zip file
