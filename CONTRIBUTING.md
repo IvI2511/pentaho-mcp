@@ -4,9 +4,10 @@ Thanks for helping. Bug reports, ideas and pull requests are all welcome: open a
 [issue](https://github.com/IvI2511/pentaho-mcp/issues) first for anything big, so we can agree on the
 approach.
 
-Open pull requests against `main`. Code comments, the skill and
-`docs/api-spoon.md` are in Spanish; user-facing docs and the plugin listing are in English. Write in
-whichever you prefer.
+Open pull requests against `main`. Code comments and `docs/api-spoon.md` are in Spanish; the skill,
+the user-facing docs, the plugin listing and everything the MCP tools expose to the AI (tool and
+argument names, response keys, descriptions, error messages) are in English. Write docs and comments in
+whichever you prefer, but name new tools and arguments in English.
 
 ## Repository layout
 

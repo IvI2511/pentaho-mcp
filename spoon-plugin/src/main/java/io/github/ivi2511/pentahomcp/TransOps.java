@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -91,13 +92,13 @@ final class TransOps {
       }
     }
     if ( porNombre != null ) {
-      throw new ToolError( "'" + t + "' es el nombre en pantalla; el tipo (id) es '" + id( porNombre ) + "'" );
+      throw new ToolError( "'" + t + "' is the name shown on screen; the step type (id) is '" + id( porNombre ) + "'" );
     }
-    throw new ToolError( "No existe el tipo de step '" + t + "'. " + sugerencias( t )
-      + " Usa tipos_de_step(buscar=...) para buscar." );
+    throw new ToolError( "There is no step type '" + t + "'. " + sugerencias( t )
+      + " Use list_step_types(search=...) to look for it." );
   }
 
-  /** "Parecidos: A (nombre), B (nombre)..." para los mensajes de error. */
+  /** "Similar: A (nombre), B (nombre)..." para los mensajes de error. */
   static String sugerencias( String q ) {
     final String n = norm( q );
     final List<Object[]> cands = new ArrayList<Object[]>(); // {plugin, puntaje}
@@ -125,9 +126,9 @@ final class TransOps {
       }
     } );
     if ( cands.isEmpty() ) {
-      return "No encontre ids parecidos.";
+      return "No similar ids found.";
     }
-    StringBuilder sb = new StringBuilder( "Parecidos:" );
+    StringBuilder sb = new StringBuilder( "Similar:" );
     for ( int k = 0; k < cands.size() && k < 8; k++ ) {
       PluginInterface p = (PluginInterface) cands.get( k )[ 0 ];
       sb.append( k == 0 ? " " : ", " ).append( id( p ) ).append( " (" ).append( p.getName() ).append( ')' );
@@ -176,14 +177,14 @@ final class TransOps {
   static StepMeta paso( TransMeta tm, String nombre ) throws ToolError {
     StepMeta sm = tm.findStep( nombre );
     if ( sm == null ) {
-      throw new ToolError( "No hay ningun step '" + nombre + "' en '" + Docs.nombre( tm ) + "'. " + nombres( tm ) );
+      throw new ToolError( "There is no step '" + nombre + "' in '" + Docs.nombre( tm ) + "'. " + nombres( tm ) );
     }
     return sm;
   }
 
   static String nombres( TransMeta tm ) {
     if ( tm.nrSteps() == 0 ) {
-      return "La transformacion no tiene steps.";
+      return "The transformation has no steps.";
     }
     StringBuilder sb = new StringBuilder( "Steps:" );
     for ( int i = 0; i < tm.nrSteps(); i++ ) {
@@ -197,14 +198,14 @@ final class TransOps {
     StepMeta b = paso( tm, hacia );
     TransHopMeta h = tm.findTransHop( a, b, true );
     if ( h == null ) {
-      throw new ToolError( "No hay hop de '" + a.getName() + "' a '" + b.getName() + "'" );
+      throw new ToolError( "There is no hop from '" + a.getName() + "' to '" + b.getName() + "'" );
     }
     return h;
   }
 
   // ---------------------------------------------------------------- agregar / configurar
 
-  /** Lo que devuelve agregarStep: el step nuevo y, si se pidio despues_de, el hop creado. */
+  /** Lo que devuelve agregarStep: el step nuevo y, si se pidio 'after', el hop creado. */
   static final class Agregado {
     StepMeta step;
     TransHopMeta hop;
@@ -220,12 +221,12 @@ final class TransOps {
     PluginInterface p = plugin( tipo );
     String nom = nombre == null ? "" : nombre.trim();
     if ( nom.isEmpty() ) {
-      throw new ToolError( "Falta el nombre del step" );
+      throw new ToolError( "Missing argument 'name' (the step name)" );
     }
     StepMeta existente = tm.findStep( nom );
     if ( existente != null ) {
-      throw new ToolError( "Ya hay un step llamado '" + existente.getName() + "' (" + existente.getStepID()
-        + "). Elegi otro nombre o usa configurar_step para cambiar el existente." );
+      throw new ToolError( "There is already a step named '" + existente.getName() + "' (" + existente.getStepID()
+        + "). Choose another name, or use configure_step to change the existing one." );
     }
     StepMeta previo = despuesDe == null ? null : paso( tm, despuesDe );
     Point pos = posicionNueva( tm, previo, x, y );
@@ -264,16 +265,16 @@ final class TransOps {
     try {
       nodo = XMLHandler.getSubNode( XMLHandler.loadXMLString( xml.toString() ), "step" );
     } catch ( Exception e ) {
-      throw new ToolError( "XML de configuracion invalido: " + mensaje( e ) );
+      throw new ToolError( "Invalid configuration XML: " + mensaje( e ) );
     }
     StepMeta sm;
     try {
       sm = new StepMeta( nodo, tm.getDatabases(), ms );
     } catch ( Exception e ) {
-      throw new ToolError( "Kettle no pudo leer la configuracion de '" + nombre + "' (" + tipo + "): " + mensaje( e ) );
+      throw new ToolError( "Kettle could not read the configuration of '" + nombre + "' (" + tipo + "): " + mensaje( e ) );
     }
     if ( sm.isMissing() ) {
-      throw new ToolError( "El plugin del tipo '" + tipo + "' no esta disponible en esta instalacion" );
+      throw new ToolError( "The plugin for step type '" + tipo + "' is not available in this installation" );
     }
     sm.getStepMetaInterface().setParentStepMeta( sm );
     return sm;
@@ -303,8 +304,8 @@ final class TransOps {
     while ( m.find() ) {
       String n = m.group( 1 ).trim().replace( "&amp;", "&" ).replace( "&lt;", "<" ).replace( "&gt;", ">" );
       if ( !n.isEmpty() && !n.startsWith( "${" ) && tm.findDatabase( n ) == null ) {
-        return "La conexion '" + n + "' no existe en esta transformacion: el step queda sin conexion hasta que "
-          + "la agregues y vuelvas a configurarlo.";
+        return "The connection '" + n + "' does not exist in this transformation: the step has no connection until "
+          + "you add it and configure the step again.";
       }
     }
     return null;
@@ -385,11 +386,11 @@ final class TransOps {
   static List<StepMeta[]> renombrar( TransMeta tm, StepMeta sm, String nuevo, IMetaStore ms ) throws Exception {
     String n = nuevo == null ? "" : nuevo.trim();
     if ( n.isEmpty() ) {
-      throw new ToolError( "Falta el nuevo nombre" );
+      throw new ToolError( "Missing argument 'new_name'" );
     }
     StepMeta otro = tm.findStep( n );
     if ( otro != null && otro != sm ) {
-      throw new ToolError( "Ya hay un step llamado '" + otro.getName() + "'" );
+      throw new ToolError( "There is already a step named '" + otro.getName() + "'" );
     }
     List<StepMeta> otros = new ArrayList<StepMeta>();
     List<String> xmlAntes = new ArrayList<String>();
@@ -435,7 +436,7 @@ final class TransOps {
     }
   }
 
-  // ---------------------------------------------------------------- modo de salida (copiar / repartir)
+  // ---------------------------------------------------------------- modo de salida (copy / distribute)
 
   /**
    * Hops normales que salen del step: sin los de error. Si el step manda las filas a destinos
@@ -460,23 +461,24 @@ final class TransOps {
     return n;
   }
 
+  /** "copy" o "distribute": el modo de salida del step, con los valores que ve la IA. */
   static String modoSalida( StepMeta a ) {
-    return a.isDistributes() ? "repartir" : "copiar";
+    return a.isDistributes() ? "distribute" : "copy";
   }
 
   /**
    * Lo que en Spoon es la pregunta "copiar o repartir" al sacar un segundo hop de un step. Con modo
-   * explicito ("copiar" / "repartir") lo aplica; sin modo, si el step quedo con 2+ salidas normales y
+   * explicito ("copy" / "distribute") lo aplica; sin modo, si el step quedo con 2+ salidas normales y
    * esta repartiendo, lo pasa a copiar (lo que casi siempre se quiere: si no, cada salida recibe solo
    * una parte de las filas). Devuelve una nota para la IA, o null si no hizo nada.
    */
   static String aplicarModoSalida( TransMeta tm, StepMeta a, String modo ) throws ToolError {
     if ( modo != null ) {
-      String m = modo.trim().toLowerCase();
-      if ( !m.equals( "copiar" ) && !m.equals( "repartir" ) ) {
-        throw new ToolError( "modo_salida tiene que ser 'copiar' o 'repartir', llego: " + modo );
+      String m = modo.trim().toLowerCase( Locale.ROOT );
+      if ( !m.equals( "copy" ) && !m.equals( "distribute" ) ) {
+        throw new ToolError( "The output mode must be 'copy' or 'distribute', got: " + modo );
       }
-      boolean repartir = m.equals( "repartir" );
+      boolean repartir = m.equals( "distribute" );
       if ( a.isDistributes() != repartir ) {
         a.setDistributes( repartir );
         a.setChanged();
@@ -486,8 +488,8 @@ final class TransOps {
     if ( salidasNormales( tm, a ) >= 2 && a.isDistributes() ) {
       a.setDistributes( false );
       a.setChanged();
-      return "'" + a.getName() + "' tiene varias salidas: quedo en modo COPIAR (cada salida recibe todas las "
-        + "filas). Si querias repartirlas entre las salidas, usa modo_salida con 'repartir'.";
+      return "'" + a.getName() + "' has several outputs: it was set to COPY (every output gets all the rows). "
+        + "To split the rows among the outputs instead, use set_output_mode with mode='distribute'.";
     }
     return null;
   }
@@ -501,32 +503,33 @@ final class TransOps {
   static TransHopMeta conectar( TransMeta tm, StepMeta a, StepMeta b, boolean habilitado, boolean deError )
     throws ToolError {
     if ( a == b ) {
-      throw new ToolError( "Un step no puede conectarse consigo mismo" );
+      throw new ToolError( "A step cannot be connected to itself" );
     }
     TransHopMeta existe = tm.findTransHop( a, b, true );
     if ( existe != null ) {
-      throw new ToolError( "Ya hay un hop de '" + a.getName() + "' a '" + b.getName() + "'"
-        + ( existe.isEnabled() ? "" : " (deshabilitado: usa habilitar_hop)" ) );
+      throw new ToolError( "There is already a hop from '" + a.getName() + "' to '" + b.getName() + "'"
+        + ( existe.isEnabled() ? "" : " (disabled: use set_hop_enabled)" ) );
     }
     if ( tm.findTransHop( b, a, true ) != null ) {
-      throw new ToolError( "Ya hay un hop de '" + b.getName() + "' a '" + a.getName() + "': crearia un ciclo" );
+      throw new ToolError( "There is already a hop from '" + b.getName() + "' to '" + a.getName()
+        + "': it would create a cycle" );
     }
     if ( deError ) {
       if ( !a.supportsErrorHandling() ) {
-        throw new ToolError( "El step '" + a.getName() + "' (" + a.getStepID() + ") no admite manejo de errores" );
+        throw new ToolError( "Step '" + a.getName() + "' (" + a.getStepID() + ") does not support error handling" );
       }
       StepErrorMeta prev = a.getStepErrorMeta();
       if ( prev != null && prev.isEnabled() && prev.getTargetStep() != null && prev.getTargetStep() != b
         && tm.findTransHop( a, prev.getTargetStep(), true ) != null ) {
-        throw new ToolError( "'" + a.getName() + "' ya manda sus errores a '" + prev.getTargetStep().getName()
-          + "'. Desconecta ese hop primero (un step tiene un solo destino de errores)." );
+        throw new ToolError( "'" + a.getName() + "' already sends its errors to '" + prev.getTargetStep().getName()
+          + "'. Disconnect that hop first (a step has a single error target)." );
       }
     }
     TransHopMeta h = new TransHopMeta( a, b, habilitado );
     tm.addTransHop( h );
     if ( tm.hasLoop( b ) || tm.hasLoop( a ) ) {
       tm.removeTransHop( tm.indexOfTransHop( h ) );
-      throw new ToolError( "El hop '" + a.getName() + "' -> '" + b.getName() + "' crearia un ciclo" );
+      throw new ToolError( "The hop '" + a.getName() + "' -> '" + b.getName() + "' would create a cycle" );
     }
     if ( deError ) {
       StepErrorMeta sem = a.getStepErrorMeta();
@@ -577,8 +580,8 @@ final class TransOps {
 
   static ObjectNode ficha( StepMeta sm ) {
     ObjectNode o = Tools.obj();
-    o.put( "nombre", sm.getName() );
-    o.put( "tipo", sm.getStepID() );
+    o.put( "name", sm.getName() );
+    o.put( "type", sm.getStepID() );
     o.put( "x", sm.getLocation().x );
     o.put( "y", sm.getLocation().y );
     return o;
@@ -586,13 +589,13 @@ final class TransOps {
 
   static ObjectNode fichaHop( TransHopMeta h ) {
     ObjectNode o = Tools.obj();
-    o.put( "desde", h.getFromStep().getName() );
-    o.put( "hacia", h.getToStep().getName() );
+    o.put( "from", h.getFromStep().getName() );
+    o.put( "to", h.getToStep().getName() );
     if ( !h.isEnabled() ) {
-      o.put( "habilitado", false );
+      o.put( "enabled", false );
     }
     if ( h.isErrorHop() ) {
-      o.put( "de_error", true );
+      o.put( "error", true );
     }
     return o;
   }
@@ -601,19 +604,19 @@ final class TransOps {
   static ObjectNode ver( TransMeta tm, StepMeta sm ) throws Exception {
     ObjectNode o = ficha( sm );
     if ( sm.getDescription() != null && !sm.getDescription().isEmpty() ) {
-      o.put( "descripcion", sm.getDescription() );
+      o.put( "description", sm.getDescription() );
     }
     if ( sm.getCopies() != 1 ) {
-      o.put( "copias", sm.getCopies() );
+      o.put( "copies", sm.getCopies() );
     }
-    ArrayNode entrada = o.putArray( "hops_entrada" );
-    ArrayNode salida = o.putArray( "hops_salida" );
+    ArrayNode entrada = o.putArray( "incoming_hops" );
+    ArrayNode salida = o.putArray( "outgoing_hops" );
     for ( TransHopMeta h : hopsDe( tm, sm ) ) {
       ( h.getToStep() == sm ? entrada : salida ).add( fichaHop( h ) );
     }
     StepErrorMeta sem = sm.getStepErrorMeta();
     if ( sem != null && sem.isEnabled() && sem.getTargetStep() != null ) {
-      o.put( "errores_a", sem.getTargetStep().getName() );
+      o.put( "errors_to", sem.getTargetStep().getName() );
     }
     o.put( "xml", Xml.sinPasswords( sm.getXML() ) );
     return o;

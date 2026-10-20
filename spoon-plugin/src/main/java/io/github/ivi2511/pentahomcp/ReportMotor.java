@@ -147,8 +147,8 @@ final class ReportMotor {
 
   private static Map<String, String> mapa( String[] claves, String[] valores ) {
     if ( claves.length != valores.length ) {
-      throw new IllegalStateException( "ReportMotor: faltan textos (" + claves.length + " claves, "
-        + valores.length + " valores)" );
+      throw new IllegalStateException( "ReportMotor: missing texts (" + claves.length + " keys, "
+        + valores.length + " values)" );
     }
     Map<String, String> m = new HashMap<String, String>();
     for ( int i = 0; i < claves.length; i++ ) {
@@ -160,7 +160,7 @@ final class ReportMotor {
   static String idioma( String pedido ) throws ToolError {
     String l = pedido == null ? "en" : pedido.trim().toLowerCase();
     if ( !TEXTOS.containsKey( l ) ) {
-      throw new ToolError( "language must be one of en, es, pt; got: " + pedido );
+      throw new ToolError( "'language' must be one of en, es, pt, got: " + pedido );
     }
     return l;
   }
@@ -828,11 +828,11 @@ final class ReportMotor {
 
   private static void validacion( StringBuilder md, ObjectNode v, T t ) {
     md.append( "## " ).append( t.s( "validation" ) ).append( "\n\n" );
-    int err = v.path( "errores" ).asInt();
-    int adv = v.path( "advertencias" ).asInt();
+    int err = v.path( "errors" ).asInt();
+    int adv = v.path( "warnings" ).asInt();
     md.append( "**" ).append( err ).append( ' ' ).append( t.s( "n_errors" ) ).append( ", " ).append( adv ).append( ' ' )
       .append( t.s( "n_warnings" ) ).append( ".**\n\n" );
-    JsonNode ps = v.path( "por_step" );
+    JsonNode ps = v.path( "by_step" );
     if ( err + adv == 0 || !ps.isObject() || ps.size() == 0 ) {
       md.append( t.s( "no_issues" ) ).append( "\n\n" );
       return;
@@ -845,9 +845,9 @@ final class ReportMotor {
         if ( s.startsWith( "ERROR: " ) ) {
           tipo = "**" + t.s( "error_label" ) + ":** ";
           s = s.substring( 7 );
-        } else if ( s.startsWith( "ADVERTENCIA: " ) ) {
+        } else if ( s.startsWith( "WARNING: " ) ) {
           tipo = "**" + t.s( "warning_label" ) + ":** ";
-          s = s.substring( 13 );
+          s = s.substring( 9 );
         }
         md.append( "- " ).append( texto( e.getKey() ) ).append( " — " ).append( tipo ).append( texto( s ) )
           .append( '\n' );

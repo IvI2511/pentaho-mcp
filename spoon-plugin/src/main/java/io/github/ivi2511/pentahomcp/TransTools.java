@@ -36,66 +36,67 @@ final class TransTools {
 
     // ------------------------------------------------------------ catalogo
 
-    s.add( Tools.tool( "tipos_de_step",
-      "Busca tipos de step instalados en este Spoon. Usala ANTES de agregar_step para encontrar el id exacto "
-        + "(el valor de <type>, p.ej. CsvInput, FilterRows, TableOutput), que no siempre se parece al nombre en "
-        + "pantalla. Sin argumentos devuelve las categorias con cuantos steps tiene cada una. 'buscar' filtra por "
-        + "texto en id, nombre y descripcion (sin distinguir mayusculas ni tildes, en ingles o castellano).",
+    s.add( Tools.tool( "list_step_types",
+      "Searches the step types installed in this Spoon. Use it BEFORE add_step to find the exact id (the value "
+        + "of <type>, e.g. CsvInput, FilterRows, TableOutput), which does not always look like the name shown on "
+        + "screen. With no arguments it returns the categories and how many steps each one has. 'search' filters by "
+        + "text in the id, name and description (case- and accent-insensitive).",
       Tools.schema()
-        .str( "buscar", "Texto a buscar, p.ej. 'csv', 'filtrar', 'lookup', 'excel'", false )
-        .str( "categoria", "Limitar a una categoria (p.ej. 'Input', 'Transform', 'Flow')", false ).build(),
-      a -> tiposDeStep( Tools.optStr( a, "buscar", null ), Tools.optStr( a, "categoria", null ) ) ) );
+        .str( "search", "Text to look for, e.g. 'csv', 'filter', 'lookup', 'excel'", false )
+        .str( "category", "Restrict to one category (or part of its name). Category names come in Spoon's "
+          + "language, e.g. 'Input' / 'Entrada', 'Transform' / 'Transformar'; call with no arguments to "
+          + "list them", false ).build(),
+      a -> tiposDeStep( Tools.optStr( a, "search", null ), Tools.optStr( a, "category", null ) ) ) );
 
-    s.add( Tools.tool( "plantilla_step",
-      "XML de configuracion por defecto de un tipo de step (lo que va dentro de <step>, sin name/type/GUI). "
-        + "Usala para ver que tags lleva un step antes de agregar_step o configurar_step: despues manda solo "
-        + "los tags que cambian.",
-      Tools.schema().str( "tipo", "Id del tipo de step (de tipos_de_step), p.ej. 'SelectValues'", true ).build(),
+    s.add( Tools.tool( "get_step_template",
+      "Default configuration XML of a step type (what goes inside <step>, without name/type/GUI). Use it to see "
+        + "which tags a step takes before add_step or configure_step: then send only the tags that change.",
+      Tools.schema().str( "type", "Step type id (from list_step_types), e.g. 'SelectValues'", true ).build(),
       a -> {
-        PluginInterface p = TransOps.plugin( Tools.str( a, "tipo" ) );
+        PluginInterface p = TransOps.plugin( Tools.str( a, "type" ) );
         try {
           String x = TransOps.plantilla( p );
           return x.trim().isEmpty()
-            ? "<!-- " + TransOps.id( p ) + " no tiene configuracion propia: agregalo sin config_xml -->" : x;
+            ? "<!-- " + TransOps.id( p ) + " has no configuration of its own: add it without config_xml -->" : x;
         } catch ( ToolError e ) {
           throw e;
         } catch ( Exception e ) {
-          throw new ToolError( "No se pudo generar la plantilla de " + TransOps.id( p ) + ": " + TransOps.mensaje( e ) );
+          throw new ToolError( "Could not generate the template for " + TransOps.id( p ) + ": " + TransOps.mensaje( e ) );
         }
       } ) );
 
     // ------------------------------------------------------------ steps
 
-    s.add( Tools.tool( "agregar_step",
-      "Agrega UN step a la transformacion y lo deja resaltado en el lienzo: para cambios puntuales (sumar o "
-        + "corregir un step en un flujo que ya existe). Para armar un ETL entero o un tramo de varios steps usa "
-        + "build_steps (una llamada, animada, un solo Ctrl+Z). Con 'despues_de' queda a la derecha del anterior y "
-        + "conectado con un hop. "
-        + "config_xml lleva solo los tags que cambian respecto de plantilla_step (lo demas queda por defecto); "
-        + "puede ir suelto (<separator>;</separator><fields>...</fields>) o envuelto en <step>. Las referencias "
-        + "a otros steps (send_true_to, <from>...) se resuelven solas, aunque el step referido se agregue despues. "
-        + "Falla si ya existe un step con ese nombre. Sin x/y ni despues_de, va a la derecha del step mas a la derecha; "
-        + "con despues_de el hop se crea igual aunque pases x/y. Los tags del envoltorio (name, type, copies, GUI...) "
-        + "se ignoran.",
-      Tools.schema().documento()
-        .str( "tipo", "Id del tipo de step (de tipos_de_step), p.ej. 'CsvInput'", true )
-        .str( "nombre", "Nombre unico del step en la transformacion", true )
-        .str( "config_xml", "Tags de configuracion que cambian respecto de la plantilla", false )
-        .str( "despues_de", "Step existente: el nuevo se ubica a su derecha y se crea el hop despues_de -> nuevo", false )
-        .integer( "x", "Posicion x en el lienzo (opcional)", false )
-        .integer( "y", "Posicion y en el lienzo (opcional)", false )
-        .str( "descripcion", "Descripcion del step (opcional)", false )
-        .strEnum( "modo_salida", "Si 'despues_de' queda con 2+ salidas: copiar (todas las filas a cada salida, "
-          + "por defecto) o repartir (round robin)", false, "copiar", "repartir" ).build(),
+    s.add( Tools.tool( "add_step",
+      "Adds ONE step to the transformation and highlights it on the canvas: for one-off changes (adding or fixing "
+        + "a step in a flow that already exists). To build a whole ETL or a stretch of several steps use "
+        + "build_steps (one call, animated, a single Ctrl+Z). With 'after' it is placed to the right of that step "
+        + "and connected to it with a hop. "
+        + "config_xml carries only the tags that differ from get_step_template (the rest keeps its default); it "
+        + "can be bare (<separator>;</separator><fields>...</fields>) or wrapped in <step>. References to other "
+        + "steps (send_true_to, <from>...) are resolved automatically, even if the referenced step is added later. "
+        + "Fails if a step with that name already exists. Without x/y or 'after', it goes to the right of the "
+        + "rightmost step; with 'after' the hop is created even if you pass x/y. Wrapper tags (name, type, copies, "
+        + "GUI...) are ignored.",
+      Tools.schema().document()
+        .str( "type", "Step type id (from list_step_types), e.g. 'CsvInput'", true )
+        .str( "name", "Unique step name in the transformation", true )
+        .str( "config_xml", "Configuration tags that differ from the template", false )
+        .str( "after", "Existing step: the new one is placed to its right and the hop after -> new is created", false )
+        .integer( "x", "Canvas x position (optional)", false )
+        .integer( "y", "Canvas y position (optional)", false )
+        .str( "description", "Step description (optional)", false )
+        .strEnum( "output_mode", "If 'after' ends up with 2+ outputs: copy (every output gets all rows, the "
+          + "default) or distribute (round robin)", false, "copy", "distribute" ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
-        String despuesDe = Tools.optStr( a, "despues_de", null );
+        String despuesDe = Tools.optStr( a, "after", null );
         StepMeta previo = despuesDe == null ? null : TransOps.paso( tm, despuesDe );
         StepMeta previoAntes = previo == null ? null : (StepMeta) previo.clone();
-        TransOps.Agregado r = TransOps.agregarStep( tm, Tools.str( a, "tipo" ), Tools.str( a, "nombre" ),
+        TransOps.Agregado r = TransOps.agregarStep( tm, Tools.str( a, "type" ), Tools.str( a, "name" ),
           Tools.optStr( a, "config_xml", null ), Tools.optInteger( a, "x" ), Tools.optInteger( a, "y" ),
-          despuesDe, Tools.optStr( a, "descripcion", null ), sp.getMetaStore() );
+          despuesDe, Tools.optStr( a, "description", null ), sp.getMetaStore() );
         // step + hop + modo de salida del previo: un solo Ctrl+Z
         UndoGrupo undo = new UndoGrupo( sp, tm );
         undo.nuevo( new Object[] { r.step }, new int[] { tm.indexOfStep( r.step ) } );
@@ -103,7 +104,7 @@ final class TransTools {
         if ( r.hop != null ) {
           undo.nuevo( new Object[] { r.hop }, new int[] { tm.indexOfTransHop( r.hop ) } );
           boolean antes = previo.isDistributes();
-          notaSalida = TransOps.aplicarModoSalida( tm, previo, Tools.optStr( a, "modo_salida", null ) );
+          notaSalida = TransOps.aplicarModoSalida( tm, previo, Tools.optStr( a, "output_mode", null ) );
           if ( previo.isDistributes() != antes ) {
             undo.cambio( new Object[] { previoAntes }, new Object[] { previo.clone() },
               new int[] { tm.indexOfStep( previo ) } );
@@ -114,14 +115,14 @@ final class TransTools {
         if ( r.hop != null ) {
           o.set( "hop", TransOps.fichaHop( r.hop ) );
           if ( TransOps.salidasNormales( tm, previo ) >= 2 ) {
-            o.put( "modo_salida_de_" + previo.getName(), TransOps.modoSalida( previo ) );
+            o.set( "output_mode_of", modoSalidaDe( previo ) );
           }
         }
         if ( r.aviso != null ) {
-          o.put( "aviso", r.aviso );
+          o.put( "warning", r.aviso );
         }
         if ( notaSalida != null ) {
-          o.put( "nota", notaSalida );
+          o.put( "note", notaSalida );
         }
         return o;
       } ) ) );
@@ -129,12 +130,12 @@ final class TransTools {
     s.add( Tools.tool( "build_steps",
       "Builds several steps and their hops in ONE call, animated: the user watches the nodes appear on the canvas "
         + "one by one. Use it to lay out a whole ETL or a whole stretch of one (input -> transforms -> output, "
-        + "branches, lookups); use agregar_step (add_step) for a one-off change to an existing flow. Everything is "
+        + "branches, lookups); use add_step for a one-off change to an existing flow. Everything is "
         + "validated BEFORE touching the canvas (step types exist, names are unique in the document and in the batch, "
         + "'after'/'from'/'to' exist or are created earlier in this batch, config_xml is valid, no repeated hops, no "
         + "cycles): if anything is wrong nothing changes and you get the full list of problems. Per step: 'type' = "
-        + "step type id (from tipos_de_step, e.g. CsvInput, SelectValues, TableOutput); 'name' = unique name; "
-        + "'config_xml' = only the tags that differ from plantilla_step (same rules as agregar_step); 'after' = an "
+        + "step type id (from list_step_types, e.g. CsvInput, SelectValues, TableOutput); 'name' = unique name; "
+        + "'config_xml' = only the tags that differ from get_step_template (same rules as add_step); 'after' = an "
         + "existing step or an EARLIER step of this list: the new one goes to its right, connected by a hop; 'x'/'y' "
         + "force the position; 'output_mode' = how THIS step sends rows once it has 2+ outgoing hops: copy (default: "
         + "every output gets all rows) or distribute (round robin). 'hops' = extra connections that 'after' cannot "
@@ -144,21 +145,21 @@ final class TransTools {
         + "created later in the batch. 'arrange' (default true) runs the auto-layout at the end. The whole batch is a "
         + "single Ctrl+Z in Spoon. Returns the created steps (name, type, x, y), the hops, notes and warnings (e.g. a "
         + "database connection that does not exist).",
-      Tools.schema().documento()
+      Tools.schema().document()
         .raw( "steps", esquemaSteps(), true )
         .raw( "hops", esquemaHops(), false )
         .integer( "delay_ms", "Pause between nodes so the user can follow the build, in ms (default "
           + TransLote.DELAY_DEFECTO + ", max " + TransLote.DELAY_MAX + "; 0 = no animation)", false )
-        .bool( "arrange", "Run the auto-layout (ordenar_lienzo) at the end (default true)", false ).build(),
+        .bool( "arrange", "Run the auto-layout (arrange_canvas) at the end (default true)", false ).build(),
       a -> TransLote.ejecutar( a ) ) );
 
-    s.add( Tools.tool( "configurar_step",
-      "Cambia la configuracion de un step existente: config_xml se mezcla sobre su configuracion ACTUAL "
-        + "(cada tag que mandes reemplaza a ese tag completo; los que no mandes quedan como estan). Mantiene "
-        + "nombre, posicion y hops. Para listas (<fields>...) manda la lista entera. Mira ver_step antes.",
-      Tools.schema().documento()
-        .str( "step", "Nombre del step", true )
-        .str( "config_xml", "Tags de configuracion a reemplazar", true ).build(),
+    s.add( Tools.tool( "configure_step",
+      "Changes the configuration of an existing step: config_xml is merged over its CURRENT configuration (each "
+        + "tag you send replaces that whole tag; the ones you do not send stay as they are). Keeps the name, "
+        + "position and hops. For lists (<fields>...) send the whole list. Look at get_step first.",
+      Tools.schema().document()
+        .str( "step", "Step name", true )
+        .str( "config_xml", "Configuration tags to replace", true ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
@@ -171,32 +172,32 @@ final class TransTools {
         Docs.touched( tm );
         ObjectNode o = TransOps.ficha( sm );
         if ( aviso != null ) {
-          o.put( "aviso", aviso );
+          o.put( "warning", aviso );
         }
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "ver_step",
-      "Lee un step: su XML completo (igual que en el .ktr, contrasenias enmascaradas), su posicion y sus hops "
-        + "de entrada y de salida. Usala antes de configurar_step para ver la configuracion actual.",
-      Tools.schema().documento().str( "step", "Nombre del step", true ).build(),
+    s.add( Tools.tool( "get_step",
+      "Reads a step: its full XML (as in the .ktr, passwords masked), its position and its incoming and outgoing "
+        + "hops. Use it before configure_step to see the current configuration.",
+      Tools.schema().document().str( "step", "Step name", true ).build(),
       a -> Docs.ui( () -> {
         TransMeta tm = Docs.trans( a );
         return TransOps.ver( tm, TransOps.paso( tm, Tools.str( a, "step" ) ) );
       } ) ) );
 
-    s.add( Tools.tool( "renombrar_step",
-      "Cambia el nombre de un step. Las referencias de otros steps (send_true_to, <from>...) se actualizan "
-        + "solas. Falla si ya hay un step con el nombre nuevo.",
-      Tools.schema().documento()
-        .str( "step", "Nombre actual", true )
-        .str( "nuevo_nombre", "Nombre nuevo", true ).build(),
+    s.add( Tools.tool( "rename_step",
+      "Renames a step. References from other steps (send_true_to, <from>...) are updated automatically. Fails if "
+        + "there is already a step with the new name.",
+      Tools.schema().document()
+        .str( "step", "Current name", true )
+        .str( "new_name", "New name", true ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
         StepMeta sm = TransOps.paso( tm, Tools.str( a, "step" ) );
         StepMeta antes = (StepMeta) sm.clone();
-        List<StepMeta[]> otros = TransOps.renombrar( tm, sm, Tools.str( a, "nuevo_nombre" ), sp.getMetaStore() );
+        List<StepMeta[]> otros = TransOps.renombrar( tm, sm, Tools.str( a, "new_name" ), sp.getMetaStore() );
         Object[] desde = new Object[ otros.size() + 1 ];
         Object[] hasta = new Object[ otros.size() + 1 ];
         int[] idx = new int[ otros.size() + 1 ];
@@ -213,20 +214,20 @@ final class TransTools {
         new UndoGrupo( sp, tm ).cambio( desde, hasta, idx ); // el step y los que lo nombran: una sola accion
         seleccionarSolo( tm, sm );
         Docs.touched( tm );
-        ObjectNode o = TransOps.ficha( sm ).put( "nombre_anterior", antes.getName() );
+        ObjectNode o = TransOps.ficha( sm ).put( "previous_name", antes.getName() );
         if ( refs.size() > 0 ) {
-          o.set( "referencias_actualizadas_en", refs );
+          o.set( "references_updated_in", refs );
         }
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "mover_step",
-      "Mueve un step a otra posicion del lienzo (coordenadas en pixeles; ~150 de separacion horizontal entre "
-        + "steps). Para acomodar todo de una vez usa ordenar_lienzo.",
-      Tools.schema().documento()
-        .str( "step", "Nombre del step", true )
-        .integer( "x", "Nueva x", true )
-        .integer( "y", "Nueva y", true ).build(),
+    s.add( Tools.tool( "move_step",
+      "Moves a step to another position on the canvas (pixel coordinates; ~150 of horizontal spacing between "
+        + "steps). To arrange everything at once use arrange_canvas.",
+      Tools.schema().document()
+        .str( "step", "Step name", true )
+        .integer( "x", "New x", true )
+        .integer( "y", "New y", true ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
@@ -242,9 +243,9 @@ final class TransTools {
         return TransOps.ficha( sm );
       } ) ) );
 
-    s.add( Tools.tool( "borrar_step",
-      "Borra un step y todos sus hops (un solo Ctrl+Z en Spoon lo recupera).",
-      Tools.schema().documento().str( "step", "Nombre del step", true ).build(),
+    s.add( Tools.tool( "delete_step",
+      "Deletes a step and all its hops (a single Ctrl+Z in Spoon brings it back).",
+      Tools.schema().document().str( "step", "Step name", true ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
@@ -283,38 +284,38 @@ final class TransTools {
         c.registrar( undo, tm );
         Docs.touched( tm );
         ObjectNode o = Tools.obj();
-        o.put( "borrado", sm.getName() );
-        o.set( "hops_borrados", quitados );
+        o.put( "deleted", sm.getName() );
+        o.set( "deleted_hops", quitados );
         return o;
       } ) ) );
 
     // ------------------------------------------------------------ hops
 
-    s.add( Tools.tool( "conectar",
-      "Crea un hop entre dos steps (las filas van de 'desde' a 'hacia'). Rechaza duplicados y ciclos. "
-        + "Con de_error=true el hop es de errores: activa el manejo de errores del step origen con ese destino "
-        + "(el step tiene que admitirlo). OJO: en Filter rows (send_true_to/send_false_to) y en Switch/case "
-        + "(case_value_target, default_target_step) el destino se configura en el XML del step con "
-        + "configurar_step, y ADEMAS hace falta este hop; uno sin el otro no funciona. Si 'desde' queda con 2+ "
-        + "salidas normales, Spoon preguntaria copiar o repartir: aca se elige con modo_salida (por defecto "
-        + "copiar = cada salida recibe todas las filas).",
-      Tools.schema().documento()
-        .str( "desde", "Step origen", true )
-        .str( "hacia", "Step destino", true )
-        .bool( "habilitado", "Hop habilitado (por defecto true)", false )
-        .bool( "de_error", "Hop de manejo de errores (por defecto false)", false )
-        .strEnum( "modo_salida", "Con 2+ salidas: copiar (por defecto) o repartir (round robin)", false,
-          "copiar", "repartir" ).build(),
+    s.add( Tools.tool( "connect_steps",
+      "Creates a hop between two steps (rows flow from 'from' to 'to'). Rejects duplicates and cycles. With "
+        + "error=true it is an error hop: it enables the error handling of the source step with that target (the "
+        + "step must support it). NOTE: in Filter rows (send_true_to/send_false_to) and in Switch/case "
+        + "(case_value_target, default_target_step) the target is set in the step's XML with configure_step, AND "
+        + "this hop is needed as well; one without the other does not work. If 'from' ends up with 2+ normal "
+        + "outputs, Spoon would ask copy or distribute: here you choose it with output_mode (default copy = every "
+        + "output gets all rows).",
+      Tools.schema().document()
+        .str( "from", "Source step", true )
+        .str( "to", "Target step", true )
+        .bool( "enabled", "Hop enabled (default true)", false )
+        .bool( "error", "Error-handling hop (default false)", false )
+        .strEnum( "output_mode", "With 2+ outputs: copy (default) or distribute (round robin)", false,
+          "copy", "distribute" ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
-        StepMeta desde = TransOps.paso( tm, Tools.str( a, "desde" ) );
-        StepMeta hacia = TransOps.paso( tm, Tools.str( a, "hacia" ) );
-        boolean deError = Tools.optBool( a, "de_error", false );
+        StepMeta desde = TransOps.paso( tm, Tools.str( a, "from" ) );
+        StepMeta hacia = TransOps.paso( tm, Tools.str( a, "to" ) );
+        boolean deError = Tools.optBool( a, "error", false );
         StepMeta antes = (StepMeta) desde.clone();
-        TransHopMeta h = TransOps.conectar( tm, desde, hacia, Tools.optBool( a, "habilitado", true ), deError );
+        TransHopMeta h = TransOps.conectar( tm, desde, hacia, Tools.optBool( a, "enabled", true ), deError );
         String nota = deError ? null
-          : TransOps.aplicarModoSalida( tm, desde, Tools.optStr( a, "modo_salida", null ) );
+          : TransOps.aplicarModoSalida( tm, desde, Tools.optStr( a, "output_mode", null ) );
         boolean cambioStep = deError || desde.isDistributes() != antes.isDistributes();
         UndoGrupo undo = new UndoGrupo( sp, tm ); // hop + cambio del origen: un solo Ctrl+Z
         undo.nuevo( new Object[] { h }, new int[] { tm.indexOfTransHop( h ) } );
@@ -324,27 +325,27 @@ final class TransTools {
         Docs.touched( tm );
         ObjectNode o = TransOps.fichaHop( h );
         if ( !deError && TransOps.salidasNormales( tm, desde ) >= 2 ) {
-          o.put( "modo_salida_de_" + desde.getName(), TransOps.modoSalida( desde ) );
+          o.set( "output_mode_of", modoSalidaDe( desde ) );
         }
         if ( nota != null ) {
-          o.put( "nota", nota );
+          o.put( "note", nota );
         }
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "modo_salida",
-      "Cambia como reparte las filas un step con varias salidas (lo que Spoon pregunta al dibujar el segundo "
-        + "hop): 'copiar' = cada salida recibe TODAS las filas; 'repartir' = round robin, cada fila va a una sola "
-        + "salida. No aplica a Filter rows ni Switch/case, que mandan a destinos concretos.",
-      Tools.schema().documento()
-        .str( "step", "Nombre del step", true )
-        .strEnum( "modo", "copiar o repartir", true, "copiar", "repartir" ).build(),
+    s.add( Tools.tool( "set_output_mode",
+      "Changes how a step with several outputs sends its rows (what Spoon asks when you draw the second hop): "
+        + "'copy' = every output gets ALL the rows; 'distribute' = round robin, each row goes to only one output. "
+        + "Does not apply to Filter rows or Switch/case, which send rows to specific targets.",
+      Tools.schema().document()
+        .str( "step", "Step name", true )
+        .strEnum( "mode", "copy or distribute", true, "copy", "distribute" ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
         StepMeta sm = TransOps.paso( tm, Tools.str( a, "step" ) );
         StepMeta antes = (StepMeta) sm.clone();
-        TransOps.aplicarModoSalida( tm, sm, Tools.str( a, "modo" ) );
+        TransOps.aplicarModoSalida( tm, sm, Tools.str( a, "mode" ) );
         if ( sm.isDistributes() != antes.isDistributes() ) {
           new UndoGrupo( sp, tm ).cambio( new Object[] { antes }, new Object[] { sm.clone() },
             new int[] { tm.indexOfStep( sm ) } );
@@ -352,21 +353,21 @@ final class TransTools {
         }
         ObjectNode o = Tools.obj();
         o.put( "step", sm.getName() );
-        o.put( "modo_salida", TransOps.modoSalida( sm ) );
-        o.put( "salidas", TransOps.salidasNormales( tm, sm ) );
+        o.put( "output_mode", TransOps.modoSalida( sm ) );
+        o.put( "outputs", TransOps.salidasNormales( tm, sm ) );
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "desconectar",
-      "Borra el hop entre dos steps (los steps quedan). Si era el hop de errores, apaga el manejo de errores "
-        + "del origen.",
-      Tools.schema().documento()
-        .str( "desde", "Step origen", true )
-        .str( "hacia", "Step destino", true ).build(),
+    s.add( Tools.tool( "disconnect_steps",
+      "Deletes the hop between two steps (the steps stay). If it was the error hop, it turns off the error "
+        + "handling of the source step.",
+      Tools.schema().document()
+        .str( "from", "Source step", true )
+        .str( "to", "Target step", true ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
-        TransHopMeta h = TransOps.hop( tm, Tools.str( a, "desde" ), Tools.str( a, "hacia" ) );
+        TransHopMeta h = TransOps.hop( tm, Tools.str( a, "from" ), Tools.str( a, "to" ) );
         StepMeta desde = h.getFromStep();
         StepMeta hacia = h.getToStep();
         List<StepMeta> extremos = new ArrayList<StepMeta>();
@@ -380,23 +381,23 @@ final class TransTools {
         TransOps.limpiarTrasQuitarHop( h );
         c.registrar( undo, tm ); // si algun extremo cambio su configuracion, se deshace junto con el hop
         Docs.touched( tm );
-        return TransOps.fichaHop( h ).put( "borrado", true );
+        return TransOps.fichaHop( h ).put( "deleted", true );
       } ) ) );
 
-    s.add( Tools.tool( "habilitar_hop",
-      "Habilita o deshabilita un hop sin borrarlo (un hop deshabilitado no pasa filas; se dibuja gris).",
-      Tools.schema().documento()
-        .str( "desde", "Step origen", true )
-        .str( "hacia", "Step destino", true )
-        .bool( "habilitado", "true para habilitar, false para deshabilitar", true ).build(),
+    s.add( Tools.tool( "set_hop_enabled",
+      "Enables or disables a hop without deleting it (a disabled hop passes no rows; it is drawn grey).",
+      Tools.schema().document()
+        .str( "from", "Source step", true )
+        .str( "to", "Target step", true )
+        .bool( "enabled", "true to enable, false to disable", true ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         TransMeta tm = Docs.trans( a );
-        if ( a.get( "habilitado" ) == null || a.get( "habilitado" ).isNull() ) {
-          throw new ToolError( "Falta el argumento 'habilitado'" );
+        if ( a.get( "enabled" ) == null || a.get( "enabled" ).isNull() ) {
+          throw new ToolError( "Missing argument 'enabled'" );
         }
-        TransHopMeta h = TransOps.hop( tm, Tools.str( a, "desde" ), Tools.str( a, "hacia" ) );
-        boolean hab = Tools.optBool( a, "habilitado", true );
+        TransHopMeta h = TransOps.hop( tm, Tools.str( a, "from" ), Tools.str( a, "to" ) );
+        boolean hab = Tools.optBool( a, "enabled", true );
         if ( h.isEnabled() != hab ) {
           Object antes = h.clone();
           h.setEnabled( hab );
@@ -405,46 +406,46 @@ final class TransTools {
           tm.clearCaches();
           Docs.touched( tm );
         }
-        return TransOps.fichaHop( h ).put( "habilitado", h.isEnabled() );
+        return TransOps.fichaHop( h ).put( "enabled", h.isEnabled() );
       } ) ) );
 
     // ------------------------------------------------------------ lienzo (transformaciones y jobs)
 
-    s.add( Tools.tool( "agregar_nota",
-      "Agrega una nota (post-it) al lienzo de una transformacion o un job, para documentar que hace una parte. "
-        + "Sin x/y va debajo de todo lo que hay.",
-      Tools.schema().documento()
-        .str( "texto", "Texto de la nota (puede tener saltos de linea)", true )
-        .integer( "x", "Posicion x (opcional)", false )
-        .integer( "y", "Posicion y (opcional)", false )
-        .integer( "ancho", "Ancho minimo en pixeles (opcional; se agranda solo segun el texto)", false )
-        .integer( "alto", "Alto minimo en pixeles (opcional)", false ).build(),
+    s.add( Tools.tool( "add_note",
+      "Adds a note (sticky note) to the canvas of a transformation or a job, to document what a part of it does. "
+        + "Without x/y it goes below everything else on the canvas.",
+      Tools.schema().document()
+        .str( "text", "Note text (may contain line breaks)", true )
+        .integer( "x", "x position (optional)", false )
+        .integer( "y", "y position (optional)", false )
+        .integer( "width", "Minimum width in pixels (optional; it grows with the text)", false )
+        .integer( "height", "Minimum height in pixels (optional)", false ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         AbstractMeta m = Docs.resolver( a );
-        String texto = Tools.str( a, "texto" );
+        String texto = Tools.str( a, "text" );
         Integer x = Tools.optInteger( a, "x" );
         Integer y = Tools.optInteger( a, "y" );
         if ( y == null ) {
           y = debajoDeTodo( m );
         }
-        NotePadMeta n = new NotePadMeta( texto, x == null ? 100 : x, y, Tools.optInt( a, "ancho", 20 ),
-          Tools.optInt( a, "alto", 20 ) );
+        NotePadMeta n = new NotePadMeta( texto, x == null ? 100 : x, y, Tools.optInt( a, "width", 20 ),
+          Tools.optInt( a, "height", 20 ) );
         m.addNote( n );
         new UndoGrupo( sp, m ).nuevo( new Object[] { n }, new int[] { m.indexOfNote( n ) } );
         Docs.touched( m );
         ObjectNode o = Tools.obj();
-        o.put( "nota", m.indexOfNote( n ) );
+        o.put( "index", m.indexOfNote( n ) );
         o.put( "x", n.getLocation().x );
         o.put( "y", n.getLocation().y );
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "seleccionar",
-      "Resalta steps (o entradas de un job) en el lienzo para que el usuario vea de cuales se esta hablando. "
-        + "No cambia nada del documento. Lista vacia = quitar la seleccion.",
-      Tools.schema().documento()
-        .strList( "steps", "Nombres de los steps o entradas a resaltar", true ).build(),
+    s.add( Tools.tool( "select_steps",
+      "Highlights steps (or the entries of a job) on the canvas so the user sees which ones you are talking about. "
+        + "Does not change the document. Empty list = clear the selection.",
+      Tools.schema().document()
+        .strList( "steps", "Names of the steps or entries to highlight", true ).build(),
       a -> {
         final List<String> nombres = new ArrayList<String>();
         JsonNode l = a.get( "steps" );
@@ -458,12 +459,11 @@ final class TransTools {
         return Docs.ui( () -> seleccionar( Docs.resolver( a ), nombres ) );
       } ) );
 
-    s.add( Tools.tool( "ordenar_lienzo",
-      "Acomoda automaticamente el lienzo de una transformacion o un job de izquierda a derecha siguiendo los "
-        + "hops (cada nivel en una columna, las ramas una debajo de otra; en jobs START queda a la izquierda). "
-        + "Usala al terminar de armar o cuando el dibujo quedo desordenado. Las notas no se mueven. Se deshace "
-        + "con Ctrl+Z.",
-      Tools.schema().documento().build(),
+    s.add( Tools.tool( "arrange_canvas",
+      "Automatically arranges the canvas of a transformation or a job from left to right following the hops "
+        + "(each level in a column, branches one below the other; in jobs START goes on the left). Use it when you "
+        + "finish building or when the drawing got messy. Notes are not moved. Undo with Ctrl+Z.",
+      Tools.schema().document().build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         AbstractMeta m = Docs.resolver( a );
@@ -473,23 +473,28 @@ final class TransTools {
           Docs.touched( m );
         }
         ObjectNode o = Tools.obj();
-        o.put( "movidos", mov.objetos.size() );
-        o.put( "columnas", mov.columnas );
+        o.put( "moved", mov.objetos.size() );
+        o.put( "columns", mov.columnas );
         return o;
       } ) ) );
   }
 
   // ---------------------------------------------------------------- ayudas
 
+  /** {"step": nombre, "output_mode": "copy"|"distribute"}: el modo de salida del step previo, con clave fija. */
+  private static ObjectNode modoSalidaDe( StepMeta sm ) {
+    return Tools.obj().put( "step", sm.getName() ).put( "output_mode", TransOps.modoSalida( sm ) );
+  }
+
   /** JSON Schema del argumento 'steps' de build_steps. */
   private static ObjectNode esquemaSteps() {
     ObjectNode item = Tools.obj().put( "type", "object" );
     ObjectNode p = item.putObject( "properties" );
     p.putObject( "type" ).put( "type", "string" ).put( "description",
-      "Step type id (from tipos_de_step), e.g. 'CsvInput', 'FilterRows', 'TableOutput'" );
+      "Step type id (from list_step_types), e.g. 'CsvInput', 'FilterRows', 'TableOutput'" );
     p.putObject( "name" ).put( "type", "string" ).put( "description", "Unique step name" );
     p.putObject( "config_xml" ).put( "type", "string" ).put( "description",
-      "Only the configuration tags that differ from plantilla_step" );
+      "Only the configuration tags that differ from get_step_template" );
     p.putObject( "after" ).put( "type", "string" ).put( "description",
       "Existing step, or a step EARLIER in this list: placed to its right and connected after -> this" );
     p.putObject( "x" ).put( "type", "integer" ).put( "description", "Canvas x (optional)" );
@@ -613,7 +618,7 @@ final class TransTools {
         }
       }
       if ( !faltan.isEmpty() ) {
-        throw new ToolError( "No existen: " + faltan + ". " + TransOps.nombres( tm ) );
+        throw new ToolError( "Not found: " + faltan + ". " + TransOps.nombres( tm ) );
       }
       tm.unselectAll();
       for ( StepMeta sm : sel ) {
@@ -636,7 +641,8 @@ final class TransTools {
         for ( JobEntryCopy c : jm.getJobCopies() ) {
           hay.append( hay.length() == 0 ? "'" : ", '" ).append( c.getName() ).append( '\'' );
         }
-        throw new ToolError( "No existen: " + faltan + ". Entradas: " + hay );
+        throw new ToolError( "Not found: " + faltan + ". "
+          + ( hay.length() == 0 ? "The job has no entries." : "Entries: " + hay ) );
       }
       jm.unselectAll();
       for ( JobEntryCopy c : sel ) {
@@ -646,14 +652,14 @@ final class TransTools {
     }
     Docs.redibujar( m );
     ObjectNode o = Tools.obj();
-    ArrayNode arr = o.putArray( "seleccionados" );
+    ArrayNode arr = o.putArray( "selected" );
     for ( String n : marcados ) {
       arr.add( n );
     }
     return o;
   }
 
-  /** tipos_de_step: categorias, o los que coinciden con buscar/categoria. */
+  /** list_step_types: categorias, o los que coinciden con search/category. */
   static ObjectNode tiposDeStep( String buscar, String categoria ) {
     List<PluginInterface> todos = TransOps.plugins();
     ObjectNode o = Tools.obj();
@@ -664,12 +670,12 @@ final class TransTools {
         Integer n = cats.get( c );
         cats.put( c, n == null ? 1 : n + 1 );
       }
-      ArrayNode arr = o.putArray( "categorias" );
+      ArrayNode arr = o.putArray( "categories" );
       for ( Map.Entry<String, Integer> e : cats.entrySet() ) {
-        arr.addObject().put( "categoria", e.getKey() ).put( "steps", e.getValue() );
+        arr.addObject().put( "category", e.getKey() ).put( "count", e.getValue() );
       }
       o.put( "total", todos.size() );
-      o.put( "ayuda", "Pasa 'buscar' (texto) o 'categoria' para ver los steps." );
+      o.put( "note", "Pass 'search' (text) or 'category' to see the step types." );
       return o;
     }
     String q = TransOps.norm( buscar );
@@ -695,18 +701,18 @@ final class TransTools {
     hits.addAll( enIdONombre );
     hits.addAll( enDescripcion );
     final int max = 40;
-    ArrayNode arr = o.putArray( "steps" );
+    ArrayNode arr = o.putArray( "types" );
     for ( int i = 0; i < hits.size() && i < max; i++ ) {
       PluginInterface p = hits.get( i );
-      arr.addObject().put( "id", TransOps.id( p ) ).put( "nombre", p.getName() ).put( "categoria", p.getCategory() )
-        .put( "descripcion", p.getDescription() );
+      arr.addObject().put( "id", TransOps.id( p ) ).put( "name", p.getName() ).put( "category", p.getCategory() )
+        .put( "description", p.getDescription() );
     }
     o.put( "total", hits.size() );
     if ( hits.size() > max ) {
-      o.put( "nota", "Hay " + hits.size() + " coincidencias; se muestran " + max + ". Afina 'buscar' o 'categoria'." );
+      o.put( "note", hits.size() + " matches; showing " + max + ". Narrow 'search' or 'category'." );
     }
     if ( hits.isEmpty() ) {
-      o.put( "nota", "Nada coincide. " + TransOps.sugerencias( buscar == null ? categoria : buscar ) );
+      o.put( "note", "Nothing matches. " + TransOps.sugerencias( buscar == null ? categoria : buscar ) );
     }
     return o;
   }

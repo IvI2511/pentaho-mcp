@@ -22,20 +22,23 @@ public class McpLifecycleListener implements LifecycleListener {
 
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
-  static final String VERSION = "0.3.1";
+  static final String VERSION = "0.4.0";
 
   /** Llega a la IA en el initialize de MCP: como trabajar con estas herramientas. */
   static final String INSTRUCCIONES =
-    "Este servidor edita EN VIVO la transformacion o el job abierto en Spoon (Pentaho Data Integration "
-      + "9.4): el usuario mira el lienzo y ve aparecer cada step. Flujo recomendado: (1) estado para ver "
-      + "que hay abierto; (2) nueva_transformacion / abrir_archivo; (3) para cada step: tipos_de_step para "
-      + "encontrar el id, plantilla_step para ver su XML de configuracion, agregar_step con solo los tags que "
-      + "cambian (lo demas queda por defecto) y 'despues_de' para que se ubique y conecte solo; (4) "
-      + "campos_step para confirmar que columnas salen de cada step antes de configurar el siguiente; (5) "
-      + "validar y preview_step para ver filas reales; (6) ordenar_lienzo si hay ramas o lookups, para que "
-      + "no queden lineas cruzadas; (7) guardar con una ruta .ktr/.kjb. Ubica los steps de izquierda a "
-      + "derecha, ~150 px entre uno y otro. Si un step tiene varias salidas, por defecto cada una recibe todas "
-      + "las filas (modo_salida). Todo cambio se puede deshacer con Ctrl+Z en Spoon.";
+    "This server edits the transformation or job open in Spoon (Pentaho Data Integration 9.4) LIVE: the "
+      + "user watches the canvas and sees each step appear. Recommended flow: (1) status to see what is open; "
+      + "(2) new_transformation / open_file; (3) for each step: list_step_types to find its type id, "
+      + "get_step_template to see its configuration XML, add_step with only the tags that change (everything "
+      + "else keeps its default) and 'after' so it is placed and connected automatically; to lay out a whole "
+      + "flow in one call use build_steps; (4) get_step_fields to confirm which columns come out of each step "
+      + "before configuring the next one; (5) validate and preview_step to see real rows; (6) arrange_canvas "
+      + "if there are branches or lookups, so no lines cross; (7) save with a .ktr/.kjb path. Place steps left "
+      + "to right, ~150 px apart. If a step has several outputs, by default each one gets a copy of every row "
+      + "(change it with set_output_mode). generate_report writes a Markdown report of the document and "
+      + "canvas_screenshot returns an image of the canvas to check the drawing. Every change can be undone "
+      + "with Ctrl+Z in Spoon. The step catalog and the guides are also available as MCP resources "
+      + "(pentaho://...) for clients that do not have the pentaho-etl skill.";
 
   private McpHttpServer server;
 
@@ -55,6 +58,7 @@ public class McpLifecycleListener implements LifecycleListener {
       RunTools.register( server );
       DbTools.register( server );
       ReportTools.register( server );
+      McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("
         + server.toolCount() + " herramientas)" );

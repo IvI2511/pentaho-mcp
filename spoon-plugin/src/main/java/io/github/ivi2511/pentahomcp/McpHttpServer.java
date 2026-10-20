@@ -69,6 +69,21 @@ final class McpHttpServer {
     }
   }
 
+  /**
+   * Error de protocolo con codigo JSON-RPC propio (p. ej. -32002 recurso inexistente, -32602 cursor
+   * invalido): sale como "error" de la respuesta, con data opcional.
+   */
+  static final class RpcError extends Exception {
+    final int code;
+    final JsonNode data;
+
+    RpcError( int code, String msg, JsonNode data ) {
+      super( msg );
+      this.code = code;
+      this.data = data;
+    }
+  }
+
   static final ObjectMapper JSON = new ObjectMapper();
 
   private static final String[] VERSIONES = { "2025-06-18", "2025-03-26", "2024-11-05" };
@@ -77,6 +92,8 @@ final class McpHttpServer {
   private final String version;
   private final String instrucciones;
   private final Map<String, Tool> tools = new LinkedHashMap<String, Tool>();
+  /** Catalogo y guias como recursos MCP; null = sin recursos (listas vacias). */
+  private volatile McpResources recursos;
   private HttpServer http;
   private ExecutorService pool;
 
@@ -84,6 +101,10 @@ final class McpHttpServer {
     this.port = port;
     this.version = version;
     this.instrucciones = instrucciones;
+  }
+
+  void resources( McpResources r ) {
+    this.recursos = r;
   }
 
   void add( Tool t ) {
@@ -135,7 +156,7 @@ final class McpHttpServer {
   private void manejar( HttpExchange ex ) throws IOException {
     String origin = ex.getRequestHeaders().getFirst( "Origin" );
     if ( origin != null && !origin.matches( "^https?://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:\\d+)?$" ) ) {
-      responder( ex, 403, "{\"error\":\"Origin no permitido\"}" );
+      responder( ex, 403, "{\"error\":\"Origin not allowed\"}" );
       return;
     }
     String metodo = ex.getRequestMethod();
@@ -152,7 +173,7 @@ final class McpHttpServer {
     try {
       msg = JSON.readTree( leer( ex.getRequestBody() ) );
     } catch ( Exception e ) {
-      responder( ex, 400, error( null, -32700, "JSON invalido: " + e.getMessage() ).toString() );
+      responder( ex, 400, error( null, -32700, "Invalid JSON: " + e.getMessage() ).toString() );
       return;
     }
     if ( msg != null && msg.isArray() ) { // lotes: solo versiones viejas del protocolo
@@ -190,7 +211,12 @@ final class McpHttpServer {
           }
           ObjectNode res = JSON.createObjectNode();
           res.put( "protocolVersion", elegida );
-          res.putObject( "capabilities" ).putObject( "tools" ).put( "listChanged", false );
+          ObjectNode caps = res.putObject( "capabilities" );
+          caps.putObject( "tools" ).put( "listChanged", false );
+          if ( recursos != null ) {
+            caps.putObject( "resources" ).put( "listChanged", false );
+            caps.putObject( "completions" ); // ids de las plantillas pentaho://catalog/.../{id}
+          }
           res.putObject( "serverInfo" ).put( "name", "pentaho" ).put( "version", version );
           if ( instrucciones != null ) {
             res.put( "instructions", instrucciones );
@@ -215,18 +241,51 @@ final class McpHttpServer {
           String nombre = params.path( "name" ).asText();
           Tool t = tools.get( nombre );
           if ( t == null ) {
-            return error( id, -32602, "Herramienta desconocida: " + nombre );
+            return error( id, -32602, "Unknown tool: " + nombre );
           }
           JsonNode args = params.has( "arguments" ) ? params.get( "arguments" ) : JSON.createObjectNode();
           return ok( id, ejecutar( t, args ) );
         }
-        case "resources/list":
-          return ok( id, JSON.createObjectNode().set( "resources", JSON.createArrayNode() ) );
+        case "resources/list": {
+          McpResources r = recursos;
+          return ok( id, r == null ? JSON.createObjectNode().set( "resources", JSON.createArrayNode() )
+            : r.listar( cursor( params ) ) );
+        }
+        case "resources/templates/list": {
+          McpResources r = recursos;
+          return ok( id, r == null ? JSON.createObjectNode().set( "resourceTemplates", JSON.createArrayNode() )
+            : r.plantillas( cursor( params ) ) );
+        }
+        case "resources/read": {
+          JsonNode u = params.get( "uri" );
+          if ( u == null || !u.isTextual() || u.asText().isEmpty() ) {
+            return error( id, -32602, "Missing argument 'uri'" );
+          }
+          McpResources r = recursos;
+          ObjectNode res = r == null ? null : r.leer( u.asText() );
+          if ( res == null ) {
+            throw new RpcError( -32002, "Resource not found", JSON.createObjectNode().put( "uri", u.asText() ) );
+          }
+          return ok( id, res );
+        }
+        case "completion/complete": {
+          McpResources r = recursos;
+          if ( r == null ) {
+            return error( id, -32601, "Unsupported method: " + metodo );
+          }
+          return ok( id, r.completar( params ) );
+        }
         case "prompts/list":
           return ok( id, JSON.createObjectNode().set( "prompts", JSON.createArrayNode() ) );
         default:
-          return error( id, -32601, "Metodo no soportado: " + metodo );
+          return error( id, -32601, "Unsupported method: " + metodo );
       }
+    } catch ( RpcError e ) {
+      ObjectNode r = error( id, e.code, e.getMessage() );
+      if ( e.data != null ) {
+        ( (ObjectNode) r.get( "error" ) ).set( "data", e.data );
+      }
+      return r;
     } catch ( Throwable e ) {
       return error( id, -32603, String.valueOf( e ) );
     }
@@ -264,11 +323,17 @@ final class McpHttpServer {
         pila = pila.substring( 0, 3000 ) + "\n...";
       }
       McpLifecycleListener.LOG.logError( "Pentaho MCP: fallo " + t.name(), e );
-      content.addObject().put( "type", "text" ).put( "text", "Error inesperado en " + t.name() + ": " + causa
+      content.addObject().put( "type", "text" ).put( "text", "Unexpected error in " + t.name() + ": " + causa
         + "\n" + pila );
       res.put( "isError", true );
     }
     return res;
+  }
+
+  /** params.cursor de las listas paginadas; null si no vino. */
+  private static String cursor( JsonNode params ) {
+    JsonNode c = params.get( "cursor" );
+    return c == null || c.isNull() ? null : c.asText();
   }
 
   private static ObjectNode ok( JsonNode id, JsonNode result ) {

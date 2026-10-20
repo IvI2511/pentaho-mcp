@@ -21,7 +21,49 @@ Planned as **0.4.0**.
 
 ### Changed
 
-- Tool names are now in English (for example `estado` → `status`).
+- **Breaking: the whole MCP surface is now in English**: tool names, argument names, enum values,
+  response keys, tool descriptions, error messages and the server instructions. Prompts, notes or
+  scripts that call the old names must use the new ones. Renamed tools (`preview_step` keeps its name):
+  - Documents: `estado` → `status`, `nueva_transformacion` → `new_transformation`, `nuevo_job` →
+    `new_job`, `abrir_archivo` → `open_file`, `guardar` → `save`, `activar_documento` →
+    `activate_document`, `cerrar_documento` → `close_document`, `ver_documento` → `get_document`.
+  - Steps and hops: `tipos_de_step` → `list_step_types`, `plantilla_step` → `get_step_template`,
+    `agregar_step` → `add_step`, `configurar_step` → `configure_step`, `ver_step` → `get_step`,
+    `renombrar_step` → `rename_step`, `mover_step` → `move_step`, `borrar_step` → `delete_step`,
+    `conectar` → `connect_steps`, `desconectar` → `disconnect_steps`, `habilitar_hop` →
+    `set_hop_enabled`, `modo_salida` → `set_output_mode`, `campos_step` → `get_step_fields`.
+  - Canvas: `agregar_nota` → `add_note`, `seleccionar` → `select_steps`, `ordenar_lienzo` →
+    `arrange_canvas`.
+  - Jobs: `tipos_de_entrada` → `list_entry_types`, `plantilla_entrada` → `get_entry_template`,
+    `agregar_entrada` → `add_entry`, `configurar_entrada` → `configure_entry`, `ver_entrada` →
+    `get_entry`, `renombrar_entrada` → `rename_entry`, `mover_entrada` → `move_entry`,
+    `borrar_entrada` → `delete_entry`, `conectar_entradas` → `connect_entries`,
+    `desconectar_entradas` → `disconnect_entries`, `cambiar_condicion` → `set_hop_condition`.
+  - Checks and runs: `validar` → `validate`, `ejecutar` → `run`, `estado_ejecucion` →
+    `get_run_status`, `detener` → `stop_run`.
+  - Databases: `tipos_de_base` → `list_database_types`, `listar_conexiones` → `list_connections`,
+    `agregar_conexion` → `add_connection`, `probar_conexion` → `test_connection`, `borrar_conexion` →
+    `delete_connection`, `tablas` → `list_tables`, `columnas` → `list_columns`, `consultar_sql` →
+    `run_sql`.
+  - Parameters: `parametros` → `list_parameters`, `definir_parametro` → `set_parameter`,
+    `borrar_parametro` → `delete_parameter`.
+  - Arguments and values follow the same idea, for example `documento` → `document`, `despues_de` →
+    `after`, `nombre` → `name`, `tipo` → `type`, `desde` / `hacia` → `from` / `to`, `condicion` →
+    `condition` (`siempre` / `si_ok` / `si_falla` → `always` / `on_success` / `on_failure`), output mode
+    `copiar` / `repartir` → `copy` / `distribute`, run mode `visible` / `segundo_plano` → `visible` /
+    `background`. Transformations are reported as `transformation`.
+  - A few responses changed shape, not just names: `add_step` and `connect_steps` report the output mode
+    of a step with several outputs as `output_mode_of: {step, output_mode}` (was a
+    `modo_salida_de_<step>` key); `add_note` returns the note position as `index` (was `nota`);
+    `get_step` and `get_entry` both list hops as `incoming_hops` / `outgoing_hops`; the matches of
+    `list_step_types` and `list_entry_types` both come under `types`.
+  - `get_step_fields` (`side`) and `run` (`mode`) now reject unknown values. Before, anything other than
+    `entrada` meant output and anything other than `segundo_plano` meant visible.
+- The `pentaho-etl` skill is entirely in English, `SKILL.md` included (file names unchanged); it covers
+  `build_steps`, `generate_report`, `canvas_screenshot` and the MCP resources.
+- The installers print their messages in English; the stage marker is now `== Step N - ...` (was
+  `== Paso N - ...`). Parameters (`-PdiHome`, `-InstalarPdi`, `--instalar-pdi`…) and exit codes are
+  unchanged.
 - Each tool call is a single undo step: one Ctrl+Z in Spoon reverts everything a tool did.
 - The skill manual no longer uses a `${DB_PASS}` example that read like a machine credential.
 

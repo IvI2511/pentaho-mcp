@@ -40,9 +40,10 @@ final class JobSoporte {
   static final String DUMMY = "DUMMY";
   static final String SPECIAL = "SPECIAL";
 
-  static final String SIEMPRE = "siempre";
-  static final String SI_OK = "si_ok";
-  static final String SI_FALLA = "si_falla";
+  /** Valores de 'condition' que ve la IA. */
+  static final String SIEMPRE = "always";
+  static final String SI_OK = "on_success";
+  static final String SI_FALLA = "on_failure";
 
   /** Envoltorio de &lt;entry&gt; que no se acepta en config_xml (lo arma el plugin). */
   static final Set<String> IGNORAR = new HashSet<String>( Xml.TAGS_ENVOLTORIO_ENTRY );
@@ -62,9 +63,9 @@ final class JobSoporte {
    * Undo en jobs (PDI 9.4, verificado en el bytecode; detalle en UndoGrupo): SpoonJobDelegate no
    * mira TransAction.getNextAlso, asi que en un job cada accion registrada es un Ctrl+Z aparte. Lo
    * unico que Spoon deshace junto es DELETE_JOB_HOP seguido de DELETE_JOB_ENTRY (caso fijo de
-   * Spoon.undoAction), que es justo lo que registra borrar(): borrar_entrada = un Ctrl+Z.
+   * Spoon.undoAction), que es justo lo que registra borrar(): delete_entry = un Ctrl+Z.
    *
-   * agregar_entrada con despues_de queda en DOS Ctrl+Z (el primero quita el hop, el segundo la
+   * add_entry con 'after' queda en DOS Ctrl+Z (el primero quita el hop, el segundo la
    * entrada; Ctrl+Y al reves). No hay alternativa limpia: un TransAction toma su tipo del primer
    * objeto, asi que no puede llevar entrada y hop juntos; registrar solo la entrada dejaria el hop
    * colgando al deshacer (JobMeta.removeJobEntry no quita hops); y el historial no admite acciones
@@ -89,18 +90,18 @@ final class JobSoporte {
         Integer n = cats.get( t[2] );
         cats.put( t[2], n == null ? 1 : n + 1 );
       }
-      ArrayNode a = o.putArray( "categorias" );
+      ArrayNode a = o.putArray( "categories" );
       for ( Map.Entry<String, Integer> e : cats.entrySet() ) {
-        a.addObject().put( "categoria", e.getKey() ).put( "cantidad", e.getValue() );
+        a.addObject().put( "category", e.getKey() ).put( "count", e.getValue() );
       }
       o.put( "total", todos.size() );
-      o.put( "nota", "Filtra con 'buscar' o 'categoria'. START y DUMMY son entradas especiales: se crean con "
-        + "agregar_entrada tipo=START / tipo=DUMMY." );
+      o.put( "note", "Filter with 'search' or 'category'. START and DUMMY are special entries: create them with "
+        + "add_entry type=START / type=DUMMY." );
       return o;
     }
     String[] palabras = buscar == null ? new String[0] : normalizar( buscar ).split( "\\s+" );
     String cat = categoria == null ? null : normalizar( categoria );
-    ArrayNode a = o.putArray( "tipos" );
+    ArrayNode a = o.putArray( "types" );
     int n = 0;
     for ( String[] t : todos ) {
       if ( cat != null && !normalizar( t[2] ).contains( cat ) ) {
@@ -116,15 +117,15 @@ final class JobSoporte {
       }
       if ( ok ) {
         if ( n++ < 80 ) {
-          a.addObject().put( "id", t[0] ).put( "nombre", t[1] ).put( "categoria", t[2] ).put( "descripcion", t[3] );
+          a.addObject().put( "id", t[0] ).put( "name", t[1] ).put( "category", t[2] ).put( "description", t[3] );
         }
       }
     }
     o.put( "total", n );
     if ( n > 80 ) {
-      o.put( "nota", "Mostrando 80 de " + n + "; afina la busqueda." );
+      o.put( "note", "Showing 80 of " + n + "; narrow the search." );
     } else if ( n == 0 ) {
-      o.put( "nota", "Nada coincide. Llama sin argumentos para ver las categorias." );
+      o.put( "note", "Nothing matches. Call without arguments to see the categories." );
     }
     return o;
   }
@@ -137,9 +138,9 @@ final class JobSoporte {
       String id = p.getIds()[0];
       String cat = nz( p.getCategory() );
       if ( SPECIAL.equals( id ) ) {
-        out.add( new String[] { START, "Start", cat, "Inicio del job (unico, obligatorio). El hop que sale de "
-          + "START es siempre incondicional." } );
-        out.add( new String[] { DUMMY, "Dummy", cat, "No hace nada; sirve para juntar o separar ramas." } );
+        out.add( new String[] { START, "Start", cat, "Start of the job (exactly one, required). The hop leaving "
+          + "START is always unconditional." } );
+        out.add( new String[] { DUMMY, "Dummy", cat, "Does nothing; used to join or split branches." } );
         continue;
       }
       out.add( new String[] { id, nz( p.getName() ), cat, nz( p.getDescription() ) } );
@@ -177,8 +178,8 @@ final class JobSoporte {
         return p.getIds()[0];
       }
     }
-    throw new ToolError( "Tipo de entrada desconocido '" + tipo + "'. " + parecidos( t )
-      + "Usa tipos_de_entrada para buscar." );
+    throw new ToolError( "Unknown job entry type '" + tipo + "'. " + parecidos( t )
+      + "Use list_entry_types to search." );
   }
 
   private static String parecidos( String t ) {
@@ -198,7 +199,7 @@ final class JobSoporte {
     if ( hits.size() > 10 ) {
       hits = hits.subList( 0, 10 );
     }
-    return "Parecidos: " + String.join( ", ", hits ) + ". ";
+    return "Similar: " + String.join( ", ", hits ) + ". ";
   }
 
   /** XML de configuracion por defecto (sin envoltorio) de un tipo ya resuelto. */
@@ -214,7 +215,7 @@ final class JobSoporte {
     PluginRegistry reg = PluginRegistry.getInstance();
     PluginInterface p = reg.findPluginWithId( JobEntryPluginType.class, id );
     if ( p == null ) {
-      throw new ToolError( "Tipo de entrada desconocido '" + id + "'" );
+      throw new ToolError( "Unknown job entry type '" + id + "'" );
     }
     JobEntryInterface jei = reg.loadClass( p, JobEntryInterface.class );
     jei.setPluginId( id );
@@ -229,7 +230,7 @@ final class JobSoporte {
   static JobEntryCopy entrada( JobMeta jm, String nombre ) throws ToolError {
     JobEntryCopy c = buscar( jm, nombre );
     if ( c == null ) {
-      throw new ToolError( "No hay ninguna entrada '" + nombre + "' en el job. " + nombres( jm ) );
+      throw new ToolError( "There is no entry '" + nombre + "' in the job. " + nombres( jm ) );
     }
     return c;
   }
@@ -246,39 +247,40 @@ final class JobSoporte {
 
   private static String nombres( JobMeta jm ) {
     if ( jm.nrJobEntries() == 0 ) {
-      return "El job no tiene entradas.";
+      return "The job has no entries.";
     }
     List<String> ns = new ArrayList<String>();
     for ( JobEntryCopy c : jm.getJobCopies() ) {
       ns.add( "'" + c.getName() + "'" );
     }
-    return "Entradas: " + String.join( ", ", ns ) + ".";
+    return "Entries: " + String.join( ", ", ns ) + ".";
   }
 
   private static void nombreLibre( JobMeta jm, String nombre, JobEntryCopy excepto ) throws ToolError {
     JobEntryCopy otra = buscar( jm, nombre );
     if ( otra != null && otra != excepto ) {
-      throw new ToolError( "Ya hay una entrada llamada '" + otra.getName() + "'. Usa otro nombre." );
+      throw new ToolError( "There is already an entry named '" + otra.getName() + "'. Use another name." );
     }
   }
 
   /**
-   * Agrega una entrada. Con despues_de la pone a su derecha y crea el hop; sin posicion, a la
+   * Agrega una entrada. Con 'after' la pone a su derecha y crea el hop; sin posicion, a la
    * derecha de la ultima entrada (o en 100,100 si el job esta vacio). Queda seleccionada.
    */
   static ObjectNode agregar( JobMeta jm, String tipo, String nombre, String config, Integer x, Integer y,
     String despuesDe, String condicion, Repository rep, IMetaStore ms, UndoGrupo undo ) throws Exception {
     String t = resolverTipo( tipo );
     if ( SPECIAL.equals( t ) ) {
-      throw new ToolError( "Para la entrada especial usa tipo=START (inicio del job) o tipo=DUMMY." );
+      throw new ToolError( "For the special entry use type=START (start of the job) or type=DUMMY." );
     }
     if ( nombre == null || nombre.trim().isEmpty() ) {
-      throw new ToolError( "Falta el argumento 'nombre'" );
+      throw new ToolError( "Missing argument 'name'" );
     }
     nombre = nombre.trim();
     nombreLibre( jm, nombre, null );
     if ( START.equals( t ) && jm.findStart() != null ) {
-      throw new ToolError( "El job ya tiene START ('" + jm.findStart().getName() + "'); solo puede haber uno." );
+      throw new ToolError( "The job already has a START ('" + jm.findStart().getName() + "'); there can only be "
+        + "one." );
     }
     JobEntryCopy origen = despuesDe == null ? null : entrada( jm, despuesDe );
     String cond = origen == null ? null : condicionHop( origen, condicion );
@@ -297,7 +299,7 @@ final class JobSoporte {
       py = yLibre( jm, px, py );
     }
     if ( px < 0 || py < 0 ) {
-      throw new ToolError( "La posicion tiene que ser positiva (x=" + px + ", y=" + py + ")" );
+      throw new ToolError( "The position must not be negative (x=" + px + ", y=" + py + ")" );
     }
 
     // la entrada
@@ -343,7 +345,7 @@ final class JobSoporte {
     UndoGrupo undo ) throws Exception {
     JobEntryCopy c = entrada( jm, nombre );
     if ( config == null || config.trim().isEmpty() ) {
-      throw new ToolError( "Falta el argumento 'config_xml'" );
+      throw new ToolError( "Missing argument 'config_xml'" );
     }
     JobEntryCopy nueva = reconstruir( jm, c, config, rep, ms );
     JobEntryCopy antes = (JobEntryCopy) c.clone();
@@ -368,8 +370,8 @@ final class JobSoporte {
     String cuerpo = Xml.mezclar( actual, config, IGNORAR );
     JobEntryCopy nueva = desdeXml( jm, "<entry>" + cuerpo + "</entry>", rep, ms );
     if ( nueva.isStart() != c.isStart() || nueva.isDummy() != c.isDummy() ) {
-      throw new ToolError( "No se puede convertir START/DUMMY en otra cosa (ni al reves) cambiando <start>/<dummy>: "
-        + "borra la entrada y agrega otra." );
+      throw new ToolError( "START/DUMMY cannot be turned into another type (or the other way round) by changing "
+        + "<start>/<dummy>: delete the entry and add a new one." );
     }
     return nueva;
   }
@@ -378,7 +380,7 @@ final class JobSoporte {
     Node nodo = XMLHandler.getSubNode( XMLHandler.loadXMLString( xml ), "entry" );
     JobEntryCopy c = new JobEntryCopy( nodo, jm.getDatabases(), jm.getSlaveServers(), rep, ms );
     if ( c.isMissing() || c.getEntry() == null ) {
-      throw new ToolError( "Spoon no reconoce el tipo de entrada (falta el plugin)" );
+      throw new ToolError( "Spoon does not recognize the entry type (missing plugin)" );
     }
     return c;
   }
@@ -388,14 +390,14 @@ final class JobSoporte {
     JobEntryCopy c = entrada( jm, nombre );
     ObjectNode o = ficha( c );
     if ( c.getDescription() != null && !c.getDescription().isEmpty() ) {
-      o.put( "descripcion", c.getDescription() );
+      o.put( "description", c.getDescription() );
     }
     if ( c.isLaunchingInParallel() ) {
-      o.put( "en_paralelo", true );
+      o.put( "parallel", true );
     }
     o.put( "config_xml", Xml.sinPasswords( Xml.sinEnvoltorio( c.getEntry().getXML(), IGNORAR ) ) );
-    ArrayNode entran = o.putArray( "hops_entrantes" );
-    ArrayNode salen = o.putArray( "hops_salientes" );
+    ArrayNode entran = o.putArray( "incoming_hops" );
+    ArrayNode salen = o.putArray( "outgoing_hops" );
     for ( JobHopMeta h : jm.getJobhops() ) {
       if ( h.getToEntry() == c ) {
         entran.add( hop( h ) );
@@ -410,7 +412,7 @@ final class JobSoporte {
   static ObjectNode renombrar( JobMeta jm, String nombre, String nuevo, UndoGrupo undo ) throws ToolError {
     JobEntryCopy c = entrada( jm, nombre );
     if ( nuevo == null || nuevo.trim().isEmpty() ) {
-      throw new ToolError( "Falta el argumento 'nuevo_nombre'" );
+      throw new ToolError( "Missing argument 'new_name'" );
     }
     nuevo = nuevo.trim();
     nombreLibre( jm, nuevo, c );
@@ -421,14 +423,14 @@ final class JobSoporte {
     jm.unselectAll();
     c.setSelected( true );
     ObjectNode o = ficha( c );
-    o.put( "antes", viejo );
+    o.put( "previous_name", viejo );
     return o;
   }
 
   static ObjectNode mover( JobMeta jm, String nombre, int x, int y, UndoGrupo undo ) throws ToolError {
     JobEntryCopy c = entrada( jm, nombre );
     if ( x < 0 || y < 0 ) {
-      throw new ToolError( "La posicion tiene que ser positiva (x=" + x + ", y=" + y + ")" );
+      throw new ToolError( "The position must not be negative (x=" + x + ", y=" + y + ")" );
     }
     Point antes = new Point( c.getLocation().x, c.getLocation().y );
     c.setLocation( x, y );
@@ -469,8 +471,8 @@ final class JobSoporte {
     jm.removeJobEntry( idx );
     undo.borrado( new Object[] { c }, new int[] { idx } );
     ObjectNode o = Tools.obj();
-    o.put( "borrada", c.getName() );
-    o.set( "hops_borrados", borrados );
+    o.put( "deleted", c.getName() );
+    o.set( "deleted_hops", borrados );
     return o;
   }
 
@@ -481,14 +483,14 @@ final class JobSoporte {
     JobEntryCopy a = entrada( jm, desde );
     JobEntryCopy b = entrada( jm, hacia );
     if ( a == b ) {
-      throw new ToolError( "Un hop no puede ir de una entrada a si misma" );
+      throw new ToolError( "A hop cannot go from an entry to itself" );
     }
     if ( b.isStart() ) {
-      throw new ToolError( "No puede llegar un hop a START: es el inicio del job" );
+      throw new ToolError( "A hop cannot go into START: it is the start of the job" );
     }
     if ( jm.findJobHop( a, b, true ) != null ) {
-      throw new ToolError( "Ya hay un hop de '" + a.getName() + "' a '" + b.getName() + "'. Para cambiarlo usa "
-        + "cambiar_condicion." );
+      throw new ToolError( "There is already a hop from '" + a.getName() + "' to '" + b.getName() + "'. To change "
+        + "it use set_hop_condition." );
     }
     String cond = condicionHop( a, condicion );
     JobHopMeta h = new JobHopMeta( a, b );
@@ -496,8 +498,8 @@ final class JobSoporte {
     jm.addJobHop( h );
     if ( !permitirBucle && ( jm.hasLoop( b ) || jm.hasLoop( a ) ) ) {
       jm.removeJobHop( h );
-      throw new ToolError( "El hop '" + a.getName() + "' -> '" + b.getName() + "' cierra un bucle. Si el bucle es "
-        + "intencional (reintentos, recorrer filas), pasa permitir_bucle=true." );
+      throw new ToolError( "The hop '" + a.getName() + "' -> '" + b.getName() + "' closes a loop. If the loop is "
+        + "intentional (retries, looping over rows), pass allow_loop=true." );
     }
     undo.nuevo( new Object[] { h }, new int[] { jm.indexOfJobHop( h ) } );
     ObjectNode o = hop( h );
@@ -511,7 +513,7 @@ final class JobSoporte {
     ObjectNode o = hop( h );
     jm.removeJobHop( idx );
     undo.borrado( new Object[] { h }, new int[] { idx } );
-    o.put( "borrado", true );
+    o.put( "deleted", true );
     return o;
   }
 
@@ -519,7 +521,7 @@ final class JobSoporte {
     UndoGrupo undo ) throws ToolError {
     JobHopMeta h = hopEntre( jm, desde, hacia );
     if ( condicion == null && habilitado == null ) {
-      throw new ToolError( "Pasa 'condicion' y/o 'habilitado'" );
+      throw new ToolError( "Pass 'condition' and/or 'enabled'" );
     }
     int idx = jm.indexOfJobHop( h );
     JobHopMeta antes = (JobHopMeta) h.clone();
@@ -540,7 +542,7 @@ final class JobSoporte {
     JobEntryCopy b = entrada( jm, hacia );
     JobHopMeta h = jm.findJobHop( a, b, true );
     if ( h == null ) {
-      throw new ToolError( "No hay hop de '" + a.getName() + "' a '" + b.getName() + "'" );
+      throw new ToolError( "There is no hop from '" + a.getName() + "' to '" + b.getName() + "'" );
     }
     return h;
   }
@@ -550,7 +552,7 @@ final class JobSoporte {
     return origen.isStart() || ( !origen.evaluates() && origen.isUnconditional() );
   }
 
-  /** Condicion efectiva: la pedida (si_ok por defecto), o 'siempre' si el origen lo exige. */
+  /** Condicion efectiva: la pedida (on_success por defecto), o 'always' si el origen lo exige. */
   static String condicionHop( JobEntryCopy origen, String pedida ) throws ToolError {
     if ( soloIncondicional( origen ) ) {
       return SIEMPRE;
@@ -562,7 +564,8 @@ final class JobSoporte {
     if ( p.equals( SIEMPRE ) || p.equals( SI_OK ) || p.equals( SI_FALLA ) ) {
       return p;
     }
-    throw new ToolError( "condicion tiene que ser siempre, si_ok o si_falla; llego '" + pedida + "'" );
+    throw new ToolError( "'condition' must be " + SIEMPRE + ", " + SI_OK + " or " + SI_FALLA + "; got '" + pedida
+      + "'" );
   }
 
   static void aplicarCondicion( JobHopMeta h, String cond ) {
@@ -581,8 +584,8 @@ final class JobSoporte {
 
   private static void avisoCondicion( ObjectNode o, JobEntryCopy origen, String pedida, String efectiva ) {
     if ( pedida != null && !pedida.trim().isEmpty() && !pedida.trim().equalsIgnoreCase( efectiva ) ) {
-      o.put( "aviso", "'" + origen.getName() + "' " + ( origen.isStart() ? "es START" : "no evalua resultado" )
-        + ": sus hops son siempre incondicionales." );
+      o.put( "warning", "'" + origen.getName() + "' " + ( origen.isStart() ? "is START" : "does not evaluate a "
+        + "result" ) + ": its hops are always unconditional." );
     }
   }
 
@@ -590,8 +593,8 @@ final class JobSoporte {
 
   static ObjectNode ficha( JobEntryCopy c ) {
     ObjectNode o = Tools.obj();
-    o.put( "entrada", c.getName() );
-    o.put( "tipo", c.isStart() ? START : ( c.isDummy() ? DUMMY : c.getEntry().getPluginId() ) );
+    o.put( "name", c.getName() );
+    o.put( "type", c.isStart() ? START : ( c.isDummy() ? DUMMY : c.getEntry().getPluginId() ) );
     o.put( "x", c.getLocation().x );
     o.put( "y", c.getLocation().y );
     return o;
@@ -599,11 +602,11 @@ final class JobSoporte {
 
   static ObjectNode hop( JobHopMeta h ) {
     ObjectNode o = Tools.obj();
-    o.put( "desde", h.getFromEntry().getName() );
-    o.put( "hacia", h.getToEntry().getName() );
-    o.put( "condicion", condicion( h ) );
+    o.put( "from", h.getFromEntry().getName() );
+    o.put( "to", h.getToEntry().getName() );
+    o.put( "condition", condicion( h ) );
     if ( !h.isEnabled() ) {
-      o.put( "habilitado", false );
+      o.put( "enabled", false );
     }
     return o;
   }
@@ -612,9 +615,9 @@ final class JobSoporte {
   private static void avisos( ObjectNode o, JobEntryCopy c, String condPedida, JobEntryCopy origen ) {
     if ( origen != null && o.has( "hop" ) ) {
       ObjectNode tmp = Tools.obj();
-      avisoCondicion( tmp, origen, condPedida, o.get( "hop" ).get( "condicion" ).asText() );
-      if ( tmp.has( "aviso" ) ) {
-        o.put( "aviso", tmp.get( "aviso" ).asText() );
+      avisoCondicion( tmp, origen, condPedida, o.get( "hop" ).get( "condition" ).asText() );
+      if ( tmp.has( "warning" ) ) {
+        o.put( "warning", tmp.get( "warning" ).asText() );
       }
     }
     String id = c.getEntry() == null ? null : c.getEntry().getPluginId();
@@ -625,11 +628,11 @@ final class JobSoporte {
       if ( "filename".equals( metodo ) || metodo == null ) {
         String ext = "TRANS".equals( id ) ? ".ktr" : ".kjb";
         if ( archivo == null || archivo.isEmpty() ) {
-          o.put( "aviso_ruta", "Falta <filename>: configurala con config_xml, p.ej. "
-            + "<filename>${Internal.Entry.Current.Directory}/archivo" + ext + "</filename>" );
+          o.put( "path_warning", "Missing <filename>: set it with config_xml, e.g. "
+            + "<filename>${Internal.Entry.Current.Directory}/file" + ext + "</filename>" );
         } else if ( !archivo.contains( "${" ) ) {
-          o.put( "aviso_ruta", "La ruta es absoluta; conviene ${Internal.Entry.Current.Directory}/"
-            + new java.io.File( archivo ).getName() + " para que el job siga andando si se mueve la carpeta." );
+          o.put( "path_warning", "The path is absolute; ${Internal.Entry.Current.Directory}/"
+            + new java.io.File( archivo ).getName() + " is better, so the job keeps working if the folder is moved." );
         }
       }
     }

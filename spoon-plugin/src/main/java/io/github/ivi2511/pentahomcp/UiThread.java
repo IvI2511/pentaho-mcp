@@ -41,7 +41,7 @@ final class UiThread {
   static <T> T call( final Callable<T> task, long timeoutMs ) throws Exception {
     Display d = display();
     if ( d == null ) {
-      throw new IllegalStateException( "Spoon/Display no disponible" );
+      throw new IllegalStateException( "Spoon/Display not available" );
     }
     if ( d.getThread() == Thread.currentThread() ) {
       return task.call();
@@ -66,7 +66,7 @@ final class UiThread {
       }
       throw new RuntimeException( c );
     } catch ( TimeoutException e ) {
-      throw new TimeoutException( "La UI de Spoon no respondio en " + timeoutMs + " ms" );
+      throw new TimeoutException( "Spoon's UI did not respond within " + timeoutMs + " ms" );
     }
   }
 }

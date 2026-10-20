@@ -55,48 +55,48 @@ final class DbTools {
 
   static void register( McpHttpServer s ) {
 
-    s.add( Tools.tool( "tipos_de_base",
-      "Tipos de base de datos que entiende PDI (el id va en 'tipo' de agregar_conexion), con puerto por "
-        + "defecto, clase del driver JDBC y si el driver esta instalado. Usala antes de agregar_conexion si no "
-        + "sabes el id exacto, o cuando una conexion falla por driver: si driver_disponible=false hay que copiar "
-        + "el .jar del conector a data-integration/lib y reiniciar Spoon.",
-      Tools.schema().str( "buscar", "Filtra por id o nombre (por ejemplo 'mysql', 'postgres', 'sqlite')", false )
-        .bool( "solo_disponibles", "Solo los que tienen el driver instalado", false ).build(),
-      a -> tipos( Tools.optStr( a, "buscar", null ), Tools.optBool( a, "solo_disponibles", false ) ) ) );
+    s.add( Tools.tool( "list_database_types",
+      "Database types PDI understands (the id goes in 'type' of add_connection), with default port, JDBC "
+        + "driver class and whether the driver is installed. Use it before add_connection if you do not know the "
+        + "exact id, or when a connection fails because of the driver: if driver_available=false, the connector "
+        + ".jar has to be copied to data-integration/lib and Spoon restarted.",
+      Tools.schema().str( "search", "Filter by id or name (for example 'mysql', 'postgres', 'sqlite')", false )
+        .bool( "available_only", "Only the types whose driver is installed", false ).build(),
+      a -> tipos( Tools.optStr( a, "search", null ), Tools.optBool( a, "available_only", false ) ) ) );
 
-    s.add( Tools.tool( "listar_conexiones",
-      "Conexiones a bases definidas en la transformacion o job: nombre, tipo, host, puerto, base, usuario y "
-        + "que steps/entradas las usan (nunca la contrasenia). Usala antes de configurar un Table input/output "
-        + "o antes de borrar o reemplazar una conexion.",
-      Tools.schema().documento().build(),
+    s.add( Tools.tool( "list_connections",
+      "Database connections defined in the transformation or job: name, type, host, port, database, user and "
+        + "which steps/entries use them (never the password). Use it before configuring a Table input/output "
+        + "or before deleting or replacing a connection.",
+      Tools.schema().document().build(),
       a -> Docs.ui( () -> listar( Docs.resolver( a ) ) ) ) );
 
-    s.add( Tools.tool( "agregar_conexion",
-      "Crea una conexion a base de datos en el documento (o la reemplaza si ya hay una con ese nombre: los "
-        + "steps que la usan pasan a la nueva configuracion). Usala cuando un step necesita una conexion que no "
-        + "existe. Despues proba con probar_conexion. Ejemplos: MYSQL localhost 3306 (MySQL 8 suele necesitar "
-        + "opciones useSSL=false, allowPublicKeyRetrieval=true, serverTimezone=UTC); POSTGRESQL localhost 5432; "
-        + "SQLITE o H2: sin host, 'base' = ruta del archivo (H2: sin la extension .mv.db). Para un driver no "
-        + "listado: tipo GENERIC con atributos CUSTOM_URL y CUSTOM_DRIVER_CLASS. Alternativa: 'xml' con un "
-        + "<connection> completo. No crea conexiones compartidas (shared.xml).",
-      Tools.schema().documento()
-        .str( "nombre", "Nombre de la conexion (asi la referencian los steps)", false )
-        .str( "tipo", "Id del tipo de base (MYSQL, POSTGRESQL, SQLITE, H2, MSSQLNATIVE, ORACLE...; ver "
-          + "tipos_de_base)", false )
-        .str( "host", "Servidor (localhost si esta en tu maquina). Vacio para SQLite/H2 embebido", false )
-        .str( "puerto", "Puerto; si se omite, el por defecto del tipo", false )
-        .str( "base", "Nombre de la base (o ruta del archivo para SQLite/H2, o nombre JNDI)", false )
-        .str( "usuario", "Usuario", false )
-        .str( "password", "Contrasenia (se guarda cifrada en el .ktr/.kjb; tambien vale ${VARIABLE})", false )
-        .strEnum( "acceso", "Tipo de acceso (por defecto Native = JDBC)", false, "Native", "JNDI", "ODBC", "OCI",
+    s.add( Tools.tool( "add_connection",
+      "Creates a database connection in the document (or replaces it if one with that name already exists: the "
+        + "steps that use it switch to the new configuration). Use it when a step needs a connection that does "
+        + "not exist. Then check it with test_connection. Examples: MYSQL localhost 3306 (MySQL 8 usually needs "
+        + "options useSSL=false, allowPublicKeyRetrieval=true, serverTimezone=UTC); POSTGRESQL localhost 5432; "
+        + "SQLITE or H2: no host, 'database' = file path (H2: without the .mv.db extension). For a driver that "
+        + "is not listed: type GENERIC with attributes CUSTOM_URL and CUSTOM_DRIVER_CLASS. Alternative: 'xml' "
+        + "with a complete <connection>. Does not create shared connections (shared.xml).",
+      Tools.schema().document()
+        .str( "name", "Connection name (steps reference it by this name)", false )
+        .str( "type", "Database type id (MYSQL, POSTGRESQL, SQLITE, H2, MSSQLNATIVE, ORACLE...; see "
+          + "list_database_types)", false )
+        .str( "host", "Server (localhost if it runs on your machine). Empty for embedded SQLite/H2", false )
+        .str( "port", "Port; if omitted, the default port of the type", false )
+        .str( "database", "Database name (or the file path for SQLite/H2, or the JNDI name)", false )
+        .str( "user", "User name", false )
+        .str( "password", "Password (stored encrypted in the .ktr/.kjb; ${VARIABLE} also works)", false )
+        .strEnum( "access", "Access type (default Native = JDBC)", false, "Native", "JNDI", "ODBC", "OCI",
           "Plugin" )
-        .raw( "opciones", mapaStrings( "Opciones extra del driver JDBC (van en la URL), por ejemplo "
+        .raw( "options", mapaStrings( "Extra JDBC driver options (they go in the URL), for example "
           + "{\"useSSL\":\"false\",\"serverTimezone\":\"UTC\"}" ), false )
-        .raw( "atributos", mapaStrings( "Atributos de la conexion, por ejemplo {\"CUSTOM_URL\":\"jdbc:...\","
-          + "\"CUSTOM_DRIVER_CLASS\":\"com.x.Driver\"} para GENERIC, o {\"SUPPORTS_BOOLEAN_DATA_TYPE\":\"Y\"}" ),
+        .raw( "attributes", mapaStrings( "Connection attributes, for example {\"CUSTOM_URL\":\"jdbc:...\","
+          + "\"CUSTOM_DRIVER_CLASS\":\"com.x.Driver\"} for GENERIC, or {\"SUPPORTS_BOOLEAN_DATA_TYPE\":\"Y\"}" ),
           false )
-        .str( "xml", "Alternativa: un <connection>...</connection> completo, como en el .ktr. Si viene 'nombre', "
-          + "lo pisa", false )
+        .str( "xml", "Alternative: a complete <connection>...</connection>, as in the .ktr. If 'name' is also "
+          + "given, it overrides the name in the XML", false )
         .build(),
       a -> {
         final DatabaseMeta nueva = construir( a );
@@ -108,56 +108,56 @@ final class DbTools {
         } );
       } ) );
 
-    s.add( Tools.tool( "probar_conexion",
-      "Prueba una conexion del documento: conecta en segundo plano (con timeout) y devuelve ok o el problema "
-        + "(driver_faltante, credenciales, host_inalcanzable, host_desconocido, base_inexistente, timeout) con "
-        + "un mensaje para explicarle al usuario. Usala despues de agregar_conexion y cuando un step falla al "
-        + "conectar.",
-      Tools.schema().documento().str( "nombre", "Nombre de la conexion", true )
-        .integer( "timeout_seg", "Segundos maximos de espera (por defecto " + DbJdbc.TIMEOUT_CONECTAR_S + ")", false )
+    s.add( Tools.tool( "test_connection",
+      "Tests a connection of the document: connects in the background (with a timeout) and returns ok or the "
+        + "problem (missing_driver, bad_credentials, host_unreachable, unknown_host, database_not_found, timeout) "
+        + "with a message to explain to the user. Use it after add_connection and when a step fails to "
+        + "connect.",
+      Tools.schema().document().str( "name", "Connection name", true )
+        .integer( "timeout_s", "Maximum seconds to wait (default " + DbJdbc.TIMEOUT_CONECTAR_S + ")", false )
         .build(),
       a -> {
-        Copia c = copia( a, Tools.str( a, "nombre" ) );
+        Copia c = copia( a, Tools.str( a, "name" ) );
         return DbJdbc.probar( c.db, c.vars, timeout( a, DbJdbc.TIMEOUT_CONECTAR_S ) );
       } ) );
 
-    s.add( Tools.tool( "borrar_conexion",
-      "Quita una conexion del documento. Falla si algun step, entrada o tabla de log la usa (primero cambia o "
-        + "borra esos steps). Se puede deshacer con Ctrl+Z en transformaciones.",
-      Tools.schema().documento().str( "nombre", "Nombre de la conexion", true ).build(),
+    s.add( Tools.tool( "delete_connection",
+      "Removes a connection from the document. Fails if any step, entry or log table uses it (change or delete "
+        + "those steps first). Can be undone with Ctrl+Z in transformations.",
+      Tools.schema().document().str( "name", "Connection name", true ).build(),
       a -> Docs.ui( () -> {
         AbstractMeta m = Docs.resolver( a );
-        String r = borrar( Docs.spoon(), m, Tools.str( a, "nombre" ) );
+        String r = borrar( Docs.spoon(), m, Tools.str( a, "name" ) );
         Docs.touched( m );
         return r;
       } ) ) );
 
-    s.add( Tools.tool( "tablas",
-      "Lista las tablas y vistas de una conexion del documento, agrupadas por esquema (oculta los esquemas de "
-        + "sistema). Usala para saber que hay en la base antes de armar un Table input o una consulta.",
-      Tools.schema().documento().str( "conexion", "Nombre de la conexion", true )
-        .str( "esquema", "Solo este esquema (en MySQL, la base)", false )
-        .str( "buscar", "Solo nombres que contengan este texto", false )
-        .bool( "incluir_sistema", "Incluir information_schema, pg_catalog, etc.", false ).build(),
+    s.add( Tools.tool( "list_tables",
+      "Lists the tables and views of a document connection, grouped by schema (system schemas are hidden). Use "
+        + "it to see what is in the database before building a Table input or a query.",
+      Tools.schema().document().str( "connection", "Connection name", true )
+        .str( "schema", "Only this schema (in MySQL, the database)", false )
+        .str( "search", "Only names that contain this text", false )
+        .bool( "include_system", "Include information_schema, pg_catalog, etc.", false ).build(),
       a -> {
-        final Copia c = copia( a, Tools.str( a, "conexion" ) );
-        final String esquema = Tools.optStr( a, "esquema", null );
-        final String buscar = Tools.optStr( a, "buscar", null );
-        final boolean sistema = Tools.optBool( a, "incluir_sistema", false );
+        final Copia c = copia( a, Tools.str( a, "connection" ) );
+        final String esquema = Tools.optStr( a, "schema", null );
+        final String buscar = Tools.optStr( a, "search", null );
+        final boolean sistema = Tools.optBool( a, "include_system", false );
         return DbJdbc.conConexion( c.db, c.vars, DbJdbc.TIMEOUT_EXPLORAR_S,
           db -> DbJdbc.tablas( db, esquema, buscar, sistema ) );
       } ) );
 
-    s.add( Tools.tool( "columnas",
-      "Columnas de una tabla (nombre, tipo Kettle, largo, precision, tipo de la base, pk). Usala para "
-        + "configurar campos de un Table output, Insert/Update, Database lookup o el SQL de un Table input.",
-      Tools.schema().documento().str( "conexion", "Nombre de la conexion", true )
-        .str( "tabla", "Nombre de la tabla o vista (acepta esquema.tabla)", true )
-        .str( "esquema", "Esquema, si no va en 'tabla'", false ).build(),
+    s.add( Tools.tool( "list_columns",
+      "Columns of a table (name, Kettle type, length, precision, database type, pk). Use it to configure the "
+        + "fields of a Table output, Insert/Update, Database lookup or the SQL of a Table input.",
+      Tools.schema().document().str( "connection", "Connection name", true )
+        .str( "table", "Table or view name (accepts schema.table)", true )
+        .str( "schema", "Schema, if it is not in 'table'", false ).build(),
       a -> {
-        final Copia c = copia( a, Tools.str( a, "conexion" ) );
-        String tabla = Tools.str( a, "tabla" ).trim();
-        String esquema = Tools.optStr( a, "esquema", null );
+        final Copia c = copia( a, Tools.str( a, "connection" ) );
+        String tabla = Tools.str( a, "table" ).trim();
+        String esquema = Tools.optStr( a, "schema", null );
         if ( esquema == null && tabla.indexOf( '.' ) > 0 && tabla.indexOf( '.' ) < tabla.length() - 1 ) {
           esquema = sinComillas( tabla.substring( 0, tabla.lastIndexOf( '.' ) ) );
           tabla = tabla.substring( tabla.lastIndexOf( '.' ) + 1 );
@@ -167,67 +167,67 @@ final class DbTools {
         return DbJdbc.conConexion( c.db, c.vars, DbJdbc.TIMEOUT_EXPLORAR_S, db -> DbJdbc.columnas( db, e, t ) );
       } ) );
 
-    s.add( Tools.tool( "consultar_sql",
-      "Corre una consulta SQL contra una conexion del documento y devuelve campos y filas (como texto). Para "
-        + "mirar datos reales, probar un SELECT antes de ponerlo en un Table input o contar filas. Solo lectura: "
-        + "SELECT, WITH, SHOW, DESCRIBE, EXPLAIN, PRAGMA. Para crear tablas o modificar datos hace falta "
-        + "permitir_escritura=true, y solo si el usuario lo pidio.",
-      Tools.schema().documento().str( "conexion", "Nombre de la conexion", true )
-        .str( "sql", "La consulta. Las ${VARIABLES} del documento se reemplazan", true )
-        .integer( "filas", "Maximo de filas a devolver (por defecto 50, tope " + DbJdbc.MAX_FILAS + ")", false )
-        .bool( "permitir_escritura", "Permite INSERT/UPDATE/DELETE/CREATE... (se ejecuta y se confirma)", false )
-        .integer( "timeout_seg", "Segundos maximos (por defecto " + DbJdbc.TIMEOUT_CONSULTA_S + ")", false ).build(),
+    s.add( Tools.tool( "run_sql",
+      "Runs a SQL query against a document connection and returns fields and rows (as text). Use it to look at "
+        + "real data, to try a SELECT before putting it in a Table input, or to count rows. Read-only: SELECT, "
+        + "WITH, SHOW, DESCRIBE, EXPLAIN, PRAGMA. Creating tables or modifying data requires allow_write=true, "
+        + "and only if the user asked for it.",
+      Tools.schema().document().str( "connection", "Connection name", true )
+        .str( "sql", "The query. The document's ${VARIABLES} are substituted", true )
+        .integer( "rows", "Maximum rows to return (default 50, max " + DbJdbc.MAX_FILAS + ")", false )
+        .bool( "allow_write", "Allows INSERT/UPDATE/DELETE/CREATE... (executed and committed)", false )
+        .integer( "timeout_s", "Maximum seconds (default " + DbJdbc.TIMEOUT_CONSULTA_S + ")", false ).build(),
       a -> {
         final String sql = Tools.str( a, "sql" );
-        final int filas = Math.max( 1, Math.min( DbJdbc.MAX_FILAS, Tools.optInt( a, "filas", 50 ) ) );
-        final boolean escribir = Tools.optBool( a, "permitir_escritura", false );
+        final int filas = Math.max( 1, Math.min( DbJdbc.MAX_FILAS, Tools.optInt( a, "rows", 50 ) ) );
+        final boolean escribir = Tools.optBool( a, "allow_write", false );
         if ( !escribir && DbJdbc.motivoNoLectura( sql ) != null ) { // antes de tocar el documento
-          throw new ToolError( "consultar_sql es de solo lectura: " + DbJdbc.motivoNoLectura( sql ) + ". Si el "
-            + "usuario pidio modificar la base, repeti con permitir_escritura=true." );
+          throw new ToolError( "run_sql is read-only: " + DbJdbc.motivoNoLectura( sql ) + ". If the user asked "
+            + "to modify the database, repeat with allow_write=true." );
         }
-        final Copia c = copia( a, Tools.str( a, "conexion" ) );
+        final Copia c = copia( a, Tools.str( a, "connection" ) );
         final String sustituido = c.vars.environmentSubstitute( sql );
         final String motivo = DbJdbc.motivoNoLectura( sustituido ); // de nuevo: una ${VARIABLE} puede traer SQL
         if ( motivo != null && !escribir ) {
-          throw new ToolError( "consultar_sql es de solo lectura y, con las variables reemplazadas, la consulta no lo "
-            + "es: " + motivo + "." );
+          throw new ToolError( "run_sql is read-only and, once the variables are substituted, the query is not: "
+            + motivo + "." );
         }
         final String limpio = DbJdbc.sinPuntoYComaFinal( sustituido );
         return DbJdbc.conConexion( c.db, c.vars, timeout( a, DbJdbc.TIMEOUT_CONSULTA_S ),
           db -> motivo == null ? DbJdbc.consultar( db, limpio, filas ) : DbJdbc.ejecutar( db, limpio ) );
       } ) );
 
-    s.add( Tools.tool( "parametros",
-      "Parametros con nombre de la transformacion o job (nombre, valor por defecto, descripcion). Usala antes "
-        + "de usar ${PARAM} en un step o de ejecutar con parametros.",
-      Tools.schema().documento().build(),
+    s.add( Tools.tool( "list_parameters",
+      "Named parameters of the transformation or job (name, default value, description). Use it before using "
+        + "${PARAM} in a step or running with parameters.",
+      Tools.schema().document().build(),
       a -> Docs.ui( () -> parametros( Docs.resolver( a ) ) ) ) );
 
-    s.add( Tools.tool( "definir_parametro",
-      "Crea un parametro del documento, o cambia el valor por defecto o la descripcion si ya existe (lo que no "
-        + "pases queda igual). Usala cuando un step va a usar ${NOMBRE} y no esta definido.",
-      Tools.schema().documento().str( "nombre", "Nombre del parametro, sin ${}", true )
-        .str( "por_defecto", "Valor por defecto", false )
-        .str( "descripcion", "Descripcion", false ).build(),
+    s.add( Tools.tool( "set_parameter",
+      "Creates a document parameter, or changes its default value or description if it already exists (what "
+        + "you do not pass stays the same). Use it when a step is going to use ${NAME} and it is not defined.",
+      Tools.schema().document().str( "name", "Parameter name, without ${}", true )
+        .str( "default", "Default value", false )
+        .str( "description", "Description", false ).build(),
       a -> Docs.ui( () -> {
         AbstractMeta m = Docs.resolver( a );
-        JsonNode pd = a.get( "por_defecto" );
-        JsonNode de = a.get( "descripcion" );
+        JsonNode pd = a.get( "default" );
+        JsonNode de = a.get( "description" );
         ObjectNode o = definirParametro( m, nombreParametro( a ),
           pd == null || pd.isNull() ? null : pd.asText(), de == null || de.isNull() ? null : de.asText() );
         Docs.touched( m );
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "borrar_parametro",
-      "Quita un parametro del documento (los ${NOMBRE} que lo usen quedan sin valor).",
-      Tools.schema().documento().str( "nombre", "Nombre del parametro", true ).build(),
+    s.add( Tools.tool( "delete_parameter",
+      "Removes a parameter from the document (any ${NAME} that uses it is left without a value).",
+      Tools.schema().document().str( "name", "Parameter name", true ).build(),
       a -> Docs.ui( () -> {
         AbstractMeta m = Docs.resolver( a );
         String n = nombreParametro( a );
         borrarParametro( m, n );
         Docs.touched( m );
-        return "Parametro '" + n + "' borrado";
+        return "Parameter '" + n + "' deleted";
       } ) ) );
   }
 
@@ -261,26 +261,26 @@ final class DbTools {
       }
       ObjectNode o = out.addObject();
       o.put( "id", id );
-      o.put( "nombre", nombre );
+      o.put( "name", nombre );
       if ( di.getDefaultDatabasePort() > 0 ) {
-        o.put( "puerto", di.getDefaultDatabasePort() );
+        o.put( "port", di.getDefaultDatabasePort() );
       }
       if ( driver != null && !driver.isEmpty() ) {
         o.put( "driver", driver );
       }
       if ( disp != null ) {
-        o.put( "driver_disponible", disp );
+        o.put( "driver_available", disp );
         if ( !disp ) {
           o.put( "jar", jarSugerido( id ) );
         }
       }
       try {
-        ArrayNode acc = o.putArray( "accesos" );
+        ArrayNode acc = o.putArray( "access_types" );
         for ( int t : di.getAccessTypeList() ) {
           acc.add( DatabaseMeta.getAccessTypeDesc( t ) );
         }
       } catch ( Throwable ignored ) {
-        o.remove( "accesos" );
+        o.remove( "access_types" );
       }
     }
     return out;
@@ -290,7 +290,7 @@ final class DbTools {
   static String jarSugerido( String id ) {
     String u = id == null ? "" : id.toUpperCase( Locale.ROOT );
     if ( u.equals( "MYSQL" ) ) {
-      return "el conector MySQL (mysql-connector-j-8.x.jar, de dev.mysql.com o Maven Central)";
+      return "the MySQL connector (mysql-connector-j-8.x.jar, from dev.mysql.com or Maven Central)";
     }
     if ( u.equals( "MARIADB" ) ) {
       return "mariadb-java-client-x.jar (Maven Central)";
@@ -299,12 +299,12 @@ final class DbTools {
       return "mssql-jdbc-x.jre8.jar (Microsoft JDBC Driver for SQL Server)";
     }
     if ( u.equals( "MSSQL" ) ) {
-      return "jtds-1.3.1.jar (o usa el tipo MSSQLNATIVE con mssql-jdbc)";
+      return "jtds-1.3.1.jar (or use the MSSQLNATIVE type with mssql-jdbc)";
     }
     if ( u.startsWith( "ORACLE" ) ) {
       return "ojdbc8.jar (Oracle)";
     }
-    return "el .jar del driver JDBC de esa base";
+    return "the JDBC driver .jar for that database";
   }
 
   /** Carga (sin inicializar) la clase del driver con el classloader del plugin de base. null = no aplica. */
@@ -339,18 +339,18 @@ final class DbTools {
   /** Ficha de una conexion, sin contrasenia. */
   static ObjectNode ficha( DatabaseMeta d ) {
     ObjectNode o = Tools.obj();
-    o.put( "nombre", d.getName() );
-    o.put( "tipo", d.getPluginId() );
-    o.put( "acceso", d.getAccessTypeDesc() );
+    o.put( "name", d.getName() );
+    o.put( "type", d.getPluginId() );
+    o.put( "access", d.getAccessTypeDesc() );
     putSiHay( o, "host", d.getHostname() );
     String p = d.getDatabasePortNumberString();
     if ( p != null && !p.isEmpty() && !"-1".equals( p ) ) {
-      o.put( "puerto", p );
+      o.put( "port", p );
     }
-    putSiHay( o, "base", d.getDatabaseName() );
-    putSiHay( o, "usuario", d.getUsername() );
+    putSiHay( o, "database", d.getDatabaseName() );
+    putSiHay( o, "user", d.getUsername() );
     if ( d.getExtraOptions() != null && !d.getExtraOptions().isEmpty() ) {
-      ObjectNode op = o.putObject( "opciones" );
+      ObjectNode op = o.putObject( "options" );
       String pref = d.getPluginId() + ".";
       for ( Map.Entry<String, String> e : new TreeMap<String, String>( d.getExtraOptions() ).entrySet() ) {
         String k = e.getKey().startsWith( pref ) ? e.getKey().substring( pref.length() ) : e.getKey();
@@ -360,7 +360,7 @@ final class DbTools {
       }
     }
     if ( d.isShared() ) {
-      o.put( "compartida", true );
+      o.put( "shared", true );
     }
     return o;
   }
@@ -372,7 +372,7 @@ final class DbTools {
       ObjectNode o = ficha( d );
       List<String> usos = usos( m, d );
       if ( !usos.isEmpty() ) {
-        ArrayNode u = o.putArray( "usada_por" );
+        ArrayNode u = o.putArray( "used_by" );
         for ( String x : usos ) {
           u.add( x );
         }
@@ -397,7 +397,7 @@ final class DbTools {
         }
       }
       if ( mismo( tm.getMaxDateConnection(), d ) ) {
-        out.add( "(fecha maxima de la transformacion)" );
+        out.add( "(transformation max date)" );
       }
       logs( tm.getLogTables(), d, out );
     } else if ( m instanceof JobMeta ) {
@@ -424,7 +424,7 @@ final class DbTools {
     for ( LogTableInterface lt : tablas ) {
       try {
         if ( mismo( lt.getDatabaseMeta(), d ) ) {
-          out.add( "(tabla de log " + lt.getLogTableType() + ")" );
+          out.add( "(log table " + lt.getLogTableType() + ")" );
         }
       } catch ( Throwable ignored ) {
         // tabla de log sin conexion
@@ -450,26 +450,26 @@ final class DbTools {
   /** Arma el DatabaseMeta a partir de los argumentos (no toca el documento). */
   static DatabaseMeta construir( JsonNode a ) throws ToolError {
     String xml = Tools.optStr( a, "xml", null );
-    String nombre = Tools.optStr( a, "nombre", null );
+    String nombre = Tools.optStr( a, "name", null );
     DatabaseMeta d;
     if ( xml != null ) {
       try {
         d = new DatabaseMeta( xml.trim() );
       } catch ( KettleXMLException e ) {
-        throw new ToolError( "El <connection> no se pudo leer: " + e.getMessage().trim() );
+        throw new ToolError( "The <connection> could not be read: " + e.getMessage().trim() );
       }
       if ( nombre != null ) {
         d.setName( nombre );
       }
       if ( d.getName() == null || d.getName().trim().isEmpty() ) {
-        throw new ToolError( "La conexion no tiene nombre: pasa 'nombre' o <name> en el XML" );
+        throw new ToolError( "The connection has no name: pass 'name' or put <name> in the XML" );
       }
     } else {
       if ( nombre == null ) {
-        throw new ToolError( "Falta el argumento 'nombre'" );
+        throw new ToolError( "Missing argument 'name'" );
       }
-      DatabaseInterface di = tipo( Tools.str( a, "tipo" ) );
-      String acceso = Tools.optStr( a, "acceso", "Native" );
+      DatabaseInterface di = tipo( Tools.str( a, "type" ) );
+      String acceso = Tools.optStr( a, "access", "Native" );
       int at = DatabaseMeta.getAccessType( acceso );
       boolean ok = false;
       List<String> validos = new ArrayList<String>();
@@ -478,17 +478,18 @@ final class DbTools {
         validos.add( DatabaseMeta.getAccessTypeDesc( t ) );
       }
       if ( !ok ) {
-        throw new ToolError( "El tipo " + di.getPluginId() + " no admite acceso '" + acceso + "'. Validos: " + validos );
+        throw new ToolError( "Type " + di.getPluginId() + " does not support access '" + acceso + "'. Valid: "
+          + validos );
       }
       String host = Tools.optStr( a, "host", "" );
-      String puerto = Tools.optStr( a, "puerto", null );
+      String puerto = Tools.optStr( a, "port", null );
       if ( puerto == null ) {
         puerto = !host.isEmpty() && di.getDefaultDatabasePort() > 0 ? String.valueOf( di.getDefaultDatabasePort() ) : "";
       }
       d = new DatabaseMeta( nombre, di.getPluginId(), DatabaseMeta.getAccessTypeDesc( at ), host,
-        Tools.str( a, "base" ), puerto, Tools.optStr( a, "usuario", "" ), optCrudo( a, "password" ) );
+        Tools.str( a, "database" ), puerto, Tools.optStr( a, "user", "" ), optCrudo( a, "password" ) );
     }
-    JsonNode op = a.get( "opciones" );
+    JsonNode op = a.get( "options" );
     if ( op != null && op.isObject() ) {
       for ( Iterator<Map.Entry<String, JsonNode>> it = op.fields(); it.hasNext(); ) {
         Map.Entry<String, JsonNode> e = it.next();
@@ -496,7 +497,7 @@ final class DbTools {
           : e.getValue().toString() );
       }
     }
-    JsonNode at = a.get( "atributos" );
+    JsonNode at = a.get( "attributes" );
     if ( at != null && at.isObject() ) {
       for ( Iterator<Map.Entry<String, JsonNode>> it = at.fields(); it.hasNext(); ) {
         Map.Entry<String, JsonNode> e = it.next();
@@ -528,8 +529,8 @@ final class DbTools {
         parecidos.add( e.getKey() );
       }
     }
-    throw new ToolError( "No hay un tipo de base '" + t + "'." + ( parecidos.isEmpty() ? "" : " Quizas: " + parecidos
-      + "." ) + " Mira tipos_de_base." );
+    throw new ToolError( "There is no database type '" + t + "'." + ( parecidos.isEmpty() ? "" : " Maybe: " + parecidos
+      + "." ) + " See list_database_types." );
   }
 
   /**
@@ -557,31 +558,31 @@ final class DbTools {
     }
     DBCache.getInstance().clear( puesta.getName() );
     ObjectNode o = ficha( puesta );
-    o.put( "reemplazada", antes != null );
+    o.put( "replaced", antes != null );
     if ( antes != null ) {
       List<String> usos = usos( m, puesta );
       if ( !usos.isEmpty() ) {
-        ArrayNode u = o.putArray( "usada_por" );
+        ArrayNode u = o.putArray( "used_by" );
         for ( String x : usos ) {
           u.add( x );
         }
       }
     }
     if ( compartida ) {
-      o.put( "aviso", "Era una conexion compartida (shared.xml): si el usuario guarda desde Spoon, el cambio puede "
-        + "escribirse tambien en shared.xml" );
+      o.put( "warning", "It was a shared connection (shared.xml): if the user saves from Spoon, the change may "
+        + "also be written to shared.xml" );
     }
     Boolean disp = driverDisponible( puesta );
     if ( Boolean.FALSE.equals( disp ) ) {
-      o.put( "driver_disponible", false );
-      o.put( "falta_driver", "No esta instalado el driver JDBC de " + puesta.getPluginId() + ": copia "
-        + jarSugerido( puesta.getPluginId() ) + " a data-integration/lib y reinicia Spoon" );
+      o.put( "driver_available", false );
+      o.put( "missing_driver", "The JDBC driver for " + puesta.getPluginId() + " is not installed: copy "
+        + jarSugerido( puesta.getPluginId() ) + " to data-integration/lib and restart Spoon" );
     }
     String archivo = DbJdbc.avisoArchivo( puesta );
     if ( archivo != null ) {
-      o.put( "aviso_archivo", archivo );
+      o.put( "file_warning", archivo );
     }
-    o.put( "deshacer", deshacer );
+    o.put( "undoable", deshacer );
     return o;
   }
 
@@ -590,7 +591,8 @@ final class DbTools {
     DatabaseMeta d = buscarConexion( m, nombre );
     List<String> usos = usos( m, d );
     if ( !usos.isEmpty() ) {
-      throw new ToolError( "La conexion '" + d.getName() + "' la usan: " + usos + ". Cambia o borra esos steps antes." );
+      throw new ToolError( "Connection '" + d.getName() + "' is used by: " + usos + ". Change or delete those steps "
+        + "first." );
     }
     int idx = m.indexOfDatabase( d );
     m.removeDatabase( idx );
@@ -598,17 +600,17 @@ final class DbTools {
       spoon.addUndoDelete( m, new Object[] { d }, new int[] { idx } );
     }
     DBCache.getInstance().clear( d.getName() );
-    return "Conexion '" + d.getName() + "' borrada" + ( d.isShared() ? " de este documento (es compartida: sigue en "
-      + "shared.xml y vuelve a aparecer al reabrir)" : "" );
+    return "Connection '" + d.getName() + "' deleted" + ( d.isShared() ? " from this document (it is shared: it "
+      + "stays in shared.xml and comes back when the document is reopened)" : "" );
   }
 
   static DatabaseMeta buscarConexion( AbstractMeta m, String nombre ) throws ToolError {
     DatabaseMeta d = m.findDatabase( nombre.trim() );
     if ( d == null ) {
       String[] hay = m.getDatabaseNames();
-      throw new ToolError( "No hay ninguna conexion '" + nombre + "' en '" + Docs.nombre( m ) + "'. "
-        + ( hay.length == 0 ? "El documento no tiene conexiones: crea una con agregar_conexion."
-          : "Hay: " + java.util.Arrays.toString( hay ) ) );
+      throw new ToolError( "There is no connection '" + nombre + "' in '" + Docs.nombre( m ) + "'. "
+        + ( hay.length == 0 ? "The document has no connections: create one with add_connection."
+          : "Available: " + java.util.Arrays.toString( hay ) ) );
     }
     return d;
   }
@@ -653,10 +655,10 @@ final class DbTools {
     ArrayNode out = Tools.arr();
     for ( String p : m.listParameters() ) {
       ObjectNode o = out.addObject();
-      o.put( "nombre", p );
-      o.put( "por_defecto", m.getParameterDefault( p ) );
-      putSiHay( o, "descripcion", m.getParameterDescription( p ) );
-      putSiHay( o, "valor", m.getParameterValue( p ) );
+      o.put( "name", p );
+      o.put( "default", m.getParameterDefault( p ) );
+      putSiHay( o, "description", m.getParameterDescription( p ) );
+      putSiHay( o, "value", m.getParameterValue( p ) );
     }
     return out;
   }
@@ -684,10 +686,10 @@ final class DbTools {
     }
     m.activateParameters();
     ObjectNode o = Tools.obj();
-    o.put( "nombre", existia ? clave : nombre );
-    o.put( "por_defecto", m.getParameterDefault( existia ? clave : nombre ) );
-    putSiHay( o, "descripcion", m.getParameterDescription( existia ? clave : nombre ) );
-    o.put( "creado", !existia );
+    o.put( "name", existia ? clave : nombre );
+    o.put( "default", m.getParameterDefault( existia ? clave : nombre ) );
+    putSiHay( o, "description", m.getParameterDescription( existia ? clave : nombre ) );
+    o.put( "created", !existia );
     return o;
   }
 
@@ -695,7 +697,7 @@ final class DbTools {
     Map<String, String[]> todos = leerParametros( m );
     String clave = claveExistente( todos, nombre );
     if ( clave == null ) {
-      throw new ToolError( "No hay ningun parametro '" + nombre + "'. Hay: " + todos.keySet() );
+      throw new ToolError( "There is no parameter '" + nombre + "'. Available: " + todos.keySet() );
     }
     todos.remove( clave );
     reescribirParametros( m, todos );
@@ -737,14 +739,14 @@ final class DbTools {
   }
 
   private static String nombreParametro( JsonNode a ) throws ToolError {
-    String n = Tools.str( a, "nombre" ).trim();
+    String n = Tools.str( a, "name" ).trim();
     if ( n.startsWith( "${" ) && n.endsWith( "}" ) ) {
       n = n.substring( 2, n.length() - 1 ).trim();
     } else if ( n.startsWith( "%%" ) && n.endsWith( "%%" ) && n.length() > 4 ) {
       n = n.substring( 2, n.length() - 2 ).trim();
     }
     if ( n.isEmpty() ) {
-      throw new ToolError( "El nombre del parametro esta vacio" );
+      throw new ToolError( "The parameter name is empty" );
     }
     return n;
   }
@@ -772,7 +774,7 @@ final class DbTools {
   }
 
   private static int timeout( JsonNode a, int def ) throws ToolError {
-    return Math.max( 1, Math.min( 600, Tools.optInt( a, "timeout_seg", def ) ) );
+    return Math.max( 1, Math.min( 600, Tools.optInt( a, "timeout_s", def ) ) );
   }
 
   private static String sinComillas( String s ) {

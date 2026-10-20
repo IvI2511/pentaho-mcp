@@ -57,7 +57,7 @@ final class TransLote {
     String after;
     Integer x;
     Integer y;
-    /** copiar / repartir (ya traducido), o null. */
+    /** copy / distribute (normalizado por modo()), o null. */
     String modo;
 
     String etiqueta() {
@@ -214,14 +214,14 @@ final class TransLote {
     return s == null ? null : ( k.equals( "config_xml" ) ? s : s.trim() );
   }
 
-  /** copy/distribute (o copiar/repartir) a lo que entiende TransOps.aplicarModoSalida; null si no. */
+  /** copy/distribute (sin distinguir mayusculas) a lo que entiende TransOps.aplicarModoSalida; null si no. */
   static String modo( String m ) {
     String s = m.trim().toLowerCase( Locale.ROOT );
-    if ( s.equals( "copy" ) || s.equals( "copiar" ) ) {
-      return "copiar";
+    if ( s.equals( "copy" ) ) {
+      return "copy";
     }
-    if ( s.equals( "distribute" ) || s.equals( "repartir" ) || s.equals( "round_robin" ) ) {
-      return "repartir";
+    if ( s.equals( "distribute" ) ) {
+      return "distribute";
     }
     return null;
   }
@@ -243,13 +243,13 @@ final class TransLote {
         problemas.add( et + ": missing 'name'" );
       } else if ( tm.findStep( p.name ) != null ) {
         problemas.add( et + ": a step named '" + tm.findStep( p.name ).getName()
-          + "' already exists in the transformation (use configurar_step to change it)" );
+          + "' already exists in the transformation (use configure_step to change it)" );
       } else if ( vistos.containsKey( clave( p.name ) ) ) {
         problemas.add( et + ": name repeated in this batch (also " + vistos.get( clave( p.name ) ).etiqueta() + ")" );
       }
       PluginInterface plugin = null;
       if ( p.type == null || p.type.isEmpty() ) {
-        problemas.add( et + ": missing 'type' (step type id from tipos_de_step, e.g. CsvInput)" );
+        problemas.add( et + ": missing 'type' (step type id from list_step_types, e.g. CsvInput)" );
       } else {
         try {
           plugin = TransOps.plugin( p.type );
@@ -540,7 +540,7 @@ final class TransLote {
   }
 
   /**
-   * Lo mismo que agregar_step hace con el step previo: el modo de salida pedido o, sin pedido, copiar
+   * Lo mismo que add_step hace con el step previo: el modo de salida pedido o, sin pedido, copiar
    * si quedo con 2+ salidas. Recuerda los que pasaron a copiar solos, para avisarlo.
    */
   private static void modoSalida( Ejecucion e, Lote l, StepMeta s ) throws ToolError {
@@ -582,7 +582,7 @@ final class TransLote {
           : "copy (every output gets all rows)" );
         if ( e.aCopiar.contains( s ) ) {
           t += ", set automatically; to split the rows instead "
-            + ( e.creados.contains( s ) ? "give it output_mode='distribute'" : "use the modo_salida tool" );
+            + ( e.creados.contains( s ) ? "give it output_mode='distribute'" : "use set_output_mode" );
         }
         notas.add( t + "." );
       }

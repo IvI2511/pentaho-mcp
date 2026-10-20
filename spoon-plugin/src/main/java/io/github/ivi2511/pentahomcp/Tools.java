@@ -1,5 +1,7 @@
 package io.github.ivi2511.pentahomcp;
 
+import java.util.Locale;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -14,8 +16,8 @@ import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
  * Uso tipico, en cada *Tools.register(server):
  *
  * <pre>
- * s.add( Tools.tool( "mover_step", "Mueve un step a otra posicion del lienzo.",
- *   Tools.schema().documento().str( "step", "Nombre del step", true ).integer( "x", "...", true ).build(),
+ * s.add( Tools.tool( "move_step", "Moves a step to another position on the canvas.",
+ *   Tools.schema().document().str( "step", "Step name", true ).integer( "x", "...", true ).build(),
  *   a -> { ... return resumen; } ) );
  * </pre>
  */
@@ -117,10 +119,10 @@ final class Tools {
       return this;
     }
 
-    /** El argumento opcional "documento" que aceptan casi todas las herramientas. */
-    Schema documento() {
-      return str( "documento", "Transformacion o job sobre el que se trabaja: su id (T1, J2... de 'estado'), "
-        + "la ruta o el nombre del archivo, o el nombre de la pestania. Si se omite, la pestania activa.", false );
+    /** El argumento opcional "document" que aceptan casi todas las herramientas. */
+    Schema document() {
+      return str( "document", "Transformation or job to work on: its id (T1, J2... from 'status'), "
+        + "the file path or file name, or the tab name. If omitted, the active tab.", false );
     }
 
     ObjectNode build() {
@@ -136,7 +138,7 @@ final class Tools {
   static String str( JsonNode a, String k ) throws ToolError {
     JsonNode v = a.get( k );
     if ( v == null || v.isNull() || v.asText().trim().isEmpty() ) {
-      throw new ToolError( "Falta el argumento '" + k + "'" );
+      throw new ToolError( "Missing argument '" + k + "'" );
     }
     return v.isTextual() ? v.asText() : v.toString();
   }
@@ -153,7 +155,7 @@ final class Tools {
   static int integer( JsonNode a, String k ) throws ToolError {
     Integer v = optInteger( a, k );
     if ( v == null ) {
-      throw new ToolError( "Falta el argumento entero '" + k + "'" );
+      throw new ToolError( "Missing integer argument '" + k + "'" );
     }
     return v;
   }
@@ -169,7 +171,7 @@ final class Tools {
     try {
       return Integer.parseInt( v.asText().trim() );
     } catch ( NumberFormatException e ) {
-      throw new ToolError( "'" + k + "' tiene que ser un numero entero, llego: " + v );
+      throw new ToolError( "'" + k + "' must be an integer, got: " + v );
     }
   }
 
@@ -186,8 +188,8 @@ final class Tools {
     if ( v.isBoolean() ) {
       return v.asBoolean();
     }
-    String s = v.asText().trim().toLowerCase();
-    return s.equals( "true" ) || s.equals( "si" ) || s.equals( "y" ) || s.equals( "1" );
+    String s = v.asText().trim().toLowerCase( Locale.ROOT );
+    return s.equals( "true" ) || s.equals( "yes" ) || s.equals( "y" ) || s.equals( "1" ) || s.equals( "si" );
   }
 
   static ObjectNode obj() {

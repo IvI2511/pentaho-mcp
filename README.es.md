@@ -218,8 +218,9 @@ herramientas en inglés y el catálogo de steps como recursos MCP. Detalle en
 | Regenerar el catálogo de steps | `bash tools/generador-catalogo/generar.sh <data-integration>` |
 | Diseño interno (API de Spoon, hilos, diálogos a evitar) | [`docs/api-spoon.md`](docs/api-spoon.md) |
 
-Las contribuciones son bienvenidas: mirá [`CONTRIBUTING.md`](CONTRIBUTING.md). La skill y la
-documentación interna están en español; la ficha del plugin y la documentación para usuarios, en inglés.
+Las contribuciones son bienvenidas: mirá [`CONTRIBUTING.md`](CONTRIBUTING.md). La documentación interna
+y los comentarios del código están en español; la skill, las herramientas MCP, la ficha del plugin y la
+documentación para usuarios, en inglés.
 
 ## Licencia
 

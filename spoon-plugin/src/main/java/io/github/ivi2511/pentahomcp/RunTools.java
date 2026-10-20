@@ -4,6 +4,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -48,112 +49,121 @@ final class RunTools {
 
   static void register( McpHttpServer s ) {
 
-    s.add( Tools.tool( "campos_step",
-      "Que campos (nombre, tipo, longitud, precision, formato y step de origen) SALEN de un step, o con "
-        + "lado='entrada' cuales le LLEGAN (mas los de sus streams de busqueda en lookups). Usala antes de "
-        + "configurar el step siguiente, para escribir nombres de campo que existan. No ejecuta nada.",
-      Tools.schema().documento()
-        .str( "step", "Nombre del step", true )
-        .strEnum( "lado", "salida (por defecto) o entrada", false, "salida", "entrada" ).build(),
+    s.add( Tools.tool( "get_step_fields",
+      "Which fields (name, type, length, precision, format and origin step) come OUT of a step, or with "
+        + "side='input' which ones come IN to it (plus the fields of its info streams, for lookups). Use it before "
+        + "configuring the next step, so you write field names that exist. Runs nothing.",
+      Tools.schema().document()
+        .str( "step", "Step name", true )
+        .strEnum( "side", "output (default) or input", false, "output", "input" ).build(),
       a -> {
         final String step = Tools.str( a, "step" );
-        final boolean entrada = "entrada".equals( Tools.optStr( a, "lado", "salida" ) );
+        final String lado = Tools.optStr( a, "side", "output" ).trim().toLowerCase( Locale.ROOT );
+        if ( !lado.equals( "output" ) && !lado.equals( "input" ) ) {
+          throw new ToolError( "'side' must be 'output' or 'input', got: " + lado );
+        }
+        final boolean entrada = lado.equals( "input" );
         final Copia c = copia( a, true );
         ObjectNode o = RunMotor.enSegundoPlano( () -> RunMotor.camposStep( (TransMeta) c.meta, step, entrada ),
-          MS_CAMPOS, null, "El calculo de campos" );
+          MS_CAMPOS, null, "Computing the fields" );
         return RunMotor.json( o );
       } ) );
 
-    s.add( Tools.tool( "validar",
-      "Valida la transformacion (checkSteps) o el job (checkJobEntries) como 'Verificar' de Spoon, sin abrir "
-        + "dialogos, y suma chequeos propios: steps sin hops, hops deshabilitados, plugins que faltan, entradas "
-        + "de job que no se alcanzan desde START. Devuelve errores y advertencias agrupados por step "
-        + "(detalle=true agrega los OK y comentarios). Usala despues de una tanda de cambios y antes de ejecutar.",
-      Tools.schema().documento()
-        .bool( "detalle", "Incluir tambien los resultados OK y los comentarios (por defecto false)", false ).build(),
+    s.add( Tools.tool( "validate",
+      "Validates the transformation (checkSteps) or the job (checkJobEntries) like Spoon's 'Verify', without "
+        + "opening dialogs, and adds its own checks: steps without hops, disabled hops, missing plugins, steps with "
+        + "several outputs in distribute mode, job entries that cannot be reached from START. Returns errors and "
+        + "warnings grouped by step (detail=true adds the OK results and comments). Use it after a batch of changes "
+        + "and before running.",
+      Tools.schema().document()
+        .bool( "detail", "Also include the OK results and the comments (default false)", false ).build(),
       a -> {
-        final boolean detalle = Tools.optBool( a, "detalle", false );
+        final boolean detalle = Tools.optBool( a, "detail", false );
         final Copia c = copia( a, false );
         ObjectNode o = RunMotor.enSegundoPlano(
-          () -> RunMotor.validar( c.meta, detalle, c.rep, c.meta.getMetaStore() ), MS_VALIDAR, null, "La validacion" );
+          () -> RunMotor.validar( c.meta, detalle, c.rep, c.meta.getMetaStore() ), MS_VALIDAR, null, "The validation" );
         ObjectNode r = Tools.obj();
-        r.put( "documento", c.id );
+        r.put( "document", c.id );
         r.setAll( o );
         return RunMotor.json( r );
       } ) );
 
     s.add( Tools.tool( "preview_step",
-      "Muestra las primeras filas que SALEN de un step, ejecutando en segundo plano (sin dialogos y sin tocar "
-        + "el documento) una copia con SOLO ese step y los que le llegan por hops; los steps de mas adelante no "
-        + "corren, asi que no se escriben sus archivos ni tablas. Si el step pedido o uno anterior es una salida, "
-        + "esa si escribe (se avisa). No hace falta guardar antes. Devuelve campos, filas formateadas, errores, "
-        + "metricas por step y el log si hubo errores. Usala para comprobar cada step mientras armas.",
-      Tools.schema().documento()
-        .str( "step", "Nombre del step a previsualizar", true )
-        .integer( "filas", "Cuantas filas traer (por defecto 20, maximo 1000)", false )
-        .integer( "timeout_s", "Corta la ejecucion a los N segundos (por defecto 60, maximo 600)", false ).build(),
+      "Shows the first rows that come OUT of a step, by running in the background (no dialogs, without touching "
+        + "the document) a copy with ONLY that step and the steps that feed it through hops; the steps further "
+        + "ahead do not run, so their files and tables are not written. If the requested step or an upstream one is "
+        + "an output, that one does write (you get a warning). No need to save first. Returns fields, formatted "
+        + "rows, errors, metrics per step and the log if there were errors. Use it to check each step as you build.",
+      Tools.schema().document()
+        .str( "step", "Name of the step to preview", true )
+        .integer( "rows", "How many rows to fetch (default 20, max 1000)", false )
+        .integer( "timeout_s", "Stop the run after N seconds (default 60, max 600)", false ).build(),
       a -> {
         final String step = Tools.str( a, "step" );
-        final int filas = Math.max( 1, Math.min( 1000, Tools.optInt( a, "filas", 20 ) ) );
+        final int filas = Math.max( 1, Math.min( 1000, Tools.optInt( a, "rows", 20 ) ) );
         final int timeout = Math.max( 1, Math.min( 600, Tools.optInt( a, "timeout_s", 60 ) ) );
         final Copia c = copia( a, true );
         // el propio preview corta a los timeout_s; el margen es para el stopAll y el armado
         ObjectNode o = RunMotor.enSegundoPlano(
           () -> RunMotor.preview( (TransMeta) c.meta, step, filas, timeout * 1000L ), timeout * 1000L + 30000, null,
-          "El preview" );
+          "The preview" );
         ObjectNode r = Tools.obj();
-        r.put( "documento", c.id );
+        r.put( "document", c.id );
         r.setAll( o );
         return RunMotor.json( r );
       } ) );
 
-    s.add( Tools.tool( "ejecutar",
-      "Ejecuta la transformacion o el job ENTERO. modo='visible' (por defecto): como apretar Run en Spoon, el "
-        + "usuario ve las metricas y el log en la GUI; guarda antes si hay cambios (guardar_antes) y necesita que "
-        + "el documento tenga archivo. Espera hasta esperar_s y devuelve el estado; si sigue corriendo, segui con "
-        + "estado_ejecucion o detener. modo='segundo_plano': corre una copia en la JVM sin GUI (no hace falta "
-        + "guardar) y la corta si pasa esperar_s. En los dos modos se ESCRIBEN DE VERDAD las salidas (archivos, "
-        + "tablas). Para solo mirar filas usa preview_step.",
-      Tools.schema().documento()
-        .strEnum( "modo", "visible (por defecto) o segundo_plano", false, "visible", "segundo_plano" )
-        .integer( "esperar_s", "Segundos a esperar el final (por defecto 60, maximo 600)", false )
-        .bool( "guardar_antes", "Modo visible: guardar en su archivo si hay cambios (por defecto true)", false )
+    s.add( Tools.tool( "run",
+      "Runs the WHOLE transformation or job. mode='visible' (default): like pressing Run in Spoon, the user sees "
+        + "the metrics and the log in the GUI; it saves first if there are changes (save_first) and the document "
+        + "needs a file. Waits up to wait_s and returns the state; if it is still running, follow up with "
+        + "get_run_status or stop_run. mode='background': runs a copy in the JVM without GUI (no need to save) and "
+        + "stops it if it goes past wait_s. In both modes the outputs are REALLY WRITTEN (files, tables). To just "
+        + "look at rows, use preview_step.",
+      Tools.schema().document()
+        .strEnum( "mode", "visible (default) or background", false, "visible", "background" )
+        .integer( "wait_s", "Seconds to wait for the end (default 60, max 600)", false )
+        .bool( "save_first", "Visible mode: save to its file if there are changes (default true)", false )
         .build(),
       a -> {
-        final int espera = Math.max( 0, Math.min( 600, Tools.optInt( a, "esperar_s", 60 ) ) );
-        if ( "segundo_plano".equals( Tools.optStr( a, "modo", "visible" ) ) ) {
+        final int espera = Math.max( 0, Math.min( 600, Tools.optInt( a, "wait_s", 60 ) ) );
+        final String modo = Tools.optStr( a, "mode", "visible" ).trim().toLowerCase( Locale.ROOT );
+        if ( !modo.equals( "visible" ) && !modo.equals( "background" ) ) {
+          throw new ToolError( "'mode' must be 'visible' or 'background', got: " + modo );
+        }
+        if ( modo.equals( "background" ) ) {
           final Copia c = copia( a, false );
           ObjectNode o = RunMotor.enSegundoPlano( () -> c.meta instanceof TransMeta
               ? RunMotor.ejecutarTrans( (TransMeta) c.meta, espera * 1000L )
               : RunMotor.ejecutarJob( (JobMeta) c.meta, c.rep, espera * 1000L ),
-            espera * 1000L + 30000, null, "La ejecucion" );
+            espera * 1000L + 30000, null, "The run" );
           ObjectNode r = Tools.obj();
-          r.put( "documento", c.id );
-          r.put( "modo", "segundo_plano" );
+          r.put( "document", c.id );
+          r.put( "mode", "background" );
           if ( c.meta.getFilename() == null ) {
-            r.put( "aviso_archivo", "El documento no tiene archivo: ${Internal.Entry.Current.Directory} y las rutas "
-              + "relativas no apuntan a ningun lado" );
+            r.put( "file_warning", "The document has no file: ${Internal.Entry.Current.Directory} and relative "
+              + "paths point nowhere" );
           }
           r.setAll( o );
           return RunMotor.json( r );
         }
-        return RunMotor.json( ejecutarVisible( a, espera, Tools.optBool( a, "guardar_antes", true ) ) );
+        return RunMotor.json( ejecutarVisible( a, espera, Tools.optBool( a, "save_first", true ) ) );
       } ) );
 
-    s.add( Tools.tool( "estado_ejecucion",
-      "Estado de la ultima ejecucion visible (la del boton Run de Spoon) de una transformacion o job: si sigue "
-        + "corriendo, errores, metricas por step o resultado por entrada del job, y la cola del log. Usala cuando "
-        + "'ejecutar' devolvio que seguia corriendo, o para leer lo que corrio el usuario.",
-      Tools.schema().documento().build(),
+    s.add( Tools.tool( "get_run_status",
+      "State of the last visible run (the one from Spoon's Run button) of a transformation or job: whether it is "
+        + "still running, errors, metrics per step or result per job entry, and the tail of the log. Use it when "
+        + "'run' reported it was still running, or to read what the user ran.",
+      Tools.schema().document().build(),
       a -> {
         final Object[] g = Docs.ui( () -> corrida( Docs.resolver( a ) ) );
         return RunMotor.json( estado( g ) );
       } ) );
 
-    s.add( Tools.tool( "detener",
-      "Detiene la ejecucion visible (como el boton Stop de Spoon) de una transformacion o job y devuelve como "
-        + "quedo. No abre dialogos. Las corridas de preview_step y de modo segundo_plano se cortan solas por timeout.",
-      Tools.schema().documento().build(),
+    s.add( Tools.tool( "stop_run",
+      "Stops the visible run (like Spoon's Stop button) of a transformation or job and returns how it ended up. "
+        + "Opens no dialogs. Runs from preview_step and from mode='background' stop on their own by timeout.",
+      Tools.schema().document().build(),
       a -> {
         final Object[] g = Docs.ui( () -> {
           Object[] x = corrida( Docs.resolver( a ) );
@@ -187,7 +197,7 @@ final class RunTools {
         }
         ObjectNode o = estado( g );
         if ( !terminado( g ) ) {
-          o.put( "aviso", "Se pidio detener pero todavia hay steps/entradas terminando; consulta estado_ejecucion" );
+          o.put( "warning", "Stop was requested but some steps/entries are still finishing; check get_run_status" );
         }
         return RunMotor.json( o );
       } ) );
@@ -234,22 +244,22 @@ final class RunTools {
       AbstractMeta m = Docs.resolver( a ); // activa la pestania: Spoon ejecuta la activa
       String nombre = Docs.nombre( m );
       if ( m.getFilename() == null ) {
-        throw new ToolError( "'" + nombre + "' no tiene archivo y Spoon no ejecuta sin guardar: usa 'guardar' con una "
-          + "ruta ." + ( m instanceof JobMeta ? "kjb" : "ktr" ) + " (o ejecutar con modo='segundo_plano')" );
+        throw new ToolError( "'" + nombre + "' has no file and Spoon does not run unsaved documents: use 'save' with a "
+          + "." + ( m instanceof JobMeta ? "kjb" : "ktr" ) + " path (or run with mode='background')" );
       }
       if ( sp.getRepository() != null && m.getObjectId() == null ) {
-        throw new ToolError( "Spoon esta conectado a un repositorio y '" + nombre + "' es un archivo: el Run de Spoon "
-          + "abriria un dialogo. Usa modo='segundo_plano'." );
+        throw new ToolError( "Spoon is connected to a repository and '" + nombre + "' is a file: Spoon's Run would "
+          + "open a dialog. Use mode='background'." );
       }
       Object[] antes = corridaOpcional( m );
       if ( antes[ 1 ] != null && !terminado( antes ) ) {
-        throw new ToolError( "'" + nombre + "' ya se esta ejecutando. Usa estado_ejecucion para seguirla o detener." );
+        throw new ToolError( "'" + nombre + "' is already running. Use get_run_status to follow it, or stop_run." );
       }
       String guardado = null;
       if ( m.hasChanged() ) {
         if ( !guardarAntes ) {
-          throw new ToolError( "'" + nombre + "' tiene cambios sin guardar y Spoon no ejecuta sin guardar: usa "
-            + "'guardar' o pasa guardar_antes=true" );
+          throw new ToolError( "'" + nombre + "' has unsaved changes and Spoon does not run unsaved documents: use "
+            + "'save' or pass save_first=true" );
         }
         guardado = guardar( sp, m );
       }
@@ -259,7 +269,7 @@ final class RunTools {
         if ( m instanceof TransMeta ) {
           TransMeta tm = (TransMeta) m;
           if ( sp.getActiveTransGraph() == null || sp.getActiveTransGraph().getTransMeta() != tm ) {
-            throw new ToolError( "No se pudo activar la pestania de '" + nombre + "'" );
+            throw new ToolError( "Could not activate the tab of '" + nombre + "'" );
           }
           TransExecutionConfiguration cfg = sp.getTransExecutionConfiguration();
           LogLevel nivel = cfg != null && cfg.getLogLevel() != null ? cfg.getLogLevel() : LogLevel.BASIC;
@@ -269,7 +279,7 @@ final class RunTools {
         } else {
           JobMeta jm = (JobMeta) m;
           if ( sp.getActiveJobGraph() == null || sp.getActiveJobGraph().getJobMeta() != jm ) {
-            throw new ToolError( "No se pudo activar la pestania de '" + nombre + "'" );
+            throw new ToolError( "Could not activate the tab of '" + nombre + "'" );
           }
           sp.delegates.jobs.executeJob( jm, true, false, null, false, null, 0 ); // idem: sin ErrorDialog
         }
@@ -278,8 +288,8 @@ final class RunTools {
       }
       Object[] ahora = corridaOpcional( m );
       if ( ahora[ 1 ] == null || ahora[ 1 ] == antes[ 1 ] ) {
-        throw new ToolError( "Spoon no arranco la ejecucion de '" + nombre + "' (mira si quedo un dialogo abierto "
-          + "o el log de Spoon)" );
+        throw new ToolError( "Spoon did not start the run of '" + nombre + "' (check whether a dialog was left open, "
+          + "or Spoon's log)" );
       }
       return new Object[] { ahora[ 0 ], ahora[ 1 ], Docs.id( m ), guardado };
     } );
@@ -290,14 +300,14 @@ final class RunTools {
       RunMotor.dormir( 250 );
     }
     ObjectNode o = Tools.obj();
-    o.put( "documento", (String) g[ 2 ] );
-    o.put( "modo", "visible" );
+    o.put( "document", (String) g[ 2 ] );
+    o.put( "mode", "visible" );
     if ( g[ 3 ] != null ) {
-      o.put( "guardado_en", (String) g[ 3 ] );
+      o.put( "saved_to", (String) g[ 3 ] );
     }
     o.setAll( estado( g ) );
     if ( !terminado( g ) ) {
-      o.put( "aviso", "Sigue corriendo despues de " + espera + " s. Consulta estado_ejecucion o usa detener." );
+      o.put( "warning", "Still running after " + espera + " s. Check get_run_status or use stop_run." );
     }
     return o;
   }
@@ -306,7 +316,8 @@ final class RunTools {
   private static Object[] corrida( AbstractMeta m ) throws ToolError {
     Object[] x = corridaOpcional( m );
     if ( x[ 1 ] == null ) {
-      throw new ToolError( "'" + Docs.nombre( m ) + "' no se ejecuto en Spoon en esta sesion (ejecutar con modo visible)" );
+      throw new ToolError( "'" + Docs.nombre( m ) + "' has not been run in Spoon in this session (use run with "
+        + "mode='visible')" );
     }
     return x;
   }
@@ -317,13 +328,13 @@ final class RunTools {
     if ( m instanceof TransMeta ) {
       TransGraph tg = sp.delegates.trans.findTransGraphOfTransformation( (TransMeta) m );
       if ( tg == null ) {
-        throw new ToolError( "No encuentro el lienzo de '" + Docs.nombre( m ) + "'" );
+        throw new ToolError( "Cannot find the canvas of '" + Docs.nombre( m ) + "'" );
       }
       return new Object[] { tg, tg.getTrans() };
     }
     JobGraph jg = sp.delegates.jobs.findJobGraphOfJob( (JobMeta) m );
     if ( jg == null ) {
-      throw new ToolError( "No encuentro el lienzo de '" + Docs.nombre( m ) + "'" );
+      throw new ToolError( "Cannot find the canvas of '" + Docs.nombre( m ) + "'" );
     }
     return new Object[] { jg, jg.getJob() };
   }
@@ -362,7 +373,7 @@ final class RunTools {
   }
 
   /**
-   * Guarda en su archivo sin pasar por los dialogos de Spoon (igual que la herramienta 'guardar'). (UI)
+   * Guarda en su archivo sin pasar por los dialogos de Spoon (igual que la herramienta 'save'). (UI)
    */
   private static String guardar( Spoon sp, AbstractMeta m ) throws Exception {
     String archivo = m.getFilename();

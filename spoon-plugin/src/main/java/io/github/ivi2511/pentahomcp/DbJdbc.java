@@ -104,8 +104,8 @@ final class DbJdbc {
     try {
       return conConexionCruda( dm, vars, timeoutSeg, t );
     } catch ( TimeoutException e ) {
-      throw new ToolError( "La base '" + dm.getName() + "' no respondio en " + timeoutSeg + " s (" + destino( dm )
-        + "). Revisa que el servidor este levantado y accesible, o achica la consulta." );
+      throw new ToolError( "Database '" + dm.getName() + "' did not respond within " + timeoutSeg + " s ("
+        + destino( dm ) + "). Check that the server is up and reachable, or narrow the query." );
     } catch ( ExecutionException e ) {
       Throwable c = e.getCause();
       if ( c instanceof ToolError ) {
@@ -120,9 +120,9 @@ final class DbJdbc {
   /** Conecta y devuelve producto/version, o ok=false con un diagnostico legible. Nunca tira por la base. */
   static ObjectNode probar( final DatabaseMeta dm, VariableSpace vars, int timeoutSeg ) throws Exception {
     ObjectNode o = Tools.obj();
-    o.put( "conexion", dm.getName() );
-    o.put( "tipo", dm.getPluginId() );
-    o.put( "destino", destino( dm ) );
+    o.put( "connection", dm.getName() );
+    o.put( "type", dm.getPluginId() );
+    o.put( "target", destino( dm ) );
     String aviso = avisoArchivo( dm ); // antes de conectar: SQLite/H2 crean el archivo si no existe
     final long t0 = System.currentTimeMillis();
     try {
@@ -132,7 +132,7 @@ final class DbJdbc {
           ObjectNode x = Tools.obj();
           try {
             DatabaseMetaData md = db.getConnection().getMetaData();
-            x.put( "producto", md.getDatabaseProductName() + " " + md.getDatabaseProductVersion() );
+            x.put( "product", md.getDatabaseProductName() + " " + md.getDatabaseProductVersion() );
             x.put( "driver", md.getDriverName() + " " + md.getDriverVersion() );
           } catch ( Throwable ignored ) {
             // algunos drivers no implementan metadata
@@ -144,18 +144,18 @@ final class DbJdbc {
       o.setAll( info );
     } catch ( TimeoutException e ) {
       o.put( "ok", false );
-      o.put( "problema", "timeout" );
-      o.put( "mensaje", "La base no respondio en " + timeoutSeg + " s. Revisa host, puerto y firewall, o que el "
-        + "servidor este levantado." );
+      o.put( "problem", "timeout" );
+      o.put( "message", "The database did not respond within " + timeoutSeg + " s. Check host, port and "
+        + "firewall, or that the server is up." );
     } catch ( ExecutionException e ) {
       String[] d = diagnosticar( dm, e.getCause() );
       o.put( "ok", false );
-      o.put( "problema", d[0] );
-      o.put( "mensaje", d[1] );
+      o.put( "problem", d[0] );
+      o.put( "message", d[1] );
     }
     o.put( "ms", System.currentTimeMillis() - t0 );
     if ( aviso != null ) {
-      o.put( "aviso", aviso );
+      o.put( "warning", aviso );
     }
     return o;
   }
@@ -201,8 +201,8 @@ final class DbJdbc {
       if ( f.exists() ) {
         return null;
       }
-      return "El archivo " + f.getAbsolutePath() + " no existia: " + tipo + " crea una base vacia al conectar. Si "
-        + "la base ya tenia datos, la ruta esta mal escrita.";
+      return "The file " + f.getAbsolutePath() + " did not exist: " + tipo + " creates an empty database when "
+        + "connecting. If the database already had data, the path is misspelled.";
     } catch ( Throwable t ) {
       return null;
     }
@@ -262,17 +262,17 @@ final class DbJdbc {
     int[] total = { 0 };
     boolean[] truncado = { false };
     String filtro = buscar == null ? null : buscar.toLowerCase( Locale.ROOT );
-    agrupar( tablas, "tablas", porEsquema, esquema, filtro, sistema, total, truncado );
-    agrupar( vistas, "vistas", porEsquema, esquema, filtro, sistema, total, truncado );
+    agrupar( tablas, "tables", porEsquema, esquema, filtro, sistema, total, truncado );
+    agrupar( vistas, "views", porEsquema, esquema, filtro, sistema, total, truncado );
     ObjectNode o = Tools.obj();
-    o.put( "conexion", db.getDatabaseMeta().getName() );
-    ArrayNode lista = o.putArray( "esquemas" );
+    o.put( "connection", db.getDatabaseMeta().getName() );
+    ArrayNode lista = o.putArray( "schemas" );
     for ( ObjectNode e : porEsquema.values() ) {
       lista.add( e );
     }
     o.put( "total", total[0] );
     if ( truncado[0] ) {
-      o.put( "truncado", "Hay mas de " + MAX_NOMBRES + "; filtra con 'buscar' o 'esquema'" );
+      o.put( "truncated", "There are more than " + MAX_NOMBRES + "; filter with 'search' or 'schema'" );
     }
     return o;
   }
@@ -298,7 +298,7 @@ final class DbJdbc {
         if ( g == null ) {
           g = Tools.obj();
           if ( !esq.isEmpty() ) {
-            g.put( "esquema", esq );
+            g.put( "schema", esq );
           }
           salida.put( esq, g );
         }
@@ -327,8 +327,8 @@ final class DbJdbc {
       }
     }
     if ( rm == null ) {
-      throw new ToolError( "No encuentro la tabla '" + ( esquema == null ? "" : esquema + "." ) + tabla
-        + "'. Usa 'tablas' para ver los nombres exactos." );
+      throw new ToolError( "Table '" + ( esquema == null ? "" : esquema + "." ) + tabla
+        + "' not found. Use list_tables to see the exact names." );
     }
     Set<String> pk = new HashSet<String>();
     try {
@@ -342,12 +342,12 @@ final class DbJdbc {
       // la base no informa claves
     }
     ObjectNode o = Tools.obj();
-    o.put( "conexion", dm.getName() );
+    o.put( "connection", dm.getName() );
     if ( esquema != null ) {
-      o.put( "esquema", esquema );
+      o.put( "schema", esquema );
     }
-    o.put( "tabla", tabla );
-    ArrayNode cols = o.putArray( "columnas" );
+    o.put( "table", tabla );
+    ArrayNode cols = o.putArray( "columns" );
     for ( ValueMetaInterface v : rm.getValueMetaList() ) {
       ObjectNode c = campo( v );
       if ( pk.contains( v.getName().toLowerCase( Locale.ROOT ) ) ) {
@@ -360,16 +360,16 @@ final class DbJdbc {
 
   private static ObjectNode campo( ValueMetaInterface v ) {
     ObjectNode c = Tools.obj();
-    c.put( "nombre", v.getName() );
-    c.put( "tipo", v.getTypeDesc() );
+    c.put( "name", v.getName() );
+    c.put( "type", v.getTypeDesc() );
     if ( v.getLength() > 0 ) {
-      c.put( "largo", v.getLength() );
+      c.put( "length", v.getLength() );
     }
     if ( v.getPrecision() > 0 ) {
       c.put( "precision", v.getPrecision() );
     }
     if ( v.getOriginalColumnTypeName() != null ) {
-      c.put( "tipo_bd", v.getOriginalColumnTypeName() );
+      c.put( "db_type", v.getOriginalColumnTypeName() );
     }
     return c;
   }
@@ -377,7 +377,7 @@ final class DbJdbc {
   // ---------------------------------------------------------------- consultar
 
   /**
-   * SELECT y compania: hasta 'filas' filas, todo como texto, con los tipos Kettle (lo que veria un Table
+   * SELECT y compania: hasta 'rows' filas, todo como texto, con los tipos Kettle (lo que veria un Table
    * input). Si Kettle no puede convertir algun valor (p.ej. fechas guardadas como texto en SQLite) cae a
    * JDBC crudo y lo avisa, porque el Table input fallaria igual. (worker)
    */
@@ -398,8 +398,8 @@ final class DbJdbc {
       } catch ( Exception e2 ) {
         throw e; // el error original de Kettle es el que importa (SQL invalido, tabla inexistente...)
       }
-      o.put( "aviso", "Kettle no pudo convertir los valores (un Table input con esta consulta fallaria igual): "
-        + diagnosticar( db.getDatabaseMeta(), e )[1] + ". Se muestran como los devuelve el driver." );
+      o.put( "warning", "Kettle could not convert the values (a Table input with this query would fail the same "
+        + "way): " + diagnosticar( db.getDatabaseMeta(), e )[1] + ". They are shown as the driver returns them." );
       return o;
     }
     RowMetaInterface rm = db.getReturnRowMeta();
@@ -407,13 +407,13 @@ final class DbJdbc {
       rm = db.getQueryFields( sql, false );
     }
     ObjectNode o = Tools.obj();
-    ArrayNode campos = o.putArray( "campos" );
+    ArrayNode campos = o.putArray( "fields" );
     if ( rm != null ) {
       for ( ValueMetaInterface v : rm.getValueMetaList() ) {
-        campos.addObject().put( "nombre", v.getName() ).put( "tipo", v.getTypeDesc() );
+        campos.addObject().put( "name", v.getName() ).put( "type", v.getTypeDesc() );
       }
     }
-    ArrayNode out = o.putArray( "filas" );
+    ArrayNode out = o.putArray( "rows" );
     int n = 0;
     for ( Object[] r : rows ) {
       if ( n >= filas ) {
@@ -426,9 +426,9 @@ final class DbJdbc {
       }
       n++;
     }
-    o.put( "n", n );
+    o.put( "row_count", n );
     if ( rows.size() > filas ) {
-      o.put( "hay_mas", true );
+      o.put( "has_more", true );
     }
     return o;
   }
@@ -441,11 +441,11 @@ final class DbJdbc {
       try {
         ResultSetMetaData md = rs.getMetaData();
         ObjectNode o = Tools.obj();
-        ArrayNode campos = o.putArray( "campos" );
+        ArrayNode campos = o.putArray( "fields" );
         for ( int i = 1; i <= md.getColumnCount(); i++ ) {
-          campos.addObject().put( "nombre", md.getColumnLabel( i ) ).put( "tipo_bd", md.getColumnTypeName( i ) );
+          campos.addObject().put( "name", md.getColumnLabel( i ) ).put( "db_type", md.getColumnTypeName( i ) );
         }
-        ArrayNode out = o.putArray( "filas" );
+        ArrayNode out = o.putArray( "rows" );
         int n = 0;
         boolean mas = false;
         while ( rs.next() ) {
@@ -457,13 +457,13 @@ final class DbJdbc {
           for ( int i = 1; i <= md.getColumnCount(); i++ ) {
             String v = rs.getString( i );
             fila.add( v != null && v.length() > MAX_TEXTO_CELDA ? v.substring( 0, MAX_TEXTO_CELDA ) + "...("
-              + v.length() + " caracteres)" : v );
+              + v.length() + " characters)" : v );
           }
           n++;
         }
-        o.put( "n", n );
+        o.put( "row_count", n );
         if ( mas ) {
-          o.put( "hay_mas", true );
+          o.put( "has_more", true );
         }
         return o;
       } finally {
@@ -474,7 +474,7 @@ final class DbJdbc {
     }
   }
 
-  /** Sentencias de escritura (permitir_escritura=true). (worker) */
+  /** Sentencias de escritura (allow_write=true). (worker) */
   static ObjectNode ejecutar( Database db, String sql ) throws Exception {
     Result r = contarSentencias( sql ) > 1 ? db.execStatements( sql ) : db.execStatement( sql );
     if ( !db.isAutoCommit() ) {
@@ -484,7 +484,7 @@ final class DbJdbc {
     o.put( "ok", true );
     if ( r != null ) {
       long afectadas = r.getNrLinesUpdated() + r.getNrLinesInput() + r.getNrLinesOutput() + r.getNrLinesDeleted();
-      o.put( "filas_afectadas", afectadas );
+      o.put( "affected_rows", afectadas );
     }
     return o;
   }
@@ -496,14 +496,14 @@ final class DbJdbc {
     String s;
     try {
       if ( v.isBinary() && x instanceof byte[] ) {
-        return "<binario " + ( (byte[]) x ).length + " bytes>";
+        return "<binary " + ( (byte[]) x ).length + " bytes>";
       }
       s = v.getString( x );
     } catch ( Exception e ) {
       s = String.valueOf( x );
     }
     if ( s != null && s.length() > MAX_TEXTO_CELDA ) {
-      s = s.substring( 0, MAX_TEXTO_CELDA ) + "...(" + s.length() + " caracteres)";
+      s = s.substring( 0, MAX_TEXTO_CELDA ) + "...(" + s.length() + " characters)";
     }
     return s;
   }
@@ -520,24 +520,25 @@ final class DbJdbc {
       limpio = limpio.substring( 0, limpio.length() - 1 ).trim();
     }
     if ( limpio.isEmpty() ) {
-      return "La consulta esta vacia";
+      return "the query is empty";
     }
     if ( limpio.indexOf( ';' ) >= 0 ) {
-      return "Trae varias sentencias separadas por ';'";
+      return "the query has several statements separated by ';'";
     }
     String sinParen = limpio.replaceFirst( "^\\(+\\s*", "" );
     Matcher m = Pattern.compile( "^([A-Za-z]+)" ).matcher( sinParen );
     String primera = m.find() ? m.group( 1 ).toUpperCase( Locale.ROOT ) : "";
     if ( !SQL_LECTURA.contains( primera ) ) {
-      return "Empieza con '" + primera + "' (solo se aceptan SELECT, WITH, SHOW, DESCRIBE, DESC, EXPLAIN y PRAGMA)";
+      return "the query starts with '" + primera + "' (only SELECT, WITH, SHOW, DESCRIBE, DESC, EXPLAIN and PRAGMA "
+        + "are accepted)";
     }
     String mayus = limpio.toUpperCase( Locale.ROOT );
     Matcher w = SQL_ESCRITURA.matcher( mayus );
     if ( w.find() ) {
-      return "Contiene '" + w.group( 1 ) + "', que puede escribir o bloquear";
+      return "the query contains '" + w.group( 1 ) + "', which can write or lock";
     }
     if ( "PRAGMA".equals( primera ) && limpio.indexOf( '=' ) >= 0 ) {
-      return "Un PRAGMA con '=' cambia la configuracion de la base";
+      return "a PRAGMA with '=' changes the database configuration";
     }
     return null;
   }
@@ -621,7 +622,10 @@ final class DbJdbc {
     return sb.toString();
   }
 
-  /** {codigo, mensaje}: driver_faltante, credenciales, host_desconocido, host_inalcanzable, base_inexistente, error. */
+  /**
+   * {codigo, mensaje}: missing_driver, bad_credentials, unknown_host, host_unreachable, database_not_found,
+   * sql_error, error.
+   */
   static String[] diagnosticar( DatabaseMeta dm, Throwable e ) {
     List<Throwable> cadena = new ArrayList<Throwable>();
     for ( Throwable c = e; c != null && cadena.size() < 12; c = c.getCause() ) {
@@ -643,25 +647,26 @@ final class DbJdbc {
     for ( Throwable c : cadena ) {
       if ( c instanceof ClassNotFoundException || c instanceof NoClassDefFoundError ) {
         String clase = driverClass( dm );
-        return new String[] { "driver_faltante", "Falta el driver JDBC de " + tipo + ( clase == null ? "" : " (" + clase
-          + ")" ) + ". Copia " + DbTools.jarSugerido( tipo ) + " a data-integration/lib y reinicia Spoon." };
+        return new String[] { "missing_driver", "The JDBC driver for " + tipo + " is missing" + ( clase == null ? ""
+          : " (" + clase + ")" ) + ". Copy " + DbTools.jarSugerido( tipo ) + " to data-integration/lib and restart "
+          + "Spoon." };
       }
     }
     if ( todo.contains( "unabletofindclassmissingdriver" ) || todo.contains( "no suitable driver" ) ) {
-      return new String[] { "driver_faltante", "Falta el driver JDBC de " + tipo + ". Copia "
-        + DbTools.jarSugerido( tipo ) + " a data-integration/lib y reinicia Spoon. Detalle: " + detalle };
+      return new String[] { "missing_driver", "The JDBC driver for " + tipo + " is missing. Copy "
+        + DbTools.jarSugerido( tipo ) + " to data-integration/lib and restart Spoon. Detail: " + detalle };
     }
     if ( ( sqlState != null && sqlState.startsWith( "28" ) ) || todo.contains( "password authentication failed" )
       || todo.contains( "access denied" ) || todo.contains( "authentication failed" ) || todo.contains( "login failed" )
       || todo.contains( "invalid username/password" ) || todo.contains( "wrong user name or password" )
       || todo.contains( "invalid authorization" ) ) {
-      return new String[] { "credenciales", "Usuario o contrasenia incorrectos (o el usuario no tiene permiso sobre "
-        + "esa base). Detalle: " + detalle };
+      return new String[] { "bad_credentials", "Wrong user name or password (or the user has no permission on "
+        + "that database). Detail: " + detalle };
     }
     for ( Throwable c : cadena ) {
       if ( c instanceof UnknownHostException ) {
-        return new String[] { "host_desconocido", "No se resuelve el host '" + dm.environmentSubstitute(
-          dm.getHostname() ) + "'. Revisa el nombre (para tu maquina: localhost). Detalle: " + detalle };
+        return new String[] { "unknown_host", "Cannot resolve host '" + dm.environmentSubstitute(
+          dm.getHostname() ) + "'. Check the name (for your own machine: localhost). Detail: " + detalle };
       }
     }
     boolean red = todo.contains( "connection refused" ) || todo.contains( "communications link failure" )
@@ -672,18 +677,18 @@ final class DbJdbc {
         || c instanceof SocketTimeoutException;
     }
     if ( red || ( sqlState != null && sqlState.startsWith( "08" ) && !todo.contains( "database" ) ) ) {
-      return new String[] { "host_inalcanzable", "No se pudo llegar a " + destino( dm ) + ". Esta levantado el "
-        + "servidor? Es el puerto correcto? Detalle: " + detalle };
+      return new String[] { "host_unreachable", "Could not reach " + destino( dm ) + ". Is the server up? Is it "
+        + "the right port? Detail: " + detalle };
     }
     if ( "3D000".equals( sqlState ) || todo.contains( "unknown database" )
       || ( todo.contains( "database" ) && todo.contains( "does not exist" ) )
       || todo.contains( "database not found" ) ) {
-      return new String[] { "base_inexistente", "La base '" + dm.environmentSubstitute( dm.getDatabaseName() )
-        + "' no existe en ese servidor. Detalle: " + detalle };
+      return new String[] { "database_not_found", "Database '" + dm.environmentSubstitute( dm.getDatabaseName() )
+        + "' does not exist on that server. Detail: " + detalle };
     }
     if ( sqlState != null && sqlState.startsWith( "42" ) || todo.contains( "no such table" )
       || todo.contains( "no such column" ) ) {
-      return new String[] { "error_sql", detalle + " (revisa los nombres con 'tablas' y 'columnas')" };
+      return new String[] { "sql_error", detalle + " (check the names with list_tables and list_columns)" };
     }
     return new String[] { "error", detalle };
   }
@@ -698,7 +703,7 @@ final class DbJdbc {
       }
     }
     if ( msg == null ) {
-      msg = cadena.isEmpty() ? "error desconocido" : cadena.get( cadena.size() - 1 ).toString();
+      msg = cadena.isEmpty() ? "unknown error" : cadena.get( cadena.size() - 1 ).toString();
     }
     msg = msg.replaceAll( "\\s+", " " ).trim();
     try {

@@ -42,7 +42,7 @@ final class ReportTools {
         + "document or hand in the ETL (university assignment, Obsidian note, README), or to get a readable "
         + "overview of a large document. With 'path' it saves a .md file and returns a short summary; without "
         + "it, it returns the Markdown. Runs nothing and never opens dialogs.",
-      Tools.schema().documento()
+      Tools.schema().document()
         .str( "path", "Absolute path of the .md file to write (folders are created). If omitted, the Markdown "
           + "is returned as text.", false )
         .bool( "include_fields", "Include the output fields (name and type) of every step. Default true. Only "
@@ -58,7 +58,8 @@ final class ReportTools {
         op.msCampos = MS_CAMPOS;
         final boolean validar = Tools.optBool( a, "include_validation", false );
         final String ruta = Tools.optStr( a, "path", null );
-        final AbstractMeta copia = copia( a );
+        final String[] id = new String[ 1 ];
+        final AbstractMeta copia = copia( a, id );
         if ( validar ) {
           op.validacion = RunMotor.enSegundoPlano(
             () -> RunMotor.validar( copia, false, copia.getRepository(), copia.getMetaStore() ), MS_VALIDAR, null,
@@ -72,16 +73,17 @@ final class ReportTools {
         }
         File f = escribir( ruta, inf.markdown );
         ObjectNode o = Tools.obj();
-        o.put( "path", f.getPath() );
-        o.put( "document", Docs.nombre( copia ) );
+        o.put( "saved_to", f.getPath() );
+        o.put( "document", id[ 0 ] );
+        o.put( "name", Docs.nombre( copia ) );
         o.put( copia instanceof JobMeta ? "entries" : "steps", inf.nodos );
         o.put( "hops", inf.hops );
         if ( copia instanceof TransMeta && op.campos ) {
           o.put( "fields_computed", inf.camposOk + "/" + ( inf.camposOk + inf.camposFallidos ) );
         }
         if ( op.validacion != null ) {
-          o.put( "validation", op.validacion.path( "errores" ).asInt() + " errors, "
-            + op.validacion.path( "advertencias" ).asInt() + " warnings" );
+          o.put( "validation", op.validacion.path( "errors" ).asInt() + " errors, "
+            + op.validacion.path( "warnings" ).asInt() + " warnings" );
         }
         if ( !inf.avisos.isEmpty() ) {
           ArrayNode av = o.putArray( "warnings" );
@@ -98,7 +100,7 @@ final class ReportTools {
         + "notes and, if it ran, the status icons), cropped to the used area. Use it to check how the drawing "
         + "looks after building or rearranging (overlapping steps, crossing hops, labels that do not fit), or "
         + "when the user asks what the canvas looks like. Read-only.",
-      Tools.schema().documento()
+      Tools.schema().document()
         .raw( "scale", Tools.obj().put( "type", "number" ).put( "minimum", 0.25 ).put( "maximum", 2.0 )
           .put( "description", "Zoom factor of the image, from 0.25 to 2.0 (default 1.0 = 100%). Use less than "
             + "1 for very large canvases." ), false ).build(),
@@ -138,10 +140,14 @@ final class ReportTools {
     return f;
   }
 
-  /** En la UI: resuelve el documento y toma una copia independiente para trabajar fuera de la UI. */
-  private static AbstractMeta copia( final JsonNode a ) throws Exception {
+  /**
+   * En la UI: resuelve el documento y toma una copia independiente para trabajar fuera de la UI. En
+   * id[0] deja el id del documento original (el clon tendria otro).
+   */
+  private static AbstractMeta copia( final JsonNode a, final String[] id ) throws Exception {
     return Docs.ui( () -> {
       AbstractMeta m = Docs.resolver( a );
+      id[ 0 ] = Docs.id( m );
       Spoon sp = Docs.spoon();
       AbstractMeta c = clonar( m );
       c.setRepository( sp.getRepository() );

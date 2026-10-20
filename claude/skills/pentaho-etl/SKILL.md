@@ -1,93 +1,120 @@
 ---
 name: pentaho-etl
-description: Build, modify, review or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, or find out why a .ktr/.kjb fails. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen. Construir o depurar ETLs de Pentaho (transformaciones y jobs).
+description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, or find out why a .ktr/.kjb fails. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
 ---
 
 # Pentaho Data Integration 9.4 — ETLs
 
-Todo lo de esta carpeta está **verificado contra una instalación real de PDI 9.4.0.0-343 (CE)**: los
-ids de step salen del `PluginRegistry`, los ejemplos corren con Pan/Kitchen y los errores fueron
-provocados a propósito. No inventes tags: buscalos acá.
+Everything in this folder is **verified against a real PDI 9.4.0.0-343 (CE) install**: the step ids
+come from the `PluginRegistry`, the examples run with Pan/Kitchen and the errors were triggered on
+purpose. Don't invent tags: look them up here.
 
-## Dos formas de trabajar
+## Two ways to work
 
-**A. En vivo, con el MCP `pentaho`** (si sus herramientas están disponibles: `estado`, `agregar_step`…).
-El usuario tiene Spoon abierto y ve aparecer cada nodo. Es la forma preferida.
+**A. Live, with the `pentaho` MCP** (if its tools are available: `status`, `add_step`…). The user has
+Spoon open and watches every node appear. This is the preferred way.
 
-Si el MCP `pentaho` figura pero falla al conectar, es que Spoon está cerrado o le falta el plugin de
-Spoon: `pentaho-mcp.zip` del último release de https://github.com/IvI2511/pentaho-mcp, descomprimido en
-`data-integration/plugins/`, y reiniciar Spoon (guía completa: `INSTALL.md` del repo). Escucha en
-`127.0.0.1:8765`; con otro puerto (`PENTAHO_MCP_PORT` en Spoon) hay que cambiar la opción `mcp_url`
-del plugin en `/config`.
+If the `pentaho` MCP is listed but fails to connect, Spoon is closed or the Spoon plugin is missing:
+`pentaho-mcp.zip` from the latest release of https://github.com/IvI2511/pentaho-mcp, unzipped into
+`data-integration/plugins/`, then restart Spoon (full guide: the repo's `INSTALL.md`). It listens on
+`127.0.0.1:8765`; with another port (`PENTAHO_MCP_PORT` in Spoon) change the plugin option `mcp_url`
+in `/config`.
 
-1. `estado` → qué hay abierto (ids T1, J1…). `nueva_transformacion` / `abrir_archivo` si hace falta.
-2. Por cada step, de izquierda a derecha:
-   - `tipos_de_step buscar=...` si no sabés el id exacto (el `<type>` NO es el nombre en pantalla).
-   - `plantilla_step` para ver los tags; mandá en `agregar_step` **solo los tags que cambian**
-     (el resto queda por defecto) y `despues_de=<step anterior>` para que se ubique y conecte solo.
-   - `campos_step` del step anterior **antes** de configurar el siguiente: así usás los nombres de
-     columna reales, no los que suponés.
-3. `validar`, después `preview_step` sobre el último step para ver filas reales.
-4. `guardar` con ruta `.ktr`/`.kjb`. `ejecutar` (modo visible) si el usuario quiere verlo correr.
-5. Si algo sale mal: `ver_step`, `configurar_step` (mezcla sobre la config actual), `borrar_step`.
-   El usuario puede deshacer cualquier cambio tuyo con Ctrl+Z.
+1. `status` → what is open (ids T1, J1…). `new_transformation` / `open_file` if needed. The editing
+   tools take an optional `document` (id or name); without it they work on the active tab.
+2. Build left to right. **A whole flow or a whole stretch** (input → transforms → output, branches,
+   lookups): `build_steps` in **one call**. It checks everything before touching the canvas (if
+   something is wrong nothing changes and you get the full list of problems), animates the nodes so
+   the user watches them appear, arranges the canvas at the end and is a single Ctrl+Z. Per step:
+   `type`, `name`, `config_xml`, `after`; `hops` for what `after` can't express (lookup stream, second
+   input of a join, the other branch of Filter rows, error hops with `error=true`).
+   **One step at a time** (a one-off change to an existing flow):
+   - `list_step_types search=...` if you don't know the exact id (the `<type>` is NOT the name shown
+     on screen).
+   - `get_step_template` to see the tags; send in `add_step` **only the tags that change** (the rest
+     keeps its default) and `after=<previous step>` so it is placed and connected automatically.
+   - `get_step_fields` of the previous step **before** configuring the next one: that way you use the
+     real column names, not the ones you assume.
+3. `validate`, then `preview_step` on the last step to see real rows.
+4. `canvas_screenshot` returns a PNG of the canvas: use it to check the drawing (overlapping steps,
+   crossing hops). `arrange_canvas` if there are branches or lookups.
+5. `save` with a `.ktr`/`.kjb` path. `run mode=visible` if the user wants to watch it run;
+   `get_run_status` for status and log, `stop_run` to stop it.
+6. If something goes wrong: `get_step`, `configure_step` (merges over the current config),
+   `delete_step`. The user can undo any change of yours with Ctrl+Z (one Ctrl+Z per tool call).
 
-Jobs: `nuevo_job`, `agregar_entrada tipo=START` primero, después entradas `TRANS`/`JOB`/`SUCCESS`
-con `despues_de` y `condicion` (`siempre` | `si_ok` | `si_falla`).
+Jobs: `new_job`, `add_entry type=START` first, then `TRANS`/`JOB`/`SUCCESS` entries with `after` and
+`condition` (`always` | `on_success` | `on_failure`). `set_hop_condition` changes it later.
 
-**B. Escribiendo archivos** (sin MCP, o para generar muchos de una): escribís el `.ktr`/`.kjb` en
-UTF-8 partiendo de la plantilla recomendada de `manual/01-formato-ktr.md` §1.2 y lo verificás con Pan
-o Kitchen (ver abajo). El usuario lo abre en Spoon cuando terminás.
+Databases: `list_database_types`, `add_connection` (better: the user types the password in Spoon),
+`test_connection`, `list_tables` / `list_columns`, `run_sql` (read-only unless `allow_write=true`).
 
-## Dónde está cada cosa
+**Document the ETL:** `generate_report` writes a Markdown report with a Mermaid diagram of the steps
+and hops, a table of what each step does, output fields, connections (never passwords), parameters
+and notes. `language` = `en` | `es` | `pt`; with `path` it saves a `.md`, without it returns the text.
+Use it when the user wants to hand in or document the ETL (assignment, Obsidian note, README).
 
-| Necesito… | Leer |
+**Clients without this skill** (another MCP client, Codex without the skill folder): the server also
+exposes these guides and the catalog as MCP resources, `pentaho://guide/...` (the manuals) and
+`pentaho://catalog/...` (index of step / entry ids and the default XML of each one). With the skill
+loaded, read the local files below instead: same content.
+
+**B. Writing files** (no MCP, or to generate many at once): write the `.ktr`/`.kjb` in UTF-8
+starting from the recommended template in `manual/01-formato-ktr.md` §1.2 and check it with Pan or
+Kitchen (see below). The user opens it in Spoon when you are done.
+
+## Where everything is
+
+| I need… | Read |
 |---|---|
-| Reglas de oro y esqueleto de un `.ktr` | `manual/01-formato-ktr.md` (empezá por el §0, checklist) |
-| Jobs: START, TRANS, hops con condición | `manual/02-formato-kjb.md` |
-| Un error de Pan/Kitchen, o un resultado raro con exit 0 | `manual/03-errores-comunes.md` |
-| El id exacto de un step o entry por categoría | `catalogo/INDICE.md` |
-| Cómo se configura un step común, con ejemplo y trampas | `catalogo/steps-comunes.md` (~45 steps) |
-| El XML por defecto de CUALQUIER step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |
-| Ejemplos completos que corren | `manual/ejemplos/` (README con qué hace cada uno) |
+| Golden rules and the skeleton of a `.ktr` | `manual/01-formato-ktr.md` (start with §0, the checklist) |
+| Jobs: START, TRANS, hops with a condition | `manual/02-formato-kjb.md` |
+| A Pan/Kitchen error, or an odd result with exit 0 | `manual/03-errores-comunes.md` |
+| The exact id of a step or entry, by category | `catalogo/INDICE.md` |
+| How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
+| The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |
+| Complete examples that run | `manual/ejemplos/` (README with what each one does) |
 
-## Trampas que más cuestan (detalle en el manual)
+## The pitfalls that cost the most (details in the manual)
 
-- `<type>` es el **id del plugin**: Add constants = `Constant`, Add sequence = `Sequence`,
-  User defined Java expression = `Janino`, Excel writer = `TypeExitExcelWriterStep`. START y Dummy
-  de un job son `<type>SPECIAL</type>`.
-- Cada `<step>` lleva `<copies>1</copies>` y `<GUI>…<draw>Y</draw></GUI>`; sin `copies` Pan falla
-  sin explicar, sin `draw` el step no se ve en Spoon.
-- Nombres de step **únicos**: un duplicado hace desaparecer un step en silencio.
-- Un step con **2 o más salidas** reparte las filas entre ellas por defecto (round robin, `<distribute>Y</distribute>`):
-  cada salida recibe una parte. Si cada salida tiene que recibir todas las filas, `<distribute>N</distribute>`
-  (en vivo: `modo_salida` copiar, que es lo que el MCP deja por defecto al crear la segunda salida).
-  No aplica a Filter rows ni Switch/case, que mandan a destinos concretos.
-- **Group by** y **Merge join** necesitan la entrada **ordenada** por la clave (Sort rows antes);
-  si no, dan resultados mal sin error.
-- **Stream lookup** referencia al step de búsqueda con `<from>` (no existe `<lookup_step>`) y además
-  necesita el hop desde ese step. Lo mismo Filter rows (`send_true_to`/`send_false_to`) y Switch/case:
-  la referencia en el XML **y** el hop.
-- Números: declarar `<decimal>.</decimal>` explícito; vacío con locale español lee `2.50` como 250.
-- En Generate rows y Add constants el valor va en `<nullif>`.
-- Rutas siempre relativas con `${Internal.Entry.Current.Directory}/…` (la carpeta del propio archivo).
-- Excel `.xlsx`: `<spreadsheet_type>POI</spreadsheet_type>` (el default JXL solo lee `.xls`).
-- Escapar `&` y `<` en el XML (`&amp;`, `&lt;`).
-- Drivers JDBC incluidos: PostgreSQL, H2, SQLite, HSQLDB, Derby y otros. **No vienen** MySQL, MariaDB,
-  SQL Server ni Oracle: hay que copiar el `.jar` del conector a `data-integration/lib/` y reiniciar Spoon.
-  Con MySQL Connector/J 8 o posterior (`mysql-connector-j-*.jar`) alcanza el tipo `MYSQL` normal: PDI 9.4
-  usa `com.mysql.cj.jdbc.Driver` si está (verificado con `tipos_de_base`); no hace falta "Generic database".
+- `<type>` is the **plugin id**: Add constants = `Constant`, Add sequence = `Sequence`,
+  User defined Java expression = `Janino`, Excel writer = `TypeExitExcelWriterStep`. A job's START
+  and Dummy are `<type>SPECIAL</type>`.
+- Every `<step>` needs `<copies>1</copies>` and `<GUI>…<draw>Y</draw></GUI>`; without `copies` Pan
+  fails without explanation, without `draw` the step is not shown in Spoon.
+- **Unique** step names: a duplicate silently makes a step disappear.
+- In the file format, a step with **2 or more outputs** distributes the rows among them by default
+  (round robin, `<distribute>Y</distribute>`): each output gets only part. If every output must get
+  all the rows, `<distribute>N</distribute>` (live: `set_output_mode mode=copy`, which is what the MCP
+  sets by default when it creates the second output). Doesn't apply to Filter rows or Switch/case,
+  which send rows to specific targets.
+- **Group by** and **Merge join** need their input **sorted** by the key (Sort rows before);
+  otherwise they give wrong results with no error.
+- **Stream lookup** references the lookup step with `<from>` (there is no `<lookup_step>`) and also
+  needs the hop from that step. Same for Filter rows (`send_true_to`/`send_false_to`) and
+  Switch/case: the reference in the XML **and** the hop.
+- Numbers: declare `<decimal>.</decimal>` explicitly; left empty with a Spanish locale, `2.50` is read
+  as 250.
+- In Generate rows and Add constants the value goes in `<nullif>`.
+- Paths always relative, with `${Internal.Entry.Current.Directory}/…` (the file's own folder).
+- Excel `.xlsx`: `<spreadsheet_type>POI</spreadsheet_type>` (the default, JXL, only reads `.xls`).
+- Escape `&` and `<` in the XML (`&amp;`, `&lt;`).
+- Bundled JDBC drivers: PostgreSQL, H2, SQLite, HSQLDB, Derby and others. MySQL, MariaDB, SQL Server
+  and Oracle are **not included**: copy the connector `.jar` into `data-integration/lib/` and restart
+  Spoon. With MySQL Connector/J 8 or later (`mysql-connector-j-*.jar`) the regular `MYSQL` type is
+  enough: PDI 9.4 uses `com.mysql.cj.jdbc.Driver` when it is there (verified with
+  `list_database_types`); no need for "Generic database".
 
-## Verificar con Pan / Kitchen (Windows, desde PowerShell)
+## Verify with Pan / Kitchen (Windows, from PowerShell)
 
 ```powershell
 Remove-Item Env:NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue
-& cmd.exe /c call '<data-integration>\Pan.bat' "/file:<ruta.ktr>" /level:Basic '"/param:X=1"'
-# jobs: Kitchen.bat con los mismos argumentos
+& cmd.exe /c call '<data-integration>\Pan.bat' "/file:<path.ktr>" /level:Basic '"/param:X=1"'
+# jobs: Kitchen.bat with the same arguments
 ```
 
-- Sin quitar `NoDefaultCurrentDirectoryInExePath`, `Pan.bat` no encuentra `Spoon.bat`.
-- Con `& Pan.bat` directo, `$LASTEXITCODE` da 0 aunque falle: usar `cmd /c call`.
-- `/param` entre comillas dobles, si no cmd corta en el `=`.
-- Exit 0 no alcanza: mirá la salida (ver "errores silenciosos" en `03-errores-comunes.md`).
-- Para no tocar la configuración del usuario (`~/.kettle`), definir `KETTLE_HOME` en una carpeta propia.
+- Without removing `NoDefaultCurrentDirectoryInExePath`, `Pan.bat` doesn't find `Spoon.bat`.
+- With `& Pan.bat` directly, `$LASTEXITCODE` is 0 even when it fails: use `cmd /c call`.
+- `/param` goes in double quotes, otherwise cmd cuts it at the `=`.
+- Exit 0 is not enough: read the output (see "Silent errors" in `03-errores-comunes.md`).
+- To leave the user's configuration (`~/.kettle`) alone, set `KETTLE_HOME` to a folder of your own.

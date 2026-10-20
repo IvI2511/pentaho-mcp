@@ -121,7 +121,7 @@ final class RunMotor {
         }
       }
       f.cancel( true );
-      throw new ToolError( que + " no termino en " + ( timeoutMs / 1000 ) + " s y se corto" );
+      throw new ToolError( que + " did not finish in " + ( timeoutMs / 1000 ) + " s and was stopped" );
     } catch ( ExecutionException e ) {
       Throwable c = e.getCause();
       if ( c instanceof Exception ) {
@@ -245,7 +245,7 @@ final class RunMotor {
       for ( StepMeta s : tm.getSteps() ) {
         sb.append( sb.length() == 0 ? "" : ", " ).append( '\'' ).append( s.getName() ).append( '\'' );
       }
-      throw new ToolError( "No hay ningun step '" + nombre + "'. Steps: " + ( sb.length() == 0 ? "(ninguno)" : sb ) );
+      throw new ToolError( "There is no step '" + nombre + "'. Steps: " + ( sb.length() == 0 ? "(none)" : sb ) );
     }
     return sm;
   }
@@ -281,61 +281,61 @@ final class RunMotor {
     }
     for ( ValueMetaInterface v : rm.getValueMetaList() ) {
       ObjectNode c = arr.addObject();
-      c.put( "nombre", v.getName() );
-      c.put( "tipo", v.getTypeDesc() );
+      c.put( "name", v.getName() );
+      c.put( "type", v.getTypeDesc() );
       if ( detalle ) {
         if ( v.getLength() >= 0 ) {
-          c.put( "longitud", v.getLength() );
+          c.put( "length", v.getLength() );
         }
         if ( v.getPrecision() >= 0 ) {
           c.put( "precision", v.getPrecision() );
         }
         if ( v.getConversionMask() != null && !v.getConversionMask().isEmpty() ) {
-          c.put( "formato", v.getConversionMask() );
+          c.put( "format", v.getConversionMask() );
         }
         if ( v.getOrigin() != null ) {
-          c.put( "origen", v.getOrigin() );
+          c.put( "origin", v.getOrigin() );
         }
       }
     }
     return arr;
   }
 
-  /** campos_step sobre una copia: salida (getStepFields) o entrada (getPrevStepFields + info streams). */
+  /** get_step_fields sobre una copia: salida (getStepFields) o entrada (getPrevStepFields + info streams). */
   static ObjectNode camposStep( TransMeta copia, String step, boolean entrada ) throws Exception {
     StepMeta sm = paso( copia, step );
     ObjectNode o = Tools.obj();
     o.put( "step", sm.getName() );
-    o.put( "tipo", sm.getStepID() );
-    o.put( "lado", entrada ? "entrada" : "salida" );
+    o.put( "type", sm.getStepID() );
+    o.put( "side", entrada ? "input" : "output" );
     RowMetaInterface rm;
     try {
       rm = entrada ? copia.getPrevStepFields( sm ) : copia.getStepFields( sm );
     } catch ( KettleStepException e ) {
-      throw new ToolError( "Kettle no pudo calcular los campos de '" + sm.getName() + "': " + mensaje( e ) );
+      throw new ToolError( "Kettle could not compute the fields of '" + sm.getName() + "': " + mensaje( e ) );
     }
     if ( entrada ) {
-      ArrayNode desde = o.putArray( "desde" );
+      ArrayNode desde = o.putArray( "from" );
       for ( StepMeta p : copia.findPreviousSteps( sm, false ) ) {
         desde.add( p.getName() );
       }
       if ( desde.size() == 0 ) {
-        o.put( "nota", "No le llega ningun hop (es un step de entrada o esta suelto)" );
+        o.put( "note", "No hop comes into it (it is an input step, or it is not connected)" );
       }
     }
-    o.put( "cantidad", rm == null ? 0 : rm.size() );
-    o.set( "campos", campos( rm, true ) );
+    o.put( "count", rm == null ? 0 : rm.size() );
+    o.set( "fields", campos( rm, true ) );
     if ( entrada ) {
       StepMeta[] infos = copia.getInfoStep( sm );
       if ( infos != null && infos.length > 0 ) {
-        ArrayNode info = o.putArray( "info" ); // lookups: los streams de busqueda
+        ArrayNode info = o.putArray( "info_streams" ); // lookups: los streams de busqueda
         for ( StepMeta i : infos ) {
           if ( i == null ) {
             continue;
           }
           ObjectNode x = info.addObject();
           x.put( "step", i.getName() );
-          x.set( "campos", campos( copia.getStepFields( i ), true ) );
+          x.set( "fields", campos( copia.getStepFields( i ), true ) );
         }
       }
     }
@@ -366,7 +366,7 @@ final class RunMotor {
     }
     if ( falloCheck != null ) {
       anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-        "La validacion de Kettle fallo: " + falloCheck, detalle );
+        "Kettle's validation failed: " + falloCheck, detalle );
     }
     if ( copia instanceof TransMeta ) {
       chequeosPropios( (TransMeta) copia, porStep, cuenta, detalle );
@@ -374,19 +374,19 @@ final class RunMotor {
       chequeosPropios( (JobMeta) copia, porStep, cuenta, detalle );
     }
     ObjectNode o = Tools.obj();
-    o.put( "valido", cuenta[ 0 ] == 0 );
-    o.put( "errores", cuenta[ 0 ] );
-    o.put( "advertencias", cuenta[ 1 ] );
+    o.put( "valid", cuenta[ 0 ] == 0 );
+    o.put( "errors", cuenta[ 0 ] );
+    o.put( "warnings", cuenta[ 1 ] );
     if ( detalle ) {
       o.put( "ok", cuenta[ 2 ] );
-      o.put( "comentarios", cuenta[ 3 ] );
+      o.put( "comments", cuenta[ 3 ] );
     }
-    ObjectNode ps = o.putObject( "por_step" );
+    ObjectNode ps = o.putObject( "by_step" );
     for ( Map.Entry<String, ArrayNode> e : porStep.entrySet() ) {
       ps.set( e.getKey(), e.getValue() );
     }
     if ( porStep.isEmpty() ) {
-      o.put( "nota", detalle ? "Kettle no devolvio observaciones" : "Sin errores ni advertencias" );
+      o.put( "note", detalle ? "Kettle returned no remarks" : "No errors or warnings" );
     }
     return o;
   }
@@ -402,7 +402,7 @@ final class RunMotor {
         break;
       case CheckResultInterface.TYPE_RESULT_WARNING:
         idx = 1;
-        etiqueta = "ADVERTENCIA";
+        etiqueta = "WARNING";
         break;
       case CheckResultInterface.TYPE_RESULT_OK:
         idx = 2;
@@ -410,7 +410,7 @@ final class RunMotor {
         break;
       default:
         idx = 3;
-        etiqueta = "COMENTARIO";
+        etiqueta = "COMMENT";
     }
     String linea = etiqueta + ": " + ( texto == null ? "" : texto.trim().replaceAll( "\\s+", " " ) );
     ArrayNode a = porStep.get( fuente );
@@ -438,7 +438,7 @@ final class RunMotor {
     ArrayNode a = porStep.get( step );
     if ( a != null ) {
       for ( int i = 0; i < a.size(); i++ ) {
-        if ( a.get( i ).asText().startsWith( "ADVERTENCIA" ) ) {
+        if ( a.get( i ).asText().startsWith( "WARNING" ) ) {
           return true;
         }
       }
@@ -450,26 +450,26 @@ final class RunMotor {
     for ( StepMeta s : tm.getSteps() ) {
       if ( s.isMissing() ) {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_ERROR,
-          "Falta el plugin de este step (tipo " + s.getStepID() + "): no se puede ejecutar", detalle );
+          "The plugin of this step is missing (type " + s.getStepID() + "): it cannot run", detalle );
       }
       if ( tm.nrSteps() > 1 && !tm.isStepUsedInTransHops( s ) && !tieneAdvertencia( porStep, s.getName() ) ) {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "No tiene hops: no recibe ni manda filas a ningun step", detalle );
+          "Has no hops: it neither receives rows from nor sends rows to any step", detalle );
       }
       int salidas = TransOps.salidasNormales( tm, s );
       if ( salidas >= 2 && s.isDistributes() ) {
         anotar( porStep, cuenta, s.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "Tiene " + salidas + " salidas en modo REPARTIR: cada salida recibe solo una parte de las filas. "
-            + "Si cada una tiene que recibirlas todas, modo_salida con 'copiar'", detalle );
+          "Has " + salidas + " outputs in DISTRIBUTE mode: each output gets only part of the rows. If each one "
+            + "must get all of them, use set_output_mode with 'copy'", detalle );
       }
     }
     for ( TransHopMeta h : tm.getTransHops() ) {
       if ( h.getFromStep() == null || h.getToStep() == null ) {
         anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-          "Hay un hop con un extremo que no existe", detalle );
+          "There is a hop with an end that does not exist", detalle );
       } else if ( !h.isEnabled() ) {
         anotar( porStep, cuenta, h.getFromStep().getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "El hop hacia '" + h.getToStep().getName() + "' esta deshabilitado: por ahi no pasan filas", detalle );
+          "The hop to '" + h.getToStep().getName() + "' is disabled: no rows go through it", detalle );
       }
     }
   }
@@ -482,7 +482,7 @@ final class RunMotor {
     JobEntryCopy start = jm.findStart();
     if ( start == null ) {
       anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-        "El job no tiene entrada START: no se puede ejecutar", detalle );
+        "The job has no START entry: it cannot run", detalle );
     }
     // por nombre+nr y no por identidad: los hops de un clon pueden apuntar a las entradas del original
     Set<String> alcanzables = new HashSet<String>();
@@ -504,24 +504,24 @@ final class RunMotor {
     for ( JobEntryCopy c : jm.getJobCopies() ) {
       if ( c.isMissing() ) {
         anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_ERROR,
-          "Falta el plugin de esta entrada: no se puede ejecutar", detalle );
+          "The plugin of this entry is missing: it cannot run", detalle );
       }
       if ( jm.nrJobEntries() > 1 && !jm.isEntryUsedInHops( c ) ) {
         anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "No tiene hops: nunca se ejecuta", detalle );
+          "Has no hops: it never runs", detalle );
       } else if ( start != null && !alcanzables.contains( clave( c ) ) ) {
         anotar( porStep, cuenta, c.getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "No se llega desde START por hops habilitados: nunca se ejecuta", detalle );
+          "Cannot be reached from START through enabled hops: it never runs", detalle );
       }
     }
     for ( int i = 0; i < jm.nrJobHops(); i++ ) {
       JobHopMeta h = jm.getJobHop( i );
       if ( h.getFromEntry() == null || h.getToEntry() == null ) {
         anotar( porStep, cuenta, "(general)", CheckResultInterface.TYPE_RESULT_ERROR,
-          "Hay un hop con un extremo que no existe", detalle );
+          "There is a hop with an end that does not exist", detalle );
       } else if ( !h.isEnabled() ) {
         anotar( porStep, cuenta, h.getFromEntry().getName(), CheckResultInterface.TYPE_RESULT_WARNING,
-          "El hop hacia '" + h.getToEntry().getName() + "' esta deshabilitado", detalle );
+          "The hop to '" + h.getToEntry().getName() + "' is disabled", detalle );
       }
     }
   }
@@ -584,7 +584,7 @@ final class RunMotor {
     }
     if ( !c.isStepUsedInTransHops( objetivo ) ) {
       // Trans solo arranca los steps que estan en algun hop: un step suelto necesita un destino
-      StepMeta fin = new StepMeta( "Dummy", c.getAlternativeStepname( "fin_preview_mcp" ), new DummyTransMeta() );
+      StepMeta fin = new StepMeta( "Dummy", c.getAlternativeStepname( "mcp_preview_end" ), new DummyTransMeta() );
       fin.setLocation( objetivo.getLocation().x + 150, objetivo.getLocation().y );
       c.addStep( fin );
       c.addTransHop( new TransHopMeta( objetivo, fin ) );
@@ -604,11 +604,11 @@ final class RunMotor {
     o.put( "step", nombre );
     ArrayNode avisos = Tools.arr();
     if ( escribe( objetivo ) ) {
-      avisos.add( "'" + nombre + "' es un step de salida (" + objetivo.getStepID() + "): al previsualizarlo "
-        + "ESCRIBE de verdad (su archivo o tabla). Las filas que muestra son las que deja pasar." );
+      avisos.add( "'" + nombre + "' is an output step (" + objetivo.getStepID() + "): previewing it REALLY "
+        + "WRITES (its file or table). The rows shown are the ones it passes on." );
     }
     if ( objetivo.isMissing() ) {
-      throw new ToolError( "Falta el plugin de '" + nombre + "' (tipo " + objetivo.getStepID() + "): no se puede ejecutar" );
+      throw new ToolError( "The plugin of '" + nombre + "' is missing (type " + objetivo.getStepID() + "): it cannot run" );
     }
     int quitados = recortar( copia, objetivo );
     List<String> escritores = new ArrayList<String>();
@@ -617,11 +617,11 @@ final class RunMotor {
         escritores.add( s.getName() );
       }
       if ( s.isMissing() ) {
-        throw new ToolError( "Falta el plugin de '" + s.getName() + "', que alimenta a '" + nombre + "'" );
+        throw new ToolError( "The plugin of '" + s.getName() + "', which feeds '" + nombre + "', is missing" );
       }
     }
     if ( !escritores.isEmpty() ) {
-      avisos.add( "Estos steps anteriores tambien corren y escriben de verdad: " + escritores );
+      avisos.add( "These upstream steps also run and really write: " + escritores );
     }
 
     final Trans t = new Trans( copia, padreDeLog() );
@@ -636,10 +636,10 @@ final class RunMotor {
       try {
         t.prepareExecution( null );
       } catch ( Exception e ) {
-        o.put( "estado", "no_inicializo" );
-        o.put( "motivo", primeraLinea( e ) );
-        o.put( "errores", Math.max( 1, t.getErrors() ) );
-        o.set( "metricas", metricas( t ) );
+        o.put( "state", "init_failed" );
+        o.put( "reason", primeraLinea( e ) );
+        o.put( "errors", Math.max( 1, t.getErrors() ) );
+        o.set( "metrics", metricas( t ) );
         o.put( "log", colaLog( t.getLogChannelId(), true ) );
         agregarAvisos( o, avisos, quitados );
         liberarLog( t.getLogChannelId() );
@@ -665,10 +665,10 @@ final class RunMotor {
       }
       t.startThreads();
       long limite = inicio + timeoutMs;
-      fin = "termino";
+      fin = "finished";
       while ( !t.isFinished() ) {
         if ( filas.size() >= maxFilas ) {
-          fin = "limite_de_filas";
+          fin = "row_limit";
           break;
         }
         if ( System.currentTimeMillis() > limite ) {
@@ -694,17 +694,17 @@ final class RunMotor {
         rm = null;
       }
     }
-    o.put( "estado", fin );
+    o.put( "state", fin );
     if ( "timeout".equals( fin ) ) {
-      avisos.add( "Se corto a los " + ( timeoutMs / 1000 ) + " s con " + filas.size() + " filas; subi timeout_s si hace falta" );
+      avisos.add( "Stopped after " + ( timeoutMs / 1000 ) + " s with " + filas.size() + " rows; raise timeout_s if needed" );
     }
-    o.put( "segundos", ( System.currentTimeMillis() - inicio ) / 1000.0 );
-    o.set( "campos", campos( rm, false ) );
-    o.put( "cantidad_filas", filas.size() );
-    o.set( "filas", filas( rm, filas ) );
+    o.put( "seconds", ( System.currentTimeMillis() - inicio ) / 1000.0 );
+    o.set( "fields", campos( rm, false ) );
+    o.put( "row_count", filas.size() );
+    o.set( "rows", filas( rm, filas ) );
     int errores = t.getErrors();
-    o.put( "errores", errores );
-    o.set( "metricas", metricas( t ) );
+    o.put( "errors", errores );
+    o.set( "metrics", metricas( t ) );
     if ( errores > 0 ) {
       o.put( "log", colaLog( t.getLogChannelId(), true ) );
     }
@@ -715,10 +715,10 @@ final class RunMotor {
 
   private static void agregarAvisos( ObjectNode o, ArrayNode avisos, int quitados ) {
     if ( quitados > 0 ) {
-      o.put( "steps_fuera_del_preview", quitados );
+      o.put( "steps_excluded_from_preview", quitados );
     }
     if ( avisos.size() > 0 ) {
-      o.set( "avisos", avisos );
+      o.set( "warnings", avisos );
     }
   }
 
@@ -769,9 +769,9 @@ final class RunMotor {
       t.prepareExecution( null );
     } catch ( Exception e ) {
       ObjectNode o = estadoTrans( t, inicio );
-      o.put( "estado", "no_inicializo" );
-      o.put( "motivo", primeraLinea( e ) );
-      o.put( "errores", Math.max( 1, t.getErrors() ) );
+      o.put( "state", "init_failed" );
+      o.put( "reason", primeraLinea( e ) );
+      o.put( "errors", Math.max( 1, t.getErrors() ) );
       o.put( "log", colaLog( t.getLogChannelId(), true ) );
       liberarLog( t.getLogChannelId() );
       return o;
@@ -790,9 +790,9 @@ final class RunMotor {
     }
     ObjectNode o = estadoTrans( t, inicio );
     if ( corte ) {
-      o.put( "estado", "detenida_por_timeout" );
-      o.put( "aviso", "No termino en " + ( esperaMs / 1000 ) + " s y se detuvo (stopAll). Lo que alcanzo a "
-        + "escribir quedo escrito. Subi esperar_s o usa modo visible." );
+      o.put( "state", "stopped_by_timeout" );
+      o.put( "warning", "Did not finish in " + ( esperaMs / 1000 ) + " s and was stopped (stopAll). Whatever it "
+        + "already wrote stays written. Raise wait_s or use mode='visible'." );
     }
     o.put( "log", colaLog( t.getLogChannelId(), t.getErrors() > 0 ) );
     liberarLog( t.getLogChannelId() );
@@ -823,8 +823,9 @@ final class RunMotor {
     }
     ObjectNode o = estadoJob( j, inicio );
     if ( corte ) {
-      o.put( "estado", "detenido_por_timeout" );
-      o.put( "aviso", "No termino en " + ( esperaMs / 1000 ) + " s y se detuvo (stopAll)." );
+      o.put( "state", "stopped_by_timeout" );
+      o.put( "warning", "Did not finish in " + ( esperaMs / 1000 ) + " s and was stopped (stopAll). Raise wait_s or "
+        + "use mode='visible'." );
     }
     liberarLog( j.getLogChannelId() );
     return o;
@@ -858,21 +859,21 @@ final class RunMotor {
     ObjectNode o = Tools.obj();
     String estado;
     if ( t.isFinished() ) { // un prepareExecution fallido tambien deja la Trans terminada (con errores)
-      estado = t.getErrors() > 0 ? "terminada_con_errores" : ( t.isStopped() ? "detenida" : "terminada" );
+      estado = t.getErrors() > 0 ? "finished_with_errors" : ( t.isStopped() ? "stopped" : "finished" );
     } else if ( t.isPreparing() || t.isInitializing() ) {
-      estado = "preparando";
+      estado = "preparing";
     } else if ( t.isRunning() ) {
-      estado = "corriendo";
+      estado = "running";
     } else {
-      estado = "sin_arrancar";
+      estado = "not_started";
     }
-    o.put( "estado", estado );
-    o.put( "estado_kettle", t.getStatus() );
+    o.put( "state", estado );
+    o.put( "kettle_status", t.getStatus() );
     if ( inicio > 0 ) {
-      o.put( "segundos", ( System.currentTimeMillis() - inicio ) / 1000.0 );
+      o.put( "seconds", ( System.currentTimeMillis() - inicio ) / 1000.0 );
     }
-    o.put( "errores", t.getErrors() );
-    o.set( "metricas", metricas( t ) );
+    o.put( "errors", t.getErrors() );
+    o.set( "metrics", metricas( t ) );
     return o;
   }
 
@@ -911,21 +912,21 @@ final class RunMotor {
       long[] v = e.getValue();
       ObjectNode x = arr.addObject();
       x.put( "step", e.getKey() );
-      x.put( "leidas", v[ 0 ] );
-      x.put( "escritas", v[ 1 ] );
+      x.put( "read", v[ 0 ] );
+      x.put( "written", v[ 1 ] );
       if ( v[ 2 ] > 0 ) {
-        x.put( "entrada", v[ 2 ] );
+        x.put( "input", v[ 2 ] );
       }
       if ( v[ 3 ] > 0 ) {
-        x.put( "salida", v[ 3 ] );
+        x.put( "output", v[ 3 ] );
       }
       if ( v[ 4 ] > 0 ) {
-        x.put( "actualizadas", v[ 4 ] );
+        x.put( "updated", v[ 4 ] );
       }
-      x.put( "rechazadas", v[ 5 ] );
-      x.put( "errores", v[ 6 ] );
+      x.put( "rejected", v[ 5 ] );
+      x.put( "errors", v[ 6 ] );
       if ( estado.get( e.getKey() ) != null ) {
-        x.put( "estado", estado.get( e.getKey() ) );
+        x.put( "state", estado.get( e.getKey() ) );
       }
     }
     return arr;
@@ -934,44 +935,44 @@ final class RunMotor {
   static ObjectNode estadoJob( Job j, long inicio ) {
     ObjectNode o = Tools.obj();
     boolean fin = j.isFinished();
-    o.put( "estado", fin ? ( j.isStopped() ? "detenido" : "terminado" ) : ( j.isActive() ? "corriendo" : "sin_arrancar" ) );
-    o.put( "estado_kettle", j.getStatus() );
+    o.put( "state", fin ? ( j.isStopped() ? "stopped" : "finished" ) : ( j.isActive() ? "running" : "not_started" ) );
+    o.put( "kettle_status", j.getStatus() );
     if ( inicio > 0 ) {
-      o.put( "segundos", ( System.currentTimeMillis() - inicio ) / 1000.0 );
+      o.put( "seconds", ( System.currentTimeMillis() - inicio ) / 1000.0 );
     }
     Result r = j.getResult();
     long errores = r == null ? j.getErrors() : Math.max( r.getNrErrors(), j.getErrors() );
     if ( fin && r != null ) {
-      o.put( "resultado", r.getResult() ? "ok" : "fallo" );
+      o.put( "result", r.getResult() ? "ok" : "failed" );
     }
-    o.put( "errores", errores );
+    o.put( "errors", errores );
     if ( r != null ) {
       ObjectNode lineas = Tools.obj();
-      putSi( lineas, "leidas", r.getNrLinesRead() );
-      putSi( lineas, "escritas", r.getNrLinesWritten() );
-      putSi( lineas, "entrada", r.getNrLinesInput() );
-      putSi( lineas, "salida", r.getNrLinesOutput() );
-      putSi( lineas, "actualizadas", r.getNrLinesUpdated() );
-      putSi( lineas, "rechazadas", r.getNrLinesRejected() );
+      putSi( lineas, "read", r.getNrLinesRead() );
+      putSi( lineas, "written", r.getNrLinesWritten() );
+      putSi( lineas, "input", r.getNrLinesInput() );
+      putSi( lineas, "output", r.getNrLinesOutput() );
+      putSi( lineas, "updated", r.getNrLinesUpdated() );
+      putSi( lineas, "rejected", r.getNrLinesRejected() );
       if ( lineas.size() > 0 ) {
-        o.set( "lineas", lineas );
+        o.set( "lines", lineas );
       }
     }
-    ArrayNode entradas = o.putArray( "entradas" );
+    ArrayNode entradas = o.putArray( "entries" );
     List<JobEntryResult> rs = j.getJobEntryResults();
     if ( rs != null ) {
       for ( JobEntryResult er : new ArrayList<JobEntryResult>( rs ) ) {
         ObjectNode x = entradas.addObject();
-        x.put( "entrada", er.getJobEntryName() );
+        x.put( "entry", er.getJobEntryName() );
         Result res = er.getResult();
         if ( res != null ) {
-          x.put( "resultado", res.getResult() ? "ok" : "fallo" );
+          x.put( "result", res.getResult() ? "ok" : "failed" );
           if ( res.getNrErrors() > 0 ) {
-            x.put( "errores", res.getNrErrors() );
+            x.put( "errors", res.getNrErrors() );
           }
         }
         if ( res != null && !res.getResult() && er.getComment() != null && !er.getComment().isEmpty() ) {
-          x.put( "detalle", er.getComment() );
+          x.put( "detail", er.getComment() );
         }
       }
     }
@@ -999,7 +1000,7 @@ final class RunMotor {
     try {
       todo = KettleLogStore.getAppender().getBuffer( canal, false ).toString();
     } catch ( Exception e ) {
-      return "(no se pudo leer el log: " + e + ")";
+      return "(could not read the log: " + e + ")";
     }
     String[] ls = todo.split( "\\r?\\n" );
     List<String> lineas = new ArrayList<String>();
@@ -1025,18 +1026,18 @@ final class RunMotor {
     }
     int desdeCola = n - LINEAS_LOG;
     if ( primerError < 0 || primerError >= desdeCola ) {
-      return "(... " + desdeCola + " lineas antes)\n" + unir( lineas, desdeCola, n );
+      return "(... " + desdeCola + " earlier lines)\n" + unir( lineas, desdeCola, n );
     }
     int a = Math.max( 0, primerError - 3 );
     int b = Math.min( n, a + 35 );
     int c = Math.max( b, n - 25 );
     StringBuilder sb = new StringBuilder();
     if ( a > 0 ) {
-      sb.append( "(... " ).append( a ).append( " lineas antes)\n" );
+      sb.append( "(... " ).append( a ).append( " earlier lines)\n" );
     }
     sb.append( unir( lineas, a, b ) );
     if ( c > b ) {
-      sb.append( "\n(... " ).append( c - b ).append( " lineas)\n" );
+      sb.append( "\n(... " ).append( c - b ).append( " lines)\n" );
     }
     sb.append( unir( lineas, c, n ) );
     return sb.toString();

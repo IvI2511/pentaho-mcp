@@ -51,7 +51,7 @@ final class Xml {
       }
       return f.newDocumentBuilder().parse( new InputSource( new StringReader( xml ) ) );
     } catch ( Exception e ) {
-      throw new ToolError( "XML invalido: " + e.getMessage() );
+      throw new ToolError( "Invalid XML: " + e.getMessage() );
     }
   }
 
@@ -64,7 +64,7 @@ final class Xml {
     if ( f.startsWith( "<?xml" ) ) {
       f = f.substring( f.indexOf( "?>" ) + 2 ).trim();
     }
-    Document d = parse( "<raiz>" + f + "</raiz>" );
+    Document d = parse( "<root>" + f + "</root>" );
     Element raiz = d.getDocumentElement();
     List<Element> primeros = elementos( raiz );
     if ( primeros.size() == 1 && ( "step".equals( primeros.get( 0 ).getTagName() )
@@ -82,7 +82,7 @@ final class Xml {
    * @return el cuerpo mezclado, sin envoltorio, listo para meter dentro de &lt;step&gt;/&lt;entry&gt;.
    */
   static String mezclar( String porDefecto, String fragmento, Set<String> ignorar ) throws ToolError {
-    Document d = parse( "<raiz>" + ( porDefecto == null ? "" : porDefecto ) + "</raiz>" );
+    Document d = parse( "<root>" + ( porDefecto == null ? "" : porDefecto ) + "</root>" );
     Element raiz = d.getDocumentElement();
     List<Element> nuevos = new ArrayList<Element>();
     Set<String> tags = new LinkedHashSet<String>();
@@ -148,7 +148,7 @@ final class Xml {
       t.transform( new DOMSource( n ), new StreamResult( w ) );
       return w.toString();
     } catch ( Exception e ) {
-      throw new ToolError( "No se pudo serializar XML: " + e.getMessage() );
+      throw new ToolError( "Could not serialize the XML: " + e.getMessage() );
     }
   }
 

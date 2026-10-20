@@ -30,7 +30,7 @@ import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
  * - Todo lo que toque Spoon o un TransMeta/JobMeta abierto corre en el hilo de UI: envolverlo
  *   en {@link #ui(Callable)}. Los metodos de esta clase que no son ui() ASUMEN que ya estan ahi.
  * - Cada documento tiene un id corto y estable mientras siga abierto (T1, T2, J1...), que es lo
- *   que la IA usa en el argumento "documento".
+ *   que la IA usa en el argumento "document".
  * - Al editar un documento se activa su pestania, asi el usuario ve el cambio en vivo.
  * - Despues de mutar: {@link #touched(AbstractMeta)} (marca cambiado, refresca arbol y lienzo).
  */
@@ -48,7 +48,7 @@ final class Docs {
   static Spoon spoon() throws ToolError {
     Spoon s = UiThread.spoon();
     if ( s == null || s.getDisplay() == null || s.getDisplay().isDisposed() ) {
-      throw new ToolError( "Spoon no esta disponible (cerrado o arrancando)" );
+      throw new ToolError( "Spoon is not available (closed or still starting)" );
     }
     return s;
   }
@@ -88,7 +88,7 @@ final class Docs {
   }
 
   static String tipo( AbstractMeta meta ) {
-    return meta instanceof JobMeta ? "job" : "transformacion";
+    return meta instanceof JobMeta ? "job" : "transformation";
   }
 
   /** Documentos abiertos, en el orden de las pestanias. (UI) */
@@ -110,16 +110,16 @@ final class Docs {
   }
 
   /**
-   * Resuelve el argumento "documento" (o la pestania activa si falta) y activa su pestania. (UI)
+   * Resuelve el argumento "document" (o la pestania activa si falta) y activa su pestania. (UI)
    */
   static AbstractMeta resolver( JsonNode args ) throws ToolError {
-    String ref = Tools.optStr( args, "documento", null );
+    String ref = Tools.optStr( args, "document", null );
     AbstractMeta meta;
     if ( ref == null ) {
       meta = activo();
       if ( meta == null ) {
-        throw new ToolError( "No hay ninguna transformacion ni job activo en Spoon. Abri o crea uno "
-          + "(nueva_transformacion, nuevo_job, abrir_archivo) o pasa 'documento'. " + listado() );
+        throw new ToolError( "There is no active transformation or job in Spoon. Open or create one "
+          + "(new_transformation, new_job, open_file) or pass 'document'. " + listado() );
       }
     } else {
       meta = buscar( ref.trim() );
@@ -131,7 +131,7 @@ final class Docs {
   static TransMeta trans( JsonNode args ) throws ToolError {
     AbstractMeta m = resolver( args );
     if ( !( m instanceof TransMeta ) ) {
-      throw new ToolError( "'" + nombre( m ) + "' es un job, y esta herramienta es para transformaciones" );
+      throw new ToolError( "'" + nombre( m ) + "' is a job, and this tool is for transformations" );
     }
     return (TransMeta) m;
   }
@@ -139,7 +139,7 @@ final class Docs {
   static JobMeta job( JsonNode args ) throws ToolError {
     AbstractMeta m = resolver( args );
     if ( !( m instanceof JobMeta ) ) {
-      throw new ToolError( "'" + nombre( m ) + "' es una transformacion, y esta herramienta es para jobs" );
+      throw new ToolError( "'" + nombre( m ) + "' is a transformation, and this tool is for jobs" );
     }
     return (JobMeta) m;
   }
@@ -172,9 +172,9 @@ final class Docs {
       return hits.get( 0 );
     }
     if ( hits.size() > 1 ) {
-      throw new ToolError( "'" + ref + "' coincide con varios documentos; usa el id. " + listado() );
+      throw new ToolError( "'" + ref + "' matches several documents; use the id. " + listado() );
     }
-    throw new ToolError( "No hay ningun documento abierto que sea '" + ref + "'. " + listado() );
+    throw new ToolError( "No open document matches '" + ref + "'. " + listado() );
   }
 
   private static String normalizarRuta( String p ) {
@@ -187,12 +187,12 @@ final class Docs {
     return s.toLowerCase();
   }
 
-  /** "Abiertos: T1 'ventas' (C:\...\ventas.ktr), J1 ..." para los mensajes de error. (UI) */
+  /** "Open: T1 'ventas' (C:\...\ventas.ktr); J1 ..." para los mensajes de error. (UI) */
   static String listado() throws ToolError {
-    StringBuilder sb = new StringBuilder( "Abiertos:" );
+    StringBuilder sb = new StringBuilder( "Open:" );
     List<AbstractMeta> docs = abiertos();
     if ( docs.isEmpty() ) {
-      return "No hay documentos abiertos.";
+      return "No documents are open.";
     }
     for ( AbstractMeta m : docs ) {
       sb.append( ' ' ).append( id( m ) ).append( " '" ).append( nombre( m ) ).append( '\'' );
@@ -205,23 +205,23 @@ final class Docs {
   }
 
   static String nombre( AbstractMeta m ) {
-    return m.getName() != null ? m.getName() : ( m.getFilename() != null ? m.getFilename() : "(sin nombre)" );
+    return m.getName() != null ? m.getName() : ( m.getFilename() != null ? m.getFilename() : "(unnamed)" );
   }
 
   /** Ficha corta de un documento. (UI) */
   static ObjectNode describir( AbstractMeta m ) throws ToolError {
     ObjectNode o = Tools.obj();
     o.put( "id", id( m ) );
-    o.put( "tipo", tipo( m ) );
-    o.put( "nombre", nombre( m ) );
-    o.put( "archivo", m.getFilename() );
-    o.put( "cambios_sin_guardar", m.hasChanged() );
-    o.put( "activo", m == activo() );
+    o.put( "type", tipo( m ) );
+    o.put( "name", nombre( m ) );
+    o.put( "file", m.getFilename() );
+    o.put( "unsaved_changes", m.hasChanged() );
+    o.put( "active", m == activo() );
     if ( m instanceof TransMeta ) {
       o.put( "steps", ( (TransMeta) m ).nrSteps() );
       o.put( "hops", ( (TransMeta) m ).nrTransHops() );
     } else if ( m instanceof JobMeta ) {
-      o.put( "entradas", ( (JobMeta) m ).nrJobEntries() );
+      o.put( "entries", ( (JobMeta) m ).nrJobEntries() );
       o.put( "hops", ( (JobMeta) m ).nrJobHops() );
     }
     return o;

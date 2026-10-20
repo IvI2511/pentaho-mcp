@@ -213,8 +213,8 @@ catalog exposed as MCP resources. See [`CHANGELOG.md`](CHANGELOG.md).
 | Regenerate the step catalog | `bash tools/generador-catalogo/generar.sh <data-integration>` |
 | Internal design (Spoon API, threads, dialogs to avoid) | [`docs/api-spoon.md`](docs/api-spoon.md) (Spanish) |
 
-Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md). The skill and the internal docs are
-written in Spanish; the plugin listing and the user docs are in English.
+Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md). The internal docs and code comments
+are written in Spanish; the skill, the MCP tools, the plugin listing and the user docs are in English.
 
 ## License
 

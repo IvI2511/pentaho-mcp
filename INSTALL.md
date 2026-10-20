@@ -54,7 +54,7 @@ streaming steps that depend on it are missing; the 216 steps in the catalog are 
 
 ## What the script returns (for the agent)
 
-It prints `== Paso N - ...` for each stage and exits with a code:
+It prints `== Step N - ...` for each stage and exits with a code:
 
 | Code | Meaning | What to do |
 |---|---|---|
@@ -85,8 +85,8 @@ is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-
 
 1. The user opens Spoon (`Spoon.bat` on Windows, `spoon.sh` on macOS/Linux).
 2. Restart the agent (or `/reload-plugins` in Claude Code) so it connects to the MCP.
-3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":50}`, or call the
-   `estado` tool of the `pentaho` MCP.
+3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":54}`, or call the
+   `status` tool of the `pentaho` MCP.
 4. Suggest a first try: *"build a transformation that reads a CSV, filters it and writes the result"*.
 
 ## Troubleshooting

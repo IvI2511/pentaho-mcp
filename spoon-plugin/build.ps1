@@ -4,7 +4,7 @@
 # Uso:  powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 [-PdiHome <ruta data-integration>]
 param(
   [string]$PdiHome = $env:PDI_HOME,
-  [string]$Version = "0.3.1"
+  [string]$Version = "0.4.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,6 +58,27 @@ $sources | ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' } | Set-Content 
 if ($LASTEXITCODE -ne 0) { throw "javac fallo ($LASTEXITCODE)" }
 
 if (Test-Path $res) { Copy-Item -Recurse -Force (Join-Path $res "*") $classes }
+
+# --- catalogo y guias de la skill pentaho-etl dentro del jar, para los recursos MCP pentaho://...
+# (McpResources los lee del classpath bajo pentaho-etl/, con la misma estructura que la skill).
+# Se copian en cada build: la fuente unica sigue siendo claude\skills\pentaho-etl, no se duplican en git.
+$skill = Join-Path (Split-Path $root -Parent) "claude\skills\pentaho-etl"
+$catJar = Join-Path $classes "pentaho-etl"
+foreach ($d in @("catalogo\steps", "catalogo\job-entries", "manual")) {
+  New-Item -ItemType Directory -Force (Join-Path $catJar $d) | Out-Null
+}
+foreach ($f in @("catalogo\INDICE.md", "catalogo\steps-comunes.md", "manual\01-formato-ktr.md",
+                 "manual\02-formato-kjb.md", "manual\03-errores-comunes.md")) {
+  $from = Join-Path $skill $f
+  if (-not (Test-Path $from)) { throw "Falta $from (catalogo de la skill pentaho-etl)" }
+  Copy-Item -Force $from (Join-Path $catJar $f)
+}
+foreach ($d in @("catalogo\steps", "catalogo\job-entries")) {
+  $xmls = @(Get-ChildItem (Join-Path $skill $d) -Filter *.xml -File)
+  if ($xmls.Count -eq 0) { throw "No hay .xml en $(Join-Path $skill $d)" }
+  $xmls | Copy-Item -Force -Destination (Join-Path $catJar $d)
+  Write-Host ("Recursos: " + $xmls.Count + " .xml de " + $d)
+}
 
 # --- empaquetar
 $manifest = Join-Path $build "MANIFEST.MF"

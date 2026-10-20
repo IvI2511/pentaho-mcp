@@ -11,13 +11,13 @@ import org.pentaho.di.ui.spoon.Spoon;
  * {@link JobSoporte} (sin GUI); aca se resuelve el documento, se corre en el hilo de UI, se
  * registra el undo en Spoon y se refresca el lienzo.
  *
- * ordenar_lienzo y agregar_nota (tambien para jobs) estan en TransTools.
+ * arrange_canvas y add_note (tambien para jobs) estan en TransTools.
  */
 final class JobTools {
 
-  private static final String CONDICION = "Cuando sigue el hop: si_ok (verde, solo si la entrada anterior "
-    + "termino bien), si_falla (rojo, solo si fallo) o siempre (negro, incondicional). Desde START es siempre "
-    + "incondicional.";
+  private static final String CONDICION = "When the hop is followed: on_success (green, only if the previous "
+    + "entry finished OK), on_failure (red, only if it failed) or always (black, unconditional). Hops leaving "
+    + "START are always unconditional.";
 
   private JobTools() {
   }
@@ -37,136 +37,136 @@ final class JobTools {
       JobMeta jm = Docs.job( a );
       ObjectNode o = e.aplicar( sp, jm, new UndoGrupo( sp, jm ) );
       Docs.touched( jm );
-      o.put( "documento", Docs.id( jm ) );
+      o.put( "document", Docs.id( jm ) );
       return o;
     } );
   }
 
   static void register( McpHttpServer s ) {
 
-    s.add( Tools.tool( "tipos_de_entrada",
-      "Busca tipos de entrada de job (job entries) instalados en este Spoon. Usala antes de agregar_entrada "
-        + "cuando no sepas el id (<type>) exacto. Sin argumentos devuelve las categorias con su cantidad; con "
-        + "'buscar' (palabras en id, nombre o descripcion) o 'categoria' devuelve id, nombre en pantalla, "
-        + "categoria y descripcion. Ids comunes: TRANS (ejecutar transformacion), JOB (ejecutar job), SUCCESS, "
-        + "ABORT, SQL, SET_VARIABLES, WRITE_TO_LOG, FILE_EXISTS, EVAL, SIMPLE_EVAL. START y DUMMY son "
-        + "especiales: se crean con agregar_entrada tipo=START / tipo=DUMMY.",
-      Tools.schema().str( "buscar", "Palabras a buscar (ej. 'file exists', 'sql', 'mail')", false )
-        .str( "categoria", "Categoria (o parte), ej. 'General', 'File management', 'Conditions'", false ).build(),
-      a -> JobSoporte.tipos( Tools.optStr( a, "buscar", null ), Tools.optStr( a, "categoria", null ) ) ) );
+    s.add( Tools.tool( "list_entry_types",
+      "Searches the job entry types installed in this Spoon. Use it before add_entry when you do not know the "
+        + "exact id (<type>). Without arguments it returns the categories with their count; with 'search' "
+        + "(words in the id, name or description) or 'category' it returns id, display name, category and "
+        + "description. Common ids: TRANS (run a transformation), JOB (run a job), SUCCESS, ABORT, SQL, "
+        + "SET_VARIABLES, WRITE_TO_LOG, FILE_EXISTS, EVAL, SIMPLE_EVAL. START and DUMMY are special: create "
+        + "them with add_entry type=START / type=DUMMY.",
+      Tools.schema().str( "search", "Words to search for (e.g. 'file exists', 'sql', 'mail')", false )
+        .str( "category", "Category (or part of it), e.g. 'General', 'File management', 'Conditions'", false )
+        .build(),
+      a -> JobSoporte.tipos( Tools.optStr( a, "search", null ), Tools.optStr( a, "category", null ) ) ) );
 
-    s.add( Tools.tool( "plantilla_entrada",
-      "XML de configuracion por defecto de un tipo de entrada de job, sin el envoltorio (<name>, <type>, "
-        + "posicion). Usala antes de agregar_entrada o configurar_entrada para saber que tags lleva: despues "
-        + "manda en config_xml solo los que cambian. Ejemplo TRANS: <specification_method>filename"
-        + "</specification_method><filename>${Internal.Entry.Current.Directory}/carga.ktr</filename>.",
-      Tools.schema().str( "tipo", "Id del tipo (TRANS, JOB, SUCCESS, ABORT..., o START/DUMMY) o su nombre en "
-        + "pantalla", true ).build(),
+    s.add( Tools.tool( "get_entry_template",
+      "Default configuration XML of a job entry type, without the wrapper (<name>, <type>, position). Use it "
+        + "before add_entry or configure_entry to see which tags it takes, then send in config_xml only the "
+        + "ones that change. TRANS example: <specification_method>filename</specification_method>"
+        + "<filename>${Internal.Entry.Current.Directory}/load.ktr</filename>.",
+      Tools.schema().str( "type", "Type id (TRANS, JOB, SUCCESS, ABORT..., or START/DUMMY) or its display name",
+        true ).build(),
       a -> {
-        String t = JobSoporte.resolverTipo( Tools.str( a, "tipo" ) );
+        String t = JobSoporte.resolverTipo( Tools.str( a, "type" ) );
         if ( JobSoporte.SPECIAL.equals( t ) ) {
           t = JobSoporte.START;
         }
         return "<!-- " + t + " -->\n" + JobSoporte.plantilla( t );
       } ) );
 
-    s.add( Tools.tool( "agregar_entrada",
-      "Agrega una entrada al job abierto (aparece en vivo en el lienzo, seleccionada) y, con despues_de, la "
-        + "conecta con un hop. Es la forma de armar un job paso a paso: START primero (tipo=START, uno solo por "
-        + "job), despues cada entrada con despues_de=<la anterior>. Posicion: con despues_de, a su derecha "
-        + "(+150; si el lugar esta ocupado, mas abajo); sin nada, a la derecha de la ultima entrada; x/y la "
-        + "fuerzan. config_xml: solo los tags que cambian respecto de plantilla_entrada. En una entrada "
-        + "Transformation (TRANS) o Job (JOB) la ruta conviene relativa a la carpeta del job: "
-        + "<specification_method>filename</specification_method><filename>${Internal.Entry.Current.Directory}"
-        + "/archivo.ktr</filename> (para JOB, .kjb). Parametros a la transformacion: <parameters>"
-        + "<pass_all_parameters>Y</pass_all_parameters><parameter><name>P</name><stream_name/><value>v</value>"
-        + "</parameter></parameters>. Para cerrar un job: SUCCESS (si_ok) y ABORT (si_falla).",
-      Tools.schema().documento()
-        .str( "tipo", "Id del tipo de entrada: START, DUMMY, TRANS, JOB, SUCCESS, ABORT, SQL... (ver "
-          + "tipos_de_entrada)", true )
-        .str( "nombre", "Nombre de la entrada, unico en el job", true )
-        .str( "config_xml", "Configuracion: tags de primer nivel que reemplazan a los de la plantilla "
-          + "(opcional)", false )
-        .integer( "x", "Posicion x en el lienzo (opcional)", false )
-        .integer( "y", "Posicion y en el lienzo (opcional)", false )
-        .str( "despues_de", "Entrada existente desde la que sale un hop hacia la nueva (opcional)", false )
-        .strEnum( "condicion", CONDICION + " Por defecto si_ok.", false, "siempre", "si_ok", "si_falla" ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.agregar( jm, Tools.str( a, "tipo" ), Tools.optStr( a, "nombre",
+    s.add( Tools.tool( "add_entry",
+      "Adds an entry to the open job (it appears live on the canvas, selected) and, with 'after', connects it "
+        + "with a hop. This is how to build a job step by step: START first (type=START, only one per job), then "
+        + "each entry with after=<the previous one>. Position: with 'after', to its right (+150; if the spot is "
+        + "taken, further down); with neither, to the right of the last entry; x/y force it. config_xml: only "
+        + "the tags that change from get_entry_template. In a Transformation (TRANS) or Job (JOB) entry the path "
+        + "should be relative to the job's folder: <specification_method>filename</specification_method>"
+        + "<filename>${Internal.Entry.Current.Directory}/file.ktr</filename> (.kjb for JOB). Parameters for the "
+        + "transformation: <parameters><pass_all_parameters>Y</pass_all_parameters><parameter><name>P</name>"
+        + "<stream_name/><value>v</value></parameter></parameters>. To close a job: SUCCESS (on_success) and "
+        + "ABORT (on_failure).",
+      Tools.schema().document()
+        .str( "type", "Entry type id: START, DUMMY, TRANS, JOB, SUCCESS, ABORT, SQL... (see list_entry_types)",
+          true )
+        .str( "name", "Entry name, unique in the job", true )
+        .str( "config_xml", "Configuration: top-level tags that replace the template's ones (optional)", false )
+        .integer( "x", "Canvas x position (optional)", false )
+        .integer( "y", "Canvas y position (optional)", false )
+        .str( "after", "Existing entry from which a hop goes to the new one (optional)", false )
+        .strEnum( "condition", CONDICION + " Default on_success.", false, JobSoporte.SIEMPRE, JobSoporte.SI_OK,
+          JobSoporte.SI_FALLA ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.agregar( jm, Tools.str( a, "type" ), Tools.optStr( a, "name",
         null ), Tools.optStr( a, "config_xml", null ), Tools.optInteger( a, "x" ), Tools.optInteger( a, "y" ),
-        Tools.optStr( a, "despues_de", null ), Tools.optStr( a, "condicion", null ), sp.getRepository(),
+        Tools.optStr( a, "after", null ), Tools.optStr( a, "condition", null ), sp.getRepository(),
         sp.getMetaStore(), u ) ) ) );
 
-    s.add( Tools.tool( "configurar_entrada",
-      "Cambia la configuracion de una entrada existente: mezcla config_xml sobre su configuracion ACTUAL "
-        + "(cada tag que mandes reemplaza al que habia; lo demas queda). Conserva nombre y posicion; se "
-        + "deshace con Ctrl+Z. Usala para corregir la ruta de una TRANS/JOB, el mensaje de un ABORT, etc. Mira "
-        + "antes ver_entrada. Para renombrar usa renombrar_entrada.",
-      Tools.schema().documento().str( "entrada", "Nombre de la entrada", true )
-        .str( "config_xml", "Tags de primer nivel a reemplazar, ej. <filename>${Internal.Entry.Current.Directory}"
-          + "/otra.ktr</filename>", true ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.configurar( jm, Tools.str( a, "entrada" ),
+    s.add( Tools.tool( "configure_entry",
+      "Changes the configuration of an existing entry: merges config_xml over its CURRENT configuration (each "
+        + "tag you send replaces the existing one; the rest stays). Keeps name and position; undo with Ctrl+Z. "
+        + "Use it to fix the path of a TRANS/JOB, the message of an ABORT, etc. Look at get_entry first. To "
+        + "rename use rename_entry.",
+      Tools.schema().document().str( "entry", "Entry name", true )
+        .str( "config_xml", "Top-level tags to replace, e.g. <filename>${Internal.Entry.Current.Directory}"
+          + "/other.ktr</filename>", true ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.configurar( jm, Tools.str( a, "entry" ),
         Tools.str( a, "config_xml" ), sp.getRepository(), sp.getMetaStore(), u ) ) ) );
 
-    s.add( Tools.tool( "ver_entrada",
-      "Lee una entrada del job: tipo, posicion, su configuracion en XML (contrasenias enmascaradas) y los "
-        + "hops que entran y salen con su condicion. Usala antes de configurar_entrada o para revisar un job "
-        + "que abrio el usuario. Para ver el job entero usa ver_documento.",
-      Tools.schema().documento().str( "entrada", "Nombre de la entrada", true ).build(),
+    s.add( Tools.tool( "get_entry",
+      "Reads a job entry: type, position, its configuration as XML (passwords masked) and the incoming and "
+        + "outgoing hops with their condition. Use it before configure_entry or to review a job the user "
+        + "opened. To see the whole job use get_document.",
+      Tools.schema().document().str( "entry", "Entry name", true ).build(),
       a -> Docs.ui( () -> {
         JobMeta jm = Docs.job( a );
-        ObjectNode o = JobSoporte.ver( jm, Tools.str( a, "entrada" ) );
-        o.put( "documento", Docs.id( jm ) );
+        ObjectNode o = JobSoporte.ver( jm, Tools.str( a, "entry" ) );
+        o.put( "document", Docs.id( jm ) );
         return o;
       } ) ) );
 
-    s.add( Tools.tool( "renombrar_entrada",
-      "Cambia el nombre de una entrada del job (los hops la siguen). Falla si el nombre ya existe. Se "
-        + "deshace con Ctrl+Z.",
-      Tools.schema().documento().str( "entrada", "Nombre actual", true )
-        .str( "nuevo_nombre", "Nombre nuevo, unico en el job", true ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.renombrar( jm, Tools.str( a, "entrada" ),
-        Tools.str( a, "nuevo_nombre" ), u ) ) ) );
+    s.add( Tools.tool( "rename_entry",
+      "Renames a job entry (its hops follow it). Fails if the name already exists. Undo with Ctrl+Z.",
+      Tools.schema().document().str( "entry", "Current name", true )
+        .str( "new_name", "New name, unique in the job", true ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.renombrar( jm, Tools.str( a, "entry" ),
+        Tools.str( a, "new_name" ), u ) ) ) );
 
-    s.add( Tools.tool( "mover_entrada",
-      "Mueve una entrada del job a otra posicion del lienzo (x, y en pixeles). Para acomodar todo el job "
-        + "de una vez usa ordenar_lienzo.",
-      Tools.schema().documento().str( "entrada", "Nombre de la entrada", true )
-        .integer( "x", "Posicion x", true ).integer( "y", "Posicion y", true ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.mover( jm, Tools.str( a, "entrada" ), Tools.integer( a, "x" ),
+    s.add( Tools.tool( "move_entry",
+      "Moves a job entry to another position on the canvas (x, y in pixels). To lay out the whole job at once "
+        + "use arrange_canvas.",
+      Tools.schema().document().str( "entry", "Entry name", true )
+        .integer( "x", "x position", true ).integer( "y", "y position", true ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.mover( jm, Tools.str( a, "entry" ), Tools.integer( a, "x" ),
         Tools.integer( a, "y" ), u ) ) ) );
 
-    s.add( Tools.tool( "borrar_entrada",
-      "Borra una entrada del job junto con todos sus hops (entrantes y salientes). Un Ctrl+Z la restaura "
-        + "con sus hops.",
-      Tools.schema().documento().str( "entrada", "Nombre de la entrada", true ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.borrar( jm, Tools.str( a, "entrada" ), u ) ) ) );
+    s.add( Tools.tool( "delete_entry",
+      "Deletes a job entry together with all its hops (incoming and outgoing). One Ctrl+Z restores it with its "
+        + "hops.",
+      Tools.schema().document().str( "entry", "Entry name", true ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.borrar( jm, Tools.str( a, "entry" ), u ) ) ) );
 
-    s.add( Tools.tool( "conectar_entradas",
-      "Crea un hop entre dos entradas existentes del job. Para ramas: el mismo origen con un hop si_ok y "
-        + "otro si_falla (p.ej. hacia un ABORT). Rechaza hops repetidos, hacia START y los que cierran un "
-        + "bucle (salvo permitir_bucle=true, para reintentos intencionales).",
-      Tools.schema().documento().str( "desde", "Entrada de origen", true ).str( "hacia", "Entrada de destino", true )
-        .strEnum( "condicion", CONDICION + " Por defecto si_ok.", false, "siempre", "si_ok", "si_falla" )
-        .bool( "permitir_bucle", "Aceptar que el hop cierre un ciclo (por defecto false)", false ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.conectar( jm, Tools.str( a, "desde" ), Tools.str( a, "hacia" ),
-        Tools.optStr( a, "condicion", null ), Tools.optBool( a, "permitir_bucle", false ), u ) ) ) );
+    s.add( Tools.tool( "connect_entries",
+      "Creates a hop between two existing job entries. For branches: the same source with one on_success hop "
+        + "and another on_failure hop (e.g. to an ABORT). Rejects duplicate hops, hops into START and hops that "
+        + "close a loop (unless allow_loop=true, for intentional retries).",
+      Tools.schema().document().str( "from", "Source entry", true ).str( "to", "Target entry", true )
+        .strEnum( "condition", CONDICION + " Default on_success.", false, JobSoporte.SIEMPRE, JobSoporte.SI_OK,
+          JobSoporte.SI_FALLA )
+        .bool( "allow_loop", "Accept a hop that closes a cycle (default false)", false ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.conectar( jm, Tools.str( a, "from" ), Tools.str( a, "to" ),
+        Tools.optStr( a, "condition", null ), Tools.optBool( a, "allow_loop", false ), u ) ) ) );
 
-    s.add( Tools.tool( "desconectar_entradas",
-      "Borra el hop entre dos entradas del job (las entradas quedan).",
-      Tools.schema().documento().str( "desde", "Entrada de origen", true ).str( "hacia", "Entrada de destino", true )
-        .build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.desconectar( jm, Tools.str( a, "desde" ), Tools.str( a, "hacia" ),
+    s.add( Tools.tool( "disconnect_entries",
+      "Deletes the hop between two job entries (the entries stay).",
+      Tools.schema().document().str( "from", "Source entry", true ).str( "to", "Target entry", true ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.desconectar( jm, Tools.str( a, "from" ), Tools.str( a, "to" ),
         u ) ) ) );
 
-    s.add( Tools.tool( "cambiar_condicion",
-      "Cambia cuando se sigue un hop existente del job (siempre / si_ok / si_falla) y/o lo habilita o "
-        + "deshabilita. Usala para convertir un hop verde en rama de error, o para apagar una rama sin "
-        + "borrarla.",
-      Tools.schema().documento().str( "desde", "Entrada de origen", true ).str( "hacia", "Entrada de destino", true )
-        .strEnum( "condicion", CONDICION, false, "siempre", "si_ok", "si_falla" )
-        .bool( "habilitado", "false para deshabilitar el hop (queda gris), true para habilitarlo", false ).build(),
-      a -> editar( a, ( sp, jm, u ) -> JobSoporte.cambiarCondicion( jm, Tools.str( a, "desde" ),
-        Tools.str( a, "hacia" ), Tools.optStr( a, "condicion", null ),
-        a.hasNonNull( "habilitado" ) ? Tools.optBool( a, "habilitado", true ) : null, u ) ) ) );
+    s.add( Tools.tool( "set_hop_condition",
+      "Changes when an existing job hop is followed (always / on_success / on_failure) and/or enables or "
+        + "disables it. Use it to turn a green hop into an error branch, or to switch a branch off without "
+        + "deleting it.",
+      Tools.schema().document().str( "from", "Source entry", true ).str( "to", "Target entry", true )
+        .strEnum( "condition", CONDICION, false, JobSoporte.SIEMPRE, JobSoporte.SI_OK, JobSoporte.SI_FALLA )
+        .bool( "enabled", "false to disable the hop (it turns grey), true to enable it", false ).build(),
+      a -> editar( a, ( sp, jm, u ) -> JobSoporte.cambiarCondicion( jm, Tools.str( a, "from" ),
+        Tools.str( a, "to" ), Tools.optStr( a, "condition", null ),
+        a.hasNonNull( "enabled" ) ? Tools.optBool( a, "enabled", true ) : null, u ) ) ) );
   }
 }
