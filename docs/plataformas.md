@@ -122,7 +122,9 @@ grueso del Pan en Mac es el arranque de la JVM y de Kettle, no la transformació
    `JavaApplicationStub` queda `-rw-rw-rw-` y la `.app` no abre. Arreglo para la 0.4.1:
    `chmod +x ~/pentaho/data-integration/Data\ Integration.app/Contents/MacOS/JavaApplicationStub`.
    Desde la 0.4.2 lo resuelve `tools/armar-zip-pdi.py`; la prueba lo va a confirmar sola cuando la 0.4.2
-   sea el último release (el paso «Permisos en el zip del release» pasa a decir «ejecutable»).
+   sea el último release (el paso «Permisos en el zip del release» pasa a decir «ejecutable»). Antes de
+   publicarla ya se puede ver con `plugin: rama` («Probar el plugin de una rama», abajo): el zip que arma
+   ese script trae los cuatro en `-rwxr-xr-x (0755)` y `unzip` los deja así en disco, sin `chmod`.
 2. **`spoon.sh` y `pan.sh` cortan en arm64 con código de salida 0.** Imprimen «not yet supported» y
    terminan con `exit` sin número: un script o un agente que mira solo el código cree que anduvo. Por eso
    la prueba lee la salida y no solo el código.
@@ -163,13 +165,15 @@ grueso del Pan en Mac es el arranque de la JVM y de Kettle, no la transformació
 
 ## Cómo se corre la prueba
 
-Se dispara con cada push a una rama `ci/**` y a mano (Actions → Plataformas → Run workflow). Los runners
-estándar son gratis en repos públicos; una corrida entera tarda ~2 min por job (más la cola de los
-runners de Mac con chip Apple, que a veces es larga).
+Se dispara con cada push a una rama `ci/**` (con el último release) y a mano, desde Actions → Plataformas
+→ Run workflow o con `gh workflow run` (abajo), con dos opciones: `plugin` (`release`, por defecto, o
+`rama`) y `solo_probar` (corre solo el job `probar`). La corrida a mano anda en cualquier rama que tenga
+este workflow, aunque no esté en `main`. Los runners estándar son gratis en repos públicos; una corrida
+entera tarda ~2 min por job (más la cola de los runners de Mac con chip Apple, que a veces es larga).
 
 | Job | Qué hace |
 |---|---|
-| `probar` (5 plataformas) | lo de arriba; artifact `evidencia-<plataforma>` con `canvas.png`, `pantalla-*.png`, `cliente.log`, `ping.json`, `pan-*.log`, `spoon-salida.log`, `pdi-logs/`, `permisos-*.txt`, `tiempos.txt` |
+| `probar` (5 plataformas) | lo de arriba; artifact `evidencia-<plataforma>` con `canvas.png`, `pantalla-*.png`, `cliente.log`, `ping.json`, `pan-*.log`, `spoon-salida.log`, `pdi-logs/`, `permisos-*.txt`, `tiempos.txt`; con `plugin: rama`, además `compilar.log`, `plugin-archivos.txt`, `armar-zip.log` y `permisos-*-rama.txt` |
 | `macos-arm64-nativo` | Java arm64: `spoon.sh` y `pan.sh` cortan, Pan nativo con shell bajo Rosetta, Spoon con Java arm64 (falla de SWT). `continue-on-error`; verde si los cortes salen como dice este documento |
 | `receta-mac-apple` | los cuatro pasos de «Mac con chip Apple» copiados tal cual, sin `setup-java` ni `KETTLE_HOME` de prueba, y después el cliente MCP |
 | `ventana-macos` | diagnóstico de la ventana en blanco (problema 5): SWT mínima con y sin AWT, Spoon, geometría de la ventana, hilos, `java.awt.headless` |
@@ -178,13 +182,61 @@ runners de Mac con chip Apple, que a veces es larga).
 `ShowRepositoriesAtStartup=N`, para que la primera apertura no dependa del diálogo de tips ni de la
 página de bienvenida. `receta-mac-apple` no lo usa (primera apertura real).
 
-Probar una versión sin publicar: hoy la prueba siempre baja el último release (es lo que hace
-`instalar.sh`). Para probar la 0.4.2 antes de publicarla haría falta compilar el plugin en el runner
-(necesita los jars de PDI, que ya baja) o subir el zip como artifact: queda para después.
+La cantidad de herramientas no está fija: el cliente MCP compara `tools/list` con la que dice `/ping`
+(`"tools"`), así que una versión con otras herramientas no rompe la prueba (en el resumen de cada job
+queda cuántas eran).
+
+### Probar el plugin de una rama (versión sin publicar)
+
+Con `plugin: release` (lo de siempre, y lo que corre en cada push) el plugin es el que trae el zip de
+`releases/latest`, porque `instalar.sh --instalar-pdi` baja ese. Con **`plugin: rama`**, el job `probar`
+prueba el plugin compilado desde el código de la rama en la que se lanza:
+
+```bash
+gh workflow run plataformas.yml -R IvI2511/pentaho-mcp --ref <rama> -f plugin=rama -f solo_probar=true
+```
+
+(o Actions → Plataformas → Run workflow → elegir la rama y `plugin` = `rama`); para seguirla,
+`gh run list -R IvI2511/pentaho-mcp -w plataformas.yml` da el id y `gh run watch <id> -R IvI2511/pentaho-mcp`.
+`solo_probar` saltea los otros tres jobs, que siempre usan el release (`receta-mac-apple` justamente
+prueba lo publicado). En el resumen de cada job queda `plugin: rama (X.Y.Z, compilado de <rama>)`.
+
+Qué cambia en `probar` con `rama`, después de instalar el PDI del release como siempre:
+
+1. **Compila el plugin** con `tools/ci/compilar-plugin.sh`, que hace lo mismo que `spoon-plugin/build.ps1`
+   (ese es de Windows): la versión sale de `VERSION` (corta si `claude/.claude-plugin/plugin.json` dice
+   otra), `javac --release 8` contra `data-integration/lib/*` y `libswt/win64/*` del PDI recién bajado, el
+   recurso `pentaho-mcp-version.txt`, el catálogo y las guías de la skill dentro del jar, `version.xml` y, si
+   la rama tiene `spoon-plugin/ui/` (desde la 0.4.2), esa carpeta. Probado con la 0.4.1: el jar sale con
+   las mismas 372 entradas que el del release y las clases idénticas byte a byte.
+2. **Reemplaza `plugins/pentaho-mcp/`**: borra antes la carpeta vieja (el jar cambia de nombre con cada
+   versión y, si quedan dos, Spoon carga el plugin dos veces) y controla que en `plugins/` quede un solo
+   `pentaho-mcp-core-*.jar`, el de `VERSION`. `plugin-archivos.txt` lista lo que traía el release y lo
+   compilado, para ver si `build.ps1` y el script se separaron.
+3. **Rearma el PDI** con `python3 -I tools/armar-zip-pdi.py` (como el zip del release desde la 0.4.2) y
+   controla en el zip, con `tools/ci/permisos_zip.py --modo 0755`, que `spoon.sh`, `pan.sh`,
+   `spoon.command` y `Data Integration.app/Contents/MacOS/JavaApplicationStub` estén en 0755. Lo descomprime
+   con `unzip` sin el `chmod` de `instalar.sh` y vuelve a controlar los cuatro en disco. Pan, Spoon y el
+   cliente MCP corren sobre **ese** PDI.
+4. El cliente MCP controla además que `initialize` diga la versión de `VERSION` (que Spoon cargó el plugin
+   compilado y no otro).
+
+Para probar la 0.4.2 antes de publicarla, la rama tiene que tener el código de la 0.4.2 **y** este
+workflow con `tools/ci/`: por ejemplo, una rama `ci/…` sacada de la de la 0.4.2 con `ci/plugin-rama`
+mergeada (el push corre la prueba con el release; `[skip ci]` en el mensaje lo evita) y después el
+`gh workflow run` de arriba con `--ref` esa rama. Lo que no cubre: el instalador de Windows, el lanzador
+(`IDCLauncher.exe`, `pentaho-live.cmd`) y `instalar.sh` sin `--instalar-pdi`, que sigue bajando el
+`pentaho-mcp.zip` del release. Si `build.ps1` cambia lo que va en el jar o en la carpeta del plugin,
+cambiar también `tools/ci/compilar-plugin.sh`.
+
+Lo que suma `rama` al job (corrida 10): compilar, 4–5 s en Linux y en el Mac Intel y 21–30 s en los de
+chip Apple (el `javac` x64 corre bajo Rosetta); armar el zip y descomprimirlo, 15–23 s. El job entero
+quedó en 60–73 s en Linux, 117 s en el Mac Intel y 152–176 s en chip Apple.
 
 ## Corridas
 
 Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.yml?query=branch%3Aci%2Fplataformas
+(de la 10 en adelante, rama `ci/plugin-rama`: `?query=branch%3Aci%2Fplugin-rama`).
 
 | # | Corrida | Qué mostró |
 |---|---|---|
@@ -197,6 +249,8 @@ Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.ym
 | 7 | [39467208277](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467208277) | hilos de Java2D en Spoon; con `java.awt.headless` sigue en blanco (cancelada después: lo que quedaba eran jobs arm64 repetidos, en cola) |
 | 8 | [39467778493](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467778493) | la ventana SWT mínima con Java2D/AWT inicializado también se dibuja (cancelada después, igual que la 7) |
 | 9 | [39468686139](https://github.com/IvI2511/pentaho-mcp/actions/runs/39468686139) | **la de referencia**, con el workflow final: 8 de 8 en verde (5 plataformas, arm64 nativo, receta del documento y diagnóstico de la ventana) |
+| 10 | [39474975995](https://github.com/IvI2511/pentaho-mcp/actions/runs/39474975995) | a mano, `plugin: rama` y `solo_probar`: 5 de 5 en verde con el plugin compilado en el runner (0.4.1 desde el código); el zip de `armar-zip-pdi.py` trae `spoon.sh` y `JavaApplicationStub` en 0755 y quedan así en disco |
+| 11 | [39475008916](https://github.com/IvI2511/pentaho-mcp/actions/runs/39475008916) | a mano, `plugin: release` y `solo_probar`: 5 de 5 en verde con el workflow nuevo (herramientas leídas de `/ping`) |
 
 Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pentaho-mcp`).
 

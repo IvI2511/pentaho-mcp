@@ -145,6 +145,7 @@ jobs:
           {
             echo "== plugin del release (plugins/pentaho-mcp)"; (cd "$PDI/plugins/pentaho-mcp" && find . -type f | sort)
             echo "== plugin compilado de la rama"; (cd "$RUNNER_TEMP/plugin/pentaho-mcp" && find . -type f | sort)
+            echo "== jars"; shasum -a 256 "$PDI"/plugins/pentaho-mcp/*.jar "$RUNNER_TEMP"/plugin/pentaho-mcp/*.jar
           } | tee "$EVID/plugin-archivos.txt"
           # el jar cambia de nombre con cada versión: sin borrar antes la carpeta vieja, Spoon carga el plugin dos veces
           rm -rf "$PDI/plugins/pentaho-mcp"
