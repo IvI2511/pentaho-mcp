@@ -159,6 +159,8 @@ if [ "$INSTALAR_PDI" = 1 ]; then
 else
   bajar "$BASE/pentaho-mcp.zip" "$TMP/pentaho-mcp.zip"
   descomprimir "$TMP/pentaho-mcp.zip" "$TMP"
+  # its folder entries have no MS-DOS attributes, so unzip makes them without the x bit (macOS's cp -R fails)
+  chmod -R u+rwX,go+rX "$TMP/pentaho-mcp"
   rm -rf "$PDI/plugins/pentaho-mcp" && cp -R "$TMP/pentaho-mcp" "$PDI/plugins/pentaho-mcp" \
     || { echo "Could not replace the plugin: close Spoon and run the installer again."; exit 4; }
   echo "   installed in $PDI/plugins/pentaho-mcp"
