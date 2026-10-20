@@ -394,8 +394,23 @@ jobs:
           osascript "$CI/ventana.applescript" "$PID" > "$EVID/geometria-spoon-tras-mcp.txt" 2>&1
           screencapture -x "$EVID/spoon-tras-mcp.png"
           cat "$EVID/geometria-spoon-tras-mcp.txt" | head -80
+          "$JAVA_HOME/bin/jcmd" "$PID" Thread.print > "$EVID/hilos-spoon.txt" 2>&1
+          echo "hilos de AWT en Spoon:"; grep -E '^"' "$EVID/hilos-spoon.txt" | grep -iE "awt|appkit" || echo "(ninguno)"
           pkill -f launcher/launcher.jar
           cp "$PDI"/logs/spoon.log "$EVID/" 2>/dev/null
+          sleep 5
+
+          echo "== Spoon con -Djava.awt.headless=true"
+          ( cd "$PDI" && PENTAHO_DI_JAVA_OPTIONS="-Xms1024m -Xmx2048m -Djava.awt.headless=true"               nohup /bin/sh ./spoon.sh > "$EVID/spoon-headless-salida.log" 2>&1 & )
+          for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > /dev/null 2>&1 && break; sleep 1; done
+          sleep 10
+          PID=$(pgrep -f launcher/launcher.jar | head -1)
+          osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is $PID) to true"
+          python3 -I "$CI/cliente_mcp.py" --salida "$EVID/mcp-headless" --plataforma headless | tail -1
+          sleep 3; screencapture -x "$EVID/spoon-headless.png"
+          "$JAVA_HOME/bin/jcmd" "$PID" Thread.print > "$EVID/hilos-spoon-headless.txt" 2>&1
+          grep -E '^"' "$EVID/hilos-spoon-headless.txt" | grep -iE "awt|appkit" || echo "(sin hilos de AWT)"
+          pkill -f launcher/launcher.jar
           exit 0
 
       - uses: actions/upload-artifact@v7
