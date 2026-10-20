@@ -103,28 +103,50 @@ final class Docs {
     return out;
   }
 
-  /** El documento de la pestania activa, o null. (UI) */
+  /**
+   * El documento de la pestania seleccionada de Data Integration, o null. (UI)
+   *
+   * No usa spoon.getActiveMeta(): ese le pregunta a la perspectiva activa, y con Informes al frente
+   * (getActiveMeta() = null) todas las tools sin "document" fallaban. getActiveTransGraph() y
+   * getActiveJobGraph() leen el tab folder directamente, sin importar la perspectiva (bytecode de 9.4:
+   * la misma logica que MainSpoonPerspective.getActiveMeta).
+   */
   static AbstractMeta activo() throws ToolError {
-    Object m = spoon().getActiveMeta();
-    return m instanceof AbstractMeta ? (AbstractMeta) m : null;
+    Spoon s = spoon();
+    TransGraph tg = s.getActiveTransGraph();
+    if ( tg != null && tg.getTransMeta() != null ) {
+      return tg.getTransMeta();
+    }
+    JobGraph jg = s.getActiveJobGraph();
+    if ( jg != null && jg.getJobMeta() != null ) {
+      return jg.getJobMeta();
+    }
+    return null;
   }
 
   /**
    * Resuelve el argumento "document" (o la pestania activa si falta) y activa su pestania. (UI)
    */
   static AbstractMeta resolver( JsonNode args ) throws ToolError {
-    String ref = Tools.optStr( args, "document", null );
-    AbstractMeta meta;
-    if ( ref == null ) {
-      meta = activo();
-      if ( meta == null ) {
-        throw new ToolError( "There is no active transformation or job in Spoon. Open or create one "
-          + "(new_transformation, new_job, open_file) or pass 'document'. " + listado() );
-      }
-    } else {
-      meta = buscar( ref.trim() );
-    }
+    AbstractMeta meta = resolverSinActivar( args );
     activar( meta );
+    return meta;
+  }
+
+  /**
+   * Igual que {@link #resolver(JsonNode)} pero sin traer la pestania al frente ni cambiar de
+   * perspectiva: lo usan las tools de informes, que no tienen que sacar al usuario de Informes. (UI)
+   */
+  static AbstractMeta resolverSinActivar( JsonNode args ) throws ToolError {
+    String ref = Tools.optStr( args, "document", null );
+    if ( ref != null ) {
+      return buscar( ref.trim() );
+    }
+    AbstractMeta meta = activo();
+    if ( meta == null ) {
+      throw new ToolError( "There is no active transformation or job in Spoon. Open or create one "
+        + "(new_transformation, new_job, open_file) or pass 'document'. " + listado() );
+    }
     return meta;
   }
 
@@ -230,6 +252,18 @@ final class Docs {
   /** Trae la perspectiva principal (Data Integration) y la pestania del documento al frente. (UI) */
   static void activar( AbstractMeta meta ) throws ToolError {
     Spoon s = spoon();
+    perspectivaPrincipal();
+    TabMapEntry e = s.delegates.tabs.findTabMapEntry( meta );
+    if ( e != null && s.tabfolder.getSelected() != e.getTabItem() ) {
+      s.tabfolder.setSelected( e.getTabItem() );
+    }
+  }
+
+  /**
+   * Si hay otra perspectiva al frente (Informes, Schedule, Model...), vuelve a Data Integration. Nunca
+   * falla: si no se puede, queda en el log. (UI)
+   */
+  static void perspectivaPrincipal() {
     try {
       SpoonPerspective p = SpoonPerspectiveManager.getInstance().getActivePerspective();
       if ( p != null && !( p instanceof MainSpoonPerspective ) ) {
@@ -237,10 +271,6 @@ final class Docs {
       }
     } catch ( Exception e ) {
       McpLifecycleListener.LOG.logDebug( "No se pudo activar la perspectiva principal: " + e );
-    }
-    TabMapEntry e = s.delegates.tabs.findTabMapEntry( meta );
-    if ( e != null && s.tabfolder.getSelected() != e.getTabItem() ) {
-      s.tabfolder.setSelected( e.getTabItem() );
     }
   }
 

@@ -17,6 +17,7 @@ import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.job.entry.JobEntryCopy;
 import org.pentaho.di.trans.TransHopMeta;
 import org.pentaho.di.trans.TransMeta;
+import org.pentaho.di.trans.step.StepErrorMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.ui.spoon.Spoon;
 
@@ -355,6 +356,92 @@ final class TransTools {
         o.put( "step", sm.getName() );
         o.put( "output_mode", TransOps.modoSalida( sm ) );
         o.put( "outputs", TransOps.salidasNormales( tm, sm ) );
+        return o;
+      } ) ) );
+
+    s.add( Tools.tool( "set_error_handling",
+      "Configures the error handling of a step (what Spoon shows in 'Define error handling...'): where its "
+        + "failing rows go and which extra fields they carry (number of errors, description, field names, error "
+        + "codes), plus the limits. Without 'target' it changes the existing error hop; with 'target' it also "
+        + "creates the error hop if there is none. The step's own messages for rejected rows, if it has any (e.g. "
+        + "Unique rows' error_description), are part of its config: use configure_step for those.",
+      Tools.schema().document()
+        .str( "step", "Step whose failing rows are handled", true )
+        .str( "target", "Step that receives the failing rows (creates the error hop if missing)", false )
+        .str( "count_field", "Name of the field with the number of errors of the row (empty = none)", false )
+        .str( "description_field", "Name of the field with the error description, e.g. motivo_rechazo", false )
+        .str( "fields_field", "Name of the field with the names of the fields in error", false )
+        .str( "codes_field", "Name of the field with the error codes", false )
+        .str( "max_errors", "Stop the transformation after this many errors (empty = no limit)", false )
+        .str( "max_percent_errors", "Stop when this percentage of rows fails (empty = no limit)", false )
+        .str( "min_rows_for_percent", "Rows to read before the percentage is checked", false )
+        .bool( "enabled", "Error handling on (default true)", false ).build(),
+      a -> Docs.ui( () -> {
+        Spoon sp = Docs.spoon();
+        TransMeta tm = Docs.trans( a );
+        StepMeta sm = TransOps.paso( tm, Tools.str( a, "step" ) );
+        if ( !sm.supportsErrorHandling() ) {
+          throw new ToolError( "Step '" + sm.getName() + "' (" + sm.getStepID() + ") does not support error handling" );
+        }
+        UndoGrupo undo = new UndoGrupo( sp, tm ); // hop nuevo + cambio del step: un solo Ctrl+Z
+        StepMeta antes = (StepMeta) sm.clone();
+        // StepMeta.clone comparte el StepErrorMeta: copia propia para que Ctrl+Z vuelva a lo de antes.
+        antes.setStepErrorMeta( sm.getStepErrorMeta() == null ? null : sm.getStepErrorMeta().clone() );
+        String destino = Tools.optStr( a, "target", null );
+        if ( destino != null && !destino.trim().isEmpty() ) {
+          StepMeta hacia = TransOps.paso( tm, destino );
+          TransHopMeta existe = tm.findTransHop( sm, hacia, true );
+          if ( existe == null ) {
+            TransHopMeta h = TransOps.conectar( tm, sm, hacia, true, true );
+            undo.nuevo( new Object[] { h.clone() }, new int[] { tm.indexOfTransHop( h ) } );
+          } else if ( !existe.isErrorHop() ) {
+            throw new ToolError( "There is already a normal hop from '" + sm.getName() + "' to '" + hacia.getName()
+              + "'. Delete it with disconnect_steps and run this again to make it the error hop." );
+          }
+        }
+        StepErrorMeta sem = sm.getStepErrorMeta();
+        if ( sem == null || sem.getTargetStep() == null ) {
+          throw new ToolError( "'" + sm.getName() + "' has no error hop yet: pass 'target' (the step that receives "
+            + "the failing rows)" );
+        }
+        if ( a.has( "count_field" ) ) {
+          sem.setNrErrorsValuename( Tools.optStr( a, "count_field", "" ) );
+        }
+        if ( a.has( "description_field" ) ) {
+          sem.setErrorDescriptionsValuename( Tools.optStr( a, "description_field", "" ) );
+        }
+        if ( a.has( "fields_field" ) ) {
+          sem.setErrorFieldsValuename( Tools.optStr( a, "fields_field", "" ) );
+        }
+        if ( a.has( "codes_field" ) ) {
+          sem.setErrorCodesValuename( Tools.optStr( a, "codes_field", "" ) );
+        }
+        if ( a.has( "max_errors" ) ) {
+          sem.setMaxErrors( Tools.optStr( a, "max_errors", "" ) );
+        }
+        if ( a.has( "max_percent_errors" ) ) {
+          sem.setMaxPercentErrors( Tools.optStr( a, "max_percent_errors", "" ) );
+        }
+        if ( a.has( "min_rows_for_percent" ) ) {
+          sem.setMinPercentRows( Tools.optStr( a, "min_rows_for_percent", "" ) );
+        }
+        sem.setEnabled( Tools.optBool( a, "enabled", true ) );
+        StepMeta despues = (StepMeta) sm.clone();
+        despues.setStepErrorMeta( sem.clone() );
+        undo.cambio( new Object[] { antes }, new Object[] { despues }, new int[] { tm.indexOfStep( sm ) } );
+        tm.clearCaches();
+        Docs.touched( tm );
+        ObjectNode o = Tools.obj();
+        o.put( "step", sm.getName() );
+        o.put( "errors_to", sem.getTargetStep().getName() );
+        o.put( "enabled", sem.isEnabled() );
+        o.put( "count_field", nulo( sem.getNrErrorsValuename() ) );
+        o.put( "description_field", nulo( sem.getErrorDescriptionsValuename() ) );
+        o.put( "fields_field", nulo( sem.getErrorFieldsValuename() ) );
+        o.put( "codes_field", nulo( sem.getErrorCodesValuename() ) );
+        o.put( "max_errors", nulo( sem.getMaxErrors() ) );
+        o.put( "max_percent_errors", nulo( sem.getMaxPercentErrors() ) );
+        o.put( "min_rows_for_percent", nulo( sem.getMinPercentRows() ) );
         return o;
       } ) ) );
 
@@ -715,5 +802,10 @@ final class TransTools {
       o.put( "note", "Nothing matches. " + TransOps.sugerencias( buscar == null ? categoria : buscar ) );
     }
     return o;
+  }
+
+  /** Texto para la respuesta: "" en vez de null. */
+  private static String nulo( String s ) {
+    return s == null ? "" : s;
   }
 }

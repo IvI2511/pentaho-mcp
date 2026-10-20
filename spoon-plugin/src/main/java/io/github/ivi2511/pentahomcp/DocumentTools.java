@@ -22,6 +22,7 @@ import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.ui.spoon.Spoon;
 import org.pentaho.di.ui.spoon.TabMapEntry;
+import org.pentaho.xul.swt.tab.TabItem;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
 
@@ -56,8 +57,12 @@ final class DocumentTools {
       Tools.schema().str( "name", "Transformation name (optional)", false ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
+        // Primero Data Integration: con otra perspectiva al frente (Informes) getActiveTransformation()
+        // le pregunta a esa perspectiva y daba null. La pestania nueva se lee del tab folder.
+        Docs.perspectivaPrincipal();
         sp.newTransFile();
-        TransMeta tm = sp.getActiveTransformation();
+        AbstractMeta nuevo = Docs.activo();
+        TransMeta tm = nuevo instanceof TransMeta ? (TransMeta) nuevo : null;
         if ( tm == null ) {
           throw new ToolError( "Spoon did not create the transformation" );
         }
@@ -71,8 +76,10 @@ final class DocumentTools {
       Tools.schema().str( "name", "Job name (optional)", false ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
+        Docs.perspectivaPrincipal(); // como en new_transformation
         sp.newJobFile();
-        JobMeta jm = sp.getActiveJob();
+        AbstractMeta nuevo = Docs.activo();
+        JobMeta jm = nuevo instanceof JobMeta ? (JobMeta) nuevo : null;
         if ( jm == null ) {
           throw new ToolError( "Spoon did not create the job" );
         }
@@ -101,6 +108,7 @@ final class DocumentTools {
               return Docs.describir( m );
             }
           }
+          Docs.perspectivaPrincipal(); // el usuario ve la pestania nueva, aunque estuviera en Informes
           sp.openFile( f.getPath(), false );
           AbstractMeta m = Docs.activo();
           if ( m == null ) {
@@ -175,7 +183,20 @@ final class DocumentTools {
           throw new ToolError( "Could not find the tab of '" + Docs.nombre( m ) + "'" );
         }
         String id = Docs.id( m );
-        sp.tabClose( e.getTabItem(), true );
+        TabItem pestania = e.getTabItem();
+        if ( !sp.tabClose( pestania, true ) ) {
+          throw new ToolError( "Spoon did not close '" + Docs.nombre( m ) + "'" );
+        }
+        // tabClose cierra el documento pero no la pestania: en la GUI la saca el CTabFolder al hacer clic en
+        // la X; llamado desde codigo, el widget quedaba visible y huerfano (pestanias fantasma).
+        if ( !pestania.isDisposed() ) {
+          if ( pestania.getTabset() != null ) {
+            pestania.getTabset().remove( pestania );
+          }
+          if ( !pestania.isDisposed() ) {
+            pestania.dispose();
+          }
+        }
         return "Closed " + id + " '" + Docs.nombre( m ) + "'";
       } ) ) );
 

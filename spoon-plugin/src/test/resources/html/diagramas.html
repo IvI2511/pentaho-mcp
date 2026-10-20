@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!-- HTML fijo de WP8 (PruebaChromium): hace de "HTML interactivo para imprimir" hasta que llegue
+     RenderHtml (WP7). La prueba lo copia a una carpeta temporal con mermaid.min.js al lado. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Prueba de impresión: diagramas</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1F2933; margin: 0; background: #FFFFFF; }
+  h1 { color: #243B53; font-size: 22px; margin: 0 0 4px; }
+  h2 { color: #243B53; font-size: 16px; border-bottom: 1px solid #D9DEE5; padding-bottom: 4px; margin-top: 24px; }
+  p.tenue { color: #6B7785; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th { background: #243B53; color: #FFFFFF; text-align: left; padding: 4px 6px; }
+  td { border-bottom: 1px solid #D9DEE5; padding: 4px 6px; }
+  tr, figure { break-inside: avoid; }
+  section { break-before: page; }
+  section.primera { break-before: auto; }
+  svg { max-width: 100%; height: auto; }
+  .marca { position: fixed; right: 8mm; bottom: 8mm; opacity: 0.08; width: 40mm; height: 23mm; background: #3F74D8; }
+  @page { size: A4; margin: 18mm 16mm 20mm;
+    @bottom-left { content: "Pentaho Live · IDC Studios"; font: 7.5pt "Segoe UI"; color: #6B7785; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 7.5pt "Segoe UI"; color: #6B7785; } }
+</style>
+<script src="mermaid.min.js"></script>
+</head>
+<body>
+<div class="marca"></div>
+<section class="primera">
+<h1>Ventas por producto</h1>
+<p class="tenue">Informe de la transformación 03_ventas_por_producto · prueba de WP8</p>
+<h2>Diagrama de flujo</h2>
+<figure><pre class="mermaid">flowchart LR
+  s1["Leer ventas"] --> s2["Calcular importe"]
+  s2 --> s3["Ordenar por producto"]
+  s3 --> s4["Agrupar por producto"]
+  s4 --> s5["#60;b#62;#38;#34;x"]
+  s5 --> s6["Escribir CSV"]
+</pre></figure>
+<table>
+  <tr><th>Step</th><th>Tipo</th><th>Qué hace</th></tr>
+  <tr><td>Leer ventas</td><td>CSV file input</td><td>Lee ventas.csv (separador «;», encabezado).</td></tr>
+  <tr><td>Calcular importe</td><td>Calculator</td><td>importe = cantidad × precio</td></tr>
+  <tr><td>&lt;b&gt;&amp;&quot;x</td><td>Dummy</td><td>Nombre con caracteres a escapar</td></tr>
+</table>
+</section>
+<section>
+<h2>Linaje de campos</h2>
+<figure><pre class="mermaid">flowchart LR
+  subgraph S1["Leer ventas"]
+    f1["producto"]
+    f2["cantidad"]
+    f3["precio"]
+  end
+  subgraph S2["Calcular importe"]
+    f4["importe"]
+  end
+  subgraph S3["Agrupar por producto"]
+    f5["producto"]
+    f6["total"]
+  end
+  f2 -->|cantidad x precio| f4
+  f3 --> f4
+  f1 -->|pasa| f5
+  f4 -->|suma| f6
+</pre></figure>
+</section>
+<section>
+<h2>Modelo destino</h2>
+<figure><pre class="mermaid">erDiagram
+  ventas_producto {
+    string producto PK
+    double total
+    integer filas
+  }
+  productos {
+    string producto PK
+    string nombre
+  }
+  productos ||--o{ ventas_producto : "producto"
+</pre></figure>
+</section>
+<script>
+mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base',
+  htmlLabels: true, flowchart: { htmlLabels: true }, class: { htmlLabels: true },
+  themeVariables: { fontFamily: 'Segoe UI, Arial, sans-serif', primaryColor: '#E9EBEE',
+    primaryBorderColor: '#243B53', lineColor: '#6B7785', primaryTextColor: '#1F2933' } });
+// Como RenderHtml (WP7) para imprimir: htmlLabels:true (con false los codigos de escaparMermaid se ven).
+mermaid.run({ querySelector: 'pre.mermaid' }).then(function () { document.title = 'LISTO'; });
+</script>
+</body>
+</html>
