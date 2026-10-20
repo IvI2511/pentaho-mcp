@@ -135,7 +135,7 @@ public final class ReglasOrden {
         if ( previos.size() > 1 && !id.equals( "SortedMerge" ) ) {
           Hallazgo h = ctx.enStep( Sev.WARNING, s, "inputs" );
           h.message = ctx.t( "unsorted_input.msg.multi", "step", s.getName(), "n", previos.size(), "keys", unir( k ) );
-          h.evidencia( "keys", unir( k ) ).evidencia( "inputs", previos.size() );
+          h.evidencia( "keys", unir( k ) ).evidencia( "inputs", previos.size() ).evidencia( "cause", "multi" );
           h.fix = Arreglo.conConfirmacion( Arreglo.INSERT_SORT ).param( "keys", unir( k ) ).param( "after_merge", "true" );
           out.add( h );
           return;
@@ -173,7 +173,8 @@ public final class ReglasOrden {
         String donde = v.donde == null ? "" : v.donde.getName();
         h.message = ctx.t( "unsorted_input.msg." + variante( v.estado ), "step", s.getName(), "input", f.getName(),
           "keys", unir( k ), "at", donde, "sortkeys", v.claves == null ? "" : unir( v.claves ), "detail", v.detalle );
-        h.evidencia( "keys", unir( k ) ).evidencia( "input", f.getName() ).evidencia( "found_at", donde );
+        h.evidencia( "keys", unir( k ) ).evidencia( "input", f.getName() ).evidencia( "found_at", donde )
+          .evidencia( "cause", variante( v.estado ) ); // el modo profundo sabe así si el orden es determinista
         if ( v.claves != null ) {
           h.evidencia( "sorted_by", unir( v.claves ) );
         }

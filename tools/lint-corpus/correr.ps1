@@ -1,7 +1,8 @@
 # Corpus de regresión del linter (docs/linter-diseno.md §3, WP7), sin Spoon: compila el plugin y el arnés
 # (ArnesLint.java) contra PDI, arma las mutaciones (mutar.py) y corre el motor sobre los samples de PDI, los
-# ejemplos de la skill y las mutaciones. Falla si cae el recall, si falla una prueba o si cambian los conteos
-# de linea-base.tsv (-EscribirBase la rehace cuando el cambio es a propósito).
+# ejemplos de la skill y las mutaciones, y otra vez con el modo profundo los que tienen hallazgos con sonda (sus
+# previews solo leen). Falla si cae el recall, si falla una prueba, si cambian los conteos de linea-base.tsv
+# (-EscribirBase la rehace cuando el cambio es a propósito) o si el modo profundo no da lo de esperado-profundo.tsv.
 #
 # Uso:  powershell -ExecutionPolicy Bypass -File tools\lint-corpus\correr.ps1 [-PdiHome <ruta data-integration>]
 #       [-Salida <carpeta>] [-KettleHome <carpeta>] [-Idioma en|es|pt] [-SinSamples] [-EscribirBase]
@@ -61,6 +62,7 @@ if (-not $SinSamples) { $corpus += ("samples=" + (Join-Path $PdiHome "samples"))
 $corpus += ("skill=" + (Join-Path $repo "claude\skills\pentaho-etl\manual\ejemplos"))
 $corpus += ("mutaciones=" + $mut)
 $props = @("-Xmx1g", "-Dlint.lang=$Idioma", "-Dlint.esperado=$(Join-Path $PSScriptRoot 'esperado.tsv')",
+  "-Dlint.profundo=$(Join-Path $PSScriptRoot 'esperado-profundo.tsv')",
   "-DKETTLE_HOME=$KettleHome", "-DPENTAHO_METASTORE_FOLDER=$KettleHome",
   "-DKETTLE_PLUGIN_BASE_FOLDERS=$(Join-Path $PdiHome 'plugins')", "-Djava.locale.providers=COMPAT,SPI")
 if (-not $SinSamples) {
@@ -79,5 +81,5 @@ try {
   Pop-Location
 }
 Write-Host ""
-Write-Host "Resultados en $res (hallazgos.tsv, puntajes.tsv, no_evaluados.tsv, resumen.txt, json\)"
+Write-Host "Resultados en $res (hallazgos.tsv, puntajes.tsv, no_evaluados.tsv, profundo.tsv, resumen.txt, json\)"
 exit $codigo

@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,19 +42,22 @@ import io.github.ivi2511.pentahomcp.lint.Puntaje;
 import io.github.ivi2511.pentahomcp.lint.Regla;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
 import io.github.ivi2511.pentahomcp.lint.Rutas;
+import io.github.ivi2511.pentahomcp.lint.Profundo;
 import io.github.ivi2511.pentahomcp.lint.Sev;
+import io.github.ivi2511.pentahomcp.lint.Sondas;
 import io.github.ivi2511.pentahomcp.lint.Supresiones;
 import io.github.ivi2511.pentahomcp.lint.Textos;
 
 /**
  * Arnés del motor del linter, sin Spoon (docs/linter-diseno.md §3, WP7). Inicializa Kettle, carga cada .ktr/.kjb
  * de los corpus como lo vería el plugin (new TransMeta/JobMeta + ReportTools.clonar) y corre LintMotor con
- * LintEntorno. Además, pruebas chicas del puntaje, las keys, las supresiones, los textos y los filtros, y los
- * arreglos de apply_lint_fixes (WP5) sobre cada documento de los corpus.
+ * LintEntorno. Además, pruebas chicas del puntaje, las keys, las supresiones, los textos y los filtros, los
+ * arreglos de apply_lint_fixes (WP5) sobre cada documento de los corpus y el modo profundo (WP3).
  *
  * Uso (lo arma correr.ps1): java ... io.github.ivi2511.pentahomcp.ArnesLint <salida> <corpus>=<carpeta> ...
  *   -Dlint.esperado=esperado.tsv   recall del corpus "mutaciones"
  *   -Dlint.base=linea-base.tsv     compara los conteos con la línea base (-Dlint.base.escribir=true la rehace)
+ *   -Dlint.profundo=esperado-profundo.tsv  lo que tiene que dar el modo profundo en los casos deterministas
  * Sale con 1 si falla algo.
  */
 public final class ArnesLint {
@@ -63,7 +67,7 @@ public final class ArnesLint {
   /** Un marcador de los textos que quedó sin reemplazar (no un ${var} del documento). */
   static final java.util.regex.Pattern MARCADOR = java.util.regex.Pattern.compile( "(?<!\\$)\\{(step|entry|keys|at|input"
     + "|sortkeys|detail|n|field|type|format|example|value|where|file|variable|steps|parameter|from|to|path|result|a|b"
-    + "|op|typeb|targets|name|fields|default|key)\\}" );
+    + "|op|typeb|targets|name|fields|default|key|rows|sorted_rows|with|values|locale|read|error|symbol|why|prev|row|s)\\}" );
 
   static final class Doc {
     String corpus;
@@ -120,6 +124,7 @@ public final class ArnesLint {
       }
     }
     pruebasArreglos( corpus, salida );
+    pruebasProfundo( docs, corpus, salida );
     escribir( salida, docs, msCorpus );
     String base = System.getProperty( "lint.base" );
     if ( base != null ) {
@@ -479,6 +484,100 @@ public final class ArnesLint {
       System.out.println( "  saltados " + m.getValue() + " x " + m.getKey() );
     }
     ok( porDefecto == 0 || pct >= 40, "propuestas de nombre para al menos 40 % de los nombres por defecto: " + pct + " %" );
+  }
+
+  /**
+   * El modo profundo (LintSondas, WP3) sobre los documentos de los corpus que tienen hallazgos con sonda: qué sube, qué
+   * baja y qué queda (profundo.tsv), la calibración del puntaje con el modo profundo (el diseño, §4: samples
+   * 177/30/1/0) y lo que tiene que dar en los casos deterministas (-Dlint.profundo, esperado-profundo.tsv). No entra en
+   * la línea base: con varias copias o entradas el orden de las filas puede cambiar de una corrida a otra.
+   */
+  static void pruebasProfundo( List<Doc> docs, Map<String, Path> corpus, File salida ) throws Exception {
+    long t0 = System.currentTimeMillis();
+    List<Doc> conProfundo = new ArrayList<Doc>();
+    Map<String, Hallazgo> porClave = new LinkedHashMap<String, Hallazgo>();
+    Map<String, Integer> cambios = new TreeMap<String, Integer>();
+    int previews = 0;
+    try ( PrintWriter w = pw( new File( salida, "profundo.tsv" ) ) ) {
+      w.println( "corpus\tarchivo\tkey\tstatic\tseverity\tdeep\tmessage" );
+      for ( Doc d : docs ) {
+        Doc p = new Doc();
+        p.corpus = d.corpus;
+        p.archivo = d.archivo;
+        p.r = d.r;
+        p.error = d.error;
+        conProfundo.add( p );
+        boolean sonda = false;
+        Map<String, Sev> antes = new HashMap<String, Sev>();
+        if ( d.r != null ) {
+          for ( Hallazgo x : d.r.findings ) {
+            sonda |= Sondas.REGLAS.contains( x.rule );
+            antes.put( x.key, x.severity );
+          }
+        }
+        if ( !sonda ) {
+          continue; // el profundo no cambia nada: el resultado es el estático
+        }
+        try {
+          Opciones op = new Opciones();
+          op.deep = true;
+          op.sondas = new LintSondas();
+          p.r = analizar( cargar( corpus.get( d.corpus ).resolve( d.archivo ) ), op );
+          revisarClaves( p );
+          previews += p.r.deep.probes;
+        } catch ( Throwable e ) {
+          ok( false, "el modo profundo reventó en " + d.corpus + "/" + d.archivo + ": " + e );
+          continue;
+        }
+        for ( Hallazgo x : p.r.findings ) {
+          if ( !Sondas.REGLAS.contains( x.rule ) ) {
+            continue;
+          }
+          porClave.put( d.corpus + "\t" + d.archivo + "\t" + x.key, x );
+          Sev s0 = antes.get( x.key );
+          String cambio = String.format( Locale.ROOT, "%-21s %s->%s %s", x.rule, s0 == null ? "?" : s0.codigo().substring( 0, 1 ),
+            x.severity.codigo().substring( 0, 1 ), x.deep );
+          cambios.merge( cambio, 1, Integer::sum );
+          w.println( d.corpus + "\t" + d.archivo + "\t" + x.key + "\t" + ( s0 == null ? "?" : s0.codigo() ) + "\t"
+            + x.severity.codigo() + "\t" + x.deep + "\t" + limpio( x.message ) );
+          ok( x.deep != null || "data".equals( x.evidence.get( "cause" ) ), // el Data grid ya es la prueba
+            "hallazgo con sonda sin resultado del modo profundo en " + d.archivo + ": " + x.key );
+          ok( !Profundo.NOT_EVALUATED.equals( x.deep ) || x.severity == s0, "no evaluado y cambió la severidad: " + x.key );
+        }
+      }
+    }
+    System.out.println( "modo profundo: " + previews + " previews en " + ( System.currentTimeMillis() - t0 ) + " ms" );
+    for ( String l : resumen( conProfundo ) ) {
+      if ( l.isEmpty() ) {
+        break; // solo los corpus: los conteos por regla ya están en profundo.tsv
+      }
+      System.out.println( "  profundo " + l.replaceAll( " ms=\\d+ \\(max \\d+\\)", "" ) );
+    }
+    for ( Map.Entry<String, Integer> c : cambios.entrySet() ) {
+      System.out.println( String.format( Locale.ROOT, "  %3d x %s", c.getValue(), c.getKey() ) );
+    }
+    String esp = System.getProperty( "lint.profundo" );
+    if ( esp == null ) {
+      return;
+    }
+    int bien = 0;
+    int total = 0;
+    for ( String l : Files.readAllLines( Paths.get( esp ), StandardCharsets.UTF_8 ) ) {
+      if ( l.startsWith( "#" ) || l.trim().isEmpty() ) {
+        continue;
+      }
+      String[] c = l.split( "\t" );
+      if ( !corpus.containsKey( c[ 0 ] ) ) {
+        continue; // -SinSamples
+      }
+      total++;
+      Hallazgo x = porClave.get( c[ 0 ] + "\t" + c[ 1 ] + "\t" + c[ 2 ] );
+      boolean va = x != null && x.severity.codigo().equals( c[ 3 ] ) && c[ 4 ].equals( x.deep );
+      bien += va ? 1 : 0;
+      ok( va, "profundo: " + c[ 1 ] + " " + c[ 2 ] + " esperaba " + c[ 3 ] + "/" + c[ 4 ] + ", dio "
+        + ( x == null ? "nada" : x.severity.codigo() + "/" + x.deep ) );
+    }
+    System.out.println( "modo profundo esperado: " + bien + "/" + total );
   }
 
   static List<String> claves( List<Hallazgo> l ) {

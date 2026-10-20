@@ -41,7 +41,7 @@ public final class Hallazgo {
   public boolean env;
   public final Map<String, String> evidence = new LinkedHashMap<String, String>();
   public Arreglo fix;
-  /** Resultado de la sonda del modo profundo (WP3); null si no corrió. */
+  /** Resultado de la sonda del modo profundo (Profundo.CONFIRMED, SORTED…); null si no corrió. */
   public String deep;
 
   public Hallazgo evidencia( String k, Object v ) {

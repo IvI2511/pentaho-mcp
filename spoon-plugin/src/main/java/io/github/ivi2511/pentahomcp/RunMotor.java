@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
@@ -740,6 +742,197 @@ final class RunMotor {
     agregarAvisos( o, avisos, quitados );
     liberarLog( t.getLogChannelId() );
     return o;
+  }
+
+  // ---------------------------------------------------------------- filas (modo profundo del linter)
+
+  /** Lo que devuelve {@link #filas}: los campos y las filas (objetos de Kettle) que salieron del step. */
+  static final class Filas {
+    RowMetaInterface meta;
+    final List<Object[]> filas = new ArrayList<Object[]>();
+    /** finished | row_limit | timeout | cancelled | init_failed */
+    String estado;
+    /** Terminó sola, sin errores y sin descartar filas: se leyó todo lo que el step tenía para dar. */
+    boolean completa;
+    int errores;
+    /** Lo que dijo Kettle cuando falló (la línea más útil del log), o null. */
+    String error;
+    long ms;
+  }
+
+  /**
+   * Como {@link #preview}, pero devuelve los objetos de Kettle (RowMeta y filas, sin pasarlas a texto) y si la
+   * corrida terminó sola, sin errores ni filas descartadas: lo usa el modo profundo del linter (LintSondas), que antes
+   * decide si todo lo que queda en la copia recortada solo lee. Recorta la copia igual que preview (no la reuses). Es
+   * aditivo: preview, que usan Informes y modo clase, no cambia. Fuera del hilo de UI.
+   */
+  static Filas filas( TransMeta copia, String step, int max, long ms ) throws Exception {
+    return filas( copia, step, max, ms, null );
+  }
+
+  /** Igual, y corta (estado cancelled) en cuanto {@code cancelado} dice true o el hilo se interrumpe. */
+  static Filas filas( TransMeta copia, String step, final int max, long ms, BooleanSupplier cancelado ) throws Exception {
+    final StepMeta objetivo = paso( copia, step );
+    final String nombre = objetivo.getName();
+    if ( objetivo.isMissing() ) {
+      throw new ToolError( "The plugin of '" + nombre + "' is missing (type " + objetivo.getStepID() + "): it cannot run" );
+    }
+    recortar( copia, objetivo );
+    final Filas r = new Filas();
+    final boolean[] descartadas = { false };
+    long inicio = System.currentTimeMillis();
+    final Trans t = new Trans( copia, padreDeLog() );
+    t.setLogLevel( LogLevel.BASIC );
+    t.setPreview( true );
+    prepararVariables( t, copia );
+    try {
+      try {
+        // init conecta a las BD: con una que no contesta, que no se coma el plazo de la sonda
+        enSegundoPlano( () -> {
+          t.prepareExecution( null );
+          return null;
+        }, Math.max( 1, ms ), t::stopAll, "Preparing '" + nombre + "'" );
+      } catch ( ToolError e ) {
+        r.estado = "timeout";
+        r.error = e.getMessage();
+        return r;
+      } catch ( Exception e ) {
+        r.estado = "init_failed";
+        r.errores = Math.max( 1, t.getErrors() );
+        r.error = errorDeLog( t.getLogChannelId(), e );
+        return r;
+      }
+      for ( StepInterface si : t.findStepInterfaces( nombre ) ) {
+        si.addRowListener( new RowAdapter() {
+          @Override
+          public void rowWrittenEvent( RowMetaInterface rm, Object[] row ) throws KettleStepException {
+            synchronized ( r.filas ) { // varias copias del step escriben a la vez
+              if ( r.filas.size() >= max ) {
+                descartadas[ 0 ] = true;
+                return;
+              }
+              if ( r.meta == null ) {
+                r.meta = rm.clone();
+              }
+              try {
+                r.filas.add( rm.cloneRow( row ) ); // los steps reutilizan el array
+              } catch ( Exception e ) {
+                throw new KettleStepException( e );
+              }
+            }
+          }
+        } );
+      }
+      t.startThreads();
+      long limite = inicio + ms;
+      r.estado = "finished";
+      while ( !t.isFinished() ) {
+        synchronized ( r.filas ) {
+          if ( descartadas[ 0 ] ) {
+            r.estado = "row_limit";
+            break;
+          }
+        }
+        if ( ( cancelado != null && cancelado.getAsBoolean() ) || Thread.currentThread().isInterrupted() ) {
+          r.estado = "cancelled";
+          break;
+        }
+        if ( System.currentTimeMillis() > limite ) {
+          r.estado = "timeout";
+          break;
+        }
+        dormir( 20 );
+      }
+      if ( !t.isFinished() ) {
+        t.stopAll();
+        esperarFin( t, 5000 );
+      }
+      r.errores = t.getErrors();
+      synchronized ( r.filas ) {
+        if ( descartadas[ 0 ] && "finished".equals( r.estado ) ) {
+          r.estado = "row_limit"; // terminó, pero hubo filas que no entraron
+        }
+        r.completa = "finished".equals( r.estado ) && r.errores == 0;
+      }
+      if ( r.errores > 0 ) {
+        r.error = errorDeLog( t.getLogChannelId(), null );
+      }
+      if ( r.meta == null ) {
+        try {
+          r.meta = copia.getStepFields( objetivo );
+        } catch ( Exception ignored ) {
+          r.meta = null;
+        }
+      }
+      return r;
+    } catch ( Exception e ) {
+      t.stopAll();
+      throw e;
+    } finally {
+      r.ms = System.currentTimeMillis() - inicio;
+      liberarLog( t.getLogChannelId() );
+    }
+  }
+
+  /** Qué valor no se pudo convertir (el renglón más largo gana: el que trae el valor). */
+  private static final Pattern ERROR_CONVERSION = Pattern.compile( "(?i)couldn'?t convert|could not convert"
+    + "|unable to convert" );
+  /** Lo que dice qué falló (un archivo, las copias de un step…). */
+  private static final Pattern ERROR_UTIL = Pattern.compile( "(?i)can'?t be executed|not found|does not exist"
+    + "|no such file|couldn'?t|could not|unable to|cannot|can'?t|conversion error" );
+  /** Renglones de error sin información: «Unexpected error», el nombre de la excepción solo. */
+  private static final Pattern ERROR_VACIO = Pattern.compile( "(?i)\\s*(unexpected error( during transformation "
+    + "execution)?|errors detected!?|[\\w.$]+(exception|error)\\s*:?)?\\s*" );
+  /** "Leer ventas.0 - " al principio de un renglón del log. */
+  private static final Pattern COPIA_DE_STEP = Pattern.compile( "^.*?\\.\\d+ - " );
+
+  /**
+   * La línea más útil del log de una corrida con errores: la que dice qué no se pudo convertir o leer; si no, el
+   * primer ERROR con texto. Sin ERROR en el log, la primera línea de la excepción (o null).
+   */
+  static String errorDeLog( String canal, Throwable e ) {
+    String[] crudas = colaLog( canal, true ).split( "\\r?\\n" );
+    List<String> ls = new ArrayList<String>();
+    int primero = -1;
+    for ( int i = 0; i < crudas.length; i++ ) {
+      if ( primero < 0 && crudas[ i ].contains( "ERROR" ) ) {
+        primero = i;
+      }
+      String x = crudas[ i ].replaceFirst( "^\\d{2}:\\d{2}:\\d{2} - ", "" );
+      java.util.regex.Matcher m = COPIA_DE_STEP.matcher( x );
+      if ( m.find() ) {
+        x = x.substring( m.end() );
+      }
+      ls.add( x.replaceFirst( "^ERROR: ?", "" ).trim() );
+    }
+    String elegido = null;
+    if ( primero >= 0 ) {
+      int hasta = Math.min( ls.size(), primero + 40 );
+      for ( int i = primero; i < hasta; i++ ) {
+        String l = ls.get( i );
+        if ( ERROR_CONVERSION.matcher( l ).find() && ( elegido == null || l.length() > elegido.length() ) ) {
+          elegido = l;
+        }
+      }
+      for ( int i = primero; i < hasta && elegido == null; i++ ) {
+        if ( ERROR_UTIL.matcher( ls.get( i ) ).find() ) {
+          elegido = ls.get( i );
+        }
+      }
+      for ( int i = primero; i < hasta && elegido == null; i++ ) {
+        if ( !ERROR_VACIO.matcher( ls.get( i ) ).matches() ) {
+          elegido = ls.get( i );
+        }
+      }
+    }
+    if ( elegido == null && e != null ) {
+      elegido = primeraLinea( e );
+    }
+    if ( elegido == null ) {
+      return null;
+    }
+    elegido = elegido.replaceAll( "[\\s.]+$", "" ); // el que lo use pone su propio punto
+    return elegido.length() <= 300 ? elegido : elegido.substring( 0, 300 ) + "...";
   }
 
   private static void agregarAvisos( ObjectNode o, ArrayNode avisos, int quitados ) {

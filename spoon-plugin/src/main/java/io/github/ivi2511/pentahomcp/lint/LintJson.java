@@ -70,7 +70,9 @@ public final class LintJson {
       d.put( "reason", r.deep.reason );
     }
     if ( r.deep.ran ) {
-      d.put( "ms", r.deep.ms ).put( "probes", r.deep.probes );
+      d.put( "ms", r.deep.ms ).put( "budget_s", r.deep.budgetMs / 1000 ).put( "probes", r.deep.probes );
+      d.put( "raised", r.deep.raised ).put( "lowered", r.deep.lowered ).put( "unchanged", r.deep.unchanged )
+        .put( "not_evaluated", r.deep.notEvaluated );
     }
     return o;
   }

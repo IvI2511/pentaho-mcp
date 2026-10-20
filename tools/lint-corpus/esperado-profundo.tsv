@@ -1,0 +1,27 @@
+# Modo profundo (LintSondas, WP3): lo que tiene que dar cada hallazgo con sonda en los casos deterministas.
+# corpus	archivo	key	severidad	deep. Lo usa correr.ps1 (ArnesLint.pruebasProfundo).
+# Afuera, a propósito, lo que depende del orden en que se mezclan los hilos: Unique - Case insensitive unique
+# (Dummy que junta 3 flujos), Unique - Duplicate (2 hops) y m16 (Sort rows en 2 copias).
+samples	transformations/Analytic Query - Lead One Example.ktr	empty_decimal_symbol:step:Text file input:Semester	info	integers
+samples	transformations/Analytic Query - Lead One Example.ktr	empty_decimal_symbol:step:Text file input:Age	info	integers
+samples	transformations/Excel Output - Write different data types.ktr	empty_decimal_symbol:step:Generate Rows:BigNumberField	error	separators
+samples	transformations/General - Repeat fields - Group by - Denormalize.ktr	unsorted_input:step:Group by:input	info	sorted
+samples	transformations/Group by - include all rows and calculations .ktr	empty_decimal_symbol:step:Text file input:Semester	info	integers
+samples	transformations/Group by - include all rows and calculations .ktr	empty_decimal_symbol:step:Text file input:Age	info	integers
+samples	transformations/HL7_test_multiple_files.ktr	unsorted_input:step:Extract fields:input	info	sorted
+samples	transformations/Merge Join - Join 2 sorted data sets.ktr	unsorted_input:step:Merge Join:step1	info	sorted
+samples	transformations/Merge Join - Join 2 sorted data sets.ktr	unsorted_input:step:Merge Join:step2	info	sorted
+samples	transformations/Merge rows - mergs 2 streams of data and add a flag.ktr	unsorted_input:step:Merge Rows:reference	info	sorted
+samples	transformations/Merge rows - mergs 2 streams of data and add a flag.ktr	unsorted_input:step:Merge Rows:compare	info	sorted
+samples	transformations/Select values - some variants.ktr	empty_decimal_symbol:step:Text file input:Semester	info	integers
+samples	transformations/Select values - some variants.ktr	empty_decimal_symbol:step:Text file input:Age	info	integers
+samples	transformations/Textfile input - fixed length.ktr	empty_decimal_symbol:step:Text file input:Semester	info	integers
+samples	transformations/Textfile input - fixed length.ktr	empty_decimal_symbol:step:Text file input:Age	info	integers
+samples	transformations/XML file with substitutes.ktr	unsorted_input:step:Merge Join:step1	warning	same_result
+samples	transformations/XML file with substitutes.ktr	unsorted_input:step:Merge Join:step2	warning	same_result
+mutaciones	m01_decimal_vacio.ktr	empty_decimal_symbol:step:Leer ventas:precio_unitario	error	separators
+mutaciones	m03_groupby_sin_ordenar.ktr	unsorted_input:step:Totales por producto:input	error	confirmed
+mutaciones	m04_mergejoin_sin_ordenar.ktr	unsorted_input:step:Unir clientes y ventas:step1	info	sorted
+mutaciones	m04_mergejoin_sin_ordenar.ktr	unsorted_input:step:Unir clientes y ventas:step2	error	confirmed
+mutaciones	m17_orden_otra_clave.ktr	unsorted_input:step:Totales por producto:input	error	confirmed
+mutaciones	m20_decimal_y_formato_vacios.ktr	empty_decimal_symbol:step:Leer ventas:precio_unitario	error	separators

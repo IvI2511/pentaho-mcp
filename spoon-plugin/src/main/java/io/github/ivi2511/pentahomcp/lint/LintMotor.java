@@ -17,7 +17,8 @@ import org.pentaho.di.trans.TransMeta;
 /**
  * El motor del linter (docs/linter-diseno.md §5). Corre las reglas estáticas sobre una COPIA desligada del
  * documento (ReportTools.clonar), en un hilo de trabajo, sin diálogos; arma las keys, separa lo silenciado y lo
- * que no resta, y calcula el puntaje. El modo profundo (LintSondas, WP3) trabaja después sobre el Resultado.
+ * que no resta, y calcula el puntaje. El modo profundo (Opciones.sondas: LintSondas, WP3) corre entre las reglas y el
+ * puntaje, sobre los hallazgos que tienen sonda.
  */
 public final class LintMotor {
 
@@ -78,6 +79,7 @@ public final class LintMotor {
     res.name = copia.getName();
     res.kind = trans ? "transformation" : "job";
     res.rulesVersion = VERSION_REGLAS;
+    profundo( ctx, copia, op, todos, res.deep ); // antes del puntaje: lo que suba o baje ya cuenta
     List<Hallazgo> cuentan = new ArrayList<Hallazgo>();
     List<Hallazgo> visibles = new ArrayList<Hallazgo>();
     for ( Hallazgo h : todos ) {
@@ -115,12 +117,52 @@ public final class LintMotor {
         res.notEvaluated.add( n );
       }
     }
-    res.deep.ran = false;
-    if ( op.deep ) {
-      res.deep.reason = ctx.t( "deep.not_run" );
-    }
     res.ms = System.currentTimeMillis() - t0;
     return res;
+  }
+
+  /**
+   * El modo profundo (§3.3): las sondas de op.sondas sobre los hallazgos que las tienen y no están silenciados. Solo en
+   * transformaciones sin ciclo (con un ciclo la transformación no termina). Lo que no puede correr lo dice deep.reason.
+   */
+  private static void profundo( Ctx ctx, AbstractMeta copia, Opciones op, List<Hallazgo> todos, Profundo deep ) {
+    deep.ran = false;
+    if ( !op.deep ) {
+      return;
+    }
+    deep.budgetMs = op.deepBudgetMs;
+    if ( op.sondas == null ) {
+      deep.reason = ctx.t( "deep.not_run" );
+      return;
+    }
+    if ( !( copia instanceof TransMeta ) ) {
+      deep.reason = ctx.t( "deep.not_run.job" );
+      return;
+    }
+    if ( ctx.hayCiclo() ) {
+      deep.reason = ctx.t( "deep.not_run.cycle" );
+      return;
+    }
+    List<Hallazgo> candidatos = new ArrayList<Hallazgo>();
+    for ( Hallazgo h : todos ) {
+      if ( Sondas.REGLAS.contains( h.rule ) && !( op.honorSuppressions && silenciado( copia, h ) ) ) {
+        candidatos.add( h );
+      }
+    }
+    deep.ran = true;
+    if ( candidatos.isEmpty() ) {
+      deep.reason = ctx.t( "deep.nothing" );
+      return;
+    }
+    long t0 = System.currentTimeMillis();
+    try {
+      op.sondas.sondear( (TransMeta) copia, candidatos, op, ctx.textos(), deep, ctx.noEvaluados() );
+    } catch ( Throwable e ) { // lo que las sondas ya cambiaron vale; el resto queda como lo dejó el estático
+      deep.reason = ctx.t( "deep.failed", "detail", Ctx.primeraLinea( e ) );
+    }
+    if ( deep.ms == 0 ) {
+      deep.ms = System.currentTimeMillis() - t0;
+    }
   }
 
   private static boolean contiene( Set<String> ids, String id ) {

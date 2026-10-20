@@ -9,14 +9,17 @@ public final class Opciones {
   public Set<String> rules;
   /** Hallazgos que se muestran: info, warning o error. El puntaje cuenta todos. */
   public Sev minSeverity = Sev.INFO;
-  /** Modo profundo (WP3, LintSondas): el motor estático no lo corre y lo informa en Resultado.deep. */
+  /** Modo profundo (§3.3): corre {@link #sondas} sobre unsorted_input y empty_decimal_symbol. */
   public boolean deep;
+  /** Quien corre el modo profundo (LintSondas en el plugin); null = no disponible (Resultado.deep lo dice). */
+  public Sondas sondas;
   /** Solo hallazgos sobre estos steps (modo clase); null = todos. */
   public Set<String> steps;
   /** Suma los avisos de checkSteps/checkJobEntries como kettle_check (puede conectarse a la BD). */
   public boolean kettleChecks;
   /** El corrector pasa false: si no, el alumno se silencia y aprueba (§9). */
   public boolean honorSuppressions = true;
+  /** Presupuesto de todo el modo profundo (deep_timeout_s); cada sonda, además, 30 s como mucho. */
   public long deepBudgetMs = 60000;
   /** en, es o pt (textos de los hallazgos). */
   public String lang = "en";

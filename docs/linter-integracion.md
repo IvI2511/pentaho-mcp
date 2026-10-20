@@ -2,8 +2,9 @@
 
 Qué falta para que el motor del linter (rama `feat/linter`) llegue a Spoon, con los cambios exactos en los
 archivos compartidos. El diseño es `docs/linter-diseno.md`; este documento no lo repite.
-Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP4 y WP5 integrados** en
-`feat/calidad` (sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5 y §2.6.
+Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP3, WP4 y WP5 integrados** en
+`feat/calidad` (sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5, §2.6 y
+§2.7.
 
 ## 1. Qué hay en la rama
 
@@ -192,13 +193,78 @@ texto), las claves `name.*` en `lint_{en,es,pt}.properties` y una cláusula en l
   piden un valor y falla si uno revienta, si una key aplicada sigue saliendo, si baja el puntaje o si el documento
   no se vuelve a abrir desde su XML: 244 documentos, 143 con cambios, 121 suben de puntaje, 0 bajan.
 
+### 2.7 WP3 en `feat/calidad` (21-oct-2026): el modo profundo
+
+`lint_etl` con `deep=true` corre sondas que **leen** las fuentes y suben o bajan `unsorted_input` y
+`empty_decimal_symbol` antes del puntaje. Archivos nuevos: `lint/Sondas.java` (la interfaz: `lint/` no ve `RunMotor`)
+y `LintSondas.java` (paquete base). Cambios chicos en archivos compartidos: `RunMotor.filas` (nuevo, aditivo),
+`Opciones.sondas`, `Profundo` (constantes de `Hallazgo.deep` y contadores), el gancho en `LintMotor.analizar`, la
+evidencia `cause` de `ReglasOrden`, `LintEntorno.soloLectura` y los textos `deep.*` en en/es/pt.
+
+- **Dónde corre**: `LintMotor.analizar` llama a `Opciones.sondas` **entre las reglas y el puntaje**, con los hallazgos
+  de las dos reglas que no están silenciados (también los que esconden `min_severity` o `steps`: el puntaje los
+  cuenta). Así lo que sube o baja ya cuenta en `score`, `counts` y los filtros. No corre en jobs, con un ciclo ni sin
+  sondas (`deep.reason` lo dice: los Informes pueden llamar al motor sin `LintSondas`).
+- **`RunMotor.filas( copia, step, max, ms[, cancelado] )`**: como `preview` (recorta igual), pero devuelve los objetos
+  de Kettle (`RowMeta` y filas), `estado` y `completa` = terminó sola, sin errores y sin descartar filas. El init va en
+  otro hilo con el mismo plazo (una BD que no contesta no se come la sonda). `errorDeLog` elige el renglón útil del log
+  (el de la conversión que trae el valor, si lo hay). `preview` no cambió.
+- **Lista blanca**: cada copia se recorta al step que se mira y corre solo si **todos** los que quedan pasan
+  `Entorno.soloLectura`. Se agregaron dos condiciones: el plugin no falta y el step no escribe archivos de líneas malas
+  (un `*_destination_directory` con algo: Text file input y Excel input con manejo de errores). `HL7Input` (parsea un
+  campo) entró en la lista.
+- **Orden**: una muestra por hallazgo (hasta 5000 filas de la entrada) comparando claves consecutivas con
+  `ValueMeta.compare`: grupos juntos para agrupar; ascendente (o el sentido de Sorted merge) si el consumidor compara.
+  Ordenada, leída entera y con orden fijo → **info** (`sorted`); con la causa `copies`, `merges` o `multi` (la
+  evidencia `cause` que ahora pone `ReglasOrden`) o cortada → queda (`sorted_sample`). Desordenada → **diferencial**,
+  una por consumidor: el consumidor tal cual y en otra copia con un Sort rows delante de **cada** entrada marcada (el
+  `Ordenar` de `LintArreglos`, sin undo), filas comparadas como multiconjunto de textos. Distintas → **error**
+  (`confirmed`); iguales → queda (`same_result`, «funciona por casualidad»); si una corrida no termina o falla, queda
+  (`unsorted`, con el motivo de Kettle). Con `RandomValue`, `SystemInfo` o `ReservoirSampling` en el camino no hay
+  diferencial. `multi` (varios hops) va directo a la diferencial. `data` (Data grid) ya es error: no se sondea.
+- **Decimal**: el step con ese campo como String (y sin formato), releído desde su XML: la columna la parte el parser
+  del propio step (ancho fijo incluido; el prototipo leía 0 valores). Hasta 2000 filas; cuentan los valores con algún
+  dígito. Con `.` o `,` → **error** (`separators`), con el símbolo que usan los datos en `fix.preview` y, si queda
+  tiempo, cómo lo lee esta JVM (`deep_read_as` o `deep_read_error`, con el locale). Enteros y leída entera → **info**
+  (`integers`); cortada → queda; 0 valores → no evaluado. `apply_lint_fixes` vuelve a correr solo el estático: el
+  símbolo hay que pasarlo en `values[key]` (la preview del profundo lo dice).
+- **Lo que no se pudo** va a `not_evaluated` (`deep_not_read_only`, `deep_budget`, `deep_cancelled`, `deep_failed`,
+  `deep_no_data`) y el hallazgo queda con la severidad del estático (`deep: "not_evaluated"`, `evidence.deep_reason`).
+  Lo que cambia de severidad pasa a `env: true` y guarda `evidence.static_severity`; el mensaje suma «Deep check: …».
+- **Presupuesto**: 30 s por sonda (la diferencial, 30 s entre sus dos corridas) y `deep_timeout_s` en total; la espera
+  de `lint_etl` es la del estático más ese presupuesto más 20 s para parar la última preview. `Resultado.deep`: `ran`,
+  `ms`, `budget_s`, `probes` (previews corridas), `raised`, `lowered`, `unchanged`, `not_evaluated`.
+- **Pruebas**: `PruebaProfundo` (15, sin Spoon): m03, m04, m16, m17, m01, m20 rehechas sobre la copia de los ejemplos,
+  los samples «Merge Join - Join 2 sorted data sets», «XML file with substitutes» y «Textfile input - fixed length»,
+  la lista blanca (un HTTP client en el camino), la entrada que escribe archivos de error, el presupuesto en 0,
+  cuándo no corre, `RunMotor.filas` y las utilidades (desorden, separadores). Suite completa: 203 ok.
+- **Arnés**: `pruebasProfundo` corre otra vez, con `deep=true`, los documentos de los tres corpus que tienen hallazgos
+  con sonda (`profundo.tsv`) y compara con `esperado-profundo.tsv` (23 casos deterministas; afuera los que dependen de
+  cómo se mezclan los hilos: Unique - Case insensitive, Unique - Duplicate, m16). No entra en `linea-base.tsv`.
+  Resultado (Windows en es-ES, 39 previews en ~6 s):
+
+  | Corpus | Estático | Con modo profundo |
+  |---|---|---|
+  | samples (208) | 96 · 175/29/4/0 | 96 · 180/25/3/0 |
+  | mutaciones (27) | 92 · 16/2/7/2 | 74 · 12/1/12/2 |
+
+  `unsorted_input` en los samples: 6 → info (las mismas 6 que el prototipo, de 6 a 146 filas), 2 quedan por orden no
+  determinista y 2 por mismo resultado («XML file with substitutes»), como en el §3.3 del diseño. Mutaciones: m03, m17
+  y m04 (`step2`) → error con la diferencial (10 → 4, 10 → 4, 8 → 10 filas); m04 `step1` → info (clientes.csv ya viene
+  ordenado); m16 queda (Kettle se niega a correr el Merge join con la entrada en 2 copias). `empty_decimal_symbol`: los
+  8 de ancho fijo de los samples → info (enteros: 417 y 447 valores); m01 y m20 → error (en es-ES, m20 lee `2.50` como
+  250.0 y m01 falla con `#.##`); y el sample «Excel Output - Write different data types» → **error**: el BigNumber
+  `989873947.2984839` de Generate rows se lee **9898739472984839** en es-ES. Contra la calibración del diseño
+  (177/30/1/0): el C de más es ese sample y el de `missing_plugin` (Spark, §5); los 4 de ancho fijo pasan de B a A
+  porque ahora se leen sus valores (el prototipo los dejaba en warning con 0 valores leídos).
+
 ## 3. Lo que falta escribir
 
 | WP | Qué | Dónde | Necesita |
 |---|---|---|---|
-| WP3 | Modo profundo: lista blanca (ya está en `LintEntorno.soloLectura`), sondas de orden y de decimal (la columna como String, con el parser del step) y prueba diferencial, presupuesto total. Sube/baja severidades en el `Resultado` (`Hallazgo.deep`) y llena `Resultado.deep`. | `LintSondas.java` (paquete base) | un método **nuevo** `RunMotor.filas( TransMeta copia, String step, int max, long ms )` que devuelva `RowMetaInterface` + filas + si terminó solo (aditivo: `preview` no cambia) |
+| ~~WP3~~ | **Hecho** (§2.7): modo profundo (`deep=true`), sondas de orden, diferencial y decimal, lista blanca y presupuesto. | `LintSondas.java`, `lint/Sondas.java`, `RunMotor.filas` | — |
 | ~~WP5~~ | **Hecho** (§2.6): `apply_lint_fixes`, `suppress_lint` y las propuestas de nombre. | `LintArreglos.java`, `LintPropuestas.java` | — |
-| WP6 | Sección «Calidad» del informe | `SecCalidad.java` (paquete base) | pedidos a Informes: `SeccionId.QUALITY`, `Pedido.calidadProfunda`, registro en `InformeServicio`, check y `LocationListener` en el panel, `quality_deep` en `build_report` |
+| WP6 | Sección «Calidad» del informe (con `Pedido.calidadProfunda`: `Opciones.deep` + `Opciones.sondas = new LintSondas()`) | `SecCalidad.java` (paquete base) | pedidos a Informes: `SeccionId.QUALITY`, `Pedido.calidadProfunda`, registro en `InformeServicio`, check y `LocationListener` en el panel, `quality_deep` en `build_report` |
 | WP7 | Skill: sección «Calidad» en `SKILL.md` y los ids de regla al lado de D1-D11 en `03-errores-comunes.md` (con las correcciones de §12 del diseño); `CHANGELOG.md`; conteo de herramientas en los README | `claude/` (sube `version` del `plugin.json`) | — |
 
 ## 4. Decisiones de esta rama
@@ -287,7 +353,8 @@ powershell -ExecutionPolicy Bypass -File tools\lint-corpus\correr.ps1 -PdiHome "
 Compila el plugin y el arnés en `%TEMP%\pentaho-lint-corpus`, arma las mutaciones y corre el motor sobre los
 samples de PDI, los ejemplos de la skill y las mutaciones. Falla si cae el recall (`esperado.tsv`), si falla una
 prueba (puntaje, keys, supresiones, textos, filtros, propuestas de ruta, los arreglos de `apply_lint_fixes` sobre
-cada documento y la cobertura de las propuestas de nombre, ≥ 40 %) o si cambian los conteos de
-`linea-base.tsv`. Con `-EscribirBase` rehace la línea base (cuando el cambio es a propósito). No escribe en la
+cada documento y la cobertura de las propuestas de nombre, ≥ 40 %), si cambian los conteos de
+`linea-base.tsv` o si el modo profundo no da lo de `esperado-profundo.tsv` (sus previews solo leen: van por la
+lista blanca, como en Spoon). Con `-EscribirBase` rehace la línea base (cuando el cambio es a propósito). No escribe en la
 carpeta de PDI (los logs de Kettle van a la carpeta de salida) y, antes de cada JVM, espera a tener
 `-MemoriaMinGB` libres (2 por defecto); el arnés corre con `-Xmx1g`.
