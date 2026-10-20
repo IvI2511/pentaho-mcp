@@ -1,0 +1,33 @@
+# Linea base del linter (tools/lint-corpus/correr.ps1). Se rehace con -EscribirBase cuando un cambio es a proposito.
+samples     docs=208 mediana= 96.0 min= 70 A/B/C/D=175/29/4/0 sin_cargar=0
+skill       docs=  9 mediana=100.0 min= 98 A/B/C/D=9/0/0/0 sin_cargar=0
+mutaciones  docs= 27 mediana= 92.0 min= 42 A/B/C/D=16/2/7/2 sin_cargar=0
+absolute_path                      warning mutaciones=2/1 samples=1/1
+calculator_integer_first           error   mutaciones=2/2
+calculator_integer_first           warning mutaciones=1/1
+cycle                              error   mutaciones=2/1
+default_entry_name                 info    samples=7/3
+default_step_name                  info    mutaciones=4/4 samples=382/165 skill=1/1
+disabled_hop                       warning mutaciones=1/1 samples=7/5
+distribute_multiple_outputs        info    samples=1/1
+distribute_multiple_outputs        warning mutaciones=1/1
+duplicate_step_name                error   mutaciones=1/1
+empty_decimal_symbol               warning mutaciones=2/2 samples=9/5
+failure_branch_ends_in_success     error   mutaciones=1/1
+failure_branch_ends_in_success     warning mutaciones=1/1
+job_variable_in_transformation     warning mutaciones=1/1
+missing_input_file                 warning mutaciones=2/2
+missing_plugin                     error   samples=1/1
+no_description                     info    samples=104/104
+orphan_step                        warning mutaciones=1/1 samples=3/3
+parameter_without_default          info    samples=6/3
+password_in_file                   error   mutaciones=1/1
+password_in_file                   warning samples=81/12
+relative_path                      error   mutaciones=2/1
+select_star                        info    samples=1/1
+start_not_named_start              error   mutaciones=1/1
+text_output_without_fields         info    mutaciones=1/1 samples=5/4 skill=1/1
+text_output_without_fields         warning mutaciones=1/1 samples=7/6
+undeclared_variable                info    samples=7/5
+unsorted_input                     warning mutaciones=5/4 samples=10/7
+variable_in_constant               error   mutaciones=1/1
