@@ -19,7 +19,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Windows installer: repairing a 0.4.1 installed inside a PDI in OneDrive no longer leaves the empty
-  `plugins\Pentaho Livein` folder behind (OneDrive marks its folders read-only and Windows refuses to
+  `plugins\Pentaho Live\bin` folder behind (OneDrive marks its folders read-only and Windows refuses to
   remove them).
 - `instalar.sh --pdi` works with the plugin zips of 0.4.0 and 0.4.1 (backslash paths, folders without the
   execute bit) and gives the `.sh` scripts, `spoon.command` and the macOS app their permissions back.
