@@ -65,10 +65,20 @@ the current user (no administrator rights) and asks for one of two types:
 | **Full** (default) | PDI 9.4 CE with the Spoon plugin in place, plus Java 21 (Eclipse Temurin), in `%LOCALAPPDATA%\Programs\Pentaho Live`: no Java needed on the computer |
 | **Plugin only** | Just the Spoon plugin, into the `data-integration` folder of a PDI 9.4 you already have (it asks for the folder and replaces any older `plugins\pentaho-mcp`) |
 
-It also creates a **Pentaho Live** shortcut in the Start menu (and, if you tick it, on the desktop),
-puts the `pentaho-live` command on the user PATH, and, if it finds Claude Code or Codex on the PATH,
-offers to configure them (it runs `instalar.ps1 -SoloAgentes`, step 4 only). If Spoon is open, it asks
-you to close it first. Uninstall it from **Settings → Apps** (it also takes `pentaho-live` off the PATH).
+The destination folder (asked before the type) is Pentaho Live's own: the launcher, the `pentaho-live`
+command and the uninstaller go there (and, in the full install, PDI and Java). Keep the default, or any
+folder outside your PDI: the installer does not accept one inside a PDI, or the folder that holds your
+`data-integration`. For **Plugin only**, your `data-integration` folder is asked for on a later page. A
+0.4.1 that was installed inside a PDI moves to the default folder when you update: the installer takes
+that folder off the PATH and deletes what it had put there (a full install's PDI and Java too, and the
+old plugin if this time it goes into another PDI or you choose Full); anything else stays as it is.
+
+It also creates a **Pentaho Live** shortcut in the Start menu (and, if you tick it, on the desktop). The
+shortcut shows a splash screen at once and keeps it until Spoon's window appears (30-60 seconds); Esc
+closes the splash, not Spoon. The installer puts the `pentaho-live` command on the user PATH, and, if it
+finds Claude Code or Codex on the PATH, offers to configure them (it runs `instalar.ps1 -SoloAgentes`,
+step 4 only). If Spoon is open, it asks you to close it first. Uninstall it from **Settings → Apps** (it
+also takes `pentaho-live` off the PATH).
 
 > **"Windows protected your PC"**: the installer is not code-signed yet, so SmartScreen may stop it.
 > Click **More info → Run anyway**. If you'd rather not, the zips are still in every release: use
@@ -76,7 +86,10 @@ you to close it first. Uninstall it from **Settings → Apps** (it also takes `p
 
 Agents (with the user's permission): `Instalador_PentahoLive_X.Y.Z.exe /VERYSILENT /SUPPRESSMSGBOXES`
 does a full install; add `/TYPE=pluginonly /PDIHOME="C:\path\to\data-integration"` for plugin only, and
-`/TASKS=""` to skip the desktop shortcut and the Claude Code / Codex setup (both are on by default). Run
+`/MERGETASKS="!claude,!codex"` to skip the Claude Code / Codex setup (on by default when the agent is on
+the PATH) and keep the desktop shortcut as it is (on by default; an update keeps the previous choice).
+`/TASKS=""` skips the setup and the desktop shortcut, and **on an update it deletes the desktop shortcut**
+the user had. Run
 it from PowerShell or cmd: **Git Bash rewrites `/VERYSILENT` as a path** (`C:/Program Files/Git/VERYSILENT`)
 and the normal wizard opens and waits for clicks. From Git Bash, prefix the command with
 `MSYS_NO_PATHCONV=1`. Silent uninstall: `unins000.exe /VERYSILENT` in the install folder.
@@ -128,5 +141,6 @@ is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-
 | `ping` answers but the agent sees no tools | The agent connected before Spoon was open | Restart the agent |
 | Port 8765 is taken | Another program uses it | Script with `-Puerto 8770` (sets `PENTAHO_MCP_PORT` for Spoon); in Claude Code set the plugin option `mcp_url` to `http://127.0.0.1:8770/mcp` in `/config` |
 | Spoon won't open | No Java | Install Java 11+ (`winget install EclipseAdoptium.Temurin.21.JRE`) |
+| Opening `Spoon.bat` shows **Open File - Security Warning** ("unknown publisher") | PDI was unzipped from a zip downloaded from the internet, and Windows marks those files | The Pentaho Live shortcut and `pentaho-live` don't trigger it. For `Spoon.bat` itself: before unzipping, right-click the zip → **Properties** → tick **Unblock**; already unzipped, in PowerShell `Get-ChildItem -Recurse "C:\path\to\data-integration" \| Unblock-File`, or **Properties** → **Unblock** on each `.bat` |
 | Driver error connecting to MySQL / SQL Server / Oracle | PDI doesn't ship those drivers | Copy the connector `.jar` into `data-integration/lib/` and restart Spoon (MySQL: `mysql-connector-j-*.jar`, regular MySQL connection type) |
 | ChatGPT (web) can't connect | ChatGPT only uses public HTTPS MCP servers; this one listens on `127.0.0.1` on purpose | Use Claude Code or Codex on the same computer |
