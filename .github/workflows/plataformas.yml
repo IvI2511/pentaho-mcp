@@ -384,6 +384,10 @@ jobs:
           sleep 10
           PID=$(pgrep -f launcher/launcher.jar | head -1)
           osascript "$CI/ventana.applescript" "$PID" > "$EVID/geometria-spoon-al-abrir.txt" 2>&1
+          for q in "splitter 1" "scroll area 1" "scroll area 2" "toolbar 1" "tab group 1 of scroll area 1" \
+                   "tab group 1 of scroll area 2" "every UI element of scroll area 2"; do
+            echo "$q: $(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $PID) to get {position, size} of $q of window 1" 2>&1)"
+          done | tee "$EVID/geometria-directa.txt"
           screencapture -x "$EVID/spoon-al-abrir.png"
           python3 -I "$CI/cliente_mcp.py" --salida "$EVID/mcp" --plataforma diag | tail -1
           sleep 3
