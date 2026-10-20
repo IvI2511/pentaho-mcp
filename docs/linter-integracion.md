@@ -2,8 +2,8 @@
 
 Qué falta para que el motor del linter (rama `feat/linter`) llegue a Spoon, con los cambios exactos en los
 archivos compartidos. El diseño es `docs/linter-diseno.md`; este documento no lo repite.
-Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP4 integrado** en `feat/calidad`
-(sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5.
+Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP4 y WP5 integrados** en
+`feat/calidad` (sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5 y §2.6.
 
 ## 1. Qué hay en la rama
 
@@ -132,12 +132,72 @@ esa línea (§6 del diseño: el lint no trae al usuario de vuelta a «Data Integ
 - **Arnés**: `correr.ps1` compila también con POI 4.1.1 (desde la 0.5.0 el plugin lo importa para el PowerPoint).
   Sobre `feat/calidad`: recall 27/27, 164 pruebas, 0 fallas, conteos iguales a `linea-base.tsv`.
 
+### 2.6 WP5 en `feat/calidad` (21-oct-2026): arreglos, silenciar y propuestas
+
+Archivos nuevos en el paquete base: `LintArreglos.java` (la lógica, sin Spoon), `LintPropuestas.java` (nombres sin
+IA). `LintTools` registra `apply_lint_fixes` y `suppress_lint` (61 tools) y `lint_etl` ya devuelve las propuestas
+en `fix.preview`. Cambios chicos en archivos compartidos: `Rutas.Ruta.elemento` (la hoja del XML, para cambiarle el
+texto), las claves `name.*` en `lint_{en,es,pt}.properties` y una cláusula en las instrucciones del servidor.
+
+- **Flujo de `apply_lint_fixes`**: copia en la UI (con la huella = `getXML().hashCode()` del documento vivo) →
+  hilo de trabajo: las reglas, las propuestas y la elección (y los campos de `declare_output_fields`, que pueden ir
+  a la BD) → UI: si la huella cambió, error («the document changed while it was being analyzed»); si no, se
+  resuelven **todas** las keys a objetos (steps, entradas, hops, conexiones) con sus precondiciones y recién
+  después se aplica, con los renombres al final, todo en un `UndoGrupo` → otra pasada de las reglas para
+  `score_after`. `dry_run` hace lo mismo sobre la copia. Una key que no sale va a `skipped` («no longer found»).
+- **Qué se aplica**: `all_auto` = los `auto` sin `confirm` ni `needs_value` de los hallazgos visibles (nunca los
+  silenciados). Una key explícita aplica cualquier arreglo (la descripción le pide al cliente que confirme los
+  `confirm`); `needs_value` sin `values[key]` va a `skipped` con la propuesta si la hay. Una key de `values` cuenta
+  como pedida. Las keys nunca se parten por comas (los nombres de step pueden tenerlas).
+- **Cada arreglo** (todos registran su cambio en el grupo; los steps se releen desde su XML cambiado, como
+  `TransOps.renombrar`):
+  - `swap_operands`, `set_output_mode`, `set_decimal` (solo `.` o `,`; si el agrupador era el mismo símbolo, lo
+    vacía), `declare_output_fields` (Strings con largo −1, el resto como llega; se saltea si Kettle no calcula
+    ningún campo, p. ej. detrás de un Transformation executor).
+  - `rename` (`TransOps.renombrar`: targets de Filter rows, `<from>` de Stream lookup, `step1/step2`, manejo de
+    errores) y `rename_entry`; rechaza un nombre que ya existe o que también es un nombre por defecto.
+  - `replace_value` en rutas: precondición = el valor que vio la regla. La propuesta con `DIR_DATOS` declara el
+    parámetro (fuera del undo, lo dice `notes`); si `DIR_DATOS` ya es otra carpeta (en el documento o en otro
+    arreglo de la misma llamada) se saltea: en `m09` la entrada y la salida están en carpetas distintas.
+  - `replace_value` en contraseñas: solo acepta una variable (`${X}` o `%%X%%`), nunca una clave. Conexión: undo
+    en transformaciones; en jobs no (`SpoonJobDelegate.undoJobAction` no tiene `CHANGE_CONNECTION` [B]); slave
+    server: nunca (tampoco `SpoonTransformationDelegate` deshace `CHANGE_SLAVE` [B]). `undoable` lo dice por key.
+  - `insert_sort`: Sort rows (ascendente y sensible a mayúsculas como `ValueMeta.compare`; Sorted merge conserva
+    sus sentidos) entre la fuente y el consumidor, y `step1/step2/reference/compare` repuntados; con varias
+    entradas, uno solo que las junta. Se saltea si el hop es de error o si la fuente manda a destinos concretos
+    (Filter rows, Switch/case). **ORDER BY** en lugar del Sort rows solo si el Table input es la entrada directa,
+    el consumidor agrupa (no Merge join/rows ni Sorted merge: la collation de la BD puede no ser la de Kettle), las
+    claves son identificadores y la consulta es un SELECT sin ORDER BY/LIMIT/UNION/variables.
+  - `retarget_hop`: el hop rojo va al Abort que ya haya (si no hay ya un hop a él) o a uno nuevo debajo del
+    Success (`name.abort`); si el Success queda sin hops, lo dice.
+  - `set_description` y `add_parameter`: fuera del undo de Spoon (`undoable:false` y una nota).
+- **`undo_steps`**: 1 en transformaciones si hubo algún cambio deshacible; en jobs, una por acción
+  (`UndoGrupo.acciones()`; Spoon no encadena en jobs). `score_after` se calcula como lo vería `lint_etl` después:
+  con el documento sin guardar (las reglas de modo archivo se juzgan en memoria; lo dice `notes`).
+- **`suppress_lint`** (`rule` o `*`; `kettle_check` no): step → `UndoGrupo` (`StepMeta.replaceMeta` copia los
+  atributos con `copyStringMap` [B]; la prueba confirma que el «antes» del undo no queda silenciado); entrada →
+  todas sus copias y **sin undo** (`JobEntryCopy.replaceMeta` no copia los atributos [B]: un Ctrl+Z no lo
+  quitaría); documento → sin undo. Siempre `setChanged()`. Valida que la regla sea del tipo de documento.
+- **`LintPropuestas`**: archivo que lee o escribe (sin carpeta ni extensión; nada si es una variable o viene de un
+  campo), tabla (FROM del Table input, `<table>` de las salidas a BD), claves de Sort rows, Group by, Unique,
+  Merge join/rows y Stream lookup, campos de la condición de Filter rows, resultados de Calculator y Formula, Add
+  constants, Generate rows (con el límite), Select values, Get variables, Value mapper, Switch/case, Split; las
+  entradas TRANS/JOB por su archivo. Únicos entre sí y con el documento («Leer clientes 3»). En los corpus:
+  **205 de 387** nombres por defecto (52 %; el diseño midió 51 % con el prototipo).
+- **Pruebas**: `PruebaArreglos` (9, sin Spoon): keys resueltas antes de tocar nada y renombres al final, keys
+  viejas y objetos que desaparecen o cambian entre el análisis y la aplicación, huella, argumentos, propuestas,
+  referencias tras renombrar (y guardar y volver a abrir), supresiones ida y vuelta en `.ktr` y `.kjb`, Sort rows y
+  ORDER BY, y los demás arreglos. `PruebaMcpInformes`: 61 tools, argumentos y errores sin Spoon de las dos nuevas.
+  Arnés: `pruebasArreglos` aplica sobre una copia de cada documento de los tres corpus todos los arreglos que no
+  piden un valor y falla si uno revienta, si una key aplicada sigue saliendo, si baja el puntaje o si el documento
+  no se vuelve a abrir desde su XML: 244 documentos, 143 con cambios, 121 suben de puntaje, 0 bajan.
+
 ## 3. Lo que falta escribir
 
 | WP | Qué | Dónde | Necesita |
 |---|---|---|---|
 | WP3 | Modo profundo: lista blanca (ya está en `LintEntorno.soloLectura`), sondas de orden y de decimal (la columna como String, con el parser del step) y prueba diferencial, presupuesto total. Sube/baja severidades en el `Resultado` (`Hallazgo.deep`) y llena `Resultado.deep`. | `LintSondas.java` (paquete base) | un método **nuevo** `RunMotor.filas( TransMeta copia, String step, int max, long ms )` que devuelva `RowMetaInterface` + filas + si terminó solo (aditivo: `preview` no cambia) |
-| WP5 | `apply_lint_fixes` (resuelve todas las keys antes de tocar nada, renombres al final, un `UndoGrupo` en transformaciones) y `suppress_lint` (`Supresiones.agregar/quitar` + `setChanged()` + `UndoGrupo` en steps). Propuestas de nombre sin IA (51 % de los nombres por defecto) para llenar `Arreglo.preview` de `default_step_name`. | `LintArreglos.java`, `LintPropuestas.java` (paquete base) | `TransOps`, `UndoGrupo`, `JobSoporte` |
+| ~~WP5~~ | **Hecho** (§2.6): `apply_lint_fixes`, `suppress_lint` y las propuestas de nombre. | `LintArreglos.java`, `LintPropuestas.java` | — |
 | WP6 | Sección «Calidad» del informe | `SecCalidad.java` (paquete base) | pedidos a Informes: `SeccionId.QUALITY`, `Pedido.calidadProfunda`, registro en `InformeServicio`, check y `LocationListener` en el panel, `quality_deep` en `build_report` |
 | WP7 | Skill: sección «Calidad» en `SKILL.md` y los ids de regla al lado de D1-D11 en `03-errores-comunes.md` (con las correcciones de §12 del diseño); `CHANGELOG.md`; conteo de herramientas en los README | `claude/` (sube `version` del `plugin.json`) | — |
 
@@ -226,7 +286,8 @@ powershell -ExecutionPolicy Bypass -File tools\lint-corpus\correr.ps1 -PdiHome "
 
 Compila el plugin y el arnés en `%TEMP%\pentaho-lint-corpus`, arma las mutaciones y corre el motor sobre los
 samples de PDI, los ejemplos de la skill y las mutaciones. Falla si cae el recall (`esperado.tsv`), si falla una
-prueba (puntaje, keys, supresiones, textos, filtros, propuestas de ruta) o si cambian los conteos de
+prueba (puntaje, keys, supresiones, textos, filtros, propuestas de ruta, los arreglos de `apply_lint_fixes` sobre
+cada documento y la cobertura de las propuestas de nombre, ≥ 40 %) o si cambian los conteos de
 `linea-base.tsv`. Con `-EscribirBase` rehace la línea base (cuando el cambio es a propósito). No escribe en la
 carpeta de PDI (los logs de Kettle van a la carpeta de salida) y, antes de cada JVM, espera a tener
 `-MemoriaMinGB` libres (2 por defecto); el arnés corre con `-Xmx1g`.

@@ -48,7 +48,8 @@ import io.github.ivi2511.pentahomcp.lint.Textos;
 /**
  * Arnés del motor del linter, sin Spoon (docs/linter-diseno.md §3, WP7). Inicializa Kettle, carga cada .ktr/.kjb
  * de los corpus como lo vería el plugin (new TransMeta/JobMeta + ReportTools.clonar) y corre LintMotor con
- * LintEntorno. Además, pruebas chicas del puntaje, las keys, las supresiones, los textos y los filtros.
+ * LintEntorno. Además, pruebas chicas del puntaje, las keys, las supresiones, los textos y los filtros, y los
+ * arreglos de apply_lint_fixes (WP5) sobre cada documento de los corpus.
  *
  * Uso (lo arma correr.ps1): java ... io.github.ivi2511.pentahomcp.ArnesLint <salida> <corpus>=<carpeta> ...
  *   -Dlint.esperado=esperado.tsv   recall del corpus "mutaciones"
@@ -118,6 +119,7 @@ public final class ArnesLint {
         recall( docs, Paths.get( esp ) );
       }
     }
+    pruebasArreglos( corpus, salida );
     escribir( salida, docs, msCorpus );
     String base = System.getProperty( "lint.base" );
     if ( base != null ) {
@@ -373,6 +375,125 @@ public final class ArnesLint {
     es.lang = "es";
     r = analizar( cargar( dir.resolve( "m09_ruta_absoluta.ktr" ) ), es );
     ok( r.findings.get( 0 ).message.startsWith( "Ruta absoluta" ), "mensajes en español: " + r.findings.get( 0 ).message );
+  }
+
+  /**
+   * apply_lint_fixes (LintArreglos, WP5) sobre una copia de cada documento de los corpus, como si alguien confirmara
+   * todo: los arreglos que no piden un valor (los auto y los confirm con propuesta). Falla si un arreglo revienta, si
+   * una key aplicada sigue saliendo después o si el documento no se puede volver a abrir desde su XML. Cuenta qué
+   * nombres por defecto tienen propuesta sin IA (el diseño midió 51 % con el prototipo).
+   */
+  static void pruebasArreglos( Map<String, Path> corpus, File salida ) throws Exception {
+    long t0 = System.currentTimeMillis();
+    Map<String, Integer> porTipo = new TreeMap<String, Integer>();
+    Map<String, Integer> motivos = new TreeMap<String, Integer>();
+    int docs = 0;
+    int conCambios = 0;
+    int porDefecto = 0;
+    int conPropuesta = 0;
+    int suben = 0;
+    int bajan = 0;
+    File dir = new File( salida, "arreglados" );
+    dir.mkdirs();
+    for ( Map.Entry<String, Path> c : corpus.entrySet() ) {
+      List<Path> archivos;
+      try ( Stream<Path> st = Files.walk( c.getValue() ) ) {
+        archivos = st.filter( x -> x.toString().endsWith( ".ktr" ) || x.toString().endsWith( ".kjb" ) ).sorted()
+          .collect( Collectors.toList() );
+      }
+      for ( Path p : archivos ) {
+        String nombre = c.getKey() + "/" + c.getValue().relativize( p ).toString().replace( '\\', '/' );
+        AbstractMeta doc;
+        try {
+          doc = cargar( p );
+        } catch ( Throwable e ) {
+          continue; // ya figura como error del corpus
+        }
+        docs++;
+        try {
+          // 1) qué se puede arreglar sin un valor
+          LintArreglos.Pedido todo = new LintArreglos.Pedido();
+          LintArreglos.Analisis an0 = LintArreglos.analizar( ReportTools.clonar( doc ), opcionesArreglo( doc ), todo );
+          for ( Hallazgo x : an0.antes.findings ) {
+            if ( x.fix != null && !x.fix.needsValue ) {
+              todo.keys.add( x.key );
+            }
+            if ( x.rule.equals( "default_step_name" ) ) {
+              porDefecto++;
+              conPropuesta += x.fix != null && x.fix.preview != null ? 1 : 0;
+            }
+          }
+          if ( todo.keys.isEmpty() ) {
+            continue;
+          }
+          // 2) analizar y aplicar, como apply_lint_fixes
+          AbstractMeta copia = ReportTools.clonar( doc );
+          LintArreglos.Analisis an = LintArreglos.analizar( copia, opcionesArreglo( copia ), todo );
+          LintArreglos.Hecho h = LintArreglos.aplicar( doc, an, "en", UndoGrupo.sinSpoon( doc ), null, null );
+          Set<String> aplicadas = new HashSet<String>();
+          for ( com.fasterxml.jackson.databind.JsonNode x : h.aplicados ) {
+            aplicadas.add( x.path( "key" ).asText() );
+          }
+          for ( Hallazgo x : an.antes.findings ) {
+            if ( aplicadas.contains( x.key ) ) {
+              porTipo.merge( x.fix.kind, 1, Integer::sum );
+            }
+          }
+          for ( String[] x : h.saltados ) {
+            String m = x[ 1 ].replaceAll( "'[^']*'", "'…'" ).replaceAll( "\\(.*", "" );
+            motivos.merge( m.length() > 70 ? m.substring( 0, 70 ) : m, 1, Integer::sum );
+            ok( !x[ 1 ].startsWith( "failed:" ), "arreglo que revienta en " + nombre + ": " + x[ 0 ] + " -> " + x[ 1 ] );
+          }
+          if ( h.cambios == 0 ) {
+            continue;
+          }
+          conCambios++;
+          // 3) lo aplicado ya no sale
+          Resultado despues = analizar( ReportTools.clonar( doc ), opcionesArreglo( doc ) );
+          for ( Hallazgo x : despues.findings ) {
+            ok( !aplicadas.contains( x.key ), "key aplicada que sigue saliendo en " + nombre + ": " + x.key );
+          }
+          suben += despues.score > an.antes.score ? 1 : 0;
+          bajan += despues.score < an.antes.score ? 1 : 0;
+          ok( despues.score >= an.antes.score, "el puntaje baja tras arreglar " + nombre + ": " + an.antes.score + " -> "
+            + despues.score + " " + claves( despues.findings ) );
+          // 4) se vuelve a abrir desde su XML
+          String ext = doc instanceof TransMeta ? ".ktr" : ".kjb";
+          File f = new File( dir, nombre.replaceAll( "[/\\\\:]", "_" ).replaceAll( "\\.(ktr|kjb)$", "" ) + ext );
+          String xml = doc instanceof TransMeta ? ( (TransMeta) doc ).getXML() : ( (JobMeta) doc ).getXML();
+          Files.write( f.toPath(), xml.getBytes( StandardCharsets.UTF_8 ) );
+          AbstractMeta otra = doc instanceof TransMeta ? new TransMeta( f.getPath() ) : new JobMeta( f.getPath(), null );
+          int n1 = doc instanceof TransMeta ? ( (TransMeta) doc ).nrSteps() : ( (JobMeta) doc ).nrJobEntries();
+          int n2 = otra instanceof TransMeta ? ( (TransMeta) otra ).nrSteps() : ( (JobMeta) otra ).nrJobEntries();
+          ok( n1 == n2, "se pierden steps al volver a abrir " + nombre + ": " + n1 + " -> " + n2 );
+        } catch ( Throwable e ) {
+          ok( false, "apply_lint_fixes reventó en " + nombre + ": " + e );
+        }
+      }
+    }
+    int pct = porDefecto == 0 ? 0 : 100 * conPropuesta / porDefecto;
+    System.out.println( "arreglos: " + docs + " documentos, " + conCambios + " con cambios, " + porTipo + "; puntaje "
+      + suben + " suben, " + bajan + " bajan; propuestas de nombre " + conPropuesta + "/" + porDefecto + " (" + pct
+      + " %); " + ( System.currentTimeMillis() - t0 ) + " ms" );
+    for ( Map.Entry<String, Integer> m : motivos.entrySet() ) {
+      System.out.println( "  saltados " + m.getValue() + " x " + m.getKey() );
+    }
+    ok( porDefecto == 0 || pct >= 40, "propuestas de nombre para al menos 40 % de los nombres por defecto: " + pct + " %" );
+  }
+
+  static List<String> claves( List<Hallazgo> l ) {
+    List<String> r = new ArrayList<String>();
+    for ( Hallazgo x : l ) {
+      r.add( x.key );
+    }
+    return r;
+  }
+
+  static Opciones opcionesArreglo( AbstractMeta copia ) {
+    Opciones op = new Opciones();
+    op.sinGuardar = true; // el archivo del disco ya no es lo que se arregla
+    op.entorno = new LintEntorno( copia );
+    return op;
   }
 
   /** Cada mutación tiene que dar su regla con la severidad esperada (o no darla, si dice none). */

@@ -38,6 +38,8 @@ public final class Rutas {
     public String valor;
     /** 1, 2… si el mismo tag aparece varias veces en el step; 0 si es único. */
     public int n;
+    /** La hoja del XML de donde salió (apply_lint_fixes le cambia el texto). */
+    public Element elemento;
   }
 
   private Rutas() {
@@ -69,6 +71,7 @@ public final class Rutas {
       Ruta r = new Ruta();
       r.tag = nombreDeFile ? "file/name" : t;
       r.valor = v;
+      r.elemento = e;
       out.add( r );
     }
     for ( Ruta r : out ) {
