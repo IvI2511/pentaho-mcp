@@ -303,8 +303,8 @@ jobs:
   # Mac con chip Apple como un usuario nuevo: sin setup-java, sin Rosetta preparada y sin ~/.kettle (primera
   # vez). Solo se corre instalar.sh, el de esta rama, como lo baja un usuario: los pasos 1, 2 y 4 de la receta
   # de docs/plataformas.md (Rosetta 2, el Java x64 y abrir Spoon con PENTAHO_JAVA_HOME + arch -x86_64) los
-  # tiene que hacer él. Sin terminal solo avisa; en una terminal (script(1) le da una) pregunta y se le
-  # contesta «y»; Spoon se abre con el comando que imprime en «Done. Next».
+  # tiene que hacer él. Sin terminal solo avisa; en una terminal (tools/ci/responder.py le da una pty)
+  # pregunta y se le contesta «y»; Spoon se abre con el comando que imprime en «Done. Next».
   receta-mac-apple:
     name: receta-mac-apple (macos-26)
     runs-on: macos-26
@@ -330,10 +330,10 @@ jobs:
 
       - name: instalar.sh en una terminal, contestando «y» (Rosetta 2, Java x64 y lanzador)
         run: |
-          # la «y» espera en la pty hasta que la pregunta del paso 3 la lee
-          printf 'y\n' | script -q "$EVID/instalar-2-terminal.typescript" \
-            bash /tmp/instalar-pentaho-mcp.sh --pdi ~/pentaho/data-integration
-          tr -d '\r' < "$EVID/instalar-2-terminal.typescript" > "$EVID/instalar-2-terminal.log"
+          # una terminal (pty) y la «y» recién cuando aparece la pregunta del paso 3, como una persona
+          python3 -I tools/ci/responder.py --espera "[Y/n]" --respuesta y --log "$EVID/instalar-2-terminal.pty" \
+            -- bash /tmp/instalar-pentaho-mcp.sh --pdi ~/pentaho/data-integration > /dev/null
+          tr -d '\r' < "$EVID/instalar-2-terminal.pty" > "$EVID/instalar-2-terminal.log"
           cat "$EVID/instalar-2-terminal.log"
           grep -q "Install what is missing now? \[Y/n\]" "$EVID/instalar-2-terminal.log"
           arch -x86_64 /usr/bin/true && echo "Rosetta 2: OK"
