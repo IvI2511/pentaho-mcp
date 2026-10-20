@@ -299,3 +299,74 @@ jobs:
           name: evidencia-macos-arm64-nativo
           path: ${{ runner.temp }}/evidencia
           if-no-files-found: warn
+
+  # Diagnóstico de la ventana de Spoon en macOS, que en las corridas de arriba se abre en blanco salvo la
+  # barra de arriba (el MCP anda igual). Compara una ventana SWT mínima con el mismo swt.jar contra Spoon,
+  # con Java 11, 17 y 21, y guarda lo que macOS ve dentro de la ventana (árbol de accesibilidad).
+  ventana-macos:
+    name: ventana-macos ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: intel-java11, runner: macos-15-intel, java: "11", prefijo: "" }
+          - { id: intel-java17, runner: macos-15-intel, java: "17", prefijo: "" }
+          - { id: intel-java21, runner: macos-15-intel, java: "21", prefijo: "" }
+          - { id: arm64-rosetta-java11, runner: macos-15, java: "11", prefijo: "arch -x86_64" }
+    env:
+      PREFIJO: ${{ matrix.prefijo }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          architecture: x64
+
+      - name: SWT mínima y Spoon
+        run: |
+          set +e +o pipefail
+          EVID="$RUNNER_TEMP/evidencia"; PDI="$RUNNER_TEMP/pentaho/data-integration"
+          export KETTLE_HOME="$RUNNER_TEMP/kettle-home"
+          mkdir -p "$EVID" "$KETTLE_HOME/.kettle"
+          printf '%s\n' ShowTips=N ShowWelcomePageOnStartup=N ShowRepositoriesAtStartup=N > "$KETTLE_HOME/.kettle/.spoonrc"
+          { sw_vers; $PREFIJO "$JAVA_HOME/bin/java" -version; } > "$EVID/sistema.txt" 2>&1
+          bash instalar.sh --instalar-pdi --destino "$RUNNER_TEMP/pentaho" --sin-claude --sin-codex > "$EVID/instalar.log" 2>&1
+          ui() {  # lo que macOS ve dentro de la ventana 1 del proceso $1
+            osascript -e "tell application \"System Events\" to tell (first process whose unix id is $1)
+              set frontmost to true
+              return {name of window 1, size of window 1, entire contents of window 1}
+            end tell" 2>&1 | head -c 30000
+          }
+
+          echo "== 1. ventana SWT mínima con el swt.jar de PDI"
+          $PREFIJO "$JAVA_HOME/bin/java" -XstartOnFirstThread -cp "$PDI/libswt/osx64/swt.jar" tools/ci/SwtPrueba.java 30000 \
+            > "$EVID/swt-prueba.log" 2>&1 &
+          sleep 15
+          screencapture -x "$EVID/swt-prueba.png"
+          ui "$(pgrep -f SwtPrueba | head -1)" > "$EVID/swt-prueba-ui.txt"
+          wait
+          cat "$EVID/swt-prueba.log"; head -c 1500 "$EVID/swt-prueba-ui.txt"; echo
+
+          echo "== 2. Spoon"
+          cd "$PDI"
+          nohup $PREFIJO /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 &
+          for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > "$EVID/ping.json" 2>/dev/null && break; sleep 1; done
+          echo "/ping a los $i s: $(cat "$EVID/ping.json")"
+          sleep 10
+          screencapture -x "$EVID/spoon.png"
+          ui "$(pgrep -f launcher/launcher.jar | head -1)" > "$EVID/spoon-ui.txt"
+          head -c 3000 "$EVID/spoon-ui.txt"; echo
+          pkill -f launcher/launcher.jar
+          cp "$PDI"/logs/spoon.log "$EVID/" 2>/dev/null
+          exit 0
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ventana-macos-${{ matrix.id }}
+          path: ${{ runner.temp }}/evidencia
