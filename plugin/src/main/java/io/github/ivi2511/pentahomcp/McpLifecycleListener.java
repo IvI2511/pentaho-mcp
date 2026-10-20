@@ -22,7 +22,7 @@ public class McpLifecycleListener implements LifecycleListener {
 
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
-  static final String VERSION = "0.1.0";
+  static final String VERSION = "0.2.0";
 
   /** Llega a la IA en el initialize de MCP: como trabajar con estas herramientas. */
   static final String INSTRUCCIONES =

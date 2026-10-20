@@ -1,5 +1,7 @@
 # Pentaho MCP
 
+> **¿Sos un agente (Claude Code, Codex…) y te pidieron instalar esto?** Seguí [`INSTALL.md`](INSTALL.md).
+
 Para que Claude arme ETLs en **Pentaho Data Integration 9.4 (Spoon)** mientras uno mira: agrega
 steps, los conecta, los configura, valida, muestra filas de preview y ejecuta, todo en la ventana de
 Spoon que tenés abierta. Cada cambio se deshace con Ctrl+Z.
@@ -15,18 +17,25 @@ La skill sirve sola también: sin Spoon abierto, Claude escribe el `.ktr` y lo v
 
 ## Instalar
 
-1. **En Spoon**: bajar `pentaho-mcp-<versión>.zip` del último release, descomprimirlo dentro de
-   `data-integration/plugins/` (queda `plugins/pentaho-mcp/`) y reiniciar Spoon.
-2. **En Claude Code**:
-   ```
-   /plugin marketplace add IvI2511/pentaho-mcp
-   /plugin install pentaho@pentaho-tools
-   ```
-3. Con Spoon abierto, pedirle a Claude algo como *"armá una transformación que lea ventas.csv, sume
-   el importe por ciudad y lo escriba en un CSV"*.
+**Lo más fácil: pedíselo a tu agente.** En Claude Code o Codex escribí:
 
-Otro puerto: definir `PENTAHO_MCP_PORT` igual para Spoon (variable de entorno o `kettle.properties`)
-y para Claude Code.
+> instalá IvI2511/pentaho-mcp
+
+El agente sigue [`INSTALL.md`](INSTALL.md): te pregunta si ya tenés Pentaho, baja lo que falta,
+instala el plugin de Spoon y se configura a sí mismo.
+
+Hay dos opciones, según tengas o no PDI:
+
+| Si… | Bajás | Script |
+|---|---|---|
+| **Ya tenés PDI** | `pentaho-mcp.zip` (el plugin, ~140 KB) → se descomprime en `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
+| **No tenés PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE entero con el plugin puesto, ~420 MB) | `instalar.ps1 -InstalarPdi` |
+
+Los dos están en el [último release](https://github.com/IvI2511/pentaho-mcp/releases/latest).
+Instalación a mano, macOS/Linux (`instalar.sh`) y problemas comunes: [`INSTALL.md`](INSTALL.md).
+
+Después: abrir Spoon y pedirle al agente algo como *"armá una transformación que lea ventas.csv,
+sume el importe por ciudad y lo escriba en un CSV"*.
 
 MySQL, MariaDB, SQL Server y Oracle no traen driver en PDI: copiar el `.jar` del conector a
 `data-integration/lib/`. Con MySQL Connector/J 8+ alcanza el tipo de conexión MySQL normal.

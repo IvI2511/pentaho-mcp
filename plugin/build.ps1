@@ -4,7 +4,7 @@
 # Uso:  powershell -ExecutionPolicy Bypass -File plugin\build.ps1 [-PdiHome <ruta data-integration>]
 param(
   [string]$PdiHome = $env:PDI_HOME,
-  [string]$Version = "0.1.0"
+  [string]$Version = "0.2.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -79,6 +79,8 @@ if ($LASTEXITCODE -ne 0) { throw "jar fallo ($LASTEXITCODE)" }
 $zip = Join-Path $root "dist\pentaho-mcp-$Version.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path $dist -DestinationPath $zip
+# copia con nombre fijo: los instaladores la bajan de .../releases/latest/download/pentaho-mcp.zip
+Copy-Item -Force $zip (Join-Path $root "dist\pentaho-mcp.zip")
 
 Write-Host ""
 Write-Host "OK -> $dist"
