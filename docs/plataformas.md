@@ -194,8 +194,9 @@ Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.ym
 | 4 | [39465396482](https://github.com/IvI2511/pentaho-mcp/actions/runs/39465396482) | todo en verde; la `.app` abre en Intel con `open` y en chip Apple con `open --arch x86_64`; los remedios de ventana no cambian nada |
 | 5 | [39466039172](https://github.com/IvI2511/pentaho-mcp/actions/runs/39466039172) | todo en verde, incluida `receta-mac-apple` (los 4 pasos tal cual en macOS 26, 83 s el job) |
 | 6 | [39466461042](https://github.com/IvI2511/pentaho-mcp/actions/runs/39466461042) | todo en verde; posición y tamaño de cada control de la ventana |
-| 7 | [39467208277](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467208277) | hilos de Java2D en Spoon; con `java.awt.headless` sigue en blanco |
-| 8 | [39467778493](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467778493) | la ventana SWT mínima con Java2D/AWT inicializado también se dibuja |
+| 7 | [39467208277](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467208277) | hilos de Java2D en Spoon; con `java.awt.headless` sigue en blanco (cancelada después: lo que quedaba eran jobs arm64 repetidos, en cola) |
+| 8 | [39467778493](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467778493) | la ventana SWT mínima con Java2D/AWT inicializado también se dibuja (cancelada después, igual que la 7) |
+| 9 | [39468686139](https://github.com/IvI2511/pentaho-mcp/actions/runs/39468686139) | **la de referencia**, con el workflow final: 8 de 8 en verde (5 plataformas, arm64 nativo, receta del documento y diagnóstico de la ventana) |
 
 Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pentaho-mcp`).
 
