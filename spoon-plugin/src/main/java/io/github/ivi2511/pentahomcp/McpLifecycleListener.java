@@ -49,8 +49,8 @@ public class McpLifecycleListener implements LifecycleListener {
       + "to right, ~150 px apart. If a step has several outputs, by default each one gets a copy of every row "
       + "(change it with set_output_mode). generate_report writes a Markdown report of the document and "
       + "canvas_screenshot returns an image of the canvas to check the drawing. To document or hand in an ETL "
-      + "with diagrams, lineage, data dictionary and run metrics, use build_report (HTML, PDF, Markdown, "
-      + "PowerPoint, JSON): call get_report_data first if you want to add a narrative based on the real data, "
+      + "with diagrams, lineage, data dictionary, run metrics and its technical quality score, use build_report "
+      + "(HTML, PDF, Markdown, PowerPoint, JSON): call get_report_data first if you want to add a narrative based on the real data, "
       + "and show_report only when the user asks to see it in Spoon's Reports perspective. Every change can be "
       + "undone with Ctrl+Z in Spoon. The step catalog and the guides are also available as MCP resources "
       + "(pentaho://...) for clients that do not have the pentaho-etl skill.";

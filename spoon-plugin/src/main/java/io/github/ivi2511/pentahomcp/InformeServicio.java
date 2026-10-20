@@ -83,7 +83,7 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
  * Motor de informes, todo estatico (diseno §1.1, §1.4 y §7.3). Lo llaman el panel (informes.ui) y
- * las tools MCP (ReportTools). Registra los doce recolectores y los renderizadores.
+ * las tools MCP (ReportTools). Registra los trece recolectores y los renderizadores.
  * <p>
  * Hilos:
  * <ul>
@@ -132,13 +132,13 @@ public final class InformeServicio {
   /** Los recolectores, en el orden del informe (SeccionId.ORDEN). */
   private static final List<Recolector> RECOLECTORES = Collections.unmodifiableList( Arrays.<Recolector>asList(
     new SecPortada(), new SecResumen(), new SecFlujo( false ), new SecFlujo( true ), new SecLinaje(),
-    new SecDiccionario(), new SecDestino(), new SecPerfil(), new SecMetricas(), new SecValidacion(),
+    new SecDiccionario(), new SecDestino(), new SecPerfil(), new SecMetricas(), new SecValidacion(), new SecCalidad(),
     new SecConexiones(), new SecNarrativa() ) );
 
   /** Secciones marcadas por defecto (diseno §2.3); metrics ademas pide una corrida. */
   private static final Set<String> POR_DEFECTO = Collections.unmodifiableSet( new LinkedHashSet<String>( Arrays.asList(
     SeccionId.PORTADA, SeccionId.RESUMEN, SeccionId.FLUJO, SeccionId.FLUJO_JOB, SeccionId.LINAJE,
-    SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.METRICAS, SeccionId.VALIDACION,
+    SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.METRICAS, SeccionId.VALIDACION, SeccionId.CALIDAD,
     SeccionId.CONEXIONES ) ) );
 
   /** docId de cada informe armado, para la carpeta de la vista previa. Por identidad (Informe no redefine equals). */
@@ -287,7 +287,8 @@ public final class InformeServicio {
     if ( SeccionId.FLUJO.equals( id ) || SeccionId.FLUJO_JOB.equals( id ) ) {
       return Disponibilidad.COSTO_UI;
     }
-    if ( SeccionId.LINAJE.equals( id ) || SeccionId.DICCIONARIO.equals( id ) ) {
+    if ( SeccionId.LINAJE.equals( id ) || SeccionId.DICCIONARIO.equals( id ) || SeccionId.CALIDAD.equals( id ) ) {
+      // quality: las reglas que miran los campos los calculan (Pedido.calidadProfunda ademas lee las fuentes)
       return Disponibilidad.COSTO_CAMPOS;
     }
     if ( SeccionId.PERFIL.equals( id ) ) {
@@ -414,8 +415,9 @@ public final class InformeServicio {
 
   /**
    * Arma el informe en el hilo que llama (un worker). Las secciones van en el orden de SeccionId.ORDEN;
-   * summary se arma al final porque junta los resumenes de las demas. Si se cancela, lo que falta
-   * queda "omitido" con el motivo y el informe se devuelve igual.
+   * summary se arma al final porque junta los resumenes de las demas. quality sabe si validation ya salio en
+   * el informe (va antes): asi no repite sus hallazgos. Si se cancela, lo que falta queda "omitido" con el
+   * motivo y el informe se devuelve igual.
    */
   static Informe armarAhora( Captura c, Pedido pedido, Tema tema, Progreso pr ) {
     final Pedido p = pedido == null ? new Pedido() : pedido;
@@ -440,9 +442,13 @@ public final class InformeServicio {
         }
         final Recolector rec = recolector( id );
         ctx.progreso().paso( r.f( "progreso.seccion", SeccionId.titulo( id, idioma ) ), hecho, total );
+        final boolean conValidacion = SeccionId.CALIDAD.equals( id ) && salio( hechas.get( SeccionId.VALIDACION ) );
         hechas.put( id, correr( id, rec, new Callable<Seccion>() {
           @Override
           public Seccion call() throws Exception {
+            if ( rec instanceof SecCalidad ) {
+              return ( (SecCalidad) rec ).armar( ctx, conValidacion );
+            }
             return rec.armar( ctx );
           }
         }, ctx, r ) );
@@ -479,6 +485,11 @@ public final class InformeServicio {
       ctx.progreso().paso( r.s( "progreso.listo" ), total, total );
       return inf;
     }
+  }
+
+  /** La seccion esta en el informe con su contenido (ok o parcial), no omitida ni en error. */
+  static boolean salio( Seccion s ) {
+    return s != null && ( Seccion.OK.equals( s.estado ) || Seccion.PARCIAL.equals( s.estado ) );
   }
 
   private static void cabecera( Informe inf, Captura c, Pedido p, String idioma, Rotulos r ) {

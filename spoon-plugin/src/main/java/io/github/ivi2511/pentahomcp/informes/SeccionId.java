@@ -23,13 +23,15 @@ public final class SeccionId {
   public static final String PERFIL = "profile";
   public static final String METRICAS = "metrics";
   public static final String VALIDACION = "validation";
+  /** Calidad tecnica: el linter (docs/linter-diseno.md §8). Va despues de validation, que la complementa. */
+  public static final String CALIDAD = "quality";
   public static final String CONEXIONES = "connections";
   public static final String NARRATIVA = "narrative";
 
   /** Orden en el informe (el indice va entre la portada y el resumen, lo pone el renderizador). */
   public static final List<String> ORDEN = Collections.unmodifiableList( Arrays.asList(
-    PORTADA, RESUMEN, FLUJO, FLUJO_JOB, LINAJE, DICCIONARIO, DESTINO, PERFIL, METRICAS, VALIDACION, CONEXIONES,
-    NARRATIVA ) );
+    PORTADA, RESUMEN, FLUJO, FLUJO_JOB, LINAJE, DICCIONARIO, DESTINO, PERFIL, METRICAS, VALIDACION, CALIDAD,
+    CONEXIONES, NARRATIVA ) );
 
   /** Area de Rotulos con los titulos de las secciones. */
   public static final String AREA = "secciones";

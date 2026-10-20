@@ -85,6 +85,7 @@ public final class ModeloMuestra {
     inf.secciones.add( perfil() );
     inf.secciones.add( metricas() );
     inf.secciones.add( validacion() );
+    inf.secciones.add( calidad() );
     inf.secciones.add( conexiones() );
     inf.secciones.add( narrativa() );
     return inf;
@@ -459,6 +460,41 @@ public final class ModeloMuestra {
     Aviso a = new Aviso( Aviso.ERROR, "La validación no terminó: «Leer clientes» no responde." );
     a.id = "validation-error";
     s.con( a );
+    return s;
+  }
+
+  private static Seccion calidad() {
+    Seccion s = new Seccion( SeccionId.CALIDAD, "Calidad técnica" );
+    s.resumen = "Puntaje 66/100 (C): 1 error y 1 advertencia. Lo que más resta: «Entrada sin ordenar por la clave» "
+      + "(25 puntos).";
+    Indicadores ind = new Indicadores()
+      .con( new Indicador( "Calidad técnica", "66/100", "Banda C", Indicador.WARN ) )
+      .con( new Indicador( "Errores", "1", null, Indicador.ERROR ) )
+      .con( new Indicador( "Advertencias", "1", null, Indicador.WARN ) )
+      .con( new Indicador( "Sugerencias", "0" ) );
+    ind.id = "quality-indicadores";
+    s.con( ind );
+    Aviso a = new Aviso( Aviso.ERROR, "Entrada sin ordenar por la clave: «Agrupar por producto» agrupa por producto "
+      + "y su entrada no viene ordenada." );
+    a.id = "quality-error-1";
+    s.con( a );
+    Tabla t = new Tabla( "Severidad", "Regla", "Dónde", "Qué pasa", "Cómo se arregla" )
+      .fila( "Error", "Entrada sin ordenar por la clave", "Agrupar por producto", "Agrupa por producto sin ordenar: "
+        + "salen grupos repetidos.", "Poner un Sort rows por producto antes. Propuesta: «Ordenar por producto»." )
+      .fila( "Advertencia", "Ruta absoluta", "Leer ventas", "Ruta absoluta en «Leer ventas»: C:\\datos\\ventas.csv. "
+        + "(Depende de esta máquina.)", "Usar ${Internal.Entry.Current.Directory} y una ruta relativa al archivo." );
+    t.id = "quality-hallazgos";
+    t.titulo = "Hallazgos";
+    t.nota = "1 hallazgo que ya está en «Validación» no se repite aquí; sí resta puntos.";
+    s.con( t );
+    Tabla p = new Tabla( "Regla", "Severidad", "Hallazgos", "Puntos" )
+      .fila( "Entrada sin ordenar por la clave", "Error", "1", "−25" )
+      .fila( "Ruta absoluta", "Advertencia", "1", "−8" );
+    p.id = "quality-puntos";
+    p.titulo = "De dónde salen los puntos que faltan";
+    p.alineacion = new ArrayList<>( Arrays.asList( "l", "l", "r", "r" ) );
+    p.nota = "Calidad técnica = 100 − puntos. Mide buenas prácticas técnicas: no es una nota.";
+    s.con( p );
     return s;
   }
 

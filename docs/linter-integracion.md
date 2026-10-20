@@ -2,9 +2,9 @@
 
 Qué falta para que el motor del linter (rama `feat/linter`) llegue a Spoon, con los cambios exactos en los
 archivos compartidos. El diseño es `docs/linter-diseno.md`; este documento no lo repite.
-Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP3, WP4 y WP5 integrados** en
-`feat/calidad` (sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5, §2.6 y
-§2.7.
+Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP3, WP4, WP5 y WP6 integrados** en
+`feat/calidad` (sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5, §2.6,
+§2.7 y §2.8.
 
 ## 1. Qué hay en la rama
 
@@ -258,13 +258,70 @@ evidencia `cause` de `ReglasOrden`, `LintEntorno.soloLectura` y los textos `deep
   (177/30/1/0): el C de más es ese sample y el de `missing_plugin` (Spark, §5); los 4 de ancho fijo pasan de B a A
   porque ahora se leen sus valores (el prototipo los dejaba en warning con 0 valores leídos).
 
+### 2.8 WP6 en `feat/calidad` (21-oct-2026): la sección «Calidad técnica» de los Informes
+
+`SecCalidad.java` (paquete base, como los `Sec*`) corre el motor sobre la copia de la captura, igual que `lint_etl`, en
+el idioma del informe. Informes ya es parte de `dev`, así que los «pedidos a Informes» del §11 del diseño se hicieron
+acá mismo, con cambios chicos en sus archivos:
+
+- **Contrato**: `SeccionId.CALIDAD = "quality"`, en `ORDEN` justo **después de `validation`** (13 secciones); títulos
+  «Technical quality» / «Calidad técnica» / «Qualidade técnica» (área `secciones`: el riesgo «el puntaje se lee como
+  nota» del §10). `Pedido.calidadProfunda` (boolean, apagado). Textos nuevos en el área `calidad_{en,es,pt}`; los de
+  las reglas siguen saliendo de `lint_{lang}.properties`.
+- **`InformeServicio`**: registra `SecCalidad` después de `SecValidacion`; quality va **marcada por defecto** (§8) con
+  costo `fields` (no es «barata»: sin plazo queda omitida). `armarAhora` le pasa a `SecCalidad.armar( ctx,
+  conValidacion )` si validation ya salió en ese informe (`salio`: ok o parcial). Un `tema.secciones` guardado antes
+  (`informes.json` con la lista) no la tiene: hay que marcarla y guardar otra vez.
+- **Entorno**: `SecCalidad.EntornoInforme` pide los campos al `Contexto` del informe (memo y presupuesto de 60 s
+  compartidos con linaje y diccionario, y nunca toca una base de archivo que no existe); cuando el contexto corta por
+  tiempo lo pasa como `TiempoAgotado` (el linter deja de pedir). La lista blanca y las salidas normales son las de
+  `LintEntorno`; `cancelado` sigue al pedido. Con `calidadProfunda`: `Opciones.deep`, `Opciones.sondas = new
+  LintSondas()` y un presupuesto de `min(60 s, lo que queda − 25 s)`. Todo en `RunMotor.enSegundoPlano` con el tope
+  de la sección; si se pasa, la sección queda en error con su motivo.
+- **`LintEntorno.soloLectura`** ahora rechaza también los steps que se conectarían a una base de archivo que **no
+  existe** (`creaBase`: SQLite/H2/HSQLDB, `SecDestino.archivoFaltante`): una preview del modo profundo la crearía
+  vacía. Vale también para `lint_etl` con `deep=true`.
+- **Bloques**: Indicadores (`quality-indicadores`: «Calidad técnica» 82/100 con la banda; A verde, C amarillo, D rojo;
+  errores, advertencias, sugerencias y, si hay, silenciados); con la revisión profunda, un párrafo con lo que hizo
+  (`quality-profundo`, o por qué no corrió: un job, nada que revisar); un **Aviso** por error (como mucho 5 y uno que
+  cuenta el resto); la tabla **Hallazgos** (`quality-hallazgos`: Severidad · Regla · Dónde · Qué pasa · Cómo se
+  arregla, hasta 150 filas, con «(Depende de esta máquina.)» en los `env` y «Propuesta: …» cuando el arreglo trae
+  `preview`: nombres de `LintPropuestas.completar`, rutas, el símbolo decimal); **De dónde salen los puntos**
+  (`quality-puntos`, con la fórmula al pie, el tope de las sugerencias y la compuerta de 74 si se aplicaron) y **Lo que
+  no se pudo revisar** (`quality-no-evaluado`; el motivo `deep_budget` se reescribe sin nombrar `deep_timeout_s`).
+  Sin hallazgos, un párrafo. `datos` = `LintJson.resultado` + `section`, `deep_requested` y
+  `keys_shown_in_validation`. Resumen: «Puntaje 82/100 (B): 2 advertencias y 1 sugerencia. Sin errores. Lo que más
+  resta: «Ruta absoluta» (8 puntos).» (el de Resumen lo junta).
+- **Sin repetir `validation`**: con las dos secciones, la tabla omite los hallazgos de `RunMotor.REGLAS_DE_VALIDATE`
+  con warning o error (los info no los da `validate`) y lo dice en la nota; el puntaje y la tabla de puntos los
+  cuentan igual. Si validation quedó en error u omitida, no se omite nada.
+- **Estados**: parcial si alguna regla quedó `cancelled` (el informe se canceló o se quedó sin tiempo: el puntaje solo
+  cuenta lo revisado); error si el análisis no terminó en el tope.
+- **Renderizadores**: sin cambios. Son bloques genéricos (Indicadores, Parrafo, Aviso, Tabla con alineación, nota y
+  pie) que HTML, PDF, Markdown y PPTX ya dibujan; `ModeloMuestra` suma una sección quality de muestra.
+- **Panel**: el check de quality más un sub-check «Revisión profunda (lee datos)» (`calidad_profunda`), apagado en
+  cada documento nuevo y deshabilitado en jobs; marcarlo marca quality. `pedido()` lo pasa solo en la vista completa y
+  al exportar: la vista liviana automática no lleva quality (`PanelInformes.LIVIANAS`). `show_report` con
+  `quality_deep` lo marca (y sin él lo apaga). **No hecho**: el `LocationListener` de la vista previa (clic en un
+  hallazgo → seleccionar el step) ni el botón/menú «Revisar calidad» (§8 del diseño, [NP]).
+- **MCP**: `build_report`, `get_report_data` y `show_report` aceptan `quality` en `sections` (el enum sale de
+  `SeccionId.ORDEN`) y `quality_deep` (bool; con `sections` explícitas agrega quality). Las descripciones dicen que
+  `quality_deep` solo lee las fuentes con previews de solo lectura. Las instrucciones del servidor nombran el puntaje
+  de calidad entre lo que documenta `build_report`. Sin herramientas nuevas: `TOOLS` sigue en 61.
+- **Pruebas**: `PruebaCalidad` (9, sin Spoon): la sección sobre 03 (el mismo puntaje que `lint_etl`), una
+  transformación con problemas en en/es/pt (step suelto, ruta absoluta, nombre por defecto con su propuesta), sin
+  repetir validation, validation que no salió, el modo profundo sobre m03 (error con la prueba, aviso, compuerta), un
+  job, el informe entero en HTML liviano/MD/PPTX/JSON y `get_report_data`, 07 sin crear la base SQLite y el entorno
+  (`TiempoAgotado`, cancelación, textos). Además `PruebaServicio`, `PruebaModelo`, `PruebaMcpInformes` y
+  `PruebaPanelSwt` cuentan la sección nueva y el check.
+
 ## 3. Lo que falta escribir
 
 | WP | Qué | Dónde | Necesita |
 |---|---|---|---|
 | ~~WP3~~ | **Hecho** (§2.7): modo profundo (`deep=true`), sondas de orden, diferencial y decimal, lista blanca y presupuesto. | `LintSondas.java`, `lint/Sondas.java`, `RunMotor.filas` | — |
 | ~~WP5~~ | **Hecho** (§2.6): `apply_lint_fixes`, `suppress_lint` y las propuestas de nombre. | `LintArreglos.java`, `LintPropuestas.java` | — |
-| WP6 | Sección «Calidad» del informe (con `Pedido.calidadProfunda`: `Opciones.deep` + `Opciones.sondas = new LintSondas()`) | `SecCalidad.java` (paquete base) | pedidos a Informes: `SeccionId.QUALITY`, `Pedido.calidadProfunda`, registro en `InformeServicio`, check y `LocationListener` en el panel, `quality_deep` en `build_report` |
+| ~~WP6~~ | **Hecho** (§2.8): sección «Calidad técnica» (`quality`, `quality_deep`). Queda abierto el `LocationListener` (clic en un hallazgo) y el botón «Revisar calidad». | `SecCalidad.java` y los cambios chicos de Informes | — |
 | WP7 | Skill: sección «Calidad» en `SKILL.md` y los ids de regla al lado de D1-D11 en `03-errores-comunes.md` (con las correcciones de §12 del diseño); `CHANGELOG.md`; conteo de herramientas en los README | `claude/` (sube `version` del `plugin.json`) | — |
 
 ## 4. Decisiones de esta rama

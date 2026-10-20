@@ -65,9 +65,10 @@ public class PruebaServicio {
   private static final String[] EJEMPLOS = { "01", "02", "03", "04", "05", "06", "07", "10", "11" };
   private static final List<String> ESTADOS = Arrays.asList( Seccion.OK, Seccion.PARCIAL, Seccion.OMITIDA,
     Seccion.ERROR );
-  /** Las secciones de WP2: nunca deberian quedar en "error" sobre los ejemplos. */
+  /** Las secciones de WP2 (y quality, del linter): nunca deberian quedar en "error" sobre los ejemplos. */
   private static final List<String> PROPIAS = Arrays.asList( SeccionId.PORTADA, SeccionId.RESUMEN, SeccionId.FLUJO,
-    SeccionId.FLUJO_JOB, SeccionId.DICCIONARIO, SeccionId.VALIDACION, SeccionId.CONEXIONES, SeccionId.NARRATIVA );
+    SeccionId.FLUJO_JOB, SeccionId.DICCIONARIO, SeccionId.VALIDACION, SeccionId.CALIDAD, SeccionId.CONEXIONES,
+    SeccionId.NARRATIVA );
 
   public void preparar() throws Exception {
     EntornoKettle.iniciar();
@@ -108,6 +109,8 @@ public class PruebaServicio {
     igual( Disponibilidad.COSTO_CAMPOS, t.get( SeccionId.DICCIONARIO ).costo, "costo dictionary" );
     igual( Disponibilidad.COSTO_EJECUTA, t.get( SeccionId.PERFIL ).costo, "costo profile" );
     igual( Disponibilidad.COSTO_NADA, t.get( SeccionId.CONEXIONES ).costo, "costo connections" );
+    igual( Disponibilidad.COSTO_CAMPOS, t.get( SeccionId.CALIDAD ).costo, "costo quality: calcula campos" );
+    cierto( t.get( SeccionId.CALIDAD ).aplica && t.get( SeccionId.CALIDAD ).porDefecto, "quality por defecto" );
     igual( Disponibilidad.COSTO_BASE, mapa( InformeServicio.disponibles( EntornoKettle.captura( "07" ), "en" ) ).get(
       SeccionId.VALIDACION ).costo, "validacion con conexion" );
 
@@ -115,6 +118,7 @@ public class PruebaServicio {
     cierto( j.get( SeccionId.FLUJO_JOB ).aplica, "job_flow aplica a jobs" );
     igual( "Only for transformations", j.get( SeccionId.FLUJO ).motivo, "flow en un job" );
     falso( j.get( SeccionId.DICCIONARIO ).aplica, "dictionary no aplica a jobs" );
+    cierto( j.get( SeccionId.CALIDAD ).aplica, "quality tambien para jobs" );
 
     List<String> orden = new ArrayList<String>();
     for ( Recolector r : InformeServicio.recolectores() ) {
@@ -137,7 +141,7 @@ public class PruebaServicio {
     List<String> t = InformeServicio.seleccion( c03, p, new Tema(), null );
     List<String> esperadas = new ArrayList<String>();
     for ( String id : Arrays.asList( SeccionId.PORTADA, SeccionId.RESUMEN, SeccionId.FLUJO, SeccionId.LINAJE,
-      SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.VALIDACION, SeccionId.CONEXIONES ) ) {
+      SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.VALIDACION, SeccionId.CALIDAD, SeccionId.CONEXIONES ) ) {
       if ( InformeServicio.recolector( id ).noAplica( c03, "es" ) == null ) {
         esperadas.add( id ); // target_model depende de su noAplica (WP5): 03 no tiene Table output
       }
@@ -226,7 +230,7 @@ public class PruebaServicio {
     Pedido p = pedido( "es" );
     p.secciones = new ArrayList<String>( SeccionId.ORDEN );
     Informe inf = armar( EntornoKettle.captura( "03" ), p, 300 );
-    igual( SeccionId.ORDEN, ids( inf ), "las doce, en orden" );
+    igual( SeccionId.ORDEN, ids( inf ), "todas, en orden" );
     Seccion jf = inf.seccion( SeccionId.FLUJO_JOB );
     igual( Seccion.OMITIDA, jf.estado, "job_flow pedido en una trans" );
     igual( "Solo para jobs", jf.motivo, "motivo" );

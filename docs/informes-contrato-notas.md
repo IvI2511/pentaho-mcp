@@ -171,3 +171,12 @@ del zip. El zip pasa de ~0,4 MB a ~10,9 MB. La versión sigue en 0.4.0 (el cambi
       entradas ocultas (`draw=N`) de jobs viejos ya no salen como «sin hops».
     - Área de textos nueva `plugins_{en,es,pt}`: nombres de tipos de step y de entrada en el idioma del
       informe (`NombresPlugin`), porque el registro de Kettle los traduce con el idioma de Spoon.
+13. Sección nueva de la fase de calidad (linter WP6, 21-oct-2026; detalle en `docs/linter-integracion.md` §2.8):
+    - `SeccionId.CALIDAD = "quality"` («Calidad técnica»), en `ORDEN` después de `validation`: ahora son **13**
+      secciones. Marcada por defecto, costo `fields`, fuera de la vista liviana (`PanelInformes.LIVIANAS`).
+    - `Pedido.calidadProfunda`: la sección corre también el modo profundo del linter (previews de solo lectura que
+      leen las fuentes). En el MCP es `quality_deep` (`build_report`, `get_report_data`, `show_report`); en el panel,
+      el sub-check `calidad_profunda` debajo de quality.
+    - `SecCalidad` (paquete base, dueño «calidad») usa el área de textos `calidad_{en,es,pt}` y los textos de las
+      reglas de `lint_{lang}.properties`. `InformeServicio.armarAhora` le dice si `validation` ya salió en el informe
+      (`InformeServicio.salio`) para que su tabla no repita esos hallazgos.

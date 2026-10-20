@@ -84,7 +84,7 @@ public class PruebaPanelSwt {
 
   static final List<String> DEFAULTS = Arrays.asList( SeccionId.PORTADA, SeccionId.RESUMEN, SeccionId.FLUJO,
     SeccionId.FLUJO_JOB, SeccionId.LINAJE, SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.VALIDACION,
-    SeccionId.CONEXIONES );
+    SeccionId.CALIDAD, SeccionId.CONEXIONES );
 
   private Display display;
   private Thread hiloUi;
@@ -212,6 +212,7 @@ public class PruebaPanelSwt {
       p.secciones, "secciones de la vista liviana" );
     igual( Pedido.METRICAS_NINGUNA, p.metricas, "la liviana no mide" );
     falso( p.destinoConsultarBase, "la liviana no consulta la base" );
+    falso( p.calidadProfunda, "la liviana no lee datos" );
     igual( "es", p.idioma, "idioma del informe = el de Spoon" );
     igual( Arrays.asList( "false", "true" ), servicio.vistasCopia(), "primero sin pre-render y despues con" );
 
@@ -238,19 +239,20 @@ public class PruebaPanelSwt {
     cierto( ui( () -> buscar( "progreso" ).getVisible() && buscar( "cancelar" ).getVisible() ),
       "barra de progreso y Cancelar visibles" );
     esperar( "termina", () -> !perspectiva.panel().ocupado() && servicio.pedidos.size() > antes && perspectiva
-      .panel().estado().equals( r.f( "status_preview_done", 8 ) ), 30000 );
+      .panel().estado().equals( r.f( "status_preview_done", 9 ) ), 30000 );
     servicio.demoraMs = 150;
     Pedido p = servicio.pedidos.get( servicio.pedidos.size() - 1 );
     igual( Arrays.asList( SeccionId.PORTADA, SeccionId.RESUMEN, SeccionId.FLUJO, SeccionId.LINAJE,
-      SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.VALIDACION, SeccionId.CONEXIONES ), p.secciones,
-      "las marcadas por defecto que aplican a una transformacion" );
+      SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.VALIDACION, SeccionId.CALIDAD, SeccionId.CONEXIONES ),
+      p.secciones, "las marcadas por defecto que aplican a una transformacion" );
+    falso( p.calidadProfunda, "la revision profunda va apagada por defecto" );
     igual( Pedido.METRICAS_ULTIMA, p.metricas, "metricas de la ultima corrida" );
     cierto( servicio.pasosRecibidos > 0, "el worker aviso pasos" );
     cierto( ui( () -> buscar( "vista_previa" ).isEnabled() && buscar( "exportar" ).isEnabled() ),
       "botones habilitados al terminar" );
     esperarHtml( "prerender" );
     Thread.sleep( 400 );
-    igual( r.f( "status_preview_done", 8 ), ui( () -> perspectiva.panel().estado() ),
+    igual( r.f( "status_preview_done", 9 ), ui( () -> perspectiva.panel().estado() ),
       "un aviso de progreso atrasado no pisa el estado final" );
     falso( ui( () -> barraScroll( false ) ), "a 1200 px la columna de opciones no necesita scroll horizontal" );
     archivo( pantalla( "panel-completa.png" ), 5000, "captura de la vista completa" );
@@ -322,6 +324,8 @@ public class PruebaPanelSwt {
     falso( ui( () -> buscar( "sec:" + SeccionId.LINAJE ).isEnabled() ), "linaje deshabilitado en un job" );
     contiene( ui( () -> ( (Button) buscar( "sec:" + SeccionId.LINAJE ) ).getToolTipText() ), "transformaciones",
       "el tooltip explica por que" );
+    cierto( ui( () -> buscar( "sec:" + SeccionId.CALIDAD ).isEnabled() ), "quality tambien en un job" );
+    falso( ui( () -> buscar( "calidad_profunda" ).isEnabled() ), "la revision profunda solo revisa transformaciones" );
 
     servicio.demoraMs = 20000;
     servicio.vioCancelacion = false;
@@ -428,6 +432,29 @@ public class PruebaPanelSwt {
       ( (Button) buscar( "consultar_base" ) ).setSelection( false );
       return null;
     } );
+
+    // «Revisión profunda (lee datos)»: va en el pedido completo (y marca quality), nunca en la liviana
+    cierto( ui( () -> buscar( "calidad_profunda" ).isEnabled() ), "revision profunda habilitada en una trans" );
+    falso( ui( () -> ( (Button) buscar( "calidad_profunda" ) ).getSelection() ), "apagada por defecto" );
+    ui( () -> {
+      ( (Button) buscar( "sec:" + SeccionId.CALIDAD ) ).setSelection( false );
+      Button b = (Button) buscar( "calidad_profunda" );
+      b.setSelection( true );
+      b.notifyListeners( SWT.Selection, new Event() );
+      return null;
+    } );
+    cierto( ui( () -> ( (Button) buscar( "sec:" + SeccionId.CALIDAD ) ).getSelection() ), "marcarla marca quality" );
+    int antesProf = servicio.pedidos.size();
+    clic( "vista_previa" );
+    esperar( "vista con la revision profunda", () -> servicio.pedidos.size() > antesProf && !perspectiva.panel()
+      .ocupado(), 30000 );
+    Pedido prof = servicio.pedidos.get( servicio.pedidos.size() - 1 );
+    cierto( prof.calidadProfunda && prof.secciones.contains( SeccionId.CALIDAD ), "el pedido lee datos: "
+      + prof.secciones );
+    ui( () -> {
+      ( (Button) buscar( "calidad_profunda" ) ).setSelection( false );
+      return null;
+    } );
   }
 
   /** «Abrir archivo…» sin el dialogo: carga en el worker, entra al combo y arma la vista liviana. */
@@ -485,6 +512,28 @@ public class PruebaPanelSwt {
     Pedido armado = servicio.pedidos.get( servicio.pedidos.size() - 1 );
     cierto( armado.secciones.contains( SeccionId.PORTADA ), "la portada pedida: " + armado.secciones );
     falso( armado.secciones.contains( SeccionId.PERFIL ), "sin el perfil por el MCP: " + armado.secciones );
+
+    // show_report con quality_deep: marca la revision profunda (solo lee, con steps de solo lectura)
+    int nq = servicio.pedidos.size();
+    Pedido profundo = new Pedido();
+    profundo.secciones = new ArrayList<String>( Arrays.asList( SeccionId.PORTADA, SeccionId.CALIDAD ) );
+    profundo.calidadProfunda = true;
+    profundo.idioma = "es";
+    PanelInformes.mostrar( "T1", profundo );
+    esperar( "aplica el pedido con revision profunda", () -> servicio.pedidos.size() > nq && !perspectiva.panel()
+      .ocupado(), 30000 );
+    Pedido conProfunda = servicio.pedidos.get( servicio.pedidos.size() - 1 );
+    igual( Arrays.asList( SeccionId.PORTADA, SeccionId.CALIDAD ), conProfunda.secciones, "portada y calidad" );
+    cierto( conProfunda.calidadProfunda, "con la revision profunda" );
+    cierto( ui( () -> ( (Button) buscar( "calidad_profunda" ) ).getSelection() ), "check marcado" );
+    Pedido sinProfunda = new Pedido();
+    sinProfunda.secciones = new ArrayList<String>( Arrays.asList( SeccionId.PORTADA, SeccionId.CALIDAD ) );
+    sinProfunda.idioma = "es";
+    int nq2 = servicio.pedidos.size();
+    PanelInformes.mostrar( "T1", sinProfunda );
+    esperar( "aplica el pedido sin revision profunda", () -> servicio.pedidos.size() > nq2 && !perspectiva.panel()
+      .ocupado(), 30000 );
+    falso( servicio.pedidos.get( servicio.pedidos.size() - 1 ).calidadProfunda, "show_report sin quality_deep la apaga" );
 
     // build_report con show_in_spoon: el informe ya armado se muestra sin armarlo (ni ejecutarlo) otra vez
     int n2 = servicio.pedidos.size();

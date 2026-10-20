@@ -289,16 +289,17 @@ final class ReportTools {
     s.add( Tools.tool( "build_report",
       "Builds a complete report of the transformation or job and writes it to files: cover, summary, flow "
         + "diagram (the real canvas plus a Mermaid diagram), field lineage, data dictionary, target table model, "
-        + "data profile, run metrics with charts, validation, connections and parameters (never passwords), and "
-        + "an optional narrative. Formats: html (one self-contained file with interactive diagrams), html_light "
-        + "(no JavaScript, much smaller), pdf (needs Edge or Chrome; without them you get a printable HTML and a "
-        + "warning), md (Markdown plus a folder with the images, for Obsidian or GitHub), pptx (PowerPoint), json "
-        + "(the report data). Use it when the user wants to document, present or hand in an ETL. To add a "
-        + "narrative, call get_report_data first and write it from the real numbers. It does not switch tabs or "
-        + "perspectives (show_in_spoon=true only if the user asks to see it in Spoon). By default it runs "
-        + "nothing: metrics=run_copy and profile_step EXECUTE a copy of the transformation and its output steps "
-        + "WRITE their files and tables, so use them only if the user agreed. Returns the files written, the "
-        + "status of each section and the warnings.",
+        + "data profile, run metrics with charts, validation, technical quality (the lint_etl score, findings and "
+        + "how to fix them), connections and parameters (never passwords), and an optional narrative. Formats: "
+        + "html (one self-contained file with interactive diagrams), html_light (no JavaScript, much smaller), pdf "
+        + "(needs Edge or Chrome; without them you get a printable HTML and a warning), md (Markdown plus a folder "
+        + "with the images, for Obsidian or GitHub), pptx (PowerPoint), json (the report data). Use it when the user "
+        + "wants to document, present or hand in an ETL. To add a narrative, call get_report_data first and write it "
+        + "from the real numbers. It does not switch tabs or perspectives (show_in_spoon=true only if the user asks "
+        + "to see it in Spoon). By default it runs nothing: metrics=run_copy and profile_step EXECUTE a copy of the "
+        + "transformation and its output steps WRITE their files and tables, so use them only if the user agreed "
+        + "(quality_deep only reads the sources through read-only previews). Returns the files written, the status "
+        + "of each section and the warnings.",
       esquema( Modo.CONSTRUIR ),
       a -> {
         Tema tema = Ajustes.cargar();
@@ -329,7 +330,8 @@ final class ReportTools {
         + "metrics, target columns...). Use it before build_report when you are going to write a narrative: base "
         + "every statement on these values, then pass the text in build_report's 'narrative'. Long tables and "
         + "lists are cut to max_rows. It computes fields and validates like build_report, but writes no files, "
-        + "never runs the transformation and does not switch tabs or perspectives.",
+        + "never runs the transformation (quality_deep only reads its sources through read-only previews) and does "
+        + "not switch tabs or perspectives.",
       esquema( Modo.DATOS ),
       a -> {
         Tema tema = Ajustes.cargar();
@@ -362,6 +364,9 @@ final class ReportTools {
               ss.add( x );
             }
           }
+          if ( op.pedido.calidadProfunda ) {
+            o.put( "quality_deep", true );
+          }
           return o;
         } );
       } ) );
@@ -373,7 +378,8 @@ final class ReportTools {
     Tools.Schema sc = Tools.schema().document();
     sc.raw( "sections", listaEnum( "Section ids to include, in any order: cover, summary, flow (transformations), "
       + "job_flow (jobs), lineage (transformations), dictionary (transformations), target_model (transformations "
-      + "with Table output or Insert/Update), profile, metrics, validation, connections, narrative. Default: the "
+      + "with Table output or Insert/Update), profile, metrics, validation, quality (technical quality: the lint_etl "
+      + "rules, score and findings; it does not repeat what validation shows), connections, narrative. Default: the "
       + "sections marked by default in the user's settings that apply to this document (metrics only if it ran "
       + "in Spoon"
       + ( modo == Modo.CONSTRUIR ? " or with metrics=run_copy; profile only with profile_step; narrative only "
@@ -401,6 +407,9 @@ final class ReportTools {
     if ( modo != Modo.DATOS ) {
       sc.raw( "narrative", esquemaNarrativa(), false );
     }
+    sc.bool( "quality_deep", "The quality section also runs lint_etl's deep mode: it reads up to 5000 rows of the "
+      + "sources (only when every step involved is known to be read-only; it never writes) to confirm or rule out "
+      + "unsorted input and decimal symbol findings. Adds the quality section. Default false.", false );
     if ( modo == Modo.CONSTRUIR ) {
       sc.str( "lineage_step", "Step whose output fields the lineage traces back to their origin. Default: "
         + "every final step that writes.", false );
@@ -470,6 +479,10 @@ final class ReportTools {
     if ( secciones != null ) {
       op.seccionesExplicitas = true;
       p.secciones = ordenar( secciones );
+    }
+    p.calidadProfunda = Tools.optBool( a, "quality_deep", false );
+    if ( p.calidadProfunda && p.secciones != null && !p.secciones.contains( SeccionId.CALIDAD ) ) {
+      p.secciones = ordenar( mas( p.secciones, SeccionId.CALIDAD ) ); // quality_deep = quiere la calidad
     }
     if ( modo == Modo.DATOS ) {
       if ( p.secciones != null && p.secciones.contains( SeccionId.PERFIL ) ) {
@@ -881,7 +894,7 @@ final class ReportTools {
       pr.cancelar();
       f.cancel( true );
       throw new ToolError( "The report did not finish in " + ( tope / 1000 ) + " s and was stopped. Ask for "
-        + "fewer sections (lineage, dictionary and validation are the slow ones with database steps)." );
+        + "fewer sections (lineage, dictionary, validation and quality are the slow ones with database steps)." );
     } catch ( ExecutionException e ) {
       Throwable causa = e.getCause();
       if ( causa instanceof Exception ) {

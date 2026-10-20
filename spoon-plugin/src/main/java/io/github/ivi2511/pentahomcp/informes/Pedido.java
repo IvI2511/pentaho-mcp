@@ -30,6 +30,11 @@ public final class Pedido {
   public String metricas = METRICAS_ULTIMA;
   /** true = target_model se conecta a la base (PK y FK). */
   public boolean destinoConsultarBase;
+  /**
+   * true = quality corre tambien el modo profundo del linter: previews de solo lectura que leen hasta 5000 filas
+   * de las fuentes para confirmar o descartar el desorden y el simbolo decimal (docs/linter-diseno.md §3.3).
+   */
+  public boolean calidadProfunda;
   public Narrativa narrativa;
   /**
    * Total en ms. Cada seccion tiene ademas su tope: campos 60 s, linaje 60 s, perfil 60 s, BD 15 s,

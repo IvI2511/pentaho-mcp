@@ -242,7 +242,7 @@ public class PruebaModelo {
     igual( Formato.HTML_ESTATICO, Formato.deClave( "html_light" ), "clave html_light" );
     igual( Formato.MARKDOWN, Formato.deClave( "MD" ), "clave md" );
     nulo( Formato.deClave( "docx" ), "clave desconocida" );
-    igual( 12, SeccionId.ORDEN.size(), "doce secciones" );
+    igual( 13, SeccionId.ORDEN.size(), "trece secciones (quality, de la fase de calidad)" );
     // los recolectores de WP3-WP5 (stubs o reales) declaran un id valido
     for ( Recolector r : new Recolector[] { new SecLinaje(), new SecMetricas(), new SecPerfil(), new SecDestino() } ) {
       cierto( SeccionId.valido( r.id() ), r.getClass().getSimpleName() + ".id() valido: " + r.id() );

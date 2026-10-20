@@ -122,7 +122,8 @@ public class PruebaMcpInformes {
     JsonNode build = porNombre.get( "build_report" );
     noNulo( build, "build_report registrada" );
     igual( set( "document", "sections", "formats", "output_dir", "file_name", "language", "title", "narrative",
-      "lineage_step", "profile_step", "profile_rows", "metrics", "query_database", "show_in_spoon" ), props( build ),
+      "lineage_step", "profile_step", "profile_rows", "metrics", "query_database", "show_in_spoon", "quality_deep" ),
+      props( build ),
       "argumentos de build_report (diseno §1.5)" );
     igual( "[\"formats\"]", build.path( "inputSchema" ).path( "required" ).toString(), "formats es obligatorio" );
     List<String> formatos = new ArrayList<>();
@@ -141,10 +142,15 @@ public class PruebaMcpInformes {
 
     JsonNode datos = porNombre.get( "get_report_data" );
     noNulo( datos, "get_report_data registrada" );
-    igual( set( "document", "sections", "language", "max_rows" ), props( datos ), "argumentos de get_report_data" );
+    igual( set( "document", "sections", "language", "max_rows", "quality_deep" ), props( datos ),
+      "argumentos de get_report_data" );
     JsonNode mostrar = porNombre.get( "show_report" );
     noNulo( mostrar, "show_report registrada" );
-    igual( set( "document", "sections", "narrative", "language" ), props( mostrar ), "argumentos de show_report" );
+    igual( set( "document", "sections", "narrative", "language", "quality_deep" ), props( mostrar ),
+      "argumentos de show_report" );
+    contiene( prop( build, "quality_deep" ).path( "description" ).asText(), "read-only", "quality_deep solo lee" );
+    cierto( prop( build, "sections" ).path( "items" ).path( "enum" ).toString().contains( "\"quality\"" ),
+      "quality en el enum de sections" );
     JsonNode lint = porNombre.get( "lint_etl" );
     noNulo( lint, "lint_etl registrada" );
     igual( set( "document", "deep", "deep_timeout_s", "rules", "min_severity", "steps", "include_kettle_checks",
@@ -267,6 +273,20 @@ public class PruebaMcpInformes {
     cierto( op.pedido.destinoConsultarBase, "query_database" );
     cierto( op.mostrar, "show_in_spoon" );
     igual( "Escribir", op.pedido.linajeStep, "lineage_step sin blancos" );
+
+    // quality_deep: pide la revision profunda y, con sections explicitas, agrega quality
+    op = ReportTools.peticion( json( "{\"formats\":[\"html\"],\"sections\":[\"cover\"],\"quality_deep\":true}" ),
+      tema, ReportTools.Modo.CONSTRUIR );
+    cierto( op.pedido.calidadProfunda, "quality_deep" );
+    igual( Arrays.asList( "cover", "quality" ), op.pedido.secciones, "quality_deep agrega quality" );
+    falso( ReportTools.peticion( json( "{\"formats\":[\"html\"]}" ), tema, ReportTools.Modo.CONSTRUIR ).pedido
+      .calidadProfunda, "sin quality_deep: solo el estatico" );
+    op = ReportTools.peticion( json( "{\"quality_deep\":true}" ), tema, ReportTools.Modo.DATOS );
+    cierto( op.pedido.calidadProfunda, "quality_deep en get_report_data" );
+    nulo( op.pedido.secciones, "sin sections: quality va por defecto" );
+    op = ReportTools.peticion( json( "{\"sections\":[\"summary\"],\"quality_deep\":true}" ), tema,
+      ReportTools.Modo.MOSTRAR );
+    igual( Arrays.asList( "summary", "quality" ), op.pedido.secciones, "quality_deep en show_report" );
 
     // idioma: el argumento, si no el de los ajustes
     Tema pt = new Tema();

@@ -7,6 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pentaho.di.base.AbstractMeta;
+import org.pentaho.di.core.database.DatabaseMeta;
 import org.pentaho.di.core.exception.KettleStepException;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.trans.TransMeta;
@@ -32,7 +33,8 @@ final class LintEntorno implements Entorno {
    * filtro, orden, joins y búsquedas en memoria. Una lista negra no alcanza: RunMotor.escribe deja pasar en 9.4
    * Call DB procedure, Dynamic SQL row, REST/HTTP, Trans/Job executor, Mapping, Metadata injection, SSH, Zip,
    * SFTP put, Set session variables, JavaScript/UDJC y productores de colas. Sin probar contra los 216 tipos [NP].
-   * Además, {@link #soloLectura} rechaza los steps cuyo plugin falta y las entradas que escriben archivos de errores.
+   * Además, {@link #soloLectura} rechaza los steps cuyo plugin falta, las entradas que escriben archivos de errores y los
+   * que se conectarían a una base de archivo que no existe (la crearían vacía).
    */
   static final Set<String> SOLO_LECTURA = new HashSet<String>( Arrays.asList(
     // entrada
@@ -109,7 +111,27 @@ final class LintEntorno implements Entorno {
   @Override
   public boolean soloLectura( StepMeta s ) {
     return s.getStepID() != null && !s.isMissing() && SOLO_LECTURA.contains( s.getStepID() ) && !RunMotor.escribe( s )
-      && !escribeArchivosDeError( s );
+      && !escribeArchivosDeError( s ) && !creaBase( s );
+  }
+
+  /**
+   * Un Table input (o cualquier step con conexión) contra una base de archivo que no existe (SQLite, H2, HSQLDB): al
+   * conectarse, Kettle la crearía vacía (SecDestino.archivoFaltante, docs/informes-diseno.md §2.4.4). Si no se puede
+   * saber, tampoco es de solo lectura.
+   */
+  boolean creaBase( StepMeta s ) {
+    try {
+      DatabaseMeta[] usadas = s.getStepMetaInterface() == null ? null
+        : s.getStepMetaInterface().getUsedDatabaseConnections();
+      for ( int i = 0; usadas != null && i < usadas.length; i++ ) {
+        if ( SecDestino.archivoFaltante( usadas[ i ], tm != null ? tm : s.getParentTransMeta() ) != null ) {
+          return true;
+        }
+      }
+      return false;
+    } catch ( Exception e ) {
+      return true;
+    }
   }
 
   /** Un tag *_destination_directory con algo: Text file input, Excel input… escriben ahí las líneas malas. */

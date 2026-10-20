@@ -31,7 +31,8 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 /**
  * Grupo «Secciones» (diseno §5.2): un check por seccion en el orden del informe, habilitado segun
  * {@code disponibles(...)} con el motivo en el tooltip, y los controles propios de algunas: step destino
- * del linaje, step y filas del perfil, ultima corrida y «Medir…», «consultar la base» y las conclusiones.
+ * del linaje, step y filas del perfil, ultima corrida y «Medir…», «consultar la base», la revision profunda
+ * de la calidad y las conclusiones.
  * Flow y job_flow ocupan el mismo renglon: se ve el que corresponde al tipo de documento. (UI)
  *
  * @dueño WP1
@@ -49,6 +50,8 @@ final class GrupoSecciones {
   final Label ultimaCorrida;
   final Button medir;
   final Button consultarBase;
+  /** quality: tambien el modo profundo del linter (lee las fuentes con previews de solo lectura). */
+  final Button calidadProfunda;
   final Text conclusiones;
 
   private final PanelInformes panel;
@@ -73,6 +76,7 @@ final class GrupoSecciones {
     Label lUltima = null;
     Button bMedir = null;
     Button bBase = null;
+    Button bProfunda = null;
     for ( final String id : SeccionId.ORDEN ) {
       final Button b = new Button( grupo, SWT.CHECK );
       b.setText( PanelInformes.esc( SeccionId.titulo( id, panel.idiomaUi ) ) );
@@ -98,6 +102,18 @@ final class GrupoSecciones {
         base.addListener( SWT.Selection, e -> {
           if ( base.getSelection() && !panel.confirmarConsultaBase() ) {
             base.setSelection( false );
+          }
+        } );
+      } else if ( SeccionId.CALIDAD.equals( id ) ) {
+        extra = sangria( grupo, 1 );
+        bProfunda = new Button( extra, SWT.CHECK );
+        bProfunda.setText( PanelInformes.esc( r.s( "quality_deep" ) ) );
+        bProfunda.setToolTipText( r.s( "quality_deep_tip" ) );
+        bProfunda.setData( PanelInformes.CLAVE, "calidad_profunda" );
+        final Button profunda = bProfunda;
+        profunda.addListener( SWT.Selection, e -> {
+          if ( profunda.getSelection() ) {
+            marcar( SeccionId.CALIDAD, true ); // la revision profunda es de la seccion de calidad
           }
         } );
       } else if ( SeccionId.PERFIL.equals( id ) ) {
@@ -141,6 +157,7 @@ final class GrupoSecciones {
     ultimaCorrida = lUltima;
     medir = bMedir;
     consultarBase = bBase;
+    calidadProfunda = bProfunda;
 
     conclusiones = new Text( grupo, SWT.BORDER | SWT.MULTI | SWT.WRAP | SWT.V_SCROLL );
     GridData gc = new GridData( SWT.FILL, SWT.TOP, true, false );
@@ -202,9 +219,10 @@ final class GrupoSecciones {
         perfilFilas.setSelection( tema.perfil.filas );
       }
       consultarBase.setSelection( false );
+      calidadProfunda.setSelection( false ); // lee datos: siempre a pedido
     }
     // los controles propios de una seccion que no aplica no ocupan lugar (Medir queda siempre)
-    for ( String id : new String[] { SeccionId.LINAJE, SeccionId.DESTINO, SeccionId.PERFIL } ) {
+    for ( String id : new String[] { SeccionId.LINAJE, SeccionId.DESTINO, SeccionId.PERFIL, SeccionId.CALIDAD } ) {
       mostrarExtra( id, checks.get( id ).isEnabled() );
     }
     linaje.setEnabled( checks.get( SeccionId.LINAJE ).isEnabled() && linaje.getItemCount() > 1 );
@@ -214,6 +232,11 @@ final class GrupoSecciones {
     consultarBase.setEnabled( checks.get( SeccionId.DESTINO ).isEnabled() );
     if ( !consultarBase.isEnabled() ) {
       consultarBase.setSelection( false );
+    }
+    // el modo profundo solo revisa transformaciones (orden de las filas y simbolo decimal)
+    calidadProfunda.setEnabled( checks.get( SeccionId.CALIDAD ).isEnabled() && !esJob );
+    if ( !calidadProfunda.isEnabled() ) {
+      calidadProfunda.setSelection( false );
     }
     medir.setEnabled( c != null && c.copia != null );
     ultimaCorrida.setText( PanelInformes.esc( ultima( c ) ) );
@@ -248,6 +271,9 @@ final class GrupoSecciones {
     }
     if ( p.destinoConsultarBase && consultarBase.isEnabled() ) {
       consultarBase.setSelection( true ); // lo pidio el usuario por MCP: no se vuelve a preguntar
+    }
+    if ( calidadProfunda.isEnabled() ) {
+      calidadProfunda.setSelection( p.calidadProfunda );
     }
   }
 
@@ -288,6 +314,12 @@ final class GrupoSecciones {
 
   boolean consultarBase() {
     return consultarBase.getSelection() && consultarBase.isEnabled();
+  }
+
+  /** La revision profunda, solo si quality va marcada. */
+  boolean calidadProfunda() {
+    Button q = checks.get( SeccionId.CALIDAD );
+    return calidadProfunda.getSelection() && calidadProfunda.isEnabled() && q.getSelection() && q.isEnabled();
   }
 
   String conclusiones() {

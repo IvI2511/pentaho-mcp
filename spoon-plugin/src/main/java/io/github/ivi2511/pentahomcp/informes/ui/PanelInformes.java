@@ -91,7 +91,10 @@ public class PanelInformes {
   /** Espera antes de la vista previa liviana automatica (§5.3). */
   public static final int DEBOUNCE_MS = 400;
 
-  /** Secciones de la vista previa liviana: no consultan la base ni ejecutan nada (§5.3). */
+  /**
+   * Secciones de la vista previa liviana: no consultan la base ni ejecutan nada (§5.3). quality tampoco va: calcula
+   * campos, como validation (docs/linter-diseno.md §8).
+   */
   public static final List<String> LIVIANAS = Collections.unmodifiableList( Arrays.asList( SeccionId.PORTADA,
     SeccionId.RESUMEN, SeccionId.FLUJO, SeccionId.FLUJO_JOB, SeccionId.CONEXIONES, SeccionId.NARRATIVA ) );
 
@@ -1188,6 +1191,7 @@ public class PanelInformes {
     p.perfilFilas = secciones.perfilFilas();
     p.metricas = metricas;
     p.destinoConsultarBase = !liviano && secciones.consultarBase();
+    p.calidadProfunda = !liviano && secciones.calidadProfunda();
     p.narrativa = narrativa();
     return p;
   }

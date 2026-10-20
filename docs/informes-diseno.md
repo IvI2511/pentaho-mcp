@@ -287,10 +287,11 @@ public final class Narrativa   { public String resumen, conclusiones; public Map
 | `metrics` | sí | sí | sí, si hubo corrida | lee la última corrida; «Medir» ejecuta una copia | §2.4.2 | Indicadores, Grafico (barras, Gantt, línea), Tabla | [P] fuera de Spoon; lectura en Spoon [B] |
 | `target_model` | si tiene Table output o Insert/Update | – | sí, si aplica | sin BD; con «consultar la base», se conecta | §2.4.4 | Diagrama `erDiagram`, Tabla de columnas, Aviso | [P] sobre SQLite |
 | `validation` | sí | sí | sí | `checkSteps` (puede conectarse a la BD) | `RunMotor.validar(copia, …)` [S] | Indicadores (errores y advertencias), Tabla | [S] |
+| `quality` (0.6, linter) | sí | sí | sí | cálculo de campos; con `Pedido.calidadProfunda` (`quality_deep`), previews de solo lectura que leen las fuentes | `LintMotor.analizar` sobre la copia (`SecCalidad`, docs/linter-diseno.md §8 y docs/linter-integracion.md §2.8) | Indicadores (puntaje y banda), Aviso por error, Tabla de hallazgos, Tabla de puntos, Tabla de lo no evaluado | [P] fuera de Spoon |
 | `connections` | sí | sí | sí | nada | Lo mismo que `ReportMotor.conexiones/parametros` [S], pero estructurado: nombre, tipo, host, base. **Nunca contraseñas.** Más parámetros con su valor por defecto y su descripción (`listParameters`, `getParameterDefault`, `getParameterDescription` [B]) | Tabla y Tabla | [S] |
 | `narrative` | sí | sí | si hay texto | nada | `Pedido.narrativa` (usuario o IA) | Parrafo (`ia` según el origen) | – |
 
-**Orden en el informe:** cover, índice, summary, flow o job_flow, lineage, dictionary, target_model, profile, metrics, validation, connections, narrative.
+**Orden en el informe:** cover, índice, summary, flow o job_flow, lineage, dictionary, target_model, profile, metrics, validation, quality (0.6), connections, narrative.
 
 **Disponibilidad.** `InformeServicio.disponibles(captura, idioma)` es barato: no consulta campos, ni la base, ni ejecuta nada, así que puede llamarse en la UI. Para cada sección devuelve `{id, aplica, motivo, porDefecto, costo}`. El panel usa eso para habilitar o deshabilitar los checks y explicar por qué.
 
