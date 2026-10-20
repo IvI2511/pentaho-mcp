@@ -33,6 +33,11 @@ YO="$0"; case "$YO" in *.sh) ;; *) YO=instalar.sh ;; esac   # with "curl ... | b
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 paso() { echo; echo "== Step $1 - $2"; }
 bajar() { echo "   downloading $1"; curl -fsSL "$1" -o "$2"; }
+descomprimir() {   # unzip exits 1 on warnings only, like "appears to use backslashes as path separators"
+  local c=0       # (the plugin zip is made with Compress-Archive on Windows): the files come out fine
+  unzip -q -o "$1" -d "$2" || c=$?
+  [ "$c" -le 1 ]
+}
 sq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }   # single-quoted, for a /bin/sh script
 version_java() {   # first line of "<java> -version"; fails if it does not run
   local v; v=$("$1" -version 2>&1) || return 1
@@ -125,7 +130,7 @@ paso 1 "Pentaho Data Integration"
 if [ "$INSTALAR_PDI" = 1 ]; then
   echo "   PDI 9.4 CE with the plugin already installed (~420 MB), into $DESTINO"
   bajar "$BASE/pdi-ce-9.4-con-pentaho-mcp.zip" "$TMP/pdi.zip"
-  mkdir -p "$DESTINO" && unzip -q -o "$TMP/pdi.zip" -d "$DESTINO"
+  mkdir -p "$DESTINO" && descomprimir "$TMP/pdi.zip" "$DESTINO"
   PDI="$DESTINO/data-integration"
   # the 0.4.0 and 0.4.1 zips lost their Unix permissions: without this neither the scripts nor the Mac .app run
   for f in "$PDI"/*.sh "$PDI"/*.command "$PDI/Data Integration.app/Contents/MacOS/JavaApplicationStub"; do
@@ -153,7 +158,7 @@ if [ "$INSTALAR_PDI" = 1 ]; then
   echo "   already included in the downloaded PDI"
 else
   bajar "$BASE/pentaho-mcp.zip" "$TMP/pentaho-mcp.zip"
-  unzip -q -o "$TMP/pentaho-mcp.zip" -d "$TMP"
+  descomprimir "$TMP/pentaho-mcp.zip" "$TMP"
   rm -rf "$PDI/plugins/pentaho-mcp" && cp -R "$TMP/pentaho-mcp" "$PDI/plugins/pentaho-mcp" \
     || { echo "Could not replace the plugin: close Spoon and run the installer again."; exit 4; }
   echo "   installed in $PDI/plugins/pentaho-mcp"
@@ -198,7 +203,7 @@ if [ "$SIN_CODEX" = 0 ] && command -v codex >/dev/null; then
   else codex mcp add pentaho --url "$URL" 2>&1 | sed 's/^/   /' || true; fi
   CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
   bajar "https://github.com/$REPO/archive/refs/heads/main.zip" "$TMP/repo.zip"
-  unzip -q -o "$TMP/repo.zip" -d "$TMP"
+  descomprimir "$TMP/repo.zip" "$TMP"
   mkdir -p "$CODEX_DIR/skills" && rm -rf "$CODEX_DIR/skills/pentaho-etl"
   cp -R "$TMP/pentaho-mcp-main/claude/skills/pentaho-etl" "$CODEX_DIR/skills/pentaho-etl"
   echo "   Codex: skill in $CODEX_DIR/skills/pentaho-etl (if it does not show up, enable skills and restart Codex)"

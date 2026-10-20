@@ -31,7 +31,28 @@ PDI 9.4 (scripts, SWT) o del zip del release.
 ## Mac con chip Apple (M1–M4): pasos exactos
 
 PDI 9.4 trae la librería gráfica de macOS (`libswt/osx64/swt.jar`, SWT 4.18) **solo para x86_64**, y
-`spoon.sh` corta en arm64. La salida es correr Spoon entero bajo Rosetta 2, con un Java x64:
+`spoon.sh` corta en arm64. La salida es correr Spoon entero bajo Rosetta 2, con un Java x64.
+
+**Con el `instalar.sh` de la rama `ci/instalar-mac-apple`** (todavía no está en `main`, que es el que bajan
+los usuarios), el script hace los pasos 1, 2 y 4 de abajo. En el paso 3 («Java») detecta el chip Apple,
+busca un Java x64 (`PENTAHO_JAVA_HOME`, `~/pentaho/java-x64`, `JAVA_HOME`, `java_home -a x86_64`), ofrece
+instalar lo que falta —Rosetta 2 con `softwareupdate` y Temurin 21 x64 en `<destino>/java-x64`, controlado
+con el SHA-256 que Adoptium publica al lado— y deja `data-integration/spoon-rosetta.sh`, que abre Spoon con
+`PENTAHO_JAVA_HOME` y `arch -x86_64`. «Done. Next» imprime ese comando en lugar de `spoon.sh`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.sh -o /tmp/instalar-pentaho-mcp.sh
+bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi     # en el paso 3 pregunta «Install what is missing now? [Y/n]»
+~/pentaho/data-integration/spoon-rosetta.sh
+```
+
+Pregunta solo si tiene una terminal (`[ -t 0 ]`): con `curl … | bash` o desde un agente no la tiene, avisa,
+no instala nada e indica volver a correrlo con `--rosetta`, que instala sin preguntar. Los pasos y los
+códigos de salida son los de `instalar.ps1`: nada de esto corta la instalación (si Rosetta o el Java no se
+pueden instalar, lo dice y sigue con el paso 4, como el «NO Java» de siempre). Probado con el job
+`receta-mac-apple` (corrida 10).
+
+A mano, o con el `instalar.sh` de `main` hasta que se publique:
 
 ```bash
 # 1. Rosetta 2 (no viene instalada en un Mac nuevo; en el runner tampoco estaba)
@@ -70,8 +91,11 @@ Por qué cada cosa:
   `/ping` con 54 herramientas; `PENTAHO_JAVA_HOME` sigue el mismo camino en `set-pentaho-env.sh` y tiene
   prioridad; con la 0.4.1 hace falta antes el `chmod` del problema 1):
   `open --arch x86_64 --env PENTAHO_JAVA_HOME=$HOME/pentaho/java-x64/Contents/Home ~/pentaho/data-integration/Data\ Integration.app`
-- El paso 3 de `instalar.sh` («Java») mira el `java` del PATH, no `PENTAHO_JAVA_HOME`: en un Mac sin otro
-  Java dice «NO Java: Spoon will not open», y con el Java de `~/pentaho/java-x64` Spoon abre igual.
+- El paso 3 del `instalar.sh` de `main` («Java») mira el `java` del PATH, no `PENTAHO_JAVA_HOME`: en un Mac
+  sin otro Java dice «NO Java: Spoon will not open», y con el Java de `~/pentaho/java-x64` Spoon abre igual.
+  El de `ci/instalar-mac-apple` mira el Java que va a usar `spoon.sh`, en el orden de `set-pentaho-env.sh`
+  (`PENTAHO_JAVA_HOME`, `jre`/`java` junto a PDI, `JAVA_HOME`, `JRE_HOME`, PATH), y no toma el
+  `/usr/bin/java` de macOS sin JDK (es un stub que pide instalar uno) por un Java.
 
 Pan y Kitchen (sin ventana) sí pueden correr con un Java **arm64** nativo si el shell va bajo Rosetta:
 `arch -x86_64 /bin/sh pan.sh ...` con `PENTAHO_JAVA_HOME` apuntando a un Java arm64 corrió el ejemplo 01
@@ -120,7 +144,8 @@ grueso del Pan en Mac es el arranque de la JVM y de Kettle, no la transformació
    `Data Integration.app/Contents/MacOS/JavaApplicationStub` están «creados en MS-DOS», `-rw-rw-rw-`.
    `instalar.sh` hace `chmod +x *.sh` y eso salva los scripts (en disco quedan `-rwxrwxrwx`), pero
    `JavaApplicationStub` queda `-rw-rw-rw-` y la `.app` no abre. Arreglo para la 0.4.1:
-   `chmod +x ~/pentaho/data-integration/Data\ Integration.app/Contents/MacOS/JavaApplicationStub`.
+   `chmod +x ~/pentaho/data-integration/Data\ Integration.app/Contents/MacOS/JavaApplicationStub`, que el
+   `instalar.sh` de `ci/instalar-mac-apple` ya hace solo (junto con `spoon.command`).
    Desde la 0.4.2 lo resuelve `tools/armar-zip-pdi.py`; la prueba lo va a confirmar sola cuando la 0.4.2
    sea el último release (el paso «Permisos en el zip del release» pasa a decir «ejecutable»).
 2. **`spoon.sh` y `pan.sh` cortan en arm64 con código de salida 0.** Imprimen «not yet supported» y
@@ -171,7 +196,7 @@ runners de Mac con chip Apple, que a veces es larga).
 |---|---|
 | `probar` (5 plataformas) | lo de arriba; artifact `evidencia-<plataforma>` con `canvas.png`, `pantalla-*.png`, `cliente.log`, `ping.json`, `pan-*.log`, `spoon-salida.log`, `pdi-logs/`, `permisos-*.txt`, `tiempos.txt` |
 | `macos-arm64-nativo` | Java arm64: `spoon.sh` y `pan.sh` cortan, Pan nativo con shell bajo Rosetta, Spoon con Java arm64 (falla de SWT). `continue-on-error`; verde si los cortes salen como dice este documento |
-| `receta-mac-apple` | los cuatro pasos de «Mac con chip Apple» copiados tal cual, sin `setup-java` ni `KETTLE_HOME` de prueba, y después el cliente MCP |
+| `receta-mac-apple` | Mac con chip Apple como un usuario nuevo (sin `setup-java`, sin Rosetta preparada, sin `KETTLE_HOME` de prueba), solo con el `instalar.sh` de la rama: sin terminal (avisa, no instala), en una terminal de `script(1)` contestando «y» (Rosetta 2, Java x64, lanzador), con `--rosetta` cuando ya está todo (no vuelve a bajar el Java); abre Spoon con el comando de «Done. Next» y corre el cliente MCP. Hasta la corrida 9 hacía los cuatro pasos a mano con el `instalar.sh` de `main` |
 | `ventana-macos` | diagnóstico de la ventana en blanco (problema 5): SWT mínima con y sin AWT, Spoon, geometría de la ventana, hilos, `java.awt.headless` |
 
 `KETTLE_HOME` de prueba en `probar`: uno nuevo con `ShowTips=N`, `ShowWelcomePageOnStartup=N` y
@@ -202,7 +227,11 @@ Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pen
 
 ## Texto propuesto para INSTALL.md y los README
 
-No se editaron (los está cambiando la sesión de la 0.4.2). Propuesta:
+No se editaron (los está cambiando la sesión de la 0.4.2). Propuesta, que da por hecho que el
+`instalar.sh` de `ci/instalar-mac-apple` ya está en `main` (si no, el párrafo del chip Apple tiene que
+volver a los cuatro pasos a mano y el de los permisos, a pedir el `chmod` de la `.app`). En la sección de
+agentes, sumar `--rosetta` a las opciones de `instalar.sh` («Mac with an Apple chip: install Rosetta 2 and
+an x64 Java without asking»); los códigos de salida no cambian.
 
 ### INSTALL.md (en)
 
@@ -219,12 +248,19 @@ install, Pan, opening Spoon and every MCP call work. Details: [`docs/plataformas
 
 **Mac with an Apple chip (M1–M4).** PDI 9.4 only ships the x86_64 graphics library for macOS, and
 `spoon.sh` stops on arm64 with *"this Mac platform [arm64] is not yet supported"* (exit code 0, so check
-the output). Run Spoon under Rosetta 2 with an x64 Java:
+the output). Spoon has to run under Rosetta 2 with an x64 Java. In step 3 the script offers to install
+both (Rosetta 2, and Temurin 21 x64 into `~/pentaho/java-x64`) and leaves `spoon-rosetta.sh` next to
+`spoon.sh`, which opens Spoon that way; "Done. Next" prints it:
+```bash
+bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi      # step 3 asks "Install what is missing now? [Y/n]"
+~/pentaho/data-integration/spoon-rosetta.sh
+```
+It only asks when it runs in a terminal. Without one (an agent, `curl | bash`) it installs nothing and says
+so: rerun with `--rosetta` to install them without asking. By hand, the same thing is:
 ```bash
 softwareupdate --install-rosetta --agree-to-license
 mkdir -p ~/pentaho/java-x64
 curl -fL https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse | tar -xz -C ~/pentaho/java-x64 --strip-components 1
-bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi
 PENTAHO_JAVA_HOME=~/pentaho/java-x64/Contents/Home arch -x86_64 /bin/sh ~/pentaho/data-integration/spoon.sh
 ```
 An arm64 Java fails to load SWT (`incompatible architecture`). Double-clicking `Data Integration.app`
@@ -237,8 +273,8 @@ stops the same way; from Terminal it opens with
 At startup Spoon warns that `libwebkitgtk-1.0` is missing: click **Close**; only the built-in browser
 (welcome page, help) is unavailable, and that package no longer exists in current Ubuntu.
 
-**Releases up to 0.4.1:** the PDI zip lost its Unix permissions. `instalar.sh` fixes the `.sh` scripts;
-for the `.app` run `chmod +x ~/pentaho/data-integration/"Data Integration.app"/Contents/MacOS/JavaApplicationStub`.
+**Releases up to 0.4.1:** the PDI zip lost its Unix permissions; `instalar.sh` gives them back to the
+`.sh` scripts, `spoon.command` and the `.app`.
 ````
 
 En «Troubleshooting», dos filas:
