@@ -300,26 +300,59 @@ jobs:
           path: ${{ runner.temp }}/evidencia
           if-no-files-found: warn
 
-  # Diagnóstico de la ventana de Spoon en macOS, que en estas VMs se abre en blanco salvo la barra de
-  # arriba (el MCP anda igual). Ya se descartó (corrida 3): la versión de Java (11, 17 y 21 igual) y SWT o
-  # la VM (una ventana SWT mínima con el mismo swt.jar se dibuja bien). Acá: abrir la .app como un usuario
-  # (open; en chip Apple open --arch x86_64) y probar remedios: al frente, minimizar y restaurar, pantalla
-  # completa. Guarda capturas y el árbol de accesibilidad.
+  # Los pasos de docs/plataformas.md para un Mac con chip Apple, copiados tal cual: sin setup-java, con el
+  # instalar.sh publicado en main y sin preparar ~/.kettle (primera vez, como un usuario nuevo).
+  receta-mac-apple:
+    name: receta-mac-apple (macos-26)
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7   # solo para el cliente MCP de la prueba
+
+      - name: Pasos del documento (1 a 3)
+        run: |
+          softwareupdate --install-rosetta --agree-to-license
+          mkdir -p ~/pentaho/java-x64
+          curl -fL https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse | tar -xz -C ~/pentaho/java-x64 --strip-components 1
+          curl -fsSL https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.sh -o /tmp/instalar-pentaho-mcp.sh
+          bash /tmp/instalar-pentaho-mcp.sh --instalar-pdi
+          file ~/pentaho/java-x64/Contents/Home/bin/java
+
+      - name: Paso 4 del documento (abrir Spoon) y prueba por MCP
+        run: |
+          EVID="$RUNNER_TEMP/evidencia"; mkdir -p "$EVID"
+          PENTAHO_JAVA_HOME=~/pentaho/java-x64/Contents/Home nohup arch -x86_64 /bin/sh ~/pentaho/data-integration/spoon.sh \
+            > "$EVID/spoon-salida.log" 2>&1 &
+          for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > "$EVID/ping.json" 2>/dev/null && break; sleep 1; done
+          echo "/ping a los $i s: $(cat "$EVID/ping.json")"
+          sleep 5
+          screencapture -x "$EVID/pantalla-1-al-abrir.png" || true
+          python3 -I tools/ci/cliente_mcp.py --salida "$EVID" --plataforma receta-mac-apple
+          screencapture -x "$EVID/pantalla-2-tras-mcp.png" || true
+
+      - name: Cerrar Spoon
+        if: always()
+        run: |
+          pkill -f launcher/launcher.jar || true
+          cp ~/pentaho/data-integration/logs/spoon.log "$RUNNER_TEMP/evidencia/" 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evidencia-receta-mac-apple
+          path: ${{ runner.temp }}/evidencia
+
+  # Diagnóstico de la ventana de Spoon en macOS, que en estas VMs se abre en blanco salvo el botón de
+  # perspectivas y «Connect» (el MCP anda igual). Descartado en corridas anteriores: la versión de Java (11,
+  # 17 y 21 igual), SWT o la VM (una ventana SWT mínima con el mismo swt.jar se dibuja bien), cómo se abre
+  # (spoon.sh o la .app con open) y los remedios de ventana (al frente, minimizar y restaurar, pantalla
+  # completa). Acá: posición y tamaño de cada elemento que macOS ve en la ventana, de la SWT mínima y de
+  # Spoon, al abrir y después de armar una transformación por MCP.
   ventana-macos:
-    name: ventana-macos ${{ matrix.id }}
-    runs-on: ${{ matrix.runner }}
+    name: ventana-macos (macos-15-intel)
+    runs-on: macos-15-intel
     timeout-minutes: 20
     continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { id: intel-spoon-sh, runner: macos-15-intel, lanzar: spoon.sh, prefijo: "" }
-          - { id: intel-app, runner: macos-15-intel, lanzar: app, prefijo: "" }
-          - { id: arm64-app-rosetta, runner: macos-15, lanzar: app, prefijo: "arch -x86_64" }
-    env:
-      PREFIJO: ${{ matrix.prefijo }}
-      LANZAR: ${{ matrix.lanzar }}
     steps:
       - uses: actions/checkout@v7
 
@@ -329,47 +362,34 @@ jobs:
           java-version: "21"
           architecture: x64
 
-      - name: Abrir Spoon y probar remedios
+      - name: Geometría de la ventana
         run: |
           set +e +o pipefail
-          EVID="$RUNNER_TEMP/evidencia"; PDI="$RUNNER_TEMP/pentaho/data-integration"
+          EVID="$RUNNER_TEMP/evidencia"; PDI="$RUNNER_TEMP/pentaho/data-integration"; CI="$GITHUB_WORKSPACE/tools/ci"
           export KETTLE_HOME="$RUNNER_TEMP/kettle-home"
           mkdir -p "$EVID" "$KETTLE_HOME/.kettle"
           printf '%s\n' ShowTips=N ShowWelcomePageOnStartup=N ShowRepositoriesAtStartup=N > "$KETTLE_HOME/.kettle/.spoonrc"
-          { sw_vers; uname -m; $PREFIJO "$JAVA_HOME/bin/java" -version; } > "$EVID/sistema.txt" 2>&1
           bash instalar.sh --instalar-pdi --destino "$RUNNER_TEMP/pentaho" --sin-claude --sin-codex > "$EVID/instalar.log" 2>&1
-          cap() { sleep 3; screencapture -x "$EVID/$1.png"; }
-          ae() { echo "> $1" >> "$EVID/acciones.txt"
-                 osascript -e "tell application \"System Events\" to tell (first process whose unix id is $PID) to $1" \
-                   >> "$EVID/acciones.txt" 2>&1; }
-          ui() { osascript -e "tell application \"System Events\" to tell (first process whose unix id is $PID) to return entire contents of window 1" 2>&1 | head -c 30000; }
 
-          echo "== Spoon con $LANZAR"
-          cd "$PDI"
-          if [ "$LANZAR" = app ]; then
-            chmod +x "Data Integration.app/Contents/MacOS/JavaApplicationStub"
-            ARCH=""; [ -n "$PREFIJO" ] && ARCH="--arch x86_64"
-            open $ARCH --env KETTLE_HOME="$KETTLE_HOME" --env JAVA_HOME="$JAVA_HOME" "$PDI/Data Integration.app" > "$EVID/open.log" 2>&1 \
-              || { launchctl setenv KETTLE_HOME "$KETTLE_HOME"; launchctl setenv JAVA_HOME "$JAVA_HOME"
-                   open $ARCH "$PDI/Data Integration.app" >> "$EVID/open.log" 2>&1; }
-            cat "$EVID/open.log"
-          else
-            nohup $PREFIJO /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 &
-          fi
+          echo "== ventana SWT mínima"
+          "$JAVA_HOME/bin/java" -XstartOnFirstThread -cp "$PDI/libswt/osx64/swt.jar" "$CI/SwtPrueba.java" 25000 > "$EVID/swt-prueba.log" 2>&1 &
+          sleep 15
+          osascript "$CI/ventana.applescript" "$(pgrep -f SwtPrueba | head -1)" > "$EVID/geometria-swt-prueba.txt" 2>&1
+          screencapture -x "$EVID/swt-prueba.png"; wait
+          head -40 "$EVID/geometria-swt-prueba.txt"
+
+          echo "== Spoon"
+          ( cd "$PDI" && nohup /bin/sh ./spoon.sh > "$EVID/spoon-salida.log" 2>&1 & )
           for i in $(seq 1 240); do curl -fsS --max-time 3 http://127.0.0.1:8765/ping > "$EVID/ping.json" 2>/dev/null && break; sleep 1; done
-          echo "/ping a los $i s: $(cat "$EVID/ping.json")"
           sleep 10
-          PID=$(pgrep -f launcher/launcher.jar | head -1); echo "pid $PID"; ps -o pid,command -p "$PID" | cut -c1-300 > "$EVID/proceso.txt"
-          ae "get {frontmost, name of window 1, position of window 1, size of window 1}"
-          cap 1-al-abrir; ui > "$EVID/ui-1-al-abrir.txt"
-          ae "set frontmost to true"; ae "perform action \"AXRaise\" of window 1"; cap 2-al-frente
-          ae "set value of attribute \"AXMinimized\" of window 1 to true"; sleep 2
-          ae "set value of attribute \"AXMinimized\" of window 1 to false"; cap 3-minimizar-y-restaurar
-          ae "set value of attribute \"AXFullScreen\" of window 1 to true"; sleep 3; cap 4-pantalla-completa
-          ae "set value of attribute \"AXFullScreen\" of window 1 to false"; sleep 3
-          python3 -I tools/ci/cliente_mcp.py --salida "$EVID/mcp" --plataforma "diag-$LANZAR" | tail -1
-          cap 5-tras-mcp; ui > "$EVID/ui-5-tras-mcp.txt"
-          cat "$EVID/acciones.txt"
+          PID=$(pgrep -f launcher/launcher.jar | head -1)
+          osascript "$CI/ventana.applescript" "$PID" > "$EVID/geometria-spoon-al-abrir.txt" 2>&1
+          screencapture -x "$EVID/spoon-al-abrir.png"
+          python3 -I "$CI/cliente_mcp.py" --salida "$EVID/mcp" --plataforma diag | tail -1
+          sleep 3
+          osascript "$CI/ventana.applescript" "$PID" > "$EVID/geometria-spoon-tras-mcp.txt" 2>&1
+          screencapture -x "$EVID/spoon-tras-mcp.png"
+          cat "$EVID/geometria-spoon-tras-mcp.txt" | head -80
           pkill -f launcher/launcher.jar
           cp "$PDI"/logs/spoon.log "$EVID/" 2>/dev/null
           exit 0
@@ -377,5 +397,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: ventana-macos-${{ matrix.id }}
+          name: ventana-macos
           path: ${{ runner.temp }}/evidencia
