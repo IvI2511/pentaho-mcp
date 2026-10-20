@@ -1,0 +1,23 @@
+    <entry>
+      <name>Send SNMP trap</name>
+      <description/>
+      <type>SNMP_TRAP</type>
+<attributes></attributes>
+      <port>162</port>
+      <servername/>
+      <oid/>
+      <comstring>public</comstring>
+      <message/>
+      <timeout>5000</timeout>
+      <nrretry>1</nrretry>
+      <targettype>community</targettype>
+      <user/>
+      <passphrase>Encrypted </passphrase>
+      <engineid/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

@@ -1,0 +1,52 @@
+  <step>
+    <name>LDAP input</name>
+    <type>LDAPInput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <usepaging>N</usepaging>
+    <pagesize>1000</pagesize>
+    <useauthentication>N</useauthentication>
+    <rownum>N</rownum>
+    <rownum_field/>
+    <host/>
+    <username/>
+    <password>Encrypted </password>
+    <port>389</port>
+    <filterstring>objectclass=*</filterstring>
+    <searchbase/>
+    <fields>
+    </fields>
+    <limit>0</limit>
+    <timelimit>0</timelimit>
+    <multivaluedseparator>;</multivaluedseparator>
+    <dynamicsearch>N</dynamicsearch>
+    <dynamicseachfieldname/>
+    <dynamicfilter>N</dynamicfilter>
+    <dynamicfilterfieldname/>
+    <searchScope>subtree</searchScope>
+    <protocol>LDAP</protocol>
+    <trustStorePath/>
+    <trustStorePassword>Encrypted </trustStorePassword>
+    <trustAllCertificates>N</trustAllCertificates>
+    <useCertificate>N</useCertificate>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

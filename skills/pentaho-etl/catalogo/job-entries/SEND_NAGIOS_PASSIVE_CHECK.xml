@@ -1,0 +1,22 @@
+    <entry>
+      <name>Send Nagios passive check</name>
+      <description/>
+      <type>SEND_NAGIOS_PASSIVE_CHECK</type>
+<attributes></attributes>
+      <port>5667</port>
+      <servername/>
+      <password/>
+      <responseTimeOut>10000</responseTimeOut>
+      <connectionTimeOut>5000</connectionTimeOut>
+      <senderServerName/>
+      <senderServiceName/>
+      <message/>
+      <encryptionMode>none</encryptionMode>
+      <level>unknown</level>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

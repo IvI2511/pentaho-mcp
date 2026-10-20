@@ -1,0 +1,28 @@
+    <entry>
+      <name>Export repository to XML file</name>
+      <description/>
+      <type>EXPORT_REPOSITORY</type>
+<attributes></attributes>
+      <repositoryname/>
+      <username/>
+      <password>Encrypted </password>
+      <targetfilename/>
+      <iffileexists>if_file_exists_skip</iffileexists>
+      <export_type>export_all</export_type>
+      <directoryPath/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <SpecifyFormat>N</SpecifyFormat>
+      <date_time_format/>
+      <createfolder>N</createfolder>
+      <newfolder>N</newfolder>
+      <add_result_filesname>N</add_result_filesname>
+      <nr_errors_less_than>10</nr_errors_less_than>
+      <success_condition>success_if_no_errors</success_condition>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

@@ -1,0 +1,15 @@
+    <entry>
+      <name>Telnet a host</name>
+      <description/>
+      <type>TELNET</type>
+<attributes></attributes>
+      <hostname/>
+      <port>23</port>
+      <timeout>3000</timeout>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

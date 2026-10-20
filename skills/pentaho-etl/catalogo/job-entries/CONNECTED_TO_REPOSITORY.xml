@@ -1,0 +1,16 @@
+    <entry>
+      <isspecificrep>N</isspecificrep>
+      <repname/>
+      <isspecificuser>N</isspecificuser>
+      <username/>
+      <name>Check if connected to repository</name>
+      <description/>
+      <type>CONNECTED_TO_REPOSITORY</type>
+<attributes></attributes>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

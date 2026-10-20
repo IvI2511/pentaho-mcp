@@ -1,0 +1,9 @@
+{
+  "name": "pentaho",
+  "version": "0.1.0",
+  "description": "Arma ETLs de Pentaho Data Integration 9.4 (Spoon): skill con el formato .ktr/.kjb y el catálogo de steps verificados, y MCP que edita en vivo la transformación abierta en Spoon.",
+  "author": { "name": "IvI2511" },
+  "repository": "https://github.com/IvI2511/pentaho-mcp",
+  "license": "MIT",
+  "keywords": ["pentaho", "pdi", "kettle", "spoon", "etl", "mcp"]
+}

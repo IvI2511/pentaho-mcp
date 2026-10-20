@@ -1,0 +1,39 @@
+  <step>
+    <name>Greenplum bulk loader (deprecated)</name>
+    <type>GPBulkLoader</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <connection/>
+    <errors>50</errors>
+    <schema/>
+    <table>target load table</table>
+    <load_method>AUTO_END</load_method>
+    <load_action>APPEND</load_action>
+    <PsqlPath>PsqlPath</PsqlPath>
+    <control_file>control${Internal.Step.CopyNr}.cfg</control_file>
+    <data_file>load${Internal.Step.CopyNr}.dat</data_file>
+    <log_file/>
+    <erase_files>Y</erase_files>
+    <encoding/>
+    <dbname_override/>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

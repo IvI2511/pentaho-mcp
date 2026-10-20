@@ -1,0 +1,14 @@
+    <entry>
+      <name>Delete file</name>
+      <description/>
+      <type>DELETE_FILE</type>
+<attributes></attributes>
+      <filename/>
+      <fail_if_file_not_exists>N</fail_if_file_not_exists>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

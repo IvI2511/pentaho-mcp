@@ -1,0 +1,38 @@
+    <entry>
+      <name>Bulk load into MSSQL</name>
+      <description/>
+      <type>MSSQL_BULK_LOAD</type>
+<attributes></attributes>
+      <schemaname/>
+      <tablename/>
+      <filename/>
+      <datafiletype>char</datafiletype>
+      <fieldterminator/>
+      <lineterminated/>
+      <codepage>OEM</codepage>
+      <specificcodepage/>
+      <formatfilename/>
+      <firetriggers>N</firetriggers>
+      <checkconstraints>N</checkconstraints>
+      <keepnulls>N</keepnulls>
+      <keepidentity>N</keepidentity>
+      <tablock>N</tablock>
+      <startfile>0</startfile>
+      <endfile>0</endfile>
+      <orderby/>
+      <orderdirection>Asc</orderdirection>
+      <maxerrors>0</maxerrors>
+      <batchsize>0</batchsize>
+      <rowsperbatch>0</rowsperbatch>
+      <errorfilename/>
+      <adddatetime>N</adddatetime>
+      <addfiletoresult>N</addfiletoresult>
+      <truncate>N</truncate>
+      <connection/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

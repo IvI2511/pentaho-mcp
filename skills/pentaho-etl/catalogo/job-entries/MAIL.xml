@@ -1,0 +1,42 @@
+    <entry>
+      <name>Mail</name>
+      <description/>
+      <type>MAIL</type>
+<attributes></attributes>
+      <server/>
+      <port/>
+      <destination/>
+      <destinationCc/>
+      <destinationBCc/>
+      <replyto/>
+      <replytoname/>
+      <subject/>
+      <include_date>N</include_date>
+      <contact_person/>
+      <contact_phone/>
+      <comment/>
+      <include_files>N</include_files>
+      <zip_files>N</zip_files>
+      <zip_name/>
+      <use_auth>N</use_auth>
+      <use_secure_auth>N</use_secure_auth>
+      <auth_user/>
+      <auth_password>Encrypted </auth_password>
+      <only_comment>N</only_comment>
+      <use_HTML>N</use_HTML>
+      <use_Priority>N</use_Priority>
+      <encoding/>
+      <priority/>
+      <importance/>
+      <sensitivity/>
+      <secureconnectiontype/>
+      <replyToAddresses/>
+      <filetypes>      </filetypes>      <embeddedimages>
+      </embeddedimages>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

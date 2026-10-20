@@ -1,0 +1,22 @@
+    <entry>
+      <name>Evaluate rows number in a table</name>
+      <description/>
+      <type>EVAL_TABLE_CONTENT</type>
+<attributes></attributes>
+      <connection/>
+      <schemaname/>
+      <tablename/>
+      <success_condition>rows_count_greater</success_condition>
+      <limit>0</limit>
+      <is_custom_sql>N</is_custom_sql>
+      <is_usevars>N</is_usevars>
+      <custom_sql/>
+      <add_rows_result>N</add_rows_result>
+      <clear_result_rows>Y</clear_result_rows>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

@@ -1,0 +1,46 @@
+  <step>
+    <name>Number range</name>
+    <type>NumberRange</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <inputField/>
+    <outputField>range</outputField>
+    <fallBackValue>unknown</fallBackValue>
+    <rules>
+      <rule>
+        <lower_bound>-1.7976931348623157E308</lower_bound>
+        <upper_bound>5.0</upper_bound>
+        <value>Less than 5</value>
+      </rule>
+      <rule>
+        <lower_bound>5.0</lower_bound>
+        <upper_bound>10.0</upper_bound>
+        <value>5-10</value>
+      </rule>
+      <rule>
+        <lower_bound>10.0</lower_bound>
+        <upper_bound>1.7976931348623157E308</upper_bound>
+        <value>More than 10</value>
+      </rule>
+    </rules>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

@@ -1,0 +1,45 @@
+  <step>
+    <name>Kafka consumer</name>
+    <type>KafkaConsumerInput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <clusterName/>
+    <consumerGroup/>
+    <transformationPath/>
+    <SUB_STEP/>
+    <batchSize>1000</batchSize>
+    <batchDuration>1000</batchDuration>
+    <PARALLELISM>1</PARALLELISM>
+    <prefetchMessageCount>100000</prefetchMessageCount>
+    <connectionType>DIRECT</connectionType>
+    <directBootstrapServers/>
+    <AUTO_COMMIT>Y</AUTO_COMMIT>
+    <OutputField kafkaName="key"  type="String" >Key</OutputField>
+    <OutputField kafkaName="message"  type="String" >Message</OutputField>
+    <OutputField kafkaName="topic"  type="String" >Topic</OutputField>
+    <OutputField kafkaName="partition"  type="Integer" >Partition</OutputField>
+    <OutputField kafkaName="offset"  type="Integer" >Offset</OutputField>
+    <OutputField kafkaName="timestamp"  type="Integer" >Timestamp</OutputField>
+    <advancedConfig>
+    </advancedConfig>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

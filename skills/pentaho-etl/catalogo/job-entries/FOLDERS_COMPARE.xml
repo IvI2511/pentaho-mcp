@@ -1,0 +1,19 @@
+    <entry>
+      <name>Compare folders</name>
+      <description/>
+      <type>FOLDERS_COMPARE</type>
+<attributes></attributes>
+      <include_subfolders>N</include_subfolders>
+      <compare_filecontent>N</compare_filecontent>
+      <compare_filesize>N</compare_filesize>
+      <compareonly>all</compareonly>
+      <wildcard/>
+      <filename1/>
+      <filename2/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

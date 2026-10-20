@@ -1,0 +1,16 @@
+    <entry>
+      <name>Check if a folder is empty</name>
+      <description/>
+      <type>FOLDER_IS_EMPTY</type>
+<attributes></attributes>
+      <foldername/>
+      <include_subfolders>N</include_subfolders>
+      <specify_wildcard>N</specify_wildcard>
+      <wildcard/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

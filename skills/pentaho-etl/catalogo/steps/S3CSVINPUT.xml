@@ -1,0 +1,41 @@
+  <step>
+    <name>S3 CSV input</name>
+    <type>S3CSVINPUT</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <aws_access_key>Encrypted </aws_access_key>
+    <aws_secret_key>Encrypted </aws_secret_key>
+    <bucket/>
+    <filename/>
+    <filename_field/>
+    <rownum_field/>
+    <include_filename>N</include_filename>
+    <separator>,</separator>
+    <enclosure>&#34;</enclosure>
+    <header>Y</header>
+    <max_line_size>5000</max_line_size>
+    <lazy_conversion>Y</lazy_conversion>
+    <parallel>N</parallel>
+    <fields>
+    </fields>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

@@ -1,0 +1,36 @@
+  <step>
+    <name>ETL metadata injection</name>
+    <type>MetaInject</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <specification_method>filename</specification_method>
+    <trans_object_id/>
+    <trans_name/>
+    <filename/>
+    <directory_path/>
+    <source_step/>
+    <source_output_fields>    </source_output_fields>    <target_file/>
+    <no_execution>N</no_execution>
+    <stream_source_step/>
+    <stream_target_step/>
+    <mappings>    </mappings><attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

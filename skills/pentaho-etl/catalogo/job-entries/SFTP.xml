@@ -1,0 +1,32 @@
+    <entry>
+      <name>Get a file with SFTP</name>
+      <description/>
+      <type>SFTP</type>
+<attributes></attributes>
+      <servername/>
+      <serverport>22</serverport>
+      <username/>
+      <password>Encrypted </password>
+      <sftpdirectory/>
+      <targetdirectory/>
+      <wildcard/>
+      <remove>N</remove>
+      <isaddresult>Y</isaddresult>
+      <createtargetfolder>N</createtargetfolder>
+      <copyprevious>N</copyprevious>
+      <usekeyfilename>N</usekeyfilename>
+      <keyfilename/>
+      <keyfilepass>Encrypted </keyfilepass>
+      <compression>none</compression>
+      <proxyType/>
+      <proxyHost/>
+      <proxyPort/>
+      <proxyUsername/>
+      <proxyPassword>Encrypted </proxyPassword>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

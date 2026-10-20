@@ -1,0 +1,37 @@
+  <step>
+    <name>Salesforce insert</name>
+    <type>SalesforceInsert</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <targeturl>https://login.salesforce.com/services/Soap/u/47.0</targeturl>
+    <username/>
+    <password>Encrypted </password>
+    <timeout>60000</timeout>
+    <useCompression>N</useCompression>
+    <module>Account</module>
+    <batchSize>10</batchSize>
+    <salesforceIDFieldName>Id</salesforceIDFieldName>
+    <fields>
+      </fields>
+    <rollbackAllChangesOnError>N</rollbackAllChangesOnError>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

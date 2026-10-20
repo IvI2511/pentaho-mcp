@@ -1,0 +1,15 @@
+    <entry>
+      <name>HL7 MLLP acknowledge</name>
+      <description/>
+      <type>HL7MLLPAcknowledge</type>
+<attributes></attributes>
+      <server/>
+      <port/>
+      <variable>MESSAGE</variable>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

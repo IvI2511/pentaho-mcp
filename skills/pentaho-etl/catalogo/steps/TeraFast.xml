@@ -1,0 +1,37 @@
+  <step>
+    <name>Teradata Fastload bulk loader</name>
+    <type>TeraFast</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+<connection/>
+<controlfile_path/>
+<datafile_path>${Internal.Step.CopyNr}.dat</datafile_path>
+<error_limit>25</error_limit>
+<fastload_path>/usr/bin/fastload</fastload_path>
+<logfile_path/>
+<sessions>2</sessions>
+<target_table>${TARGET_TABLE}_${RUN_ID}</target_table>
+<truncate_table>Y</truncate_table>
+<use_control_file>Y</use_control_file>
+<variable_substitution>Y</variable_substitution>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

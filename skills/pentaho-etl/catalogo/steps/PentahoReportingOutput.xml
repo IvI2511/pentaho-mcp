@@ -1,0 +1,33 @@
+  <step>
+    <name>Pentaho reporting output</name>
+    <type>PentahoReportingOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+  <input_file_field/>
+  <output_file_field/>
+  <create_parent_folder>N</create_parent_folder>
+  <input_file/>
+  <output_file/>
+  <use_values_from_fields>Y</use_values_from_fields>
+  <parameters>  </parameters>    <processor_type>PDF</processor_type>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

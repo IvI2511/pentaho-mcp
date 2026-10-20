@@ -1,0 +1,30 @@
+    <entry>
+      <name>HTTP</name>
+      <description/>
+      <type>HTTP</type>
+<attributes></attributes>
+      <url/>
+      <targetfilename/>
+      <file_appended>N</file_appended>
+      <date_time_added>N</date_time_added>
+      <targetfilename_extension/>
+      <uploadfilename/>
+      <run_every_row>N</run_every_row>
+      <url_fieldname/>
+      <upload_fieldname/>
+      <dest_fieldname/>
+      <username/>
+      <password>Encrypted </password>
+      <proxy_host/>
+      <proxy_port/>
+      <non_proxy_hosts/>
+      <addfilenameresult>Y</addfilenameresult>
+      <headers>
+      </headers>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

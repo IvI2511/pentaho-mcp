@@ -1,0 +1,50 @@
+  <step>
+    <name>Oracle bulk loader</name>
+    <type>OraBulkLoader</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <connection/>
+    <commit>100000</commit>
+    <bind_size>0</bind_size>
+    <read_size>0</read_size>
+    <errors>50</errors>
+    <schema/>
+    <table>target load table</table>
+    <load_method>AUTO_END</load_method>
+    <load_action>APPEND</load_action>
+    <sqlldr>sqlldr</sqlldr>
+    <control_file>control${Internal.Step.CopyNr}.cfg</control_file>
+    <data_file>load${Internal.Step.CopyNr}.dat</data_file>
+    <log_file/>
+    <bad_file/>
+    <discard_file/>
+    <direct_path>N</direct_path>
+    <erase_files>Y</erase_files>
+    <encoding/>
+    <dbname_override/>
+    <character_set/>
+    <fail_on_warning>N</fail_on_warning>
+    <fail_on_error>N</fail_on_error>
+    <parallel>N</parallel>
+    <alt_rec_term/>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

@@ -1,0 +1,33 @@
+    <entry>
+      <name>Put a file with FTP</name>
+      <description/>
+      <type>FTP_PUT</type>
+<attributes></attributes>
+      <servername/>
+      <serverport>21</serverport>
+      <username/>
+      <password>Encrypted </password>
+      <remoteDirectory/>
+      <localDirectory/>
+      <wildcard/>
+      <binary>N</binary>
+      <timeout>0</timeout>
+      <remove>N</remove>
+      <only_new>N</only_new>
+      <active>N</active>
+      <control_encoding>ISO-8859-1</control_encoding>
+      <proxy_host/>
+      <proxy_port/>
+      <proxy_username/>
+      <proxy_password>Encrypted </proxy_password>
+      <socksproxy_host/>
+      <socksproxy_port>1080</socksproxy_port>
+      <socksproxy_username/>
+      <socksproxy_password>Encrypted </socksproxy_password>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

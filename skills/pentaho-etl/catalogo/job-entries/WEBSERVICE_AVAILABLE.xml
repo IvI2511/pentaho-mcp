@@ -1,0 +1,15 @@
+    <entry>
+      <name>Check webservice availability</name>
+      <description/>
+      <type>WEBSERVICE_AVAILABLE</type>
+<attributes></attributes>
+      <url/>
+      <connectTimeOut>0</connectTimeOut>
+      <readTimeOut>0</readTimeOut>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

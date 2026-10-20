@@ -1,0 +1,29 @@
+    <entry>
+      <name>Upload files to FTPS</name>
+      <description/>
+      <type>FTPS_PUT</type>
+<attributes></attributes>
+      <servername/>
+      <serverport>21</serverport>
+      <username/>
+      <password>Encrypted </password>
+      <remoteDirectory/>
+      <localDirectory/>
+      <wildcard/>
+      <binary>N</binary>
+      <timeout>0</timeout>
+      <remove>N</remove>
+      <only_new>N</only_new>
+      <active>N</active>
+      <proxy_host/>
+      <proxy_port/>
+      <proxy_username/>
+      <proxy_password/>
+      <connection_type>FTP_CONNECTION</connection_type>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

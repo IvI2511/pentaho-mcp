@@ -1,0 +1,117 @@
+  <step>
+    <name>JMS producer</name>
+    <type>Jms2Producer</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+
+<step-props secure="IBMMQ_PASSWORD AMQ_PASSWORD SSL_KEYSTORE_PASSWORD SSL_TRUSTSTORE_PASSWORD">
+    <group name="">
+        <property group="" name="DESTINATION">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="IBMMQ_URL">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="IBMMQ_USERNAME">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="IBMMQ_PASSWORD">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="AMQ_URL">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="AMQ_USERNAME">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="AMQ_PASSWORD">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="CONNECTION_TYPE">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">ACTIVEMQ</value>
+        </property>
+        <property group="" name="DESTINATION_TYPE">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">QUEUE</value>
+        </property>
+        <property group="" name="FIELD_TO_SEND">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="" name="DISABLE_MESSAGE_ID"/>
+        <property group="" name="DISABLE_MESSAGE_TIMESTAMP"/>
+        <property group="" name="DELIVERY_MODE"/>
+        <property group="" name="PRIORITY"/>
+        <property group="" name="TIME_TO_LIVE"/>
+        <property group="" name="DELIVERY_DELAY"/>
+        <property group="" name="JMS_CORRELATION_ID"/>
+        <property group="" name="JMS_TYPE"/>
+    </group>
+    <group name="PROPERTIES">
+        <property group="PROPERTIES" name="PROPERTY_NAMES"/>
+        <property group="PROPERTIES" name="PROPERTY_VALUES"/>
+    </group>
+    <group name="SSL_GROUP">
+        <property group="SSL_GROUP" name="SSL_ENABLED">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:boolean">false</value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_KEYSTORE_PATH">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_KEYSTORE_TYPE">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_KEYSTORE_PASSWORD">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_TRUSTSTORE_PATH">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_TRUSTSTORE_TYPE">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_TRUSTSTORE_PASSWORD">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_CONTEXT_ALGORITHM">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_CIPHERSUITE">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="IBM_SSL_FIPSREQUIRED">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="AMQ_SSL_PROVIDER">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="AMQ_SSL_VERIFY_HOST">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="AMQ_SSL_TRUST_ALL">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string"></value>
+        </property>
+        <property group="SSL_GROUP" name="SSL_USE_DEFAULT_CONTEXT">
+            <value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:boolean">false</value>
+        </property>
+    </group>
+</step-props>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

@@ -1,0 +1,43 @@
+  <step>
+    <name>Run SSH commands</name>
+    <type>SSH</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <dynamicCommandField>N</dynamicCommandField>
+    <command/>
+    <commandfieldname/>
+    <port>22</port>
+    <servername/>
+    <userName/>
+    <password>Encrypted </password>
+    <usePrivateKey>Y</usePrivateKey>
+    <keyFileName/>
+    <passPhrase>Encrypted </passPhrase>
+    <stdOutFieldName>stdOut</stdOutFieldName>
+    <stdErrFieldName>stdErr</stdErrFieldName>
+    <timeOut>0</timeOut>
+    <proxyHost/>
+    <proxyPort/>
+    <proxyUsername/>
+    <proxyPassword>Encrypted </proxyPassword>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

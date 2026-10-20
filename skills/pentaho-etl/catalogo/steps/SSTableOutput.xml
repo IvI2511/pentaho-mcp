@@ -1,0 +1,32 @@
+  <step>
+    <name>SSTable output</name>
+    <type>SSTableOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+
+    <output_directory>C:\Temp\</output_directory>
+
+    <buffer_size_mb>16</buffer_size_mb>
+
+    <use_cql3>Y</use_cql3>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

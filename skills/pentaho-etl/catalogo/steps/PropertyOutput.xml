@@ -1,0 +1,42 @@
+  <step>
+    <name>Properties output</name>
+    <type>PropertyOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <keyfield/>
+    <valuefield/>
+    <comment/>
+    <fileNameInField>N</fileNameInField>
+    <fileNameField/>
+    <file>
+      <name/>
+      <extention/>
+      <split>N</split>
+      <haspartno>N</haspartno>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <create_parent_folder>N</create_parent_folder>
+    <addtoresult>N</addtoresult>
+    <append>N</append>
+      </file>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

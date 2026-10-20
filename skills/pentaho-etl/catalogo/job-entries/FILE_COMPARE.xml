@@ -1,0 +1,15 @@
+    <entry>
+      <name>File compare</name>
+      <description/>
+      <type>FILE_COMPARE</type>
+<attributes></attributes>
+      <filename1/>
+      <filename2/>
+      <add_filename_result>N</add_filename_result>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

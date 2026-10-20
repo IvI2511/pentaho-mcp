@@ -1,0 +1,37 @@
+  <step>
+    <name>Get files rows count</name>
+    <type>GetFilesRowsCount</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <files_count>N</files_count>
+    <files_count_fieldname/>
+    <rows_count_fieldname>rowscount</rows_count_fieldname>
+    <rowseparator_format>CR</rowseparator_format>
+    <row_separator/>
+    <isaddresult>Y</isaddresult>
+    <filefield>N</filefield>
+    <filename_Field/>
+    <smartCount>N</smartCount>
+    <file>
+    </file>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

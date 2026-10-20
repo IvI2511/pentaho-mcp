@@ -1,0 +1,27 @@
+    <entry>
+      <name>Bulk load into MySQL</name>
+      <description/>
+      <type>MYSQL_BULK_LOAD</type>
+<attributes></attributes>
+      <schemaname/>
+      <tablename/>
+      <filename/>
+      <separator/>
+      <enclosed/>
+      <escaped/>
+      <linestarted/>
+      <lineterminated/>
+      <replacedata>Y</replacedata>
+      <ignorelines>0</ignorelines>
+      <listattribut/>
+      <localinfile>Y</localinfile>
+      <prorityvalue>0</prorityvalue>
+      <addfiletoresult>N</addfiletoresult>
+      <connection/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

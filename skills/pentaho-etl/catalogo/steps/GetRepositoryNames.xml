@@ -1,0 +1,35 @@
+  <step>
+    <name>Get repository names</name>
+    <type>GetRepositoryNames</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <object_type>All</object_type>
+    <rownum>Y</rownum>
+    <rownum_field>rownr</rownum_field>
+    <file>
+      <directory>/</directory>
+      <name_mask>.*</name_mask>
+      <exclude_name_mask/>
+      <include_subfolders>Y</include_subfolders>
+    </file>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

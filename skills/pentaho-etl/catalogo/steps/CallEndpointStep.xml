@@ -1,0 +1,40 @@
+  <step>
+    <name>Call endpoint</name>
+    <type>CallEndpointStep</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <serverUrl>http://localhost:8080/pentaho</serverUrl>
+    <userName>admin</userName>
+    <password>password</password>
+    <isBypassingAuthentication>N</isBypassingAuthentication>
+    <moduleName/>
+    <isModuleFromField>N</isModuleFromField>
+    <endpointPath/>
+    <httpMethod/>
+    <isEndpointFromField>N</isEndpointFromField>
+    <resultField>result</resultField>
+    <statusCodeField/>
+    <responseTimeField/>
+    <fields>
+    </fields>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

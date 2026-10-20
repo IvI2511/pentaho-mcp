@@ -1,0 +1,17 @@
+    <entry>
+      <name>Write to file</name>
+      <description/>
+      <type>WRITE_TO_FILE</type>
+<attributes></attributes>
+      <filename/>
+      <createParentFolder>N</createParentFolder>
+      <appendFile>N</appendFile>
+      <content/>&#xd;
+      <encoding/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

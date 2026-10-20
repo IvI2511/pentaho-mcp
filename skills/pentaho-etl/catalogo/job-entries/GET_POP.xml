@@ -1,0 +1,51 @@
+    <entry>
+      <name>Get mails (POP3/IMAP)</name>
+      <description/>
+      <type>GET_POP</type>
+<attributes></attributes>
+      <servername/>
+      <username/>
+      <password>Encrypted </password>
+      <usessl>N</usessl>
+      <sslport/>
+      <outputdirectory/>
+      <filenamepattern>name_{SYS|hhmmss_MMddyyyy|}_#IdFile#.mail</filenamepattern>
+      <retrievemails>0</retrievemails>
+      <firstmails/>
+      <delete>N</delete>
+      <savemessage>Y</savemessage>
+      <saveattachment>Y</saveattachment>
+      <usedifferentfolderforattachment>N</usedifferentfolderforattachment>
+      <protocol>POP3</protocol>
+      <attachmentfolder/>
+      <attachmentwildcard/>
+      <valueimaplist>imaplistall</valueimaplist>
+      <imapfirstmails>0</imapfirstmails>
+      <imapfolder/>
+      <sendersearch/>
+      <nottermsendersearch>N</nottermsendersearch>
+      <receipientsearch/>
+      <nottermreceipientsearch>N</nottermreceipientsearch>
+      <subjectsearch/>
+      <nottermsubjectsearch>N</nottermsubjectsearch>
+      <bodysearch/>
+      <nottermbodysearch>N</nottermbodysearch>
+      <conditionreceiveddate>ignore</conditionreceiveddate>
+      <nottermreceiveddatesearch>N</nottermreceiveddatesearch>
+      <receiveddate1/>
+      <receiveddate2/>
+      <actiontype>get</actiontype>
+      <movetoimapfolder/>
+      <createmovetofolder>N</createmovetofolder>
+      <createlocalfolder>N</createlocalfolder>
+      <aftergetimap>nothing</aftergetimap>
+      <includesubfolders>N</includesubfolders>
+      <useproxy>N</useproxy>
+      <proxyusername/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

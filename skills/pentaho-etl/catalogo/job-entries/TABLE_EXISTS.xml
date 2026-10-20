@@ -1,0 +1,15 @@
+    <entry>
+      <name>Table exists</name>
+      <description/>
+      <type>TABLE_EXISTS</type>
+<attributes></attributes>
+      <tablename/>
+      <schemaname/>
+      <connection/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

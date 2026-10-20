@@ -1,0 +1,16 @@
+    <entry>
+      <name>Delete filenames from result</name>
+      <description/>
+      <type>DELETE_RESULT_FILENAMES</type>
+<attributes></attributes>
+      <foldername/>
+      <specify_wildcard>N</specify_wildcard>
+      <wildcard/>
+      <wildcardexclude/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

@@ -1,0 +1,26 @@
+    <entry>
+      <name>Bulk load from MySQL into file</name>
+      <description/>
+      <type>MYSQL_BULK_FILE</type>
+<attributes></attributes>
+      <schemaname/>
+      <tablename/>
+      <filename/>
+      <separator/>
+      <enclosed/>
+      <optionenclosed>N</optionenclosed>
+      <lineterminated/>
+      <limitlines>0</limitlines>
+      <listcolumn/>
+      <highpriority>Y</highpriority>
+      <outdumpvalue>0</outdumpvalue>
+      <iffileexists>2</iffileexists>
+      <addfiletoresult>N</addfiletoresult>
+      <connection/>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

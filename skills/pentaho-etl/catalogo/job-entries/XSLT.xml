@@ -1,0 +1,23 @@
+    <entry>
+      <name>XSL transformation</name>
+      <description/>
+      <type>XSLT</type>
+<attributes></attributes>
+      <xmlfilename/>
+      <xslfilename/>
+      <outputfilename/>
+      <iffileexists>1</iffileexists>
+      <addfiletoresult>N</addfiletoresult>
+      <filenamesfromprevious>N</filenamesfromprevious>
+      <xsltfactory>JAXP</xsltfactory>
+    <parameters>
+    </parameters>
+    <outputproperties>
+    </outputproperties>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

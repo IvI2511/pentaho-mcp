@@ -1,0 +1,17 @@
+    <entry>
+      <name>HL7 MLLP input</name>
+      <description/>
+      <type>HL7MLLPInput</type>
+<attributes></attributes>
+      <server/>
+      <port/>
+      <message_variable>MESSAGE</message_variable>
+      <type_variable>MESSAGE_TYPE</type_variable>
+      <version_variable>MESSAGE_VERSION</version_variable>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

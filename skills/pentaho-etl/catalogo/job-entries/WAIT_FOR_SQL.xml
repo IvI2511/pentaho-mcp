@@ -1,0 +1,25 @@
+    <entry>
+      <name>Wait for SQL</name>
+      <description/>
+      <type>WAIT_FOR_SQL</type>
+<attributes></attributes>
+      <connection/>
+      <schemaname/>
+      <tablename/>
+      <success_condition>rows_count_greater</success_condition>
+      <rows_count_value>0</rows_count_value>
+      <is_custom_sql>N</is_custom_sql>
+      <is_usevars>N</is_usevars>
+      <custom_sql/>
+      <add_rows_result>N</add_rows_result>
+      <maximum_timeout>0</maximum_timeout>
+      <check_cycle_time>60</check_cycle_time>
+      <success_on_timeout>N</success_on_timeout>
+      <clear_result_rows>Y</clear_result_rows>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

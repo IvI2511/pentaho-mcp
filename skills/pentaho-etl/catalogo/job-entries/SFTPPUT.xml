@@ -1,0 +1,36 @@
+    <entry>
+      <name>Put a file with SFTP</name>
+      <description/>
+      <type>SFTPPUT</type>
+<attributes></attributes>
+      <servername/>
+      <serverport>22</serverport>
+      <username/>
+      <password>Encrypted </password>
+      <sftpdirectory/>
+      <localdirectory/>
+      <wildcard/>
+      <copyprevious>N</copyprevious>
+      <copypreviousfiles>N</copypreviousfiles>
+      <addFilenameResut>N</addFilenameResut>
+      <usekeyfilename>N</usekeyfilename>
+      <keyfilename/>
+      <keyfilepass>Encrypted </keyfilepass>
+      <compression>none</compression>
+      <proxyType/>
+      <proxyHost/>
+      <proxyPort/>
+      <proxyUsername/>
+      <proxyPassword>Encrypted </proxyPassword>
+      <createRemoteFolder>N</createRemoteFolder>
+      <aftersftpput>nothing</aftersftpput>
+      <destinationfolder/>
+      <createdestinationfolder>N</createdestinationfolder>
+      <successWhenNoFile>N</successWhenNoFile>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

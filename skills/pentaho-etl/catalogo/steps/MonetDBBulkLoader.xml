@@ -1,0 +1,37 @@
+  <step>
+    <name>MonetDB bulk loader</name>
+    <type>MonetDBBulkLoader</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <connection/>
+    <buffer_size>100000</buffer_size>
+    <schema/>
+    <table>Table name</table>
+    <log_file/>
+    <truncate>N</truncate>
+    <fully_quote_sql>Y</fully_quote_sql>
+    <field_separator>|</field_separator>
+    <field_enclosure>&#34;</field_enclosure>
+    <null_representation/>
+    <encoding>UTF-8</encoding>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

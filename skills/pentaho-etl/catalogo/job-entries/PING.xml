@@ -1,0 +1,17 @@
+    <entry>
+      <name>Ping a host</name>
+      <description/>
+      <type>PING</type>
+<attributes></attributes>
+      <hostname/>
+      <nbr_packets>2</nbr_packets>
+      <nbrpaquets>2</nbrpaquets>
+      <timeout>3000</timeout>
+      <pingtype>classicPing</pingtype>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

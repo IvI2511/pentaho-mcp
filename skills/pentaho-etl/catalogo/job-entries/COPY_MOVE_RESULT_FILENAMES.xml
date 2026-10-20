@@ -1,0 +1,29 @@
+    <entry>
+      <name>Process result filenames</name>
+      <description/>
+      <type>COPY_MOVE_RESULT_FILENAMES</type>
+<attributes></attributes>
+      <foldername/>
+      <specify_wildcard>N</specify_wildcard>
+      <wildcard/>
+      <wildcardexclude/>
+      <destination_folder/>
+      <nr_errors_less_than>10</nr_errors_less_than>
+      <success_condition>success_if_no_errors</success_condition>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <SpecifyFormat>N</SpecifyFormat>
+      <date_time_format/>
+      <action>copy</action>
+      <AddDateBeforeExtension>N</AddDateBeforeExtension>
+      <OverwriteFile>N</OverwriteFile>
+      <CreateDestinationFolder>N</CreateDestinationFolder>
+      <RemovedSourceFilename>Y</RemovedSourceFilename>
+      <AddDestinationFilename>Y</AddDestinationFilename>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

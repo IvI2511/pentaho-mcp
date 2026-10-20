@@ -1,0 +1,33 @@
+    <entry>
+      <name>Unzip file</name>
+      <description/>
+      <type>UNZIP</type>
+<attributes></attributes>
+      <zipfilename/>
+      <wildcard/>
+      <wildcardexclude/>
+      <targetdirectory/>
+      <movetodirectory/>
+      <afterunzip>0</afterunzip>
+      <addfiletoresult>N</addfiletoresult>
+      <isfromprevious>N</isfromprevious>
+      <adddate>N</adddate>
+      <addtime>N</addtime>
+      <addOriginalTimestamp>N</addOriginalTimestamp>
+      <SpecifyFormat>N</SpecifyFormat>
+      <date_time_format/>
+      <rootzip>N</rootzip>
+      <createfolder>N</createfolder>
+      <nr_limit>10</nr_limit>
+      <wildcardSource/>
+      <success_condition>success_if_no_errors</success_condition>
+      <iffileexists>SKIP</iffileexists>
+      <create_move_to_directory>N</create_move_to_directory>
+      <setOriginalModificationDate>N</setOriginalModificationDate>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

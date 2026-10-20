@@ -1,0 +1,37 @@
+    <entry>
+      <name>FTP delete</name>
+      <description/>
+      <type>FTP_DELETE</type>
+<attributes></attributes>
+      <protocol>FTP</protocol>
+      <servername/>
+      <port>21</port>
+      <username/>
+      <password>Encrypted </password>
+      <ftpdirectory/>
+      <wildcard/>
+      <timeout>0</timeout>
+      <active>N</active>
+      <useproxy>N</useproxy>
+      <proxy_host/>
+      <proxy_port/>
+      <proxy_username/>
+      <proxy_password>Encrypted </proxy_password>
+      <publicpublickey>N</publicpublickey>
+      <keyfilename/>
+      <keyfilepass/>
+      <nr_limit_success>10</nr_limit_success>
+      <success_condition>success_is_all_files_downloaded</success_condition>
+      <copyprevious>N</copyprevious>
+      <ftps_connection_type>FTP_CONNECTION</ftps_connection_type>
+      <socksproxy_host/>
+      <socksproxy_port>1080</socksproxy_port>
+      <socksproxy_username/>
+      <socksproxy_password>Encrypted </socksproxy_password>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

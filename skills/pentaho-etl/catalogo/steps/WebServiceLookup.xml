@@ -1,0 +1,47 @@
+  <step>
+    <name>Web services lookup</name>
+    <type>WebServiceLookup</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <wsURL/>
+    <wsOperation/>
+    <wsOperationRequest/>
+    <wsOperationNamespace/>
+    <wsInFieldContainer/>
+    <wsInFieldArgument/>
+    <wsOutFieldContainer/>
+    <wsOutFieldArgument/>
+    <proxyHost/>
+    <proxyPort/>
+    <httpLogin/>
+    <httpPassword/>
+    <callStep>1000</callStep>
+    <passingInputData>Y</passingInputData>
+    <compatible>N</compatible>
+    <repeating_element/>
+    <reply_as_string>N</reply_as_string>
+    <fieldsIn>
+      </fieldsIn>
+    <fieldsOut>
+      </fieldsOut>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

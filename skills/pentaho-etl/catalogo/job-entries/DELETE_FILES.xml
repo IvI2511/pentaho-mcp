@@ -1,0 +1,16 @@
+    <entry>
+      <name>Delete files</name>
+      <description/>
+      <type>DELETE_FILES</type>
+<attributes></attributes>
+      <arg_from_previous>N</arg_from_previous>
+      <include_subfolders>N</include_subfolders>
+      <fields>
+      </fields>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

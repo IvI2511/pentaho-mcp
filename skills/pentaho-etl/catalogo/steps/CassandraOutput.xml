@@ -1,0 +1,54 @@
+  <step>
+    <name>Cassandra output</name>
+    <type>CassandraOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+
+    <cassandra_host>localhost</cassandra_host>
+
+    <cassandra_port>9042</cassandra_port>
+
+    <schema_host>localhost</schema_host>
+
+    <schema_port>9042</schema_port>
+
+    <batch_size>100</batch_size>
+
+    <cql_sub_batch_size>10</cql_sub_batch_size>
+
+    <create_table>Y</create_table>
+
+    <use_compression>N</use_compression>
+
+    <insert_fields_not_in_meta>N</insert_fields_not_in_meta>
+
+    <update_cassandra_meta>N</update_cassandra_meta>
+
+    <truncate_table>N</truncate_table>
+
+    <unlogged_batch>N</unlogged_batch>
+
+    <dont_complain_apriori_cql>N</dont_complain_apriori_cql>
+
+    <ttl_unit>None</ttl_unit>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

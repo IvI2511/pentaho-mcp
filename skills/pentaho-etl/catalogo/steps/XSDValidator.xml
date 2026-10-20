@@ -1,0 +1,38 @@
+  <step>
+    <name>XSD validator</name>
+    <type>XSDValidator</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning>
+      <method>none</method>
+      <schema_name/>
+    </partitioning>
+    <xdsfilename/>
+    <xmlstream/>
+    <resultfieldname>result</resultfieldname>
+    <addvalidationmsg>N</addvalidationmsg>
+    <validationmsgfield>ValidationMsgField</validationmsgfield>
+    <ifxmlunvalid/>
+    <ifxmlvalid/>
+    <outputstringfield>N</outputstringfield>
+    <xmlsourcefile>N</xmlsourcefile>
+    <xsddefinedfield/>
+    <xsdsource>filename</xsdsource>
+    <allowExternalEntities>Y</allowExternalEntities>
+<attributes></attributes>
+    <cluster_schema/>
+    <remotesteps>
+      <input>
+      </input>
+      <output>
+      </output>
+    </remotesteps>
+    <GUI>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+      <draw>Y</draw>
+    </GUI>
+    </step>
+

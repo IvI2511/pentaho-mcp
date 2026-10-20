@@ -1,0 +1,2 @@
+# Los scripts de bash tienen que quedar con LF o no corren
+*.sh text eol=lf

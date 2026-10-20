@@ -1,0 +1,25 @@
+    <entry>
+      <name>Evaluate files metrics</name>
+      <description/>
+      <type>EVAL_FILES_METRICS</type>
+<attributes></attributes>
+      <result_filenames_wildcard/>
+      <Result_field_file/>
+      <Result_field_wildcard/>
+      <Result_field_includesubfolders/>
+      <fields>
+      </fields>
+      <comparevalue/>
+      <minvalue/>
+      <maxvalue/>
+      <successnumbercondition>greater</successnumbercondition>
+      <source_files>files</source_files>
+      <evaluation_type>size</evaluation_type>
+      <scale>bytes</scale>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>

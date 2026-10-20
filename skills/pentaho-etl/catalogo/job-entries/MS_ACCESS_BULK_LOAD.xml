@@ -1,0 +1,19 @@
+    <entry>
+      <name>MS Access bulk load (deprecated)</name>
+      <description/>
+      <type>MS_ACCESS_BULK_LOAD</type>
+<attributes></attributes>
+      <include_subfolders>N</include_subfolders>
+      <is_args_from_previous>N</is_args_from_previous>
+      <add_result_filenames>N</add_result_filenames>
+      <limit>10</limit>
+      <success_condition>success_if_no_errors</success_condition>
+      <fields>
+      </fields>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>100</xloc>
+      <yloc>100</yloc>
+<attributes_kjc></attributes_kjc>
+    </entry>
