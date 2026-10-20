@@ -50,7 +50,11 @@ Pregunta solo si tiene una terminal (`[ -t 0 ]`): con `curl … | bash` o desde 
 no instala nada e indica volver a correrlo con `--rosetta`, que instala sin preguntar. Los pasos y los
 códigos de salida son los de `instalar.ps1`: nada de esto corta la instalación (si Rosetta o el Java no se
 pueden instalar, lo dice y sigue con el paso 4, como el «NO Java» de siempre). Probado con el job
-`receta-mac-apple` (corrida 10).
+`receta-mac-apple` (corrida 13): sin terminal avisa y no instala; en una terminal pregunta, baja el Temurin
+21 x64 (controlado con su SHA-256), deja el lanzador, y Spoon abierto con ese comando contesta `/ping` a los
+41 s con las 9 llamadas MCP bien. En esa VM de macos-26 Rosetta ya venía instalada, así que el
+`softwareupdate` de `instalar.sh` no corrió ahí; es el mismo comando del paso 1 de abajo, que sí corrió en
+las corridas 5 y 9 y en los jobs de `probar`.
 
 A mano, o con el `instalar.sh` de `main` hasta que se publique:
 
@@ -185,6 +189,15 @@ grueso del Pan en Mac es el arranque de la JVM y de Kettle, no la transformació
    ese proveedor ya no existe.
 7. `ubuntu-latest` pasa a Ubuntu 26.04 entre el 19-oct y el 19-nov de 2026: la prueba fija `ubuntu-24.04`
    y `ubuntu-26.04`, y las dos pasan.
+8. **Instalar solo el plugin (`--pdi`) no anda en Mac ni en Linux con el `instalar.sh` de `main`** (corridas
+   10 y 11; hasta ahí la prueba siempre usaba `--instalar-pdi`). `pentaho-mcp.zip` sale de `Compress-Archive`
+   (`spoon-plugin/build.ps1`, Windows PowerShell 5.1): usa `\` como separador y la entrada de la carpeta
+   `lib\` no tiene atributos de MS-DOS. `unzip` lo extrae bien pero sale con 1 («appears to use backslashes
+   as path separators») y `set -e` corta el paso 2; y además crea `lib` sin el bit x, con lo que el `cp -R`
+   de macOS falla («unable to copy extended attributes … Permission denied») y el script sale con 4 diciendo
+   «close Spoon». El `instalar.sh` de `ci/instalar-mac-apple` toma el 1 de `unzip` como aviso y hace
+   `chmod -R u+rwX` antes de copiar. Del lado del build, el zip debería armarse con `/` (como
+   `tools/armar-zip-pdi.py` arma el de PDI).
 
 ## Cómo se corre la prueba
 
@@ -210,6 +223,8 @@ Probar una versión sin publicar: hoy la prueba siempre baja el último release 
 ## Corridas
 
 Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.yml?query=branch%3Aci%2Fplataformas
+(1 a 9) y https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.yml?query=branch%3Aci%2Finstalar-mac-apple
+(10 a 13, con el `instalar.sh` nuevo).
 
 | # | Corrida | Qué mostró |
 |---|---|---|
@@ -222,6 +237,10 @@ Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.ym
 | 7 | [39467208277](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467208277) | hilos de Java2D en Spoon; con `java.awt.headless` sigue en blanco (cancelada después: lo que quedaba eran jobs arm64 repetidos, en cola) |
 | 8 | [39467778493](https://github.com/IvI2511/pentaho-mcp/actions/runs/39467778493) | la ventana SWT mínima con Java2D/AWT inicializado también se dibuja (cancelada después, igual que la 7) |
 | 9 | [39468686139](https://github.com/IvI2511/pentaho-mcp/actions/runs/39468686139) | **la de referencia**, con el workflow final: 8 de 8 en verde (5 plataformas, arm64 nativo, receta del documento y diagnóstico de la ventana) |
+| 10 | [39475282161](https://github.com/IvI2511/pentaho-mcp/actions/runs/39475282161) | `instalar.sh` nuevo: sin terminal avisa bien; con `--pdi` corta en el paso 2 por el aviso de `unzip` (problema 8). Cancelada |
+| 11 | [39475832676](https://github.com/IvI2511/pentaho-mcp/actions/runs/39475832676) | pasa el `unzip`; el `cp -R` del plugin falla por la carpeta `lib` sin bit x (problema 8). El resto, en verde |
+| 12 | [39476578123](https://github.com/IvI2511/pentaho-mcp/actions/runs/39476578123) | el plugin ya se instala con `--pdi`; la «y» metida de antemano con `script(1)` no llega a la pregunta. El resto, en verde |
+| 13 | [39478185979](https://github.com/IvI2511/pentaho-mcp/actions/runs/39478185979) | **8 de 8 en verde**: `receta-mac-apple` sin los pasos 1, 2 y 4 a mano (`tools/ci/responder.py` contesta cuando aparece la pregunta); en `probar`, el paso 3 muestra de dónde sale el Java y en chip Apple deja el lanzador |
 
 Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pentaho-mcp`).
 
