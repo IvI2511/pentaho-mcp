@@ -16,3 +16,6 @@ spoon-plugin/.ruff_cache/
 instalador/staging/
 instalador/cache/
 instalador/*.exe
+
+# Salida del ejemplo Grano de Oro (almacén SQLite, rechazos y KPI): se regenera con el job
+ejemplo/salida/
