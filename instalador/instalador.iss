@@ -613,10 +613,11 @@ var
 begin
   if not DirExists(Carpeta) then
     Exit;
-  // Hasta 5 intentos: el antivirus traba unos segundos los .jar que acaba de ver (paso en las
-  // pruebas con archivos recien creados; borrados un momento despues, salieron sin problema).
+  // DelTree con la ruta extendida (\\?\...): Setup no es longPathAware y, con la ruta normal,
+  // no borra los archivos de 260 caracteres o mas (error 3), que un PDI dentro de
+  // <PDI>\plugins\Pentaho Live tiene enseguida. Hasta 5 intentos por si algo esta en uso.
   for Intento := 1 to 5 do begin
-    if DelTree(Carpeta, True, True, True) or not DirExists(Carpeta) then begin
+    if DelTree(PathConvertNormalToSuper(Carpeta), True, True, True) or not DirExists(Carpeta) then begin
       Log('  borrada ' + Carpeta);
       Exit;
     end;
