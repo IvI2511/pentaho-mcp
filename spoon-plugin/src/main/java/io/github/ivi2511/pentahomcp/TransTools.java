@@ -67,8 +67,10 @@ final class TransTools {
     // ------------------------------------------------------------ steps
 
     s.add( Tools.tool( "agregar_step",
-      "Agrega un step a la transformacion y lo deja resaltado en el lienzo. Es la forma normal de construir: "
-        + "un step por llamada, con 'despues_de' para que quede a la derecha del anterior y conectado con un hop. "
+      "Agrega UN step a la transformacion y lo deja resaltado en el lienzo: para cambios puntuales (sumar o "
+        + "corregir un step en un flujo que ya existe). Para armar un ETL entero o un tramo de varios steps usa "
+        + "build_steps (una llamada, animada, un solo Ctrl+Z). Con 'despues_de' queda a la derecha del anterior y "
+        + "conectado con un hop. "
         + "config_xml lleva solo los tags que cambian respecto de plantilla_step (lo demas queda por defecto); "
         + "puede ir suelto (<separator>;</separator><fields>...</fields>) o envuelto en <step>. Las referencias "
         + "a otros steps (send_true_to, <from>...) se resuelven solas, aunque el step referido se agregue despues. "
@@ -94,15 +96,17 @@ final class TransTools {
         TransOps.Agregado r = TransOps.agregarStep( tm, Tools.str( a, "tipo" ), Tools.str( a, "nombre" ),
           Tools.optStr( a, "config_xml", null ), Tools.optInteger( a, "x" ), Tools.optInteger( a, "y" ),
           despuesDe, Tools.optStr( a, "descripcion", null ), sp.getMetaStore() );
-        sp.addUndoNew( tm, new Object[] { r.step }, new int[] { tm.indexOfStep( r.step ) } );
+        // step + hop + modo de salida del previo: un solo Ctrl+Z
+        UndoGrupo undo = new UndoGrupo( sp, tm );
+        undo.nuevo( new Object[] { r.step }, new int[] { tm.indexOfStep( r.step ) } );
         String notaSalida = null;
         if ( r.hop != null ) {
-          sp.addUndoNew( tm, new Object[] { r.hop }, new int[] { tm.indexOfTransHop( r.hop ) }, true );
+          undo.nuevo( new Object[] { r.hop }, new int[] { tm.indexOfTransHop( r.hop ) } );
           boolean antes = previo.isDistributes();
           notaSalida = TransOps.aplicarModoSalida( tm, previo, Tools.optStr( a, "modo_salida", null ) );
           if ( previo.isDistributes() != antes ) {
-            sp.addUndoChange( tm, new Object[] { previoAntes }, new Object[] { previo.clone() },
-              new int[] { tm.indexOfStep( previo ) }, true );
+            undo.cambio( new Object[] { previoAntes }, new Object[] { previo.clone() },
+              new int[] { tm.indexOfStep( previo ) } );
           }
         }
         Docs.touched( tm );
@@ -122,6 +126,32 @@ final class TransTools {
         return o;
       } ) ) );
 
+    s.add( Tools.tool( "build_steps",
+      "Builds several steps and their hops in ONE call, animated: the user watches the nodes appear on the canvas "
+        + "one by one. Use it to lay out a whole ETL or a whole stretch of one (input -> transforms -> output, "
+        + "branches, lookups); use agregar_step (add_step) for a one-off change to an existing flow. Everything is "
+        + "validated BEFORE touching the canvas (step types exist, names are unique in the document and in the batch, "
+        + "'after'/'from'/'to' exist or are created earlier in this batch, config_xml is valid, no repeated hops, no "
+        + "cycles): if anything is wrong nothing changes and you get the full list of problems. Per step: 'type' = "
+        + "step type id (from tipos_de_step, e.g. CsvInput, SelectValues, TableOutput); 'name' = unique name; "
+        + "'config_xml' = only the tags that differ from plantilla_step (same rules as agregar_step); 'after' = an "
+        + "existing step or an EARLIER step of this list: the new one goes to its right, connected by a hop; 'x'/'y' "
+        + "force the position; 'output_mode' = how THIS step sends rows once it has 2+ outgoing hops: copy (default: "
+        + "every output gets all rows) or distribute (round robin). 'hops' = extra connections that 'after' cannot "
+        + "express: a second input (lookup stream, merge/join), the other branch of a Filter rows, error hops "
+        + "(error=true). Filter rows / Switch-case targets go in config_xml (send_true_to...) AND need a hop "
+        + "('after' or 'hops'); references by name in config_xml are resolved at the end, so they may point to steps "
+        + "created later in the batch. 'arrange' (default true) runs the auto-layout at the end. The whole batch is a "
+        + "single Ctrl+Z in Spoon. Returns the created steps (name, type, x, y), the hops, notes and warnings (e.g. a "
+        + "database connection that does not exist).",
+      Tools.schema().documento()
+        .raw( "steps", esquemaSteps(), true )
+        .raw( "hops", esquemaHops(), false )
+        .integer( "delay_ms", "Pause between nodes so the user can follow the build, in ms (default "
+          + TransLote.DELAY_DEFECTO + ", max " + TransLote.DELAY_MAX + "; 0 = no animation)", false )
+        .bool( "arrange", "Run the auto-layout (ordenar_lienzo) at the end (default true)", false ).build(),
+      a -> TransLote.ejecutar( a ) ) );
+
     s.add( Tools.tool( "configurar_step",
       "Cambia la configuracion de un step existente: config_xml se mezcla sobre su configuracion ACTUAL "
         + "(cada tag que mandes reemplaza a ese tag completo; los que no mandes quedan como estan). Mantiene "
@@ -135,7 +165,8 @@ final class TransTools {
         StepMeta sm = TransOps.paso( tm, Tools.str( a, "step" ) );
         StepMeta antes = (StepMeta) sm.clone();
         String aviso = TransOps.reconfigurar( tm, sm, Tools.str( a, "config_xml" ), sp.getMetaStore() );
-        sp.addUndoChange( tm, new Object[] { antes }, new Object[] { sm.clone() }, new int[] { tm.indexOfStep( sm ) } );
+        new UndoGrupo( sp, tm ).cambio( new Object[] { antes }, new Object[] { sm.clone() },
+          new int[] { tm.indexOfStep( sm ) } );
         seleccionarSolo( tm, sm );
         Docs.touched( tm );
         ObjectNode o = TransOps.ficha( sm );
@@ -179,7 +210,7 @@ final class TransTools {
           idx[ i + 1 ] = tm.indexOfStep( otros.get( i )[ 1 ] );
           refs.add( otros.get( i )[ 1 ].getName() );
         }
-        sp.addUndoChange( tm, desde, hasta, idx );
+        new UndoGrupo( sp, tm ).cambio( desde, hasta, idx ); // el step y los que lo nombran: una sola accion
         seleccionarSolo( tm, sm );
         Docs.touched( tm );
         ObjectNode o = TransOps.ficha( sm ).put( "nombre_anterior", antes.getName() );
@@ -204,8 +235,8 @@ final class TransTools {
         int y = Tools.integer( a, "y" );
         Point antes = new Point( sm.getLocation().x, sm.getLocation().y );
         sm.setLocation( x, y );
-        sp.addUndoPosition( tm, new Object[] { sm }, new int[] { tm.indexOfStep( sm ) }, new Point[] { antes },
-          new Point[] { new Point( x, y ) } );
+        new UndoGrupo( sp, tm ).posicion( new Object[] { sm }, new int[] { tm.indexOfStep( sm ) },
+          new Point[] { antes }, new Point[] { new Point( x, y ) } );
         seleccionarSolo( tm, sm );
         Docs.touched( tm );
         return TransOps.ficha( sm );
@@ -220,7 +251,7 @@ final class TransTools {
         StepMeta sm = TransOps.paso( tm, Tools.str( a, "step" ) );
         List<TransHopMeta> hops = TransOps.hopsDe( tm, sm );
         ArrayNode quitados = Tools.arr();
-        boolean encadenar = false;
+        UndoGrupo undo = new UndoGrupo( sp, tm );
         List<StepMeta> vecinos = new ArrayList<StepMeta>();
         for ( TransHopMeta h : hops ) {
           StepMeta v = h.getFromStep() == sm ? h.getToStep() : h.getFromStep();
@@ -230,7 +261,8 @@ final class TransTools {
         }
         Cambios c = Cambios.antes( vecinos );
         if ( !hops.isEmpty() ) {
-          // Igual que SpoonStepsDelegate.delSteps, pero encadenado al borrado del step (un solo Ctrl+Z).
+          // Igual que SpoonStepsDelegate.delSteps: DELETE_HOP y despues DELETE_STEP (Spoon deshace ese
+          // par junto); los cambios de los vecinos se encadenan con UndoGrupo. Un solo Ctrl+Z.
           Object[] clones = new Object[ hops.size() ];
           int[] idx = new int[ hops.size() ];
           for ( int i = 0; i < hops.size(); i++ ) {
@@ -243,13 +275,12 @@ final class TransTools {
             tm.removeTransHop( tm.indexOfTransHop( hops.get( i ) ) );
             TransOps.limpiarTrasQuitarHop( hops.get( i ) ); // que los vecinos olviden al step borrado
           }
-          sp.addUndoDelete( tm, clones, idx );
-          encadenar = true;
+          undo.borrado( clones, idx );
         }
         int i = tm.indexOfStep( sm );
         tm.removeStep( i );
-        sp.addUndoDelete( tm, new Object[] { sm }, new int[] { i }, encadenar );
-        c.registrar( sp, tm );
+        undo.borrado( new Object[] { sm }, new int[] { i } );
+        c.registrar( undo, tm );
         Docs.touched( tm );
         ObjectNode o = Tools.obj();
         o.put( "borrado", sm.getName() );
@@ -285,10 +316,10 @@ final class TransTools {
         String nota = deError ? null
           : TransOps.aplicarModoSalida( tm, desde, Tools.optStr( a, "modo_salida", null ) );
         boolean cambioStep = deError || desde.isDistributes() != antes.isDistributes();
-        sp.addUndoNew( tm, new Object[] { h }, new int[] { tm.indexOfTransHop( h ) } );
+        UndoGrupo undo = new UndoGrupo( sp, tm ); // hop + cambio del origen: un solo Ctrl+Z
+        undo.nuevo( new Object[] { h }, new int[] { tm.indexOfTransHop( h ) } );
         if ( cambioStep ) {
-          sp.addUndoChange( tm, new Object[] { antes }, new Object[] { desde.clone() },
-            new int[] { tm.indexOfStep( desde ) }, true );
+          undo.cambio( new Object[] { antes }, new Object[] { desde.clone() }, new int[] { tm.indexOfStep( desde ) } );
         }
         Docs.touched( tm );
         ObjectNode o = TransOps.fichaHop( h );
@@ -315,7 +346,7 @@ final class TransTools {
         StepMeta antes = (StepMeta) sm.clone();
         TransOps.aplicarModoSalida( tm, sm, Tools.str( a, "modo" ) );
         if ( sm.isDistributes() != antes.isDistributes() ) {
-          sp.addUndoChange( tm, new Object[] { antes }, new Object[] { sm.clone() },
+          new UndoGrupo( sp, tm ).cambio( new Object[] { antes }, new Object[] { sm.clone() },
             new int[] { tm.indexOfStep( sm ) } );
           Docs.touched( tm );
         }
@@ -343,10 +374,11 @@ final class TransTools {
         extremos.add( hacia );
         Cambios c = Cambios.antes( extremos );
         int idx = tm.indexOfTransHop( h );
-        sp.addUndoDelete( tm, new Object[] { h.clone() }, new int[] { idx } );
+        UndoGrupo undo = new UndoGrupo( sp, tm );
+        undo.borrado( new Object[] { h.clone() }, new int[] { idx } );
         tm.removeTransHop( idx );
         TransOps.limpiarTrasQuitarHop( h );
-        c.registrar( sp, tm ); // si algun extremo cambio su configuracion, se deshace junto con el hop
+        c.registrar( undo, tm ); // si algun extremo cambio su configuracion, se deshace junto con el hop
         Docs.touched( tm );
         return TransOps.fichaHop( h ).put( "borrado", true );
       } ) ) );
@@ -368,7 +400,7 @@ final class TransTools {
         if ( h.isEnabled() != hab ) {
           Object antes = h.clone();
           h.setEnabled( hab );
-          sp.addUndoChange( tm, new Object[] { antes }, new Object[] { h.clone() },
+          new UndoGrupo( sp, tm ).cambio( new Object[] { antes }, new Object[] { h.clone() },
             new int[] { tm.indexOfTransHop( h ) } );
           tm.clearCaches();
           Docs.touched( tm );
@@ -399,7 +431,7 @@ final class TransTools {
         NotePadMeta n = new NotePadMeta( texto, x == null ? 100 : x, y, Tools.optInt( a, "ancho", 20 ),
           Tools.optInt( a, "alto", 20 ) );
         m.addNote( n );
-        sp.addUndoNew( m, new Object[] { n }, new int[] { m.indexOfNote( n ) } );
+        new UndoGrupo( sp, m ).nuevo( new Object[] { n }, new int[] { m.indexOfNote( n ) } );
         Docs.touched( m );
         ObjectNode o = Tools.obj();
         o.put( "nota", m.indexOfNote( n ) );
@@ -437,7 +469,7 @@ final class TransTools {
         AbstractMeta m = Docs.resolver( a );
         TransLayout.Movimientos mov = TransLayout.ordenar( m );
         if ( !mov.objetos.isEmpty() ) {
-          sp.addUndoPosition( m, mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
+          new UndoGrupo( sp, m ).posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
           Docs.touched( m );
         }
         ObjectNode o = Tools.obj();
@@ -449,12 +481,51 @@ final class TransTools {
 
   // ---------------------------------------------------------------- ayudas
 
+  /** JSON Schema del argumento 'steps' de build_steps. */
+  private static ObjectNode esquemaSteps() {
+    ObjectNode item = Tools.obj().put( "type", "object" );
+    ObjectNode p = item.putObject( "properties" );
+    p.putObject( "type" ).put( "type", "string" ).put( "description",
+      "Step type id (from tipos_de_step), e.g. 'CsvInput', 'FilterRows', 'TableOutput'" );
+    p.putObject( "name" ).put( "type", "string" ).put( "description", "Unique step name" );
+    p.putObject( "config_xml" ).put( "type", "string" ).put( "description",
+      "Only the configuration tags that differ from plantilla_step" );
+    p.putObject( "after" ).put( "type", "string" ).put( "description",
+      "Existing step, or a step EARLIER in this list: placed to its right and connected after -> this" );
+    p.putObject( "x" ).put( "type", "integer" ).put( "description", "Canvas x (optional)" );
+    p.putObject( "y" ).put( "type", "integer" ).put( "description", "Canvas y (optional)" );
+    ObjectNode modo = p.putObject( "output_mode" ).put( "type", "string" ).put( "description",
+      "How this step sends rows when it has 2+ outgoing hops: copy (default) or distribute (round robin)" );
+    modo.putArray( "enum" ).add( "copy" ).add( "distribute" );
+    item.putArray( "required" ).add( "type" ).add( "name" );
+    ObjectNode s = Tools.obj().put( "type", "array" ).put( "minItems", 1 ).put( "maxItems", TransLote.MAX_STEPS )
+      .put( "description", "Steps to create, in order (each 'after' must name an existing step or an earlier one)" );
+    s.set( "items", item );
+    return s;
+  }
+
+  /** JSON Schema del argumento 'hops' de build_steps. */
+  private static ObjectNode esquemaHops() {
+    ObjectNode item = Tools.obj().put( "type", "object" );
+    ObjectNode p = item.putObject( "properties" );
+    p.putObject( "from" ).put( "type", "string" ).put( "description", "Source step (existing or in 'steps')" );
+    p.putObject( "to" ).put( "type", "string" ).put( "description", "Target step (existing or in 'steps')" );
+    p.putObject( "error" ).put( "type", "boolean" ).put( "description",
+      "Error-handling hop: rows that fail in 'from' go to 'to' (default false)" );
+    p.putObject( "enabled" ).put( "type", "boolean" ).put( "description", "Hop enabled (default true)" );
+    item.putArray( "required" ).add( "from" ).add( "to" );
+    ObjectNode s = Tools.obj().put( "type", "array" ).put( "description",
+      "Extra hops that 'after' cannot express (lookup streams, merges, second Filter rows branch, error hops)" );
+    s.set( "items", item );
+    return s;
+  }
+
   /**
    * Foto de unos steps antes de una operacion que puede cambiarles la configuracion de rebote
-   * (limpiezas tras quitar un hop). registrar() agrega un undo de cambio, encadenado a la accion
-   * anterior, solo para los que cambiaron. (UI)
+   * (limpiezas tras quitar un hop, hops nuevos, referencias resueltas). registrar() agrega al grupo
+   * de undo un cambio solo para los que cambiaron. (UI)
    */
-  private static final class Cambios {
+  static final class Cambios {
     private final List<StepMeta> steps = new ArrayList<StepMeta>();
     private final List<StepMeta> clones = new ArrayList<StepMeta>();
     private final List<String> xmls = new ArrayList<String>();
@@ -469,7 +540,7 @@ final class TransTools {
       return c;
     }
 
-    void registrar( Spoon sp, TransMeta tm ) {
+    void registrar( UndoGrupo undo, TransMeta tm ) {
       List<Object> desde = new ArrayList<Object>();
       List<Object> hasta = new ArrayList<Object>();
       List<Integer> idx = new ArrayList<Integer>();
@@ -488,7 +559,7 @@ final class TransTools {
         for ( int i = 0; i < ix.length; i++ ) {
           ix[ i ] = idx.get( i );
         }
-        sp.addUndoChange( tm, desde.toArray(), hasta.toArray(), ix, true );
+        undo.cambio( desde.toArray(), hasta.toArray(), ix );
       }
     }
 

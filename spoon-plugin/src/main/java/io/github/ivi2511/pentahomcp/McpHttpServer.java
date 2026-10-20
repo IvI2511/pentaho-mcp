@@ -41,8 +41,25 @@ final class McpHttpServer {
 
     ObjectNode inputSchema();
 
-    /** Devuelve un String (va tal cual) o cualquier otro objeto (va como JSON compacto). */
+    /**
+     * Devuelve un String (va tal cual), una {@link Imagen} (bloque image + texto opcional) o cualquier
+     * otro objeto (va como JSON compacto).
+     */
     Object call( JsonNode args ) throws Exception;
+  }
+
+  /** Resultado con imagen: content = [{type:image, data, mimeType}, {type:text, text}] (MCP estandar). */
+  static final class Imagen {
+    final String base64;
+    final String mime;
+    /** Texto que acompania la imagen; null para mandar solo la imagen. */
+    final String texto;
+
+    Imagen( String base64, String mime, String texto ) {
+      this.base64 = base64;
+      this.mime = mime;
+      this.texto = texto;
+    }
   }
 
   /** Error esperado (argumento mal, step inexistente...): llega a la IA como isError, sin pila. */
@@ -220,9 +237,17 @@ final class McpHttpServer {
     ArrayNode content = res.putArray( "content" );
     try {
       Object salida = t.call( args );
-      // compacto: cada caracter de mas son tokens que paga la IA
-      String texto = salida instanceof String ? (String) salida : JSON.writeValueAsString( salida );
-      content.addObject().put( "type", "text" ).put( "text", texto );
+      if ( salida instanceof Imagen ) {
+        Imagen img = (Imagen) salida;
+        content.addObject().put( "type", "image" ).put( "data", img.base64 ).put( "mimeType", img.mime );
+        if ( img.texto != null ) {
+          content.addObject().put( "type", "text" ).put( "text", img.texto );
+        }
+      } else {
+        // compacto: cada caracter de mas son tokens que paga la IA
+        String texto = salida instanceof String ? (String) salida : JSON.writeValueAsString( salida );
+        content.addObject().put( "type", "text" ).put( "text", texto );
+      }
       res.put( "isError", false );
     } catch ( ToolError e ) {
       content.addObject().put( "type", "text" ).put( "text", "Error: " + e.getMessage() );

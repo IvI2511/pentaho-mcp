@@ -29,8 +29,8 @@ import org.w3c.dom.Node;
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
 
 /**
- * Logica de edicion de jobs, sin Spoon: todo recibe el JobMeta y un {@link Undo} donde registrar
- * los cambios. JobTools la llama dentro de Docs.ui() con un Undo que va a Spoon; las pruebas sin
+ * Logica de edicion de jobs, sin Spoon: todo recibe el JobMeta y un {@link UndoGrupo} donde registrar
+ * los cambios. JobTools la llama dentro de Docs.ui() con un grupo que va a Spoon; las pruebas sin
  * GUI la llaman directo.
  */
 final class JobSoporte {
@@ -58,40 +58,23 @@ final class JobSoporte {
   private JobSoporte() {
   }
 
-  /** Donde registrar el undo (Spoon en la GUI; el propio JobMeta en las pruebas). */
-  interface Undo {
-    void nuevo( Object[] objs, int[] idx, boolean nextAlso );
+  /*
+   * Undo en jobs (PDI 9.4, verificado en el bytecode; detalle en UndoGrupo): SpoonJobDelegate no
+   * mira TransAction.getNextAlso, asi que en un job cada accion registrada es un Ctrl+Z aparte. Lo
+   * unico que Spoon deshace junto es DELETE_JOB_HOP seguido de DELETE_JOB_ENTRY (caso fijo de
+   * Spoon.undoAction), que es justo lo que registra borrar(): borrar_entrada = un Ctrl+Z.
+   *
+   * agregar_entrada con despues_de queda en DOS Ctrl+Z (el primero quita el hop, el segundo la
+   * entrada; Ctrl+Y al reves). No hay alternativa limpia: un TransAction toma su tipo del primer
+   * objeto, asi que no puede llevar entrada y hop juntos; registrar solo la entrada dejaria el hop
+   * colgando al deshacer (JobMeta.removeJobEntry no quita hops); y el historial no admite acciones
+   * propias, solo los tipos que Spoon sabe deshacer. Las demas herramientas de jobs registran una
+   * sola accion. Igual se usa UndoGrupo, que marca nextAlso por si Spoon lo respeta algun dia.
+   */
 
-    void borrado( Object[] objs, int[] idx );
-
-    void cambio( Object[] antes, Object[] despues, int[] idx );
-
-    void posicion( Object[] objs, int[] idx, Point[] antes, Point[] despues );
-  }
-
-  /** Undo directo sobre el JobMeta (sin Spoon: no actualiza el menu Editar). */
-  static Undo undoMeta( final JobMeta jm ) {
-    return new Undo() {
-      @Override
-      public void nuevo( Object[] objs, int[] idx, boolean nextAlso ) {
-        jm.addUndo( objs, null, idx, null, null, JobMeta.TYPE_UNDO_NEW, nextAlso );
-      }
-
-      @Override
-      public void borrado( Object[] objs, int[] idx ) {
-        jm.addUndo( objs, null, idx, null, null, JobMeta.TYPE_UNDO_DELETE, false );
-      }
-
-      @Override
-      public void cambio( Object[] antes, Object[] despues, int[] idx ) {
-        jm.addUndo( antes, despues, idx, null, null, JobMeta.TYPE_UNDO_CHANGE, false );
-      }
-
-      @Override
-      public void posicion( Object[] objs, int[] idx, Point[] antes, Point[] despues ) {
-        jm.addUndo( objs, null, idx, antes, despues, JobMeta.TYPE_UNDO_POSITION, false );
-      }
-    };
+  /** Undo directo sobre el JobMeta (sin Spoon: no actualiza el menu Editar). Para pruebas. */
+  static UndoGrupo undoMeta( JobMeta jm ) {
+    return UndoGrupo.sinSpoon( jm );
   }
 
   // ---------------------------------------------------------------- tipos de entrada
@@ -284,7 +267,7 @@ final class JobSoporte {
    * derecha de la ultima entrada (o en 100,100 si el job esta vacio). Queda seleccionada.
    */
   static ObjectNode agregar( JobMeta jm, String tipo, String nombre, String config, Integer x, Integer y,
-    String despuesDe, String condicion, Repository rep, IMetaStore ms, Undo undo ) throws Exception {
+    String despuesDe, String condicion, Repository rep, IMetaStore ms, UndoGrupo undo ) throws Exception {
     String t = resolverTipo( tipo );
     if ( SPECIAL.equals( t ) ) {
       throw new ToolError( "Para la entrada especial usa tipo=START (inicio del job) o tipo=DUMMY." );
@@ -339,7 +322,7 @@ final class JobSoporte {
     copia.setParentJobMeta( jm );
 
     jm.addJobEntry( copia );
-    undo.nuevo( new Object[] { copia }, new int[] { jm.indexOfJobEntry( copia ) }, origen != null );
+    undo.nuevo( new Object[] { copia }, new int[] { jm.indexOfJobEntry( copia ) } );
     jm.unselectAll();
     copia.setSelected( true );
 
@@ -348,7 +331,7 @@ final class JobSoporte {
       JobHopMeta h = new JobHopMeta( origen, copia );
       aplicarCondicion( h, cond );
       jm.addJobHop( h );
-      undo.nuevo( new Object[] { h }, new int[] { jm.indexOfJobHop( h ) }, false );
+      undo.nuevo( new Object[] { h }, new int[] { jm.indexOfJobHop( h ) } );
       o.set( "hop", hop( h ) );
     }
     avisos( o, copia, condicion, origen );
@@ -356,8 +339,8 @@ final class JobSoporte {
   }
 
   /** Cambia la configuracion: mezcla config_xml sobre la actual; nombre y posicion quedan. */
-  static ObjectNode configurar( JobMeta jm, String nombre, String config, Repository rep, IMetaStore ms, Undo undo )
-    throws Exception {
+  static ObjectNode configurar( JobMeta jm, String nombre, String config, Repository rep, IMetaStore ms,
+    UndoGrupo undo ) throws Exception {
     JobEntryCopy c = entrada( jm, nombre );
     if ( config == null || config.trim().isEmpty() ) {
       throw new ToolError( "Falta el argumento 'config_xml'" );
@@ -424,7 +407,7 @@ final class JobSoporte {
     return o;
   }
 
-  static ObjectNode renombrar( JobMeta jm, String nombre, String nuevo, Undo undo ) throws ToolError {
+  static ObjectNode renombrar( JobMeta jm, String nombre, String nuevo, UndoGrupo undo ) throws ToolError {
     JobEntryCopy c = entrada( jm, nombre );
     if ( nuevo == null || nuevo.trim().isEmpty() ) {
       throw new ToolError( "Falta el argumento 'nuevo_nombre'" );
@@ -442,7 +425,7 @@ final class JobSoporte {
     return o;
   }
 
-  static ObjectNode mover( JobMeta jm, String nombre, int x, int y, Undo undo ) throws ToolError {
+  static ObjectNode mover( JobMeta jm, String nombre, int x, int y, UndoGrupo undo ) throws ToolError {
     JobEntryCopy c = entrada( jm, nombre );
     if ( x < 0 || y < 0 ) {
       throw new ToolError( "La posicion tiene que ser positiva (x=" + x + ", y=" + y + ")" );
@@ -457,7 +440,7 @@ final class JobSoporte {
   }
 
   /** Borra la entrada y sus hops (como SpoonJobDelegate.deleteJobEntryCopies: un Ctrl+Z lo restaura todo). */
-  static ObjectNode borrar( JobMeta jm, String nombre, Undo undo ) throws ToolError {
+  static ObjectNode borrar( JobMeta jm, String nombre, UndoGrupo undo ) throws ToolError {
     JobEntryCopy c = entrada( jm, nombre );
     List<JobHopMeta> hops = new ArrayList<JobHopMeta>();
     List<Integer> idxs = new ArrayList<Integer>();
@@ -494,7 +477,7 @@ final class JobSoporte {
   // ---------------------------------------------------------------- hops
 
   static ObjectNode conectar( JobMeta jm, String desde, String hacia, String condicion, boolean permitirBucle,
-    Undo undo ) throws ToolError {
+    UndoGrupo undo ) throws ToolError {
     JobEntryCopy a = entrada( jm, desde );
     JobEntryCopy b = entrada( jm, hacia );
     if ( a == b ) {
@@ -516,13 +499,13 @@ final class JobSoporte {
       throw new ToolError( "El hop '" + a.getName() + "' -> '" + b.getName() + "' cierra un bucle. Si el bucle es "
         + "intencional (reintentos, recorrer filas), pasa permitir_bucle=true." );
     }
-    undo.nuevo( new Object[] { h }, new int[] { jm.indexOfJobHop( h ) }, false );
+    undo.nuevo( new Object[] { h }, new int[] { jm.indexOfJobHop( h ) } );
     ObjectNode o = hop( h );
     avisoCondicion( o, a, condicion, cond );
     return o;
   }
 
-  static ObjectNode desconectar( JobMeta jm, String desde, String hacia, Undo undo ) throws ToolError {
+  static ObjectNode desconectar( JobMeta jm, String desde, String hacia, UndoGrupo undo ) throws ToolError {
     JobHopMeta h = hopEntre( jm, desde, hacia );
     int idx = jm.indexOfJobHop( h );
     ObjectNode o = hop( h );
@@ -533,7 +516,7 @@ final class JobSoporte {
   }
 
   static ObjectNode cambiarCondicion( JobMeta jm, String desde, String hacia, String condicion, Boolean habilitado,
-    Undo undo ) throws ToolError {
+    UndoGrupo undo ) throws ToolError {
     JobHopMeta h = hopEntre( jm, desde, hacia );
     if ( condicion == null && habilitado == null ) {
       throw new ToolError( "Pasa 'condicion' y/o 'habilitado'" );

@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a new tool, a step the skill should know better, or an improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The ETL task or workflow you have in mind, and what gets in the way today.
+      placeholder: When I ask Claude to ..., it can't ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How you imagine it working (a new MCP tool, an option, a change in the skill...).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Spoon plugin (MCP tools)
+        - Skill pentaho-etl (format, catalog, examples)
+        - Installers / INSTALL.md
+        - Documentation
+        - Other
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Anything you tried or that would also solve it.

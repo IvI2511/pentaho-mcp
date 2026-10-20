@@ -54,6 +54,7 @@ public class McpLifecycleListener implements LifecycleListener {
       JobTools.register( server );
       RunTools.register( server );
       DbTools.register( server );
+      ReportTools.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("
         + server.toolCount() + " herramientas)" );

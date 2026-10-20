@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Install guide and troubleshooting
+    url: https://github.com/IvI2511/pentaho-mcp/blob/main/INSTALL.md
+    about: Step-by-step install, installer exit codes and fixes for common problems (connection refused, port in use, missing drivers).
+  - name: Privacy policy
+    url: https://github.com/IvI2511/pentaho-mcp/blob/main/PRIVACY.md
+    about: What the plugins send, store and run.

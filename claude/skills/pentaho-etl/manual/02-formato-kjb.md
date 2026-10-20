@@ -1,26 +1,26 @@
-# 02 · Formato de jobs (.kjb) — PDI 9.4
+# 02 · Job format (.kjb) — PDI 9.4
 
-Un job orquesta: corre transformaciones, otros jobs, chequeos de archivos, SQL, etc., **en secuencia** (una entry por vez, siguiendo hops con condición). No pasa filas entre entries (para eso están los "result rows", fuera de este manual).
+A job orchestrates: it runs transformations, other jobs, file checks, SQL, etc., **in sequence** (one entry at a time, following hops with a condition). It does not pass rows between entries (that is what "result rows" are for, outside the scope of this manual).
 
-Ejemplos verificados con Kitchen: `ejemplos/10_job_secuencia.kjb` (dos `.ktr` en secuencia + rama de error) y `ejemplos/11_job_padre.kjb` (job que llama a otro job + Write to log + parámetro).
-
----
-
-## 0. Checklist rápido
-
-1. Raíz `<job>`, UTF-8, mismo tratamiento de escapes que en `.ktr` (`&amp;`, `&lt;`).
-2. **Tiene que existir una entry llamada exactamente `START`**, de `<type>SPECIAL</type>`, con `<start>Y</start>` **y `<draw>Y</draw>`**. Kitchen la busca por nombre literal y solo entre las entries visibles: si se llama "Inicio", o si le falta `<draw>Y</draw>`, falla con `Couldn't find starting point in this job.` (verificado las dos cosas).
-3. Cada entry: `<name>` único, `<type>` (ID del plugin), `<parallel>N</parallel>`, `<draw>Y</draw>`, `<nr>0</nr>`, `<xloc>`, `<yloc>`.
-4. Hops en `<hops>` (no en `<order>`), con `from`, `to`, `from_nr`, `to_nr`, `enabled`, `evaluation`, `unconditional`.
-5. El hop que sale de START: `<unconditional>Y</unconditional>`. Los demás: `evaluation=Y` (si OK) o `evaluation=N` (si falla).
-6. Rutas a `.ktr`/`.kjb`: `${Internal.Entry.Current.Directory}/archivo.ktr`. Una ruta relativa pelada (`01_generar_constantes.ktr`) falla: `The transformation path 01_generar_constantes.ktr is invalid, and will not run successfully.`
-7. Si una entry falla y no tiene hop de error, el job termina con error (exit 1 en Kitchen). Para que quede explícito, agregá una rama `evaluation=N` a un `ABORT` (o a un `WRITE_TO_LOG` + `ABORT`).
+Examples verified with Kitchen: `ejemplos/10_job_secuencia.kjb` (two `.ktr` in sequence + error branch) and `ejemplos/11_job_padre.kjb` (job that calls another job + Write to log + parameter).
 
 ---
 
-## 1. Esqueleto
+## 0. Quick checklist
 
-### 1.1 Mínimo que Kitchen acepta (verificado)
+1. Root `<job>`, UTF-8, same escaping as in `.ktr` (`&amp;`, `&lt;`).
+2. **There must be an entry named exactly `START`**, of `<type>SPECIAL</type>`, with `<start>Y</start>` **and `<draw>Y</draw>`**. Kitchen looks it up by its literal name and only among the visible entries: if it is called "Inicio", or if it lacks `<draw>Y</draw>`, it fails with `Couldn't find starting point in this job.` (both cases verified).
+3. Each entry: unique `<name>`, `<type>` (plugin ID), `<parallel>N</parallel>`, `<draw>Y</draw>`, `<nr>0</nr>`, `<xloc>`, `<yloc>`.
+4. Hops go in `<hops>` (not in `<order>`), with `from`, `to`, `from_nr`, `to_nr`, `enabled`, `evaluation`, `unconditional`.
+5. The hop leaving START: `<unconditional>Y</unconditional>`. All the others: `evaluation=Y` (on success) or `evaluation=N` (on failure).
+6. Paths to `.ktr`/`.kjb`: `${Internal.Entry.Current.Directory}/archivo.ktr`. A bare relative path (`01_generar_constantes.ktr`) fails: `The transformation path 01_generar_constantes.ktr is invalid, and will not run successfully.`
+7. If an entry fails and has no error hop, the job ends with an error (exit 1 in Kitchen). To make it explicit, add an `evaluation=N` branch to an `ABORT` (or to a `WRITE_TO_LOG` + `ABORT`).
+
+---
+
+## 1. Skeleton
+
+### 1.1 Minimum that Kitchen accepts (verified)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -38,9 +38,9 @@ Ejemplos verificados con Kitchen: `ejemplos/10_job_secuencia.kjb` (dos `.ktr` en
 </job>
 ```
 
-Corre bien, pero las entries sin `draw` quedan ocultas en Spoon. **Usá la plantilla completa.**
+It runs fine, but entries without `draw` stay hidden in Spoon. **Use the full template.**
 
-### 1.2 Plantilla recomendada
+### 1.2 Recommended template
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -73,11 +73,11 @@ Corre bien, pero las entries sin `draw` quedan ocultas en Spoon. **Usá la plant
 </job>
 ```
 
-Diferencias con `.ktr`: **no hay `<info>`**; los metadatos van directo bajo `<job>`. Las tablas de log (`job-log-table`, `jobentry-log-table`, `channel-log-table`, `checkpoint-log-table`) que escribe Spoon son omitibles. `<connection>` (mismo formato que en `.ktr`) va antes de `<entries>` si alguna entry SQL la usa. `<notepads>` va **después** de `<hops>` (al revés que en `.ktr`) y con el mismo formato (`heigth` con errata).
+Differences from `.ktr`: **there is no `<info>`**; the metadata goes directly under `<job>`. The log tables that Spoon writes (`job-log-table`, `jobentry-log-table`, `channel-log-table`, `checkpoint-log-table`) can be omitted. `<connection>` (same format as in `.ktr`) goes before `<entries>` if any SQL entry uses it. `<notepads>` goes **after** `<hops>` (the opposite of `.ktr`) and uses the same format (`heigth`, typo included).
 
 ---
 
-## 2. `<entry>`: tags comunes
+## 2. `<entry>`: common tags
 
 ```xml
 <entry>
@@ -85,7 +85,7 @@ Diferencias con `.ktr`: **no hay `<info>`**; los metadatos van directo bajo `<jo
   <description/>
   <type>TRANS</type>
   <attributes/>
-  <!-- ... tags propios del tipo ... -->
+  <!-- ... type-specific tags ... -->
   <parallel>N</parallel>
   <draw>Y</draw>
   <nr>0</nr>
@@ -95,40 +95,40 @@ Diferencias con `.ktr`: **no hay `<info>`**; los metadatos van directo bajo `<jo
 </entry>
 ```
 
-| Tag | Default si falta (código) | Notas |
+| Tag | Default if missing (code) | Notes |
 |---|---|---|
-| `name` | — | Único. |
-| `type` | — | ID del plugin, case-sensitive. Uno inexistente carga como "missing" y al llegar a esa entry: `Can't run job due to plugin missing` (exit 1). |
-| `parallel` | N | `Y` = las entries siguientes arrancan en paralelo. |
-| `draw` | **N** | Siempre `Y`. Para START es **obligatorio**. |
-| `nr` | 0 | Número de copia. Solo distinto de 0 si la **misma** entry aparece dos veces en el lienzo (p. ej. dos íconos "Success"); en ese caso los hops lo referencian con `from_nr`/`to_nr`. |
-| `xloc`, `yloc` | 0 | Misma convención que en `.ktr`: flujo principal en `yloc=112`, `xloc` 96 → 256 → 416 → 576 (paso 160; en los samples de jobs la separación horizontal más común es 160–192); rama de error debajo (`yloc` ≈ 240). |
+| `name` | — | Unique. |
+| `type` | — | Plugin ID, case-sensitive. A nonexistent one loads as "missing", and when that entry is reached: `Can't run job due to plugin missing` (exit 1). |
+| `parallel` | N | `Y` = the following entries start in parallel. |
+| `draw` | **N** | Always `Y`. For START it is **mandatory**. |
+| `nr` | 0 | Copy number. Only non-zero if the **same** entry appears twice on the canvas (e.g. two "Success" icons); in that case hops reference it with `from_nr`/`to_nr`. |
+| `xloc`, `yloc` | 0 | Same convention as in `.ktr`: main flow at `yloc=112`, `xloc` 96 → 256 → 416 → 576 (step of 160; in the job samples the most common horizontal spacing is 160–192); error branch below (`yloc` ≈ 240). |
 
 ---
 
-## 3. Tipos de entry más usados
+## 3. Most used entry types
 
-IDs verificados en `kettle-job-entries.xml` (engine) y en las anotaciones de `pdi-core-plugins-impl` (`ABORT`, `ADD_RESULT_FILENAMES`, `CHECK_DB_CONNECTIONS`). Los demás plugins de `plugins/` agregan más.
+IDs verified in `kettle-job-entries.xml` (engine) and in the annotations of `pdi-core-plugins-impl` (`ABORT`, `ADD_RESULT_FILENAMES`, `CHECK_DB_CONNECTIONS`). The other plugins in `plugins/` add more.
 
-| GUI | `type` | Notas |
+| GUI | `type` | Notes |
 |---|---|---|
-| Start | `SPECIAL` + `<start>Y</start>` | Nombre literal `START`. Tags de scheduler: `repeat`, `schedulerType` (0 = sin programación), `intervalSeconds`, `intervalMinutes`, `hour`, `minutes`, `weekDay`, `DayOfMonth`. Con `repeat=N` son decorativos. |
-| Dummy | `SPECIAL` + `<start>N</start><dummy>Y</dummy>` | No hace nada. |
+| Start | `SPECIAL` + `<start>Y</start>` | Literal name `START`. Scheduler tags: `repeat`, `schedulerType` (0 = no schedule), `intervalSeconds`, `intervalMinutes`, `hour`, `minutes`, `weekDay`, `DayOfMonth`. With `repeat=N` they are decorative. |
+| Dummy | `SPECIAL` + `<start>N</start><dummy>Y</dummy>` | Does nothing. |
 | Transformation | `TRANS` | §4. |
 | Job | `JOB` | §5. |
-| Success | `SUCCESS` | Termina el job en OK. Sin tags propios. |
-| Abort job | `ABORT` | `<message>texto</message>`; deja el job en error y escribe el mensaje como ERROR en el log. |
-| Write to log | `WRITE_TO_LOG` | `<logmessage>` (sustituye variables), `<loglevel>Basic</loglevel>`, `<logsubject>`. |
-| Set variables | `SET_VARIABLES` | `<replacevars>`, `<filename>`, `<file_variable_type>`, y por variable `<variable_name>`, `<variable_value>`, `<variable_type>` (`JVM`, `CURRENT_JOB`, `PARENT_JOB`, `ROOT_JOB`). |
+| Success | `SUCCESS` | Ends the job as OK. No tags of its own. |
+| Abort job | `ABORT` | `<message>texto</message>`; leaves the job in error and writes the message as ERROR in the log. |
+| Write to log | `WRITE_TO_LOG` | `<logmessage>` (substitutes variables), `<loglevel>Basic</loglevel>`, `<logsubject>`. |
+| Set variables | `SET_VARIABLES` | `<replacevars>`, `<filename>`, `<file_variable_type>`, and per variable `<variable_name>`, `<variable_value>`, `<variable_type>` (`JVM`, `CURRENT_JOB`, `PARENT_JOB`, `ROOT_JOB`). |
 | Evaluate / Simple evaluation | `EVAL` (JavaScript) / `SIMPLE_EVAL` | |
-| SQL | `SQL` | Usa una `<connection>` del job. |
+| SQL | `SQL` | Uses one of the job's `<connection>`s. |
 | File exists / Create folder / Delete file | `FILE_EXISTS` / `CREATE_FOLDER` / `DELETE_FILE` | |
 | Shell | `SHELL` | |
-| Otros del engine | `MAIL`, `FTP`, `SFTP`, `HTTP`, `TABLE_EXISTS`, `CREATE_FILE`, `WAIT_FOR_FILE`, `DELAY`, `COPY_FILES`, `MOVE_FILES`, `DELETE_FILES`, `ZIP_FILE`, `UNZIP`, `FILES_EXIST`, `FOLDER_IS_EMPTY`, `COLUMNS_EXIST`, `TRUNCATE_TABLES`, `WAIT_FOR_SQL`, `EVAL_TABLE_CONTENT`, `WRITE_TO_FILE`, `MSGBOX_INFO`, `PING`, … | |
+| Others in the engine | `MAIL`, `FTP`, `SFTP`, `HTTP`, `TABLE_EXISTS`, `CREATE_FILE`, `WAIT_FOR_FILE`, `DELAY`, `COPY_FILES`, `MOVE_FILES`, `DELETE_FILES`, `ZIP_FILE`, `UNZIP`, `FILES_EXIST`, `FOLDER_IS_EMPTY`, `COLUMNS_EXIST`, `TRUNCATE_TABLES`, `WAIT_FOR_SQL`, `EVAL_TABLE_CONTENT`, `WRITE_TO_FILE`, `MSGBOX_INFO`, `PING`, … | |
 
 ---
 
-## 4. Entry `TRANS` (llamar a una .ktr)
+## 4. `TRANS` entry (calling a .ktr)
 
 ```xml
 <entry>
@@ -163,9 +163,9 @@ IDs verificados en `kettle-job-entries.xml` (engine) y en las anotaciones de `pd
   <parameters>
     <pass_all_parameters>Y</pass_all_parameters>
     <parameter>
-      <name>ARCHIVO_SALIDA</name>   <!-- parámetro declarado en la .ktr -->
-      <stream_name/>                <!-- o un campo de result rows -->
-      <value>01_desde_job</value>   <!-- valor fijo; acepta ${VAR} -->
+      <name>ARCHIVO_SALIDA</name>   <!-- parameter declared in the .ktr -->
+      <stream_name/>                <!-- or a field from result rows -->
+      <value>01_desde_job</value>   <!-- fixed value; accepts ${VAR} -->
     </parameter>
   </parameters>
   <parallel>N</parallel>
@@ -177,19 +177,19 @@ IDs verificados en `kettle-job-entries.xml` (engine) y en las anotaciones de `pd
 </entry>
 ```
 
-- `specification_method`: `filename` (archivo) | `rep_name` (repositorio) | `rep_ref`. Si falta y hay `<filename>`, toma el archivo (verificado en el job mínimo). Ponelo igual.
-- `filename`: **con `${Internal.Entry.Current.Directory}`** (en un job vale la carpeta del `.kjb`). Los samples viejos usan `${Internal.Job.Filename.Directory}`, que también funciona en jobs (verificado). Una ruta relativa sin variable no funciona.
-- `run_configuration`: Spoon 9.x escribe `Pentaho local`; Kitchen loguea `Using run configuration [Pentaho local]`. Si lo omitís también corre local (verificado).
-- `wait_until_finished`: `Y`, si no la entry termina "OK" antes que la transformación.
-- `loglevel`: nivel de log de la transformación hija (`Nothing`, `Error`, `Minimal`, `Basic`, `Detailed`, `Debug`, `Rowlevel`).
-- Parámetros: `pass_all_parameters=Y` pasa los parámetros/variables del job a la ktr; cada `<parameter>` fija uno. El parámetro tiene que estar **declarado** en `<info><parameters>` de la ktr para que se tome por nombre (verificado: `ARCHIVO_SALIDA=01_desde_job` generó `salida/01_desde_job.csv`).
-- `exec_per_row=Y` + `arg_from_previous`/`params_from_previous` = loop sobre result rows (no cubierto acá).
+- `specification_method`: `filename` (file) | `rep_name` (repository) | `rep_ref`. If it is missing and there is a `<filename>`, the file is used (verified in the minimal job). Set it anyway.
+- `filename`: **with `${Internal.Entry.Current.Directory}`** (in a job it resolves to the `.kjb`'s folder). Old samples use `${Internal.Job.Filename.Directory}`, which also works in jobs (verified). A relative path without a variable does not work.
+- `run_configuration`: Spoon 9.x writes `Pentaho local`; Kitchen logs `Using run configuration [Pentaho local]`. If you omit it, it also runs locally (verified).
+- `wait_until_finished`: `Y`; otherwise the entry finishes "OK" before the transformation does.
+- `loglevel`: log level of the child transformation (`Nothing`, `Error`, `Minimal`, `Basic`, `Detailed`, `Debug`, `Rowlevel`).
+- Parameters: `pass_all_parameters=Y` passes the job's parameters/variables to the ktr; each `<parameter>` sets one. The parameter must be **declared** in the ktr's `<info><parameters>` to be picked up by name (verified: `ARCHIVO_SALIDA=01_desde_job` produced `salida/01_desde_job.csv`).
+- `exec_per_row=Y` + `arg_from_previous`/`params_from_previous` = loop over result rows (not covered here).
 
-Dentro de la `.ktr` llamada, `${Internal.Entry.Current.Directory}` apunta a la carpeta **de la ktr**, no a la del job (verificado con un job en otra carpeta). Así cada archivo resuelve sus rutas relativo a sí mismo.
+Inside the called `.ktr`, `${Internal.Entry.Current.Directory}` points to the **ktr's** folder, not the job's (verified with a job in a different folder). This way each file resolves its paths relative to itself.
 
 ---
 
-## 5. Entry `JOB` (llamar a otro .kjb)
+## 5. `JOB` entry (calling another .kjb)
 
 ```xml
 <entry>
@@ -231,11 +231,11 @@ Dentro de la `.ktr` llamada, `${Internal.Entry.Current.Directory}` apunta a la c
 </entry>
 ```
 
-Verificado en `11_job_padre.kjb`. Mismas reglas de ruta y parámetros que TRANS (sin `clear_rows`/`clear_files`/`cluster`).
+Verified in `11_job_padre.kjb`. Same path and parameter rules as TRANS (without `clear_rows`/`clear_files`/`cluster`).
 
 ---
 
-## 6. `<hops>` de un job
+## 6. A job's `<hops>`
 
 ```xml
 <hop>
@@ -249,30 +249,30 @@ Verificado en `11_job_padre.kjb`. Mismas reglas de ruta y parámetros que TRANS 
 </hop>
 ```
 
-| `unconditional` | `evaluation` | Significado | Color en Spoon |
+| `unconditional` | `evaluation` | Meaning | Color in Spoon |
 |---|---|---|---|
-| `Y` | (se ignora; Spoon pone `Y`) | Siempre sigue | negro (candado) |
-| `N` | `Y` | Sigue **si la entry origen terminó OK** | verde |
-| `N` | `N` | Sigue **si la entry origen falló** | rojo |
+| `Y` | (ignored; Spoon writes `Y`) | Always continues | black (padlock) |
+| `N` | `Y` | Continues **if the source entry finished OK** | green |
+| `N` | `N` | Continues **if the source entry failed** | red |
 
-- Defaults si faltan (código): `enabled=Y`, `evaluation=Y`, `unconditional=N`. O sea, un hop pelado es "si OK".
-- Desde `START` usá siempre `unconditional=Y` (los samples lo hacen así).
-- Distribución en samples: 36 hops `Y/N` (si OK), 19 `Y/Y` (incondicional), 5 `N/N` (si falla).
-- Una entry puede tener a la vez un hop verde y uno rojo (patrón del ejemplo 10). Varias entries pueden apuntar a la misma (dos rojos hacia un único `Abortar`).
-- Hop a una entry que no existe: no falla al cargar; revienta al ejecutar la entry origen con `java.lang.NullPointerException: Cannot invoke "org.pentaho.di.job.JobHopMeta.isUnconditional()" because "hi" is null` (exit 1).
-- `from_nr`/`to_nr`: el `<nr>` de la copia de la entry; 0 salvo entries duplicadas en el lienzo.
+- Defaults if missing (code): `enabled=Y`, `evaluation=Y`, `unconditional=N`. In other words, a bare hop means "on success".
+- From `START` always use `unconditional=Y` (the samples do it this way).
+- Distribution in the samples: 36 hops `Y/N` (on success), 19 `Y/Y` (unconditional), 5 `N/N` (on failure).
+- An entry can have a green hop and a red hop at the same time (pattern used in example 10). Several entries can point to the same one (two red hops into a single `Abortar`).
+- Hop to an entry that does not exist: it does not fail on load; it blows up when the source entry runs, with `java.lang.NullPointerException: Cannot invoke "org.pentaho.di.job.JobHopMeta.isUnconditional()" because "hi" is null` (exit 1).
+- `from_nr`/`to_nr`: the `<nr>` of the entry copy; 0 except for entries duplicated on the canvas.
 
-### Resultado del job
+### Job result
 
-- El resultado final es el de la **última entry ejecutada** en cada rama. Si una TRANS falla y no tiene hop rojo, la rama termina ahí y el job queda en error (`Kitchen - ERROR … : Finished with errors`, exit 1; verificado).
-- Si la rama roja llega a un `SUCCESS`, el job termina **OK** aunque haya fallado algo (verificado: una ktr falló, el hop rojo fue a `SUCCESS` y Kitchen devolvió exit 0). No lo hagas salvo que sea intencional.
-- `ABORT` deja el job en error con tu mensaje (`Abortar - ERROR (...) : Fallo una de las transformaciones del job 10_job_secuencia`).
+- The final result is that of the **last entry executed** in each branch. If a TRANS fails and has no red hop, the branch ends there and the job ends in error (`Kitchen - ERROR … : Finished with errors`, exit 1; verified).
+- If the red branch reaches a `SUCCESS`, the job ends **OK** even though something failed (verified: a ktr failed, the red hop went to `SUCCESS` and Kitchen returned exit 0). Don't do this unless it is intentional.
+- `ABORT` leaves the job in error with your message (`Abortar - ERROR (...) : Fallo una de las transformaciones del job 10_job_secuencia` — i.e. "One of the transformations of job 10_job_secuencia failed").
 
 ---
 
-## 7. Parámetros del job
+## 7. Job parameters
 
-Se declaran igual que en la ktr pero directo bajo `<job>`:
+They are declared the same way as in the ktr, but directly under `<job>`:
 
 ```xml
 <parameters>
@@ -284,12 +284,12 @@ Se declaran igual que en la ktr pero directo bajo `<job>`:
 </parameters>
 ```
 
-Se pasan con Kitchen `"/param:FECHA_PROCESO=2026-12-31"` (verificado en `11_job_padre.kjb`: el Write to log mostró `FECHA_PROCESO=2026-12-31`). Con `pass_all_parameters=Y` en las entries TRANS/JOB, llegan a los hijos.
+They are passed with Kitchen `"/param:FECHA_PROCESO=2026-12-31"` (verified in `11_job_padre.kjb`: the Write to log showed `FECHA_PROCESO=2026-12-31`). With `pass_all_parameters=Y` in the TRANS/JOB entries, they reach the children.
 
 ---
 
-## 8. Variables internas en jobs (verificado)
+## 8. Internal variables in jobs (verified)
 
-- `${Internal.Entry.Current.Directory}` en un job = `file:///C:/…/carpeta-del-kjb` (URI VFS, espacios como `%20`). Ejemplo real del log: `carpeta=file:///C:/ruta/al/repo/skills/pentaho-etl/manual/ejemplos`.
-- `${Internal.Job.Filename.Directory}` = misma carpeta (usable en `.kjb`, nunca en `.ktr`).
-- Para mover una carpeta entera de ETL (jobs + ktr + datos) sin romper nada: todo relativo con `${Internal.Entry.Current.Directory}`, como en `ejemplos/`.
+- `${Internal.Entry.Current.Directory}` in a job = `file:///C:/…/carpeta-del-kjb`, i.e. the `.kjb`'s folder (VFS URI, spaces as `%20`). Real example from the log: `carpeta=file:///C:/ruta/al/repo/skills/pentaho-etl/manual/ejemplos`.
+- `${Internal.Job.Filename.Directory}` = the same folder (usable in `.kjb`, never in `.ktr`).
+- To move an entire ETL folder (jobs + ktr + data) without breaking anything: make everything relative with `${Internal.Entry.Current.Directory}`, as in `ejemplos/`.

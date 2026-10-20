@@ -1,0 +1,100 @@
+name: Bug report
+description: Something doesn't work in the Spoon plugin, the Claude Code plugin or the installers.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please don't paste passwords, tokens or private data:
+        replace them with `***`.
+
+        Install problems? Check the troubleshooting table in [INSTALL.md](https://github.com/IvI2511/pentaho-mcp/blob/main/INSTALL.md#troubleshooting) first.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: |
+        Ask the agent to call the `status` tool (named `estado` before 0.4.0) and copy the `plugin` value,
+        e.g. `pentaho-mcp 0.3.0`. If the MCP doesn't connect, write the release you downloaded.
+      placeholder: pentaho-mcp 0.3.0
+    validations:
+      required: true
+
+  - type: input
+    id: pdi-version
+    attributes:
+      label: PDI version
+      description: Help → About in Spoon.
+      placeholder: 9.4.0.0-343 CE
+    validations:
+      required: true
+
+  - type: input
+    id: java-version
+    attributes:
+      label: Java version
+      description: Output of `java -version`.
+      placeholder: OpenJDK 21.0.4 (Temurin)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code (CLI)
+        - Claude desktop app
+        - Codex
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The prompt you gave, the tool that failed (if you know it) and what was open in Spoon.
+      placeholder: |
+        1. Open Spoon with a new transformation
+        2. Ask "..."
+        3. The tool `...` returns "..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: spoon-log
+    attributes:
+      label: Spoon log
+      description: |
+        Relevant lines from Spoon's log (the console of `Spoon.bat` / `spoon.sh`, or the Logging tab),
+        especially the ones mentioning `Pentaho MCP`. Remove any private data.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, the `.ktr` / `.kjb` (without credentials), output of `curl http://127.0.0.1:8765/ping`.

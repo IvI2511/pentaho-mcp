@@ -1,29 +1,29 @@
-# 01 · Formato de transformaciones (.ktr) — PDI 9.4
+# 01 · Transformation format (.ktr) — PDI 9.4
 
-Manual para una IA que tiene que **escribir a mano** archivos `.ktr` que corran con Pan (y abran en Spoon) a la primera. Todo lo que dice "verificado" se probó con Pan 9.4.0.0-343 + Java 21 en esta máquina; lo que dice "samples" sale de mirar los 189 `.ktr` de `data-integration/samples/`; lo que dice "código" sale de desensamblar las clases de `lib/kettle-engine-9.4.0.0-343.jar` con `javap`.
+Manual for an AI that has to **hand-write** `.ktr` files that run with Pan (and open in Spoon) on the first try. Everything marked "verified" was tested with Pan 9.4.0.0-343 + Java 21 on this machine; everything marked "samples" comes from inspecting the 189 `.ktr` files in `data-integration/samples/`; everything marked "code" comes from disassembling the classes in `lib/kettle-engine-9.4.0.0-343.jar` with `javap`.
 
-Ejemplos completos que funcionan: `ejemplos/01…07_*.ktr`. Copiá de ahí antes que inventar.
-
----
-
-## 0. Checklist rápido (leelo antes de generar nada)
-
-1. Primera línea: `<?xml version="1.0" encoding="UTF-8"?>` y el archivo **guardado en UTF-8** (con o sin BOM, las dos andan). Si lo guardás en ANSI/cp1252 y tiene tildes, Pan revienta (`Invalid byte 2 of 2-byte UTF-8 sequence`).
-2. Raíz `<transformation>`. Orden de hijos que escribe Spoon: `info`, `notepads`, `connection`*, `order`, `step`*, `step_error_handling`, `slave-step-copy-partition-distribution`, `slave_transformation`, `attributes`.
-3. **Cada `<step>` lleva `<copies>1</copies>`**. Si falta, el step queda con 0 copias y Pan aborta con `Unable to prepare and initialize this transformation` (exit 3). Es el único tag "obvio" que no tiene default útil.
-4. **Cada `<step>` lleva `<GUI><xloc>…</xloc><yloc>…</yloc><draw>Y</draw></GUI>`**. Sin `<draw>Y</draw>` el step corre igual en Pan pero queda **oculto** en Spoon (el código hace `"Y".equalsIgnoreCase(draw)`, ausente = no dibujado).
-5. Nombres de step **únicos** y **exactamente iguales** (mayúsculas, espacios, tildes) en `<hop><from>/<to>`, en `send_true_to`, en el `<from>` de Stream lookup, en `step1/step2` de Merge join y en `step_error_handling`. Un nombre duplicado hace que uno de los dos steps desaparezca sin aviso (los hops se resuelven al otro), y un hop circular **cuelga Pan para siempre**. Ninguno de los dos da error.
-6. Escapá `<` `>` `&` dentro de valores: `&lt;` `&gt;` `&amp;`. Típico: `<function>&lt;=</function>` en Filter rows.
-7. Rutas a archivos: siempre `${Internal.Entry.Current.Directory}/…` (se resuelve a la carpeta del `.ktr`, tanto con Pan como llamado desde un job). Nunca rutas relativas peladas: se resuelven contra la carpeta de instalación de PDI.
-8. Declarales a los campos numéricos `<decimal>` y `<group>` explícitos. Con `<decimal/>` vacío se usa el locale de la máquina (acá es español): `2.50` se lee como **250** sin ningún error.
-9. En Text file output **declará los campos** con `<length>-1</length>`. Con `<fields>` vacío escribe todo, pero rellena los String al largo declarado (espacios) y con una fuente SQLite hasta revienta con `OutOfMemoryError`.
-10. Todos los steps que participan tienen que estar unidos por hops habilitados. Un step "suelto" en una transformación que tiene hops **no se ejecuta** (no avisa).
+Complete working examples: `ejemplos/01…07_*.ktr`. Copy from there rather than inventing.
 
 ---
 
-## 1. Esqueleto mínimo
+## 0. Quick checklist (read it before generating anything)
 
-### 1.1 Lo mínimo que Pan acepta (verificado, NO recomendado)
+1. First line: `<?xml version="1.0" encoding="UTF-8"?>` and the file **saved as UTF-8** (with or without BOM, both work). If you save it as ANSI/cp1252 and it contains accented characters, Pan blows up (`Invalid byte 2 of 2-byte UTF-8 sequence`).
+2. Root `<transformation>`. Child order as Spoon writes it: `info`, `notepads`, `connection`*, `order`, `step`*, `step_error_handling`, `slave-step-copy-partition-distribution`, `slave_transformation`, `attributes`.
+3. **Every `<step>` carries `<copies>1</copies>`**. If it is missing, the step ends up with 0 copies and Pan aborts with `Unable to prepare and initialize this transformation` (exit 3). It is the only "obvious" tag that has no useful default.
+4. **Every `<step>` carries `<GUI><xloc>…</xloc><yloc>…</yloc><draw>Y</draw></GUI>`**. Without `<draw>Y</draw>` the step still runs in Pan but stays **hidden** in Spoon (the code does `"Y".equalsIgnoreCase(draw)`; absent = not drawn).
+5. Step names must be **unique** and **exactly identical** (case, spaces, accents) in `<hop><from>/<to>`, in `send_true_to`, in Stream lookup's `<from>`, in Merge join's `step1/step2` and in `step_error_handling`. A duplicated name makes one of the two steps disappear silently (the hops resolve to the other one), and a circular hop **hangs Pan forever**. Neither of the two raises an error.
+6. Escape `<` `>` `&` inside values: `&lt;` `&gt;` `&amp;`. Typical case: `<function>&lt;=</function>` in Filter rows.
+7. File paths: always `${Internal.Entry.Current.Directory}/…` (it resolves to the `.ktr`'s folder, both with Pan and when called from a job). Never bare relative paths: they are resolved against the PDI installation folder.
+8. Give numeric fields explicit `<decimal>` and `<group>`. With an empty `<decimal/>` the machine's locale is used (here it is Spanish): `2.50` is read as **250** without any error.
+9. In Text file output **declare the fields** with `<length>-1</length>`. With an empty `<fields>` it writes everything, but it pads Strings to their declared length (with spaces), and with a SQLite source it even blows up with `OutOfMemoryError`.
+10. Every participating step must be joined by enabled hops. A "loose" step in a transformation that has hops **is not executed** (no warning).
+
+---
+
+## 1. Minimal skeleton
+
+### 1.1 The bare minimum Pan accepts (verified, NOT recommended)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,9 +47,9 @@ Ejemplos completos que funcionan: `ejemplos/01…07_*.ktr`. Copiá de ahí antes
 </transformation>
 ```
 
-Corre bien (`Nada.0 - Finished processing (I=0, O=0, R=3, W=3 …)`). Incluso sin `<info>` Pan no se queja. Pero en Spoon los steps aparecen ocultos (sin `draw`) y apilados en (0,0). **Usalo solo para pruebas rápidas.**
+It runs fine (`Nada.0 - Finished processing (I=0, O=0, R=3, W=3 …)`). Pan does not complain even without `<info>`. But in Spoon the steps show up hidden (no `draw`) and stacked at (0,0). **Use it only for quick tests.**
 
-### 1.2 Plantilla recomendada (la que usan los ejemplos)
+### 1.2 Recommended template (the one the examples use)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -91,7 +91,7 @@ Corre bien (`Nada.0 - Finished processing (I=0, O=0, R=3, W=3 …)`). Incluso si
   </info>
   <notepads>
   </notepads>
-  <!-- <connection>…</connection> si hace falta, acá -->
+  <!-- <connection>…</connection> goes here, if needed -->
   <order>
     <!-- hops -->
   </order>
@@ -109,31 +109,31 @@ Corre bien (`Nada.0 - Finished processing (I=0, O=0, R=3, W=3 …)`). Incluso si
 
 ## 2. `<info>`
 
-| Tag | ¿Obligatorio? | Notas |
+| Tag | Required? | Notes |
 |---|---|---|
-| `name` | Recomendado | Nombre lógico (aparece en el log: `<name> - Dispatching started…`). No tiene que coincidir con el nombre de archivo. Si falta, el log usa la ruta. |
-| `description`, `extended_description` | No | Texto libre. Escapá `<`, `>`, `&`. |
-| `trans_version` | No | Vacío. |
-| `trans_type` | No | `Normal` (default). Existe `SerialSingleThreaded`, no lo uses. |
-| `trans_status` | No | Aparece en 84/189 samples (`0`). Omitible. |
-| `directory` | No | `/` (directorio de repositorio; irrelevante para archivos). |
-| `parameters` | No | Parámetros con nombre, ver §8. |
-| `log` | No | Bloque enorme de tablas de log (`trans-log-table`, `perf-log-table`, …). Spoon lo escribe siempre; **omitilo**: Pan no lo necesita y Spoon pone defaults al abrir. |
-| `maxdate` | No | Legacy. Omitilo. |
-| `size_rowset` | No | Tamaño del buffer entre steps. Default 10000. |
+| `name` | Recommended | Logical name (it appears in the log: `<name> - Dispatching started…`). It does not have to match the file name. If it is missing, the log uses the path. |
+| `description`, `extended_description` | No | Free text. Escape `<`, `>`, `&`. |
+| `trans_version` | No | Empty. |
+| `trans_type` | No | `Normal` (default). `SerialSingleThreaded` also exists; do not use it. |
+| `trans_status` | No | Appears in 84/189 samples (`0`). Can be omitted. |
+| `directory` | No | `/` (repository directory; irrelevant for files). |
+| `parameters` | No | Named parameters, see §8. |
+| `log` | No | Huge block of log tables (`trans-log-table`, `perf-log-table`, …). Spoon always writes it; **omit it**: Pan does not need it and Spoon fills in defaults when opening the file. |
+| `maxdate` | No | Legacy. Omit it. |
+| `size_rowset` | No | Size of the buffer between steps. Default 10000. |
 | `sleep_time_empty`, `sleep_time_full` | No | 50. |
-| `unique_connections` | No | `Y` = una sola conexión/transacción por base para toda la transformación. |
-| `feedback_shown`, `feedback_size` | No | Cada cuántas filas loguea "linenr". |
+| `unique_connections` | No | `Y` = a single connection/transaction per database for the whole transformation. |
+| `feedback_shown`, `feedback_size` | No | How often (every N rows) it logs "linenr". |
 | `using_thread_priorities` | No | `Y`. |
-| `shared_objects_file` | No | Vacío. |
-| `capture_step_performance` y afines | No | `N`. |
-| `dependencies`, `partitionschemas`, `slaveservers`, `clusterschemas` | No | Vacíos. |
-| `created_*`, `modified_*` | No | Formato `yyyy/MM/dd HH:mm:ss.SSS`. Spoon los escribe con entidades (`2011&#x2f;12&#x2f;06`); en crudo también vale. |
-| `key_for_session_key`, `is_key_private` | No | Vacío / `N`. |
+| `shared_objects_file` | No | Empty. |
+| `capture_step_performance` and related | No | `N`. |
+| `dependencies`, `partitionschemas`, `slaveservers`, `clusterschemas` | No | Empty. |
+| `created_*`, `modified_*` | No | Format `yyyy/MM/dd HH:mm:ss.SSS`. Spoon writes them with entities (`2011&#x2f;12&#x2f;06`); raw text works too. |
+| `key_for_session_key`, `is_key_private` | No | Empty / `N`. |
 
 ---
 
-## 3. `<notepads>` (notas en el lienzo)
+## 3. `<notepads>` (notes on the canvas)
 
 ```xml
 <notepads>
@@ -143,7 +143,7 @@ Puede tener saltos de línea literales.</note>
     <xloc>64</xloc>
     <yloc>16</yloc>
     <width>380</width>
-    <heigth>40</heigth>          <!-- sí: "heigth", con la errata. "height" se ignora -->
+    <heigth>40</heigth>          <!-- yes: "heigth", with the typo. "height" is ignored -->
     <fontname/>
     <fontsize>-1</fontsize>
     <fontbold>N</fontbold>
@@ -156,11 +156,11 @@ Puede tener saltos de línea literales.</note>
 </notepads>
 ```
 
-Spoon guarda los saltos de línea como `&#xa;`; un salto literal también funciona (ejemplo 01). Las notas no afectan la ejecución.
+Spoon saves line breaks as `&#xa;`; a literal line break works too (example 01). Notes do not affect execution.
 
 ---
 
-## 4. `<order>` y `<hop>`
+## 4. `<order>` and `<hop>`
 
 ```xml
 <order>
@@ -172,20 +172,20 @@ Spoon guarda los saltos de línea como `&#xa;`; un salto literal también funcio
 </order>
 ```
 
-- `from`/`to`: nombre exacto del step. Si `to` (o `from`) no existe: `java.lang.NullPointerException: Cannot invoke "org.pentaho.di.trans.step.StepMeta.isMapping()" because "nextStep" is null` (exit 2).
-- `enabled`: default **Y** si falta (código). Con `N` el hop no existe a efectos de ejecución, y si un step queda sin hops habilitados **no se ejecuta**.
-- Un step con varios hops de salida **copia** o **reparte** según `<distribute>` del step origen (ver §5). Excepciones: Filter rows/Switch case usan sus propios targets; los hops de error se declaran en `step_error_handling`.
-- Varios hops **de entrada** a un mismo step mezclan filas: todas tienen que tener el **mismo layout** (mismos campos, mismo orden y tipo). Si no, falla más adelante con errores raros (`Field [x] couldn't be found in the input stream!`); con `/safemode` Pan lo detecta: `We detected rows with varying number of fields, this is not allowed in a transformation.` Para unir flujos distintos usá Merge join / Stream lookup / Join rows; para apilar flujos iguales, Append streams o hops directos.
-- Steps de 2 entradas con "info stream" (Stream lookup, Merge join, Merge rows, Append…) además de los hops **nombran al otro step dentro de su XML** (`<from>`, `<step1>/<step2>`…). Hop y nombre tienen que coincidir.
-- Hops duplicados (mismo from/to dos veces): Pan los ignora sin error (verificado). No los generes igual.
-- **No hay detección de ciclos**: un hop que vuelve hacia atrás hace que las filas circulen infinitamente (verificado: 300.000 filas en 6 min hasta que lo maté).
-- El orden de los `<hop>` y de los `<step>` en el archivo no importa (en los samples los steps aparecen en orden alfabético; los ejemplos van en orden de flujo y andan igual).
+- `from`/`to`: exact step name. If `to` (or `from`) does not exist: `java.lang.NullPointerException: Cannot invoke "org.pentaho.di.trans.step.StepMeta.isMapping()" because "nextStep" is null` (exit 2).
+- `enabled`: defaults to **Y** if missing (code). With `N` the hop does not exist for execution purposes, and if a step is left without enabled hops **it is not executed**.
+- A step with several output hops **copies** or **distributes** rows depending on the source step's `<distribute>` (see §5). Exceptions: Filter rows/Switch case use their own targets; error hops are declared in `step_error_handling`.
+- Several **input** hops into the same step mix their rows: they must all have the **same layout** (same fields, same order and type). Otherwise it fails further down with odd errors (`Field [x] couldn't be found in the input stream!`); with `/safemode` Pan detects it: `We detected rows with varying number of fields, this is not allowed in a transformation.` To join different streams use Merge join / Stream lookup / Join rows; to stack identical streams, Append streams or direct hops.
+- 2-input steps with an "info stream" (Stream lookup, Merge join, Merge rows, Append…), in addition to the hops, **name the other step inside their XML** (`<from>`, `<step1>/<step2>`…). Hop and name must match.
+- Duplicate hops (same from/to twice): Pan ignores them without error (verified). Do not generate them anyway.
+- **There is no cycle detection**: a hop that goes backwards makes rows circulate forever (verified: 300,000 rows in 6 min until I killed it).
+- The order of the `<hop>` and `<step>` elements in the file does not matter (in the samples the steps appear in alphabetical order; the examples are in flow order and work just the same).
 
 ---
 
 ## 5. `<step>`
 
-### 5.1 Tags comunes (todos los steps)
+### 5.1 Common tags (all steps)
 
 ```xml
 <step>
@@ -200,7 +200,7 @@ Spoon guarda los saltos de línea como `&#xa;`; un salto literal también funcio
     <schema_name/>
   </partitioning>
 
-  <!-- ... tags propios del tipo de step (ver catalogo/) ... -->
+  <!-- ... tags specific to the step type (see catalogo/) ... -->
 
   <attributes/>
   <cluster_schema/>
@@ -218,117 +218,117 @@ Spoon guarda los saltos de línea como `&#xa;`; un salto literal también funcio
 </step>
 ```
 
-| Tag | Obligatorio | Default si falta (código) | Notas |
+| Tag | Required | Default if missing (code) | Notes |
 |---|---|---|---|
-| `name` | **Sí** | — | Único en la transformación. Puede tener espacios, tildes, paréntesis. Escapá `&`, `<`. |
-| `type` | **Sí** | — | ID del plugin, **case-sensitive** (`CsvInput`, `TextFileOutput`, `FilterRows`, `SelectValues`, `SortRows`, `GroupBy`, `StreamLookup`, `MergeJoin`, `RowGenerator`, `Constant`, `Dummy`…). Un ID inexistente no falla al cargar: crea un step "missing" y al ejecutar da `Can't run transformation due to plugin missing` (exit 3). Catálogo de IDs → `../catalogo/`. Ojo: el ID no siempre es el nombre de la GUI ("Add constants" = `Constant`, "Generate rows" = `RowGenerator`, "Modified Java Script Value" = `ScriptValueMod`, "Get variables" = `GetVariable`, "Write to log" = `WriteToLog`). |
-| `description` | No | vacío | |
-| `distribute` | No | **N** (= copiar) | `Y` = reparte filas round-robin entre varios hops de salida; `N` = copia cada fila a todos. Spoon escribe `Y` por defecto. Solo importa si el step tiene más de un hop de salida "normal". |
-| `custom_distribution` | No | vacío | |
-| `copies` | **Sí en la práctica** | **0** → la transformación no inicializa | Siempre `1`. Más de 1 = paralelismo (filas repartidas entre copias; rompe el orden). |
+| `name` | **Yes** | — | Unique within the transformation. May contain spaces, accents, parentheses. Escape `&`, `<`. |
+| `type` | **Yes** | — | Plugin ID, **case-sensitive** (`CsvInput`, `TextFileOutput`, `FilterRows`, `SelectValues`, `SortRows`, `GroupBy`, `StreamLookup`, `MergeJoin`, `RowGenerator`, `Constant`, `Dummy`…). A nonexistent ID does not fail on load: it creates a "missing" step and at execution time gives `Can't run transformation due to plugin missing` (exit 3). ID catalog → `../catalogo/`. Watch out: the ID is not always the GUI name ("Add constants" = `Constant`, "Generate rows" = `RowGenerator`, "Modified Java Script Value" = `ScriptValueMod`, "Get variables" = `GetVariable`, "Write to log" = `WriteToLog`). |
+| `description` | No | empty | |
+| `distribute` | No | **N** (= copy) | `Y` = distributes rows round-robin across several output hops; `N` = copies each row to all of them. Spoon writes `Y` by default. It only matters if the step has more than one "normal" output hop. |
+| `custom_distribution` | No | empty | |
+| `copies` | **Yes in practice** | **0** → the transformation does not initialize | Always `1`. More than 1 = parallelism (rows distributed across copies; breaks the order). |
 | `partitioning` | No | `none` | |
-| `attributes` | No | | Spoon 9.x escribe `<attributes/>`. |
-| `cluster_schema`, `remotesteps` | No | | Vacíos. |
-| `GUI/xloc`, `GUI/yloc` | No para Pan | 0,0 | Posición del ícono en Spoon (esquina superior izquierda). |
-| `GUI/draw` | No para Pan, **Sí para Spoon** | **N** (oculto) | Siempre `Y`. |
+| `attributes` | No | | Spoon 9.x writes `<attributes/>`. |
+| `cluster_schema`, `remotesteps` | No | | Empty. |
+| `GUI/xloc`, `GUI/yloc` | Not for Pan | 0,0 | Icon position in Spoon (top-left corner). |
+| `GUI/draw` | Not for Pan, **Yes for Spoon** | **N** (hidden) | Always `Y`. |
 
-### 5.2 Layout (convención de los samples)
+### 5.2 Layout (samples convention)
 
-Medido sobre los 785 hops de los samples:
+Measured over the 785 hops in the samples:
 
-- Separación horizontal entre steps conectados en la misma fila: casi siempre **128–192 px**, la más común **160** (77 hops), luego 144 y 128. Valores múltiplos de 16 (Spoon "pega" a una grilla de 16).
-- Separación vertical entre ramas: **80–112 px** (96 la más común).
-- Coordenadas mínimas ~32; el 80 % de los steps cae entre x=97–622 e y=76–400.
+- Horizontal spacing between connected steps on the same row: almost always **128–192 px**, the most common being **160** (77 hops), then 144 and 128. Values are multiples of 16 (Spoon "snaps" to a 16 px grid).
+- Vertical spacing between branches: **80–112 px** (96 the most common).
+- Minimum coordinates ~32; 80% of the steps fall between x=97–622 and y=76–400.
 
-Convención para generar:
+Convention for generating:
 
-- Flujo principal de **izquierda a derecha** en `yloc=112`, `xloc = 96, 256, 416, 576, 736…` (paso 160).
-- Ramas secundarias (rama "false" de un filtro, flujo de lookup, hop de error) **debajo**, `yloc = 224` (paso 112), alineadas en x con el step del que salen o al que entran.
-- Segundo flujo de entrada de un join: debajo del primero, en la misma x, y el join centrado entre ambos (ver ejemplo 05: entradas en y=112 y y=224, join en y=160).
-- Notas arriba (`yloc` 16–48).
+- Main flow from **left to right** at `yloc=112`, `xloc = 96, 256, 416, 576, 736…` (increments of 160).
+- Secondary branches (the "false" branch of a filter, the lookup stream, an error hop) **below**, at `yloc = 224` (increment of 112), aligned in x with the step they come out of or go into.
+- Second input stream of a join: below the first one, at the same x, with the join centered between both (see example 05: inputs at y=112 and y=224, join at y=160).
+- Notes on top (`yloc` 16–48).
 
 ---
 
-## 6. Declaración de campos
+## 6. Field declaration
 
-Muchos steps (CSV input, Text file input/output, Generate rows, Add constants, Get variables, Select values "meta", Data grid…) tienen un bloque `<fields><field>…</field></fields>`. Los tags varían un poco por step, pero el núcleo es el mismo:
+Many steps (CSV input, Text file input/output, Generate rows, Add constants, Get variables, Select values "meta", Data grid…) have a `<fields><field>…</field></fields>` block. The tags vary a bit per step, but the core is the same:
 
 ```xml
 <field>
   <name>saldo</name>
   <type>Number</type>
-  <format>#.##</format>       <!-- máscara de conversión texto<->valor -->
-  <currency/>                 <!-- símbolo de moneda -->
-  <decimal>.</decimal>        <!-- símbolo decimal: DECLARALO -->
-  <group/>                    <!-- símbolo de miles: DECLARALO (vacío = ninguno) -->
-  <length>-1</length>         <!-- -1 = sin largo -->
-  <precision>-1</precision>   <!-- -1 = sin precisión -->
+  <format>#.##</format>       <!-- conversion mask text<->value -->
+  <currency/>                 <!-- currency symbol -->
+  <decimal>.</decimal>        <!-- decimal symbol: DECLARE IT -->
+  <group/>                    <!-- thousands symbol: DECLARE IT (empty = none) -->
+  <length>-1</length>         <!-- -1 = no length -->
+  <precision>-1</precision>   <!-- -1 = no precision -->
   <trim_type>both</trim_type> <!-- none | left | right | both -->
 </field>
 ```
 
-### 6.1 Tipos (`<type>`) — nombres exactos
+### 6.1 Types (`<type>`) — exact names
 
-| Tipo | Java | Uso |
+| Type | Java | Use |
 |---|---|---|
-| `String` | String | Texto. |
-| `Integer` | Long (64 bits) | Enteros. |
-| `Number` | Double | Decimales en coma flotante. |
-| `BigNumber` | BigDecimal | Decimales exactos (importes). |
-| `Date` | java.util.Date | Fecha con precisión de ms. |
-| `Timestamp` | java.sql.Timestamp | Fecha-hora con nanos. |
-| `Boolean` | Boolean | Se lee de texto `Y`/`N` (el código de Kettle también acepta `true`/`yes`/`1`); en Text file output sale como `Y`/`N` (verificado). |
+| `String` | String | Text. |
+| `Integer` | Long (64 bits) | Integers. |
+| `Number` | Double | Floating-point decimals. |
+| `BigNumber` | BigDecimal | Exact decimals (amounts). |
+| `Date` | java.util.Date | Date with ms precision. |
+| `Timestamp` | java.sql.Timestamp | Date-time with nanos. |
+| `Boolean` | Boolean | Read from the text `Y`/`N` (Kettle's code also accepts `true`/`yes`/`1`); in Text file output it comes out as `Y`/`N` (verified). |
 | `Binary` | byte[] | Blobs. |
-| `Internet Address`, `Serializable` | | Raros. |
+| `Internet Address`, `Serializable` | | Rare. |
 
-Un tipo mal escrito (`Int`, `integer`, `Decimal`…) no da error al cargar: el campo queda sin tipo y el step falla con `Please set a value for the missing field(s) type.` Respetá mayúsculas.
+A misspelled type (`Int`, `integer`, `Decimal`…) does not fail on load: the field is left without a type and the step fails with `Please set a value for the missing field(s) type.` Respect the capitalization.
 
-### 6.2 `format` (máscara)
+### 6.2 `format` (mask)
 
-- Fechas: patrones de `java.text.SimpleDateFormat`: `yyyy-MM-dd`, `dd/MM/yyyy`, `yyyy-MM-dd HH:mm:ss`, `yyyy-MM-dd HH:mm:ss.SSS`, `yyyyMMdd`. `MM` = mes, `mm` = minutos.
-- Números: patrones de `java.text.DecimalFormat`: `#`, `0`, `0.00`, `#,##0.00`, `#.##`. En la máscara `.` y `,` son **posiciones** (decimal/miles); el carácter real que se lee/escribe sale de `<decimal>` y `<group>`. Ejemplo verificado (02): máscara `#,##0.00` + `<decimal>,</decimal><group>.</group>` escribe `1.500,50`.
-- En inputs, la máscara se usa para **parsear**; en outputs, para **formatear**. En el output, si no ponés máscara se usa el formato "nativo" del valor (riesgo de notación rara); poné siempre `0`, `0.00`, `yyyy-MM-dd`, etc.
+- Dates: `java.text.SimpleDateFormat` patterns: `yyyy-MM-dd`, `dd/MM/yyyy`, `yyyy-MM-dd HH:mm:ss`, `yyyy-MM-dd HH:mm:ss.SSS`, `yyyyMMdd`. `MM` = month, `mm` = minutes.
+- Numbers: `java.text.DecimalFormat` patterns: `#`, `0`, `0.00`, `#,##0.00`, `#.##`. In the mask, `.` and `,` are **positions** (decimal/thousands); the actual character read/written comes from `<decimal>` and `<group>`. Verified example (02): mask `#,##0.00` + `<decimal>,</decimal><group>.</group>` writes `1.500,50`.
+- In inputs, the mask is used to **parse**; in outputs, to **format**. In an output, if you set no mask the value's "native" format is used (risk of odd notation); always set `0`, `0.00`, `yyyy-MM-dd`, etc.
 
-### 6.3 `decimal` y `group` — trampa del locale
+### 6.3 `decimal` and `group` — the locale trap
 
-Si `<decimal>` está vacío, Kettle usa los símbolos del **locale de la JVM**. En esta máquina (es_ES) el decimal es `,` y el de miles `.`, así que el CSV `2.50` se leyó como **250** — sin warning (verificado, salida ×100). Con la JVM en inglés el mismo archivo da 2.5. Regla: **en todo campo Number/BigNumber/Integer leído de texto, declarar `<decimal>` y `<group>` explícitos**.
+If `<decimal>` is empty, Kettle uses the symbols of the **JVM locale**. On this machine (es_ES) the decimal symbol is `,` and the thousands symbol is `.`, so the CSV value `2.50` was read as **250** — with no warning (verified, output ×100). With the JVM in English the same file gives 2.5. Rule: **on every Number/BigNumber/Integer field read from text, declare explicit `<decimal>` and `<group>`**.
 
-### 6.4 `length` y `precision`
+### 6.4 `length` and `precision`
 
-- `-1` = indefinido. Es lo que conviene casi siempre.
-- En inputs, `length` en String se arrastra como metadato. En **Text file output** el largo del campo de salida (o el heredado si no declarás campos) se usa para **rellenar con espacios** (`Ana Pérez                                         ;`). Con una consulta SQLite cuyo TEXT viene con largo 2³¹, el padding pidió un array gigante: `java.lang.OutOfMemoryError: Requested array size exceeds VM limit`. Regla: en outputs declarar cada campo con `<length>-1</length>`.
-- `precision` en Number = decimales para redondeo/formato. En Select values `-2` significa "no cambiar".
+- `-1` = undefined. It is what you want almost always.
+- In inputs, `length` on a String is carried along as metadata. In **Text file output** the length of the output field (or the inherited one if you do not declare fields) is used to **pad with spaces** (`Ana Pérez                                         ;`). With a SQLite query whose TEXT comes with a length of 2³¹, the padding requested a gigantic array: `java.lang.OutOfMemoryError: Requested array size exceeds VM limit`. Rule: in outputs, declare every field with `<length>-1</length>`.
+- `precision` on a Number = decimals for rounding/formatting. In Select values `-2` means "do not change".
 
 ### 6.5 `trim_type`
 
-`none`, `left`, `right`, `both`. En inputs conviene `both` para limpiar espacios.
+`none`, `left`, `right`, `both`. In inputs `both` is advisable, to strip spaces.
 
-### 6.6 Rarezas por step (verificadas)
+### 6.6 Per-step quirks (verified)
 
-- **Generate rows (`RowGenerator`) y Add constants (`Constant`)**: el valor del campo va en **`<nullif>`** (sí, el tag se llama así aunque es "Value"). `<set_empty_string>Y</set_empty_string>` + `<nullif/>` = string vacío en vez de null. Estos valores **no** sustituyen variables: `${X}` sale literal.
-- **Text file output**: el archivo es `<file><name>` **sin extensión** + `<extention>csv</extention>` (con la errata "extention"). `<create_parent_folder>Y</create_parent_folder>` crea la carpeta; con `N` y carpeta inexistente: `Error creating output file! Parent directory [...] does not exist.` `<do_not_open_new_file_init>Y</do_not_open_new_file_init>` evita crear el archivo vacío si no llegan filas. `<format>UNIX</format>` (LF) o `DOS` (CRLF). `<encoding>UTF-8</encoding>`.
-- **CSV input (`CsvInput`)**: el archivo va en `<filename>` (no en `<file><name>` como Text file input). `<lazy_conversion>N</lazy_conversion>` para que convierta tipos al leer (con `Y` la conversión se difiere y los errores aparecen en otro step). `<header>Y</header>` saltea la primera línea (log: `Header row skipped in file …`).
-- **Calculator**: el tipo del cálculo lo decide **el campo A**. `MULTIPLY` con `field_a` Integer y `field_b` Number convierte B a entero **redondeando**: 3 × 2.50 dio 9 (= 3 × 3), sin error. Poné el Number/BigNumber en `field_a` (verificado en el ejemplo 03).
-- **Filter rows**: condición en `<compare><condition>`. Simple: `leftvalue` + `function` + (`rightvalue` = otro campo **o** `<value>` constante). Compuesta: un `<condition>` con `<conditions>` adentro y `<operator>AND|OR</operator>` desde la segunda subcondición. Funciones: `=`, `&lt;&gt;`, `&lt;`, `&lt;=`, `&gt;`, `&gt;=`, `REGEXP`, `IS NULL`, `IS NOT NULL`, `IN LIST`, `CONTAINS`, `STARTS WITH`, `ENDS WITH`, `LIKE`, `TRUE`. `send_true_to`/`send_false_to` vacíos = las filas que no cumplen se descartan y las que cumplen siguen por **todos** los hops de salida.
-- **Select values**: `<fields>` contiene, en este orden, los `<field>` a seleccionar (con `<rename>`), `<select_unspecified>N</select_unspecified>`, los `<remove>` y los `<meta>` (cambio de tipo/formato). Un campo inexistente en `<field>` da `Couldn't find field 'x' in row!`.
-- **Merge join**: los campos del segundo flujo que choquen de nombre salen con sufijo `_1` (`cliente_id_1`).
+- **Generate rows (`RowGenerator`) and Add constants (`Constant`)**: the field value goes in **`<nullif>`** (yes, the tag is named that even though it is the "Value"). `<set_empty_string>Y</set_empty_string>` + `<nullif/>` = empty string instead of null. These values do **not** substitute variables: `${X}` comes out literally.
+- **Text file output**: the file is `<file><name>` **without extension** + `<extention>csv</extention>` (with the typo "extention"). `<create_parent_folder>Y</create_parent_folder>` creates the folder; with `N` and a nonexistent folder: `Error creating output file! Parent directory [...] does not exist.` `<do_not_open_new_file_init>Y</do_not_open_new_file_init>` avoids creating the empty file if no rows arrive. `<format>UNIX</format>` (LF) or `DOS` (CRLF). `<encoding>UTF-8</encoding>`.
+- **CSV input (`CsvInput`)**: the file goes in `<filename>` (not in `<file><name>` as in Text file input). `<lazy_conversion>N</lazy_conversion>` so it converts types while reading (with `Y` the conversion is deferred and errors show up in another step). `<header>Y</header>` skips the first line (log: `Header row skipped in file …`).
+- **Calculator**: the type of the calculation is decided by **field A**. `MULTIPLY` with an Integer `field_a` and a Number `field_b` converts B to an integer **by rounding**: 3 × 2.50 gave 9 (= 3 × 3), with no error. Put the Number/BigNumber in `field_a` (verified in example 03).
+- **Filter rows**: condition in `<compare><condition>`. Simple: `leftvalue` + `function` + (`rightvalue` = another field **or** a constant `<value>`). Compound: a `<condition>` with `<conditions>` inside and `<operator>AND|OR</operator>` from the second subcondition on. Functions: `=`, `&lt;&gt;`, `&lt;`, `&lt;=`, `&gt;`, `&gt;=`, `REGEXP`, `IS NULL`, `IS NOT NULL`, `IN LIST`, `CONTAINS`, `STARTS WITH`, `ENDS WITH`, `LIKE`, `TRUE`. Empty `send_true_to`/`send_false_to` = rows that do not match are discarded and rows that match continue through **all** output hops.
+- **Select values**: `<fields>` contains, in this order, the `<field>` entries to select (with `<rename>`), `<select_unspecified>N</select_unspecified>`, the `<remove>` entries and the `<meta>` entries (type/format change). A nonexistent field in `<field>` gives `Couldn't find field 'x' in row!`.
+- **Merge join**: fields of the second stream whose names clash come out with the suffix `_1` (`cliente_id_1`).
 
 ---
 
-## 7. `<connection>` (bases de datos)
+## 7. `<connection>` (databases)
 
-Va a nivel raíz, **después de `<notepads>` y antes de `<order>`**. Los steps la referencian por nombre (`<connection>sqlite_demo</connection>`).
+It goes at root level, **after `<notepads>` and before `<order>`**. Steps reference it by name (`<connection>sqlite_demo</connection>`).
 
 ```xml
 <connection>
   <name>sqlite_demo</name>
-  <server/>                          <!-- host; vacío para SQLite/H2 embebido -->
-  <type>SQLITE</type>                <!-- ID del tipo, ver lista abajo -->
+  <server/>                          <!-- host; empty for embedded SQLite/H2 -->
+  <type>SQLITE</type>                <!-- type ID, see the list below -->
   <access>Native</access>            <!-- Native (JDBC) | JNDI | ODBC -->
   <database>${Internal.Entry.Current.Directory}/salida/demo.sqlite</database>
-  <port>-1</port>                    <!-- puerto; -1 si no aplica -->
+  <port>-1</port>                    <!-- port; -1 if not applicable -->
   <username/>
-  <password/>                        <!-- texto plano o "Encrypted 2be98…" -->
+  <password/>                        <!-- plain text or "Encrypted 2be98…" -->
   <servername/>
   <data_tablespace/>
   <index_tablespace/>
@@ -342,17 +342,17 @@ Va a nivel raíz, **después de `<notepads>` y antes de `<order>`**. Los steps l
 </connection>
 ```
 
-- Verificado con SQLite (ejemplo 07): la variable en `<database>` se resuelve y el archivo `.sqlite` se crea al conectar.
-- IDs de `<type>` disponibles (de `kettle-database-types.xml`): `AS/400`, `CACHE`, `DB2`, `DBASE`, `DERBY`, `EXASOL4`, `EXTENDB`, `FIREBIRD`, `GENERIC`, `GREENPLUM`, `INFINIDB`, `SQLBASE`, `H2`, `HYPERSONIC`, `INFOBRIGHT`, `INFORMIX`, `INGRES`, `VECTORWISE`, `INTERBASE`, `KINGBASEES`, `LucidDB`, `MARIADB`, `MONETDB`, `MSACCESS`, `MSSQLNATIVE`, `MSSQL`, `MYSQL`, `MONDRIAN`, `NEOVIEW`, `NETEZZA`, `ORACLE`, `ORACLERDB`, `POSTGRESQL`, `REDSHIFT`, `REMEDY-AR-SYSTEM`, `SAPDB`, `SQLITE`, `SYBASE`, `SYBASEIQ`, `TERADATA`, `UNIVERSE`, `VERTICA`, `VERTICA5`, `GOOGLEBIGQUERY`, `SNOWFLAKEHV`, `AZURESQLDB`.
-- Drivers JDBC presentes en `lib/`: `h2-2.1.210`, `sqlite-jdbc-3.27.2.1`, `postgresql-42.2.23`, `hsqldb-2.3.2`, `derby`. **No hay** MySQL/MariaDB, SQL Server ni Oracle: hay que copiar el `.jar` del driver a `lib/`.
-- Contraseñas: se pueden dejar en texto plano o ofuscar con `Encr.bat -kettle <clave>` → imprime `Encrypted 2be98afc86aa7f2e4cb0aab73cc97bbd5` (es ofuscación reversible, no cifrado). Al generar un `.ktr`, no escribas contraseñas reales: dejá `<password/>` vacío y que el usuario la cargue él en el diálogo de la conexión en Spoon.
-- Con `<access>JNDI</access>` (lo que usan casi todos los samples) los datos de conexión salen de `simple-jndi/jdbc.properties`; para archivos generados preferí `Native`.
+- Verified with SQLite (example 07): the variable in `<database>` is resolved and the `.sqlite` file is created on connecting.
+- Available `<type>` IDs (from `kettle-database-types.xml`): `AS/400`, `CACHE`, `DB2`, `DBASE`, `DERBY`, `EXASOL4`, `EXTENDB`, `FIREBIRD`, `GENERIC`, `GREENPLUM`, `INFINIDB`, `SQLBASE`, `H2`, `HYPERSONIC`, `INFOBRIGHT`, `INFORMIX`, `INGRES`, `VECTORWISE`, `INTERBASE`, `KINGBASEES`, `LucidDB`, `MARIADB`, `MONETDB`, `MSACCESS`, `MSSQLNATIVE`, `MSSQL`, `MYSQL`, `MONDRIAN`, `NEOVIEW`, `NETEZZA`, `ORACLE`, `ORACLERDB`, `POSTGRESQL`, `REDSHIFT`, `REMEDY-AR-SYSTEM`, `SAPDB`, `SQLITE`, `SYBASE`, `SYBASEIQ`, `TERADATA`, `UNIVERSE`, `VERTICA`, `VERTICA5`, `GOOGLEBIGQUERY`, `SNOWFLAKEHV`, `AZURESQLDB`.
+- JDBC drivers present in `lib/`: `h2-2.1.210`, `sqlite-jdbc-3.27.2.1`, `postgresql-42.2.23`, `hsqldb-2.3.2`, `derby`. There is **no** MySQL/MariaDB, SQL Server or Oracle driver: you have to copy the driver's `.jar` into `lib/`.
+- Passwords: they can be left in plain text or obfuscated with `Encr.bat -kettle <clave>` (`<clave>` = the password) → it prints `Encrypted 2be98afc86aa7f2e4cb0aab73cc97bbd5` (this is reversible obfuscation, not encryption). When generating a `.ktr`, do not write real passwords: leave `<password/>` empty and let the user enter it themselves in the connection dialog in Spoon.
+- With `<access>JNDI</access>` (what almost all the samples use) the connection details come from `simple-jndi/jdbc.properties`; for generated files prefer `Native`.
 
 ---
 
-## 8. Parámetros y variables
+## 8. Parameters and variables
 
-### 8.1 Declarar parámetros
+### 8.1 Declaring parameters
 
 ```xml
 <info>
@@ -366,41 +366,41 @@ Va a nivel raíz, **después de `<notepads>` y antes de `<order>`**. Los steps l
   </parameters>
 ```
 
-Se pasan con Pan `"/param:SALDO_MINIMO=2000"` (ver comillas en `03-errores-comunes.md`), o desde un job (§ de TRANS en `02-formato-kjb.md`). Si no se pasan, vale `default_value`. Verificado en ejemplos 01 y 06.
+They are passed with Pan as `"/param:SALDO_MINIMO=2000"` (see the quoting notes in `03-errores-comunes.md`), or from a job (the TRANS § in `02-formato-kjb.md`). If they are not passed, `default_value` applies. Verified in examples 01 and 06.
 
-### 8.2 Usar variables
+### 8.2 Using variables
 
-- Sintaxis `${NOMBRE}` (también existe `%%NOMBRE%%`, estilo Windows; `SortRows` usa `%%java.io.tmpdir%%` por default).
-- Se sustituyen **solo en los campos que Spoon marca con el símbolo `$`** (rutas de archivo, SQL si `variables_active=Y`, nombres de base, `<variable>` de Get variables, mensajes de log…). **No** en: valores de Generate rows/Add constants, constantes de Filter rows, nombres de campo. Verificado: `${ARCHIVO_SALIDA}` en un `<nullif>` de Add constants salió literal.
-- Para comparar contra un parámetro dentro del flujo: step **Get variables** (`GetVariable`) que crea un campo con el valor de `${PARAM}` (tipado), y después Filter rows campo-contra-campo (`<rightvalue>umbral</rightvalue>`). Ejemplo 06.
-- Variable inexistente: queda **literal** en la ruta y la ruta se resuelve contra la carpeta de PDI: `Could not read from "file:///C:/…/data-integration/${CARPETA_DATOS}/clientes.csv" because it is not a file.`
-- Variables globales: `KETTLE_HOME/.kettle/kettle.properties` (`NOMBRE=valor`). Para probar sin tocar la configuración del usuario, apuntar `KETTLE_HOME` a una carpeta propia.
+- Syntax `${NOMBRE}` (there is also `%%NOMBRE%%`, Windows style; `SortRows` uses `%%java.io.tmpdir%%` by default).
+- They are substituted **only in the fields that Spoon marks with the `$` symbol** (file paths, SQL if `variables_active=Y`, database names, the `<variable>` of Get variables, log messages…). **Not** in: values of Generate rows/Add constants, Filter rows constants, field names. Verified: `${ARCHIVO_SALIDA}` in a `<nullif>` of Add constants came out literally.
+- To compare against a parameter inside the flow: a **Get variables** step (`GetVariable`) that creates a field holding the value of `${PARAM}` (typed), followed by Filter rows comparing field against field (`<rightvalue>umbral</rightvalue>`). Example 06.
+- Nonexistent variable: it stays **literal** in the path and the path is resolved against the PDI folder: `Could not read from "file:///C:/…/data-integration/${CARPETA_DATOS}/clientes.csv" because it is not a file.`
+- Global variables: `KETTLE_HOME/.kettle/kettle.properties` (`NOMBRE=valor`). To test without touching the user's configuration, point `KETTLE_HOME` to a folder of your own.
 
-### 8.3 Variables internas útiles (valores verificados)
+### 8.3 Useful internal variables (verified values)
 
-| Variable | Con Pan (ktr suelta) | ktr llamada desde un job |
+| Variable | With Pan (standalone ktr) | ktr called from a job |
 |---|---|---|
-| `${Internal.Entry.Current.Directory}` | `file:///C:/…/carpeta-del-ktr` | `file:///C:/…/carpeta-del-ktr` (la del **ktr**, no la del job; verificado con un job en otra carpeta) |
-| `${Internal.Transformation.Filename.Directory}` | `file:///C:/…/carpeta-del-ktr` | idem |
-| `${Internal.Transformation.Filename.Name}` | `e37_valores_internos.ktr` | idem |
-| `${Internal.Job.Filename.Directory}` | **`Parent Job File Directory`** (texto literal, inútil) | carpeta del job |
-| `${user.dir}` | carpeta de instalación de PDI (`…\data-integration`) | idem |
-| `${KETTLE_HOME}` | el KETTLE_HOME configurado | idem |
+| `${Internal.Entry.Current.Directory}` | `file:///C:/…/carpeta-del-ktr` | `file:///C:/…/carpeta-del-ktr` (the **ktr**'s folder, not the job's; verified with a job in a different folder) |
+| `${Internal.Transformation.Filename.Directory}` | `file:///C:/…/carpeta-del-ktr` | same |
+| `${Internal.Transformation.Filename.Name}` | `e37_valores_internos.ktr` | same |
+| `${Internal.Job.Filename.Directory}` | **`Parent Job File Directory`** (literal text, useless) | the job's folder |
+| `${user.dir}` | PDI installation folder (`…\data-integration`) | same |
+| `${KETTLE_HOME}` | the configured KETTLE_HOME | same |
 
-Conclusiones:
+Conclusions:
 
-- Usá **`${Internal.Entry.Current.Directory}`** en `.ktr` y `.kjb`: es la que anda en los dos contextos. `Internal.Transformation.Filename.Directory` también anda en ktr (los samples la usan); `Internal.Job.Filename.Directory` **nunca** dentro de un ktr.
-- Los valores son URIs VFS (`file:///…`, espacios como `%20`). Funcionan en todo step de archivos de PDI, pero **no** sirven tal cual para pasarlos a un script de shell.
-- Separador: `/` funciona en Windows. Los samples también usan `${file.separator}` o `\`.
+- Use **`${Internal.Entry.Current.Directory}`** in `.ktr` and `.kjb` files: it is the one that works in both contexts. `Internal.Transformation.Filename.Directory` also works in a ktr (the samples use it); `Internal.Job.Filename.Directory` **never** inside a ktr.
+- The values are VFS URIs (`file:///…`, spaces as `%20`). They work in every PDI file step, but they are **not** usable as-is to pass to a shell script.
+- Separator: `/` works on Windows. The samples also use `${file.separator}` or `\`.
 
 ---
 
-## 9. Manejo de errores por step (`<step_error_handling>`)
+## 9. Per-step error handling (`<step_error_handling>`)
 
-Desvía las filas que fallan en un step hacia otro step en lugar de abortar. Dos piezas, las dos obligatorias:
+It diverts the rows that fail in a step to another step instead of aborting. Two pieces, both mandatory:
 
-1. Un **hop normal** desde el step origen al step de error, en `<order>`.
-2. Un `<error>` en `<step_error_handling>` (a nivel raíz, después de los `<step>`):
+1. A **normal hop** from the source step to the error step, in `<order>`.
+2. An `<error>` in `<step_error_handling>` (at root level, after the `<step>` elements):
 
 ```xml
 <step_error_handling>
@@ -408,47 +408,47 @@ Desvía las filas que fallan en un step hacia otro step en lugar de abortar. Dos
     <source_step>Leer clientes con errores</source_step>
     <target_step>Escribir errores</target_step>
     <is_enabled>Y</is_enabled>
-    <nr_valuename>num_errores</nr_valuename>              <!-- campo con la cantidad de errores -->
+    <nr_valuename>num_errores</nr_valuename>              <!-- field with the number of errors -->
     <descriptions_valuename>descripcion_error</descriptions_valuename>
     <fields_valuename>campos_error</fields_valuename>
     <codes_valuename>codigos_error</codes_valuename>
-    <max_errors/>            <!-- vacío o -1 = sin límite -->
+    <max_errors/>            <!-- empty or -1 = no limit -->
     <max_pct_errors/>
     <min_pct_rows/>
   </error>
 </step_error_handling>
 ```
 
-- Verificado (ejemplo 06): CSV input con 3 filas malas (id `X4`, saldo `no-es-numero`, fecha `30/09/2023`) → 3 filas al step de error (`E=3`), el resto sigue. Exit 0.
-- La fila de error trae **todos los campos del origen** (los que no se pudieron convertir quedan null) **más** los 4 campos de diagnóstico. `descripcion_error` es multilínea (ej.: `fecha_alta String : couldn't convert string [30/09/2023] to a date using format [yyyy-MM-dd] on offset location 2`), `codigos_error` = `CSVINPUT001`.
-- No todos los steps soportan error handling. Verificado acá: CSV input. Según la GUI también lo tienen, entre otros, Text file input, Select values, Calculator, Table output e Insert/update; Filter rows no lo necesita (tiene true/false). Antes de usarlo en otro step, confirmalo en `../catalogo/`.
-- Sin error handling, la primera fila mala aborta el step y la transformación: `There were 1 conversion errors on line 2` (exit 1).
+- Verified (example 06): CSV input with 3 bad rows (id `X4`, balance `no-es-numero`, date `30/09/2023`) → 3 rows to the error step (`E=3`), the rest continue. Exit 0.
+- The error row carries **all the source fields** (those that could not be converted are null) **plus** the 4 diagnostic fields. `descripcion_error` is multi-line (e.g.: `fecha_alta String : couldn't convert string [30/09/2023] to a date using format [yyyy-MM-dd] on offset location 2`), `codigos_error` = `CSVINPUT001`.
+- Not every step supports error handling. Verified here: CSV input. According to the GUI, it is also available in Text file input, Select values, Calculator, Table output and Insert/update, among others; Filter rows does not need it (it has true/false). Before using it on another step, confirm it in `../catalogo/`.
+- Without error handling, the first bad row aborts the step and the transformation: `There were 1 conversion errors on line 2` (exit 1).
 
 ---
 
-## 10. Encoding, escapes y XML
+## 10. Encoding, escapes and XML
 
-- Spoon escribe muchos caracteres como entidades numéricas (`&#x2f;` = `/`, `&#x24;&#x7b;` = `${`, `&#x3b;` = `;`, `&#x22;` = `"`, `&#x20ac;` = €, `&#xa;` = salto de línea). **No hace falta**: XML en crudo en UTF-8 funciona igual (todos los ejemplos van en crudo, con `ñ`, tildes y `€`).
-- Lo único obligatorio es escapar `&` → `&amp;`, `<` → `&lt;` (y por prolijidad `>` → `&gt;`). Errores literales si no:
+- Spoon writes many characters as numeric entities (`&#x2f;` = `/`, `&#x24;&#x7b;` = `${`, `&#x3b;` = `;`, `&#x22;` = `"`, `&#x20ac;` = €, `&#xa;` = line break). **It is not necessary**: raw XML in UTF-8 works the same (all the examples are raw, with `ñ`, accented characters and `€`).
+- The only mandatory thing is escaping `&` → `&amp;`, `<` → `&lt;` (and, for tidiness, `>` → `&gt;`). Exact error messages otherwise:
   - `<function><=</function>` → `[Fatal Error] :188:24: The content of elements must consist of well-formed character data or markup.`
   - `Pérez & Cía` → `The entity name must immediately follow the '&' in the entity reference.`
-- Separador tab en CSV: escribilo como entidad, `<separator>&#x9;</separator>` (no verifiqué otras formas).
-- `encoding` de archivos de datos (CSV/Text) es independiente del encoding del `.ktr`: declarar `<encoding>UTF-8</encoding>` en inputs y outputs.
+- Tab separator in CSV: write it as an entity, `<separator>&#x9;</separator>` (I did not verify other forms).
+- The `encoding` of data files (CSV/Text) is independent of the `.ktr`'s encoding: declare `<encoding>UTF-8</encoding>` in inputs and outputs.
 
 ---
 
-## 11. Plantillas de los steps usados en los ejemplos
+## 11. Templates for the steps used in the examples
 
-No repito acá el XML de cada step: está completo y verificado en `ejemplos/`. Mapa:
+I do not repeat each step's XML here: it is complete and verified in `ejemplos/`. Map:
 
-| Step (GUI) | `type` | Ejemplo |
+| Step (GUI) | `type` | Example |
 |---|---|---|
 | Generate rows | `RowGenerator` | 01 |
 | Add constants | `Constant` | 01 |
 | Text file output | `TextFileOutput` | 01–07 |
 | CSV file input | `CsvInput` | 02–06 |
-| Filter rows (condición compuesta, true/false) | `FilterRows` | 02 |
-| Filter rows (campo contra campo, sin targets) | `FilterRows` | 06 |
+| Filter rows (compound condition, true/false) | `FilterRows` | 02 |
+| Filter rows (field against field, no targets) | `FilterRows` | 06 |
 | Select values (select + rename + meta) | `SelectValues` | 02 |
 | Select values (remove) | `SelectValues` | 05 |
 | Dummy | `Dummy` | 02 |
@@ -458,6 +458,6 @@ No repito acá el XML de cada step: está completo y verificado en `ejemplos/`. 
 | Stream lookup | `StreamLookup` | 04 |
 | Merge join | `MergeJoin` | 05 |
 | Get variables | `GetVariable` | 06 |
-| Table input + conexión | `TableInput` | 07 |
+| Table input + connection | `TableInput` | 07 |
 
-Para el resto de los steps (IDs y tags) → `../catalogo/`.
+For the rest of the steps (IDs and tags) → `../catalogo/`.

@@ -3,7 +3,6 @@ package io.github.ivi2511.pentahomcp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import org.pentaho.di.core.gui.Point;
 import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.ui.spoon.Spoon;
 
@@ -23,41 +22,20 @@ final class JobTools {
   private JobTools() {
   }
 
-  /** Undo que va al historial de Spoon (Editar > Deshacer, Ctrl+Z). */
-  private static JobSoporte.Undo undoSpoon( final Spoon sp, final JobMeta jm ) {
-    return new JobSoporte.Undo() {
-      @Override
-      public void nuevo( Object[] objs, int[] idx, boolean nextAlso ) {
-        sp.addUndoNew( jm, objs, idx, nextAlso );
-      }
-
-      @Override
-      public void borrado( Object[] objs, int[] idx ) {
-        sp.addUndoDelete( jm, objs, idx );
-      }
-
-      @Override
-      public void cambio( Object[] antes, Object[] despues, int[] idx ) {
-        sp.addUndoChange( jm, antes, despues, idx );
-      }
-
-      @Override
-      public void posicion( Object[] objs, int[] idx, Point[] antes, Point[] despues ) {
-        sp.addUndoPosition( jm, objs, idx, antes, despues );
-      }
-    };
-  }
-
-  /** Una edicion sobre el job: corre en UI, con undo de Spoon, y despues refresca. */
+  /**
+   * Una edicion sobre el job: corre en UI, con un grupo de undo que va al historial de Spoon
+   * (Editar > Deshacer, Ctrl+Z), y despues refresca. Cuantos Ctrl+Z lleva cada herramienta de jobs:
+   * ver el comentario de undo en JobSoporte.
+   */
   private interface Edicion {
-    ObjectNode aplicar( Spoon sp, JobMeta jm, JobSoporte.Undo undo ) throws Exception;
+    ObjectNode aplicar( Spoon sp, JobMeta jm, UndoGrupo undo ) throws Exception;
   }
 
   private static Object editar( final JsonNode a, final Edicion e ) throws Exception {
     return Docs.ui( () -> {
       Spoon sp = Docs.spoon();
       JobMeta jm = Docs.job( a );
-      ObjectNode o = e.aplicar( sp, jm, undoSpoon( sp, jm ) );
+      ObjectNode o = e.aplicar( sp, jm, new UndoGrupo( sp, jm ) );
       Docs.touched( jm );
       o.put( "documento", Docs.id( jm ) );
       return o;

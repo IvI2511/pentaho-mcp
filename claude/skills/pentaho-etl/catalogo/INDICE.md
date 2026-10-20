@@ -1,50 +1,50 @@
-# Catalogo de steps y job entries - PDI 9.4.0.0-343 (CE)
+# Catalog of steps and job entries - PDI 9.4.0.0-343 (CE)
 
-Generado desde la propia instalacion con la API Java de Kettle (`generador/GenerarCatalogo.java`, regenerar con `bash generador/generar.sh`). No editar a mano: se pisa al regenerar.
+Generated from the installation itself with the Kettle Java API (`generador/GenerarCatalogo.java`; regenerate with `bash generador/generar.sh`). Do not edit by hand: it is overwritten on regeneration.
 
-## Lo importante
+## Key points
 
-- **El valor de `<type>` en un `.ktr` (dentro de `<step>`) o en un `.kjb` (dentro de `<entry>`) es el ID del plugin**, la primera columna de estas tablas: `CsvInput`, `SelectValues`, `FilterRows`, `TextFileOutput`, `TableInput`... **No** es el nombre en pantalla ("CSV file input", "Filtrar filas") ni el nombre de la clase. Es sensible a mayusculas.
-- Algunos ids no se parecen al nombre: `ScriptValueMod` = Modified Java Script Value, `Constant` = Add constants, `Sequence` = Add sequence, `Unique` = Unique rows, `UniqueRowsByHashSet` = Unique rows (HashSet), `Janino` = User defined Java expression, `TypeExitExcelWriterStep` = Microsoft Excel writer, `ExcelInput` = Microsoft Excel input, `getXMLData` = Get data from XML, `SystemInfo` = Get system info, `ExecSQL` = Execute SQL script, `DBLookup` = Database lookup, `DimensionLookup` = Dimension lookup/update, `SplitFieldToRows3` = Split field to rows, `FieldSplitter` = Split fields, `IfNull` = If field value is null, `Denormaliser`/`Normaliser` (con *s*), `RowGenerator` = Generate rows, `DataGrid` = Data grid.
-- Job entries: ids en MAYUSCULAS en su mayoria (`TRANS`, `JOB`, `SQL`, `SUCCESS`, `ABORT`, `WRITE_TO_LOG`...). **START y DUMMY no tienen id propio**: son `<type>SPECIAL</type>` con `<start>Y</start>` (START) o `<dummy>Y</dummy>` (Dummy).
-- `steps/<id>.xml` contiene el bloque `<step>` **completo** que produce `StepMeta.getXML()` tras `setDefault()`: `name`, `type`, `distribute`, `copies`, `partitioning`, luego **el fragmento propio del step** (lo que devuelve `StepMetaInterface.getXML()`), y al final `attributes`, `cluster_schema`, `remotesteps`, `GUI`. Igual `job-entries/<id>.xml` con el `<entry>` completo de `JobEntryCopy.getXML()`.
-- Los valores por defecto son los de `setDefault()`; en muchos steps eso deja listas vacias (`<fields></fields>`) o valores a completar. Para ejemplos realistas ver `steps-comunes.md`.
-- `nombre_es` = lo que muestra Spoon con locale es_ES (el de este equipo). "=" significa que no hay traduccion.
+- **The value of `<type>` in a `.ktr` (inside `<step>`) or in a `.kjb` (inside `<entry>`) is the plugin ID**, the first column of these tables: `CsvInput`, `SelectValues`, `FilterRows`, `TextFileOutput`, `TableInput`... It is **not** the display name ("CSV file input"; Spanish UI: «Filtrar filas») nor the class name. It is case-sensitive.
+- Some ids do not resemble the name: `ScriptValueMod` = Modified Java Script Value, `Constant` = Add constants, `Sequence` = Add sequence, `Unique` = Unique rows, `UniqueRowsByHashSet` = Unique rows (HashSet), `Janino` = User defined Java expression, `TypeExitExcelWriterStep` = Microsoft Excel writer, `ExcelInput` = Microsoft Excel input, `getXMLData` = Get data from XML, `SystemInfo` = Get system info, `ExecSQL` = Execute SQL script, `DBLookup` = Database lookup, `DimensionLookup` = Dimension lookup/update, `SplitFieldToRows3` = Split field to rows, `FieldSplitter` = Split fields, `IfNull` = If field value is null, `Denormaliser`/`Normaliser` (with an *s*), `RowGenerator` = Generate rows, `DataGrid` = Data grid.
+- Job entries: ids are mostly in UPPERCASE (`TRANS`, `JOB`, `SQL`, `SUCCESS`, `ABORT`, `WRITE_TO_LOG`...). **START and DUMMY have no id of their own**: they are `<type>SPECIAL</type>` with `<start>Y</start>` (START) or `<dummy>Y</dummy>` (Dummy).
+- `steps/<id>.xml` contains the **complete** `<step>` block produced by `StepMeta.getXML()` after `setDefault()`: `name`, `type`, `distribute`, `copies`, `partitioning`, then **the step's own fragment** (what `StepMetaInterface.getXML()` returns), and finally `attributes`, `cluster_schema`, `remotesteps`, `GUI`. Likewise `job-entries/<id>.xml` with the complete `<entry>` from `JobEntryCopy.getXML()`.
+- The default values are those of `setDefault()`; in many steps that leaves empty lists (`<fields></fields>`) or values still to be filled in. For realistic examples see `steps-comunes.md`.
+- `nombre_es` = what Spoon shows with the es_ES locale (the one on this machine). "=" means there is no translation.
 
-## Numeros
+## Numbers
 
-- Steps: **216** registrados, 216 con XML por defecto, 0 con error.
-- Job entries: **77** registrados, 77 con XML por defecto, 0 con error.
-- Origen de los steps: 129 nativos (kettle-engine, `kettle-steps.xml`) + 87 de `plugins/` (anotacion `@Step`).
-- Steps distintos usados en `samples/*.ktr`: 101; job entries distintos en `samples/*.kjb`: 15.
+- Steps: **216** registered, 216 with default XML, 0 with errors.
+- Job entries: **77** registered, 77 with default XML, 0 with errors.
+- Origin of the steps: 129 native (kettle-engine, `kettle-steps.xml`) + 87 from `plugins/` (`@Step` annotation).
+- Distinct steps used in `samples/*.ktr`: 101; distinct job entries in `samples/*.kjb`: 15.
 
-## Plugins OSGi (karaf)
+## OSGi plugins (karaf)
 
-**Esta instalacion no tiene `system/` (ni `system/karaf`)**. Por lo tanto **no hay ningun step OSGi**: lo que hay en `plugins/` + nativos es exactamente lo que Spoon puede abrir en este equipo. Lo que en un PDI 9.4 completo llega por karaf (plugin *pentaho-big-data*: Hadoop file input/output, Parquet/ORC input/output, HBase, MapReduce, Sqoop, Oozie, Pig, Spark submit, Hadoop copy files...) **no existe aqui**: un `.ktr` que los use abrira con el step marcado como plugin faltante.
+**This installation has no `system/` (nor `system/karaf`)**. Therefore **there is no OSGi step at all**: what is in `plugins/` + the native steps is exactly what Spoon can open on this machine. What a full PDI 9.4 gets through karaf (plugin *pentaho-big-data*: Hadoop file input/output, Parquet/ORC input/output, HBase, MapReduce, Sqoop, Oozie, Pig, Spark submit, Hadoop copy files...) **does not exist here**: a `.ktr` that uses them will open with the step flagged as a missing plugin.
 
-Tipos usados en `samples/` que **no** estan en el registro:
+Types used in `samples/` that are **not** in the registry:
 
-| Clase | `<type>` | Sample |
+| Kind | `<type>` | Sample |
 |---|---|---|
 | job entry | `SparkSubmit` | samples/jobs/Spark Submit/Spark submit.kjb |
 
-Ids de karaf conocidos en PDI 9.4 CE (de memoria, **no verificables en esta instalacion**): steps `HadoopFileInputPlugin`, `HadoopFileOutputPlugin`, `ParquetInput`, `ParquetOutput`, `OrcInput`, `OrcOutput`, `HBaseInput`, `HBaseOutput`, `HBaseRowDecoder`, `HadoopEnterPlugin`/`HadoopExitPlugin` (MapReduce input/output); job entries `HadoopCopyFilesPlugin`, `HadoopTransJobExecutorPlugin`, `HadoopJobExecutorPlugin`, `HadoopPigScriptExecutorPlugin`, `SqoopImport`, `SqoopExport`, `OozieJobExecutor`, `SparkSubmit` (este ultimo si confirmado por `samples/jobs/Spark Submit/Spark submit.kjb`). No usarlos en ETLs para esta instalacion.
+Known karaf ids in PDI 9.4 CE (from memory, **not verifiable in this installation**): steps `HadoopFileInputPlugin`, `HadoopFileOutputPlugin`, `ParquetInput`, `ParquetOutput`, `OrcInput`, `OrcOutput`, `HBaseInput`, `HBaseOutput`, `HBaseRowDecoder`, `HadoopEnterPlugin`/`HadoopExitPlugin` (MapReduce input/output); job entries `HadoopCopyFilesPlugin`, `HadoopTransJobExecutorPlugin`, `HadoopJobExecutorPlugin`, `HadoopPigScriptExecutorPlugin`, `SqoopImport`, `SqoopExport`, `OozieJobExecutor`, `SparkSubmit` (this last one is confirmed by `samples/jobs/Spark Submit/Spark submit.kjb`). Do not use them in ETLs for this installation.
 
-## Construir steps desde XML via API (notas para el plugin de Spoon)
+## Building steps from XML via the API (notes for the Spoon plugin)
 
-- Desde un `<step>` completo: `new StepMeta(Node stepnode, transMeta.getDatabases(), transMeta.getMetaStore())` -- busca el plugin por `<type>` en el `PluginRegistry` (lanza `KettlePluginLoaderException` si el id no existe) y llama a `StepMetaInterface.loadXML(...)`. Luego `transMeta.addStep(sm)`, `sm.setParentTransMeta(transMeta)`.
-- Desde id + fragmento: `PluginInterface p = registry.findPluginWithId(StepPluginType.class, id)`; `StepMetaInterface m = (StepMetaInterface) registry.loadClass(p)`; `m.loadXML(nodo, databases, metaStore)`; `StepMeta sm = new StepMeta(id, nombre, m)` y `m.setParentStepMeta(sm)`.
-- Los steps que nombran a otros (`<from>`, `<send_true_to>`, `<step1>`, `<target_step>`...) solo guardan el nombre al cargar: **despues de anadir todos los steps** llamar `sm.getStepMetaInterface().searchInfoAndTargetSteps(transMeta.getSteps())` en cada uno (TransMeta no expone un metodo publico para eso). Hops: `transMeta.addTransHop(new TransHopMeta(from, to))`.
-- `getXML()` de algunos steps (SortRows, BlockingStep, ZipFile, Avro, Kafka) da NPE si la meta no cuelga de `StepMeta` + `TransMeta`; `JobEntryCopy.getXML()` da NPE sin `setLocation(x, y)`.
-- Atajo en Spoon: `Spoon.getInstance().pasteXML(transMeta, xml, new Point(x, y))` acepta el formato del portapapeles `<transformation-steps><steps><step>...</step></steps><order><hop>...</hop></order><notepads/><step_error_handling/></transformation-steps>` (lo mismo que produce Ctrl+C en Spoon) y se encarga de nombres duplicados, hops, undo y refresco. Para jobs el portapapeles usa `<job-jobentries>`. Tras cambios manuales: `spoon.refreshGraph()`, `spoon.refreshTree()`, `spoon.addUndoNew(transMeta, new StepMeta[]{sm}, new int[]{transMeta.indexOfStep(sm)})`.
+- From a complete `<step>`: `new StepMeta(Node stepnode, transMeta.getDatabases(), transMeta.getMetaStore())` -- looks up the plugin by `<type>` in the `PluginRegistry` (throws `KettlePluginLoaderException` if the id does not exist) and calls `StepMetaInterface.loadXML(...)`. Then `transMeta.addStep(sm)`, `sm.setParentTransMeta(transMeta)`.
+- From id + fragment: `PluginInterface p = registry.findPluginWithId(StepPluginType.class, id)`; `StepMetaInterface m = (StepMetaInterface) registry.loadClass(p)`; `m.loadXML(nodo, databases, metaStore)`; `StepMeta sm = new StepMeta(id, nombre, m)` and `m.setParentStepMeta(sm)`.
+- Steps that name other steps (`<from>`, `<send_true_to>`, `<step1>`, `<target_step>`...) only store the name when loaded: **after adding all the steps** call `sm.getStepMetaInterface().searchInfoAndTargetSteps(transMeta.getSteps())` on each one (TransMeta does not expose a public method for that). Hops: `transMeta.addTransHop(new TransHopMeta(from, to))`.
+- `getXML()` of some steps (SortRows, BlockingStep, ZipFile, Avro, Kafka) throws an NPE if the meta is not attached to `StepMeta` + `TransMeta`; `JobEntryCopy.getXML()` throws an NPE without `setLocation(x, y)`.
+- Shortcut in Spoon: `Spoon.getInstance().pasteXML(transMeta, xml, new Point(x, y))` accepts the clipboard format `<transformation-steps><steps><step>...</step></steps><order><hop>...</hop></order><notepads/><step_error_handling/></transformation-steps>` (the same thing Ctrl+C produces in Spoon) and takes care of duplicate names, hops, undo and refresh. For jobs the clipboard uses `<job-jobentries>`. After manual changes: `spoon.refreshGraph()`, `spoon.refreshTree()`, `spoon.addUndoNew(transMeta, new StepMeta[]{sm}, new int[]{transMeta.indexOfStep(sm)})`.
 
-## Steps (transformaciones `.ktr`)
+## Steps (transformations, `.ktr`)
 
-Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: siguen funcionando pero no usarlos en ETLs nuevos.
+Grouped by Spoon palette category (English / Spanish UI). `Deprecated` last: they still work, but do not use them in new ETLs.
 
 ### Big Data (7)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`AvroInputNew`](steps/AvroInputNew.xml) | Avro input | = | Reads data from Avro file |  | pdi-avro-format-plugin |
 | [`AvroOutput`](steps/AvroOutput.xml) | Avro output | = | Writes data to an Avro file according to a mapping |  | pdi-avro-format-plugin |
@@ -56,7 +56,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Bulk loading (10)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`GPLoad`](steps/GPLoad.xml) | Greenplum load | = | Greenplum load |  | kettle-gpload-plugin |
 | [`InfobrightOutput`](steps/InfobrightOutput.xml) | Infobright loader | = | Load data to an Infobright database table |  | infobright-bulk-loader-plugins |
@@ -71,7 +71,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Cryptography (4)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`PGPDecryptStream`](steps/PGPDecryptStream.xml) | PGP decrypt stream | = | Decrypt data stream with PGP |  | nativo (kettle-engine) |
 | [`PGPEncryptStream`](steps/PGPEncryptStream.xml) | PGP encrypt stream | = | Encrypt data stream with PGP |  | nativo (kettle-engine) |
@@ -80,20 +80,20 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Data Warehouse / Almacén de Datos (2)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`CombinationLookup`](steps/CombinationLookup.xml) | Combination lookup/update | Búsqueda/actualización en combinación | Update a junk dimension in a data warehouse. Alternatively, look up information in this dimension. The primary key of a junk dimension are all the fields. | 1 | pdi-core-plugins |
 | [`DimensionLookup`](steps/DimensionLookup.xml) | Dimension lookup/update | Búsqueda/actualización en dimensión | Update a slowly changing dimension in a data warehouse. Alternatively, look up information in this dimension. | 2 | nativo (kettle-engine) |
 
 ### Experimental (1)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`SFTPPut`](steps/SFTPPut.xml) | SFTP put | = | Upload a file or a stream file to remote host via SFTP |  | nativo (kettle-engine) |
 
 ### Flow (15)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`Abort`](steps/Abort.xml) | Abort | = | Abort a transformation | 5 | pdi-core-plugins |
 | [`Append`](steps/Append.xml) | Append streams | = | Append 2 streams in an ordered way | 8 | pdi-core-plugins |
@@ -113,7 +113,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Inline / Embebido (3)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`Injector`](steps/Injector.xml) | Injector | Inyector de fila | Injector step to allow to inject rows into the transformation through the java API |  | nativo (kettle-engine) |
 | [`SocketReader`](steps/SocketReader.xml) | Socket reader | Leer de Socket | Socket reader.  A socket client that connects to a server (Socket Writer step). |  | nativo (kettle-engine) |
@@ -121,7 +121,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Input / Entrada (37)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`AccessInput`](steps/AccessInput.xml) | Microsoft Access input | = | Read data from a Microsoft Access file |  | ms-access-plugins |
 | [`CsvInput`](steps/CsvInput.xml) | CSV file input | = | Simple CSV file input | 13 | nativo (kettle-engine) |
@@ -163,7 +163,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Job / Trabajo (6)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`FilesFromResult`](steps/FilesFromResult.xml) | Get files from result | Obtener ficheros de resultado anterior | This step allows you to read filenames used or generated in a previous entry in a job. | 1 | nativo (kettle-engine) |
 | [`FilesToResult`](steps/FilesToResult.xml) | Set files in result | Copia nombres de fichero al resultado | This step allows you to set filenames in the result of this transformation. Subsequent job entries can then use this information. |  | nativo (kettle-engine) |
@@ -174,7 +174,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Joins / Uniones (6)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`JoinRows`](steps/JoinRows.xml) | Join rows (cartesian product) | Juntar filas (producto cartesiano) | The output of this step is the cartesian product of the input streams. The number of rows is the multiplication of the number of rows in the input streams. | 8 | nativo (kettle-engine) |
 | [`MergeJoin`](steps/MergeJoin.xml) | Merge join | Unión por clave | Joins two streams on a given key and outputs a joined set. The input streams must be sorted on the join key | 2 | nativo (kettle-engine) |
@@ -185,7 +185,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Lookup / Búsqueda (15)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`ColumnExists`](steps/ColumnExists.xml) | Column exists | = | Check if a column exists | 1 | pdi-core-plugins |
 | [`DBJoin`](steps/DBJoin.xml) | Database join | Consulta base de datos | Execute a database query using stream values as parameters |  | nativo (kettle-engine) |
@@ -205,7 +205,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Mapping / Mapeado (4)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`Mapping`](steps/Mapping.xml) | Mapping (sub-transformation) | Mapeo (sub-transformación) | Run a mapping (sub-transformation), use MappingInput and MappingOutput to specify the fields interface | 3 | nativo (kettle-engine) |
 | [`MappingInput`](steps/MappingInput.xml) | Mapping input specification | Especificación del mapeo de entrada | Specify the input interface of a mapping | 3 | nativo (kettle-engine) |
@@ -214,7 +214,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Output / Salida (23)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`AccessOutput`](steps/AccessOutput.xml) | Microsoft Access output | Salida Access | Stores records into an MS-Access database table. |  | ms-access-plugins |
 | [`AutoDoc`](steps/AutoDoc.xml) | Automatic documentation output | = | This step automatically generates documentation based on input in the form of a list of transformations and jobs | 3 | pdi-core-plugins |
@@ -242,7 +242,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Pentaho Server (3)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`CallEndpointStep`](steps/CallEndpointStep.xml) | Call endpoint | = | Call an endpoint of the Pentaho Server. |  | platform-utils-plugin |
 | [`GetSessionVariableStep`](steps/GetSessionVariableStep.xml) | Get session variables | = | Get session variables from the current user session. |  | platform-utils-plugin |
@@ -250,7 +250,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Scripting (9)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`ExecSQL`](steps/ExecSQL.xml) | Execute SQL script | Ejecutar script SQL | Execute an SQL script, optionally parameterized using input rows | 1 | nativo (kettle-engine) |
 | [`ExecSQLRow`](steps/ExecSQLRow.xml) | Execute row SQL script | = | Execute SQL script extracted from a field created in a previous step. | 1 | nativo (kettle-engine) |
@@ -264,7 +264,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Statistics (7)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`AnalyticQuery`](steps/AnalyticQuery.xml) | Analytic query | = | Execute analytic queries over a sorted dataset (LEAD/LAG/FIRST/LAST) | 2 | pdi-core-plugins |
 | [`GroupBy`](steps/GroupBy.xml) | Group by | Agrupar por | Builds aggregates in a group by fashion. This works only on a sorted input. If the input is not sorted, only double consecutive rows are handled correctly. | 21 | nativo (kettle-engine) |
@@ -276,7 +276,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Streaming (7)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`Jms2Consumer`](steps/Jms2Consumer.xml) | JMS consumer | = | Consumes JMS streams |  | pentaho-streaming-jms-plugin |
 | [`Jms2Producer`](steps/Jms2Producer.xml) | JMS producer | = | Produces JMS streams |  | pentaho-streaming-jms-plugin |
@@ -288,7 +288,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Transform / Transformar (26)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`AddXML`](steps/AddXML.xml) | Add XML | = | Encode several fields into an XML fragment | 15 | pdi-xml-plugin |
 | [`Calculator`](steps/Calculator.xml) | Calculator | Calculadora | Create new fields by performing simple calculations | 16 | nativo (kettle-engine) |
@@ -319,7 +319,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Utility (15)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`ChangeFileEncoding`](steps/ChangeFileEncoding.xml) | Change file encoding | = | Change file encoding and create a new file |  | pdi-core-plugins |
 | [`CloneRow`](steps/CloneRow.xml) | Clone row | = | Clone a row as many times as needed | 1 | pdi-core-plugins |
@@ -339,7 +339,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Validation (4)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`CreditCardValidator`](steps/CreditCardValidator.xml) | Credit card validator | = | The Credit card validator step will help you tell: (1) if a credit card number is valid (uses LUHN10 (MOD-10) algorithm) (2) which credit card vendor handles that number (VISA, MasterCard, Diners Club, EnRoute, American Express (AMEX),...) |  | nativo (kettle-engine) |
 | [`MailValidator`](steps/MailValidator.xml) | Mail validator | = | Check if an email address is valid. |  | nativo (kettle-engine) |
@@ -348,7 +348,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Deprecated / Obsoleto (12)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`DummyStep`](steps/DummyStep.xml) | Example step (deprecated) | Example step | This is a plugin example step |  | kettle-dummy-plugin |
 | [`ElasticSearchBulk`](steps/ElasticSearchBulk.xml) | Elasticsearch bulk insert (deprecated) | Elasticsearch bulk insert | Performs bulk inserts into ElasticSearch |  | elasticsearch-bulk-insert-plugin |
@@ -363,12 +363,12 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 | [`Script`](steps/Script.xml) | Script (deprecated) | Script | Calculate values by scripting in Ruby, Python, Groovy, JavaScript, ... (JSR-223) |  | nativo (kettle-engine) |
 | [`TextFileOutputLegacy`](steps/TextFileOutputLegacy.xml) | Text file output (deprecated) | Text file output | Write rows to a text file. |  | nativo (kettle-engine) |
 
-## Job entries (trabajos `.kjb`)
+## Job entries (jobs, `.kjb`)
 
 
 ### Bulk loading (3)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`MSSQL_BULK_LOAD`](job-entries/MSSQL_BULK_LOAD.xml) | Bulk load into MSSQL | = | Load data from a file into a MSSQL table |  | nativo (kettle-engine) |
 | [`MYSQL_BULK_FILE`](job-entries/MYSQL_BULK_FILE.xml) | Bulk load from MySQL into file | = | Load from a mysql table into a file |  | nativo (kettle-engine) |
@@ -376,7 +376,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Conditions (12)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`CHECK_DB_CONNECTIONS`](job-entries/CHECK_DB_CONNECTIONS.xml) | Check DB connections | = | Check if we can connect to one or several databases. |  | pdi-core-plugins |
 | [`CHECK_FILES_LOCKED`](job-entries/CHECK_FILES_LOCKED.xml) | Check files locked | = | Check if one or several files are locked by another process |  | nativo (kettle-engine) |
@@ -393,7 +393,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### File encryption (3)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`PGP_DECRYPT_FILES`](job-entries/PGP_DECRYPT_FILES.xml) | Decrypt files with PGP | = | Decrypt files encrypted with PGP (Pretty Good Privacy). This job entry need GnuPG to work properly. |  | nativo (kettle-engine) |
 | [`PGP_ENCRYPT_FILES`](job-entries/PGP_ENCRYPT_FILES.xml) | Encrypt files with PGP | = | Encrypt files with PGP (Pretty Good Privacy). This job entry need GnuPG to work properly. |  | nativo (kettle-engine) |
@@ -401,7 +401,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### File management (18)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`ADD_RESULT_FILENAMES`](job-entries/ADD_RESULT_FILENAMES.xml) | Add filenames to result | = | Add filenames to result | 2 | pdi-core-plugins |
 | [`COPY_FILES`](job-entries/COPY_FILES.xml) | Copy files | = | Copy files |  | nativo (kettle-engine) |
@@ -424,7 +424,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### File transfer (7)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`FTP`](job-entries/FTP.xml) | Get a file with FTP | = | Get files using FTP (File Transfer Protocol) |  | nativo (kettle-engine) |
 | [`FTP_DELETE`](job-entries/FTP_DELETE.xml) | FTP delete | = | Delete files in a remote host |  | nativo (kettle-engine) |
@@ -436,7 +436,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### General (5)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`JOB`](job-entries/JOB.xml) | Job | = | Executes a job | 2 | nativo (kettle-engine) |
 | [`SET_VARIABLES`](job-entries/SET_VARIABLES.xml) | Set variables | = | Set one or several variables. |  | nativo (kettle-engine) |
@@ -446,7 +446,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Mail (3)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`GET_POP`](job-entries/GET_POP.xml) | Get mails (POP3/IMAP) | = | Get mails (POP3/IMAP) server and save into a local folder |  | nativo (kettle-engine) |
 | [`MAIL`](job-entries/MAIL.xml) | Mail | = | Sends an e-Mail |  | nativo (kettle-engine) |
@@ -454,14 +454,14 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Repository (2)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`CONNECTED_TO_REPOSITORY`](job-entries/CONNECTED_TO_REPOSITORY.xml) | Check if connected to repository | = | Return true if we are connected to a repository |  | nativo (kettle-engine) |
 | [`EXPORT_REPOSITORY`](job-entries/EXPORT_REPOSITORY.xml) | Export repository to XML file | = | Export repository to XML file |  | nativo (kettle-engine) |
 
 ### Scripting (3)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`EVAL`](job-entries/EVAL.xml) | JavaScript | = | Evaluates the result of the execution of a previous job entry | 15 | nativo (kettle-engine) |
 | [`SHELL`](job-entries/SHELL.xml) | Shell | = | Executes a shell script | 1 | nativo (kettle-engine) |
@@ -469,7 +469,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Utility (12)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`ABORT`](job-entries/ABORT.xml) | Abort job | = | Abort the job |  | pdi-core-plugins |
 | [`HL7MLLPAcknowledge`](job-entries/HL7MLLPAcknowledge.xml) | HL7 MLLP acknowledge | = | Creates a HL7 MLLP client server and acknowledges the reception of a single HL7 message |  | kettle-hl7-plugin |
@@ -486,7 +486,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### XML (4)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`DTD_VALIDATOR`](job-entries/DTD_VALIDATOR.xml) | DTD validator | = | DTD validator |  | pdi-xml-plugin |
 | [`XML_WELL_FORMED`](job-entries/XML_WELL_FORMED.xml) | Check if XML file is well formed | = | Check if one or several XML files is/are well formed |  | pdi-xml-plugin |
@@ -495,7 +495,7 @@ Agrupados por categoria de la paleta de Spoon (en / es). `Deprecated` al final: 
 
 ### Deprecated (5)
 
-| `<type>` (id exacto) | Nombre (en) | Nombre en Spoon (es) | Que hace | Usos en samples | Origen |
+| `<type>` (exact id) | Name (en) | Spoon name (Spanish UI) | What it does | Uses in samples | Origin |
 |---|---|---|---|---|---|
 | [`DummyJob`](job-entries/DummyJob.xml) | Example job (deprecated) | = | This is an example job |  | kettle-dummy-plugin |
 | [`MS_ACCESS_BULK_LOAD`](job-entries/MS_ACCESS_BULK_LOAD.xml) | MS Access bulk load (deprecated) | = | Load data into a Microsoft Access table from CSV file format. ATTENTION, at the moment only the insertion is available! If target table exists, a new one will be created and data inserted. |  | ms-access-plugins |

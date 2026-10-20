@@ -2,7 +2,7 @@
 # Regenera el catalogo de steps / job entries de PDI 9.4 a partir de la instalacion.
 # Uso (Git Bash):  bash generar.sh ["C:/ruta/a/data-integration"]   (o defini PDI_HOME)
 # Salida: ../steps.json, ../steps/<id>.xml, ../job-entries.json, ../job-entries/<id>.xml
-#         (INDICE.md se genera aparte con indice.py)
+#         (INDICE.md is generated separately by indice.py)
 set -euo pipefail
 
 PDI="${1:-${PDI_HOME:?pasa la ruta de data-integration o defini PDI_HOME}}"
