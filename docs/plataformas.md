@@ -251,6 +251,7 @@ Todas en https://github.com/IvI2511/pentaho-mcp/actions/workflows/plataformas.ym
 | 9 | [39468686139](https://github.com/IvI2511/pentaho-mcp/actions/runs/39468686139) | **la de referencia**, con el workflow final: 8 de 8 en verde (5 plataformas, arm64 nativo, receta del documento y diagnóstico de la ventana) |
 | 10 | [39474975995](https://github.com/IvI2511/pentaho-mcp/actions/runs/39474975995) | a mano, `plugin: rama` y `solo_probar`: 5 de 5 en verde con el plugin compilado en el runner (0.4.1 desde el código); el zip de `armar-zip-pdi.py` trae `spoon.sh` y `JavaApplicationStub` en 0755 y quedan así en disco |
 | 11 | [39475008916](https://github.com/IvI2511/pentaho-mcp/actions/runs/39475008916) | a mano, `plugin: release` y `solo_probar`: 5 de 5 en verde con el workflow nuevo (herramientas leídas de `/ping`) |
+| 12 | [39476306571](https://github.com/IvI2511/pentaho-mcp/actions/runs/39476306571) | **la de referencia de `plugin: rama`**, con el workflow final: 5 de 5 en verde; el sha256 del jar compilado (en `plugin-archivos.txt`) es otro que el del release en cada plataforma, y Spoon corrió con ese |
 
 Evidencia en los artifacts de cada corrida (`gh run download <id> -R IvI2511/pentaho-mcp`).
 
