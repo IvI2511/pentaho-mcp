@@ -170,7 +170,7 @@ is added from **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-
 1. The user opens Spoon (`Spoon.bat` on Windows, `spoon.sh` on macOS/Linux; with the Windows installer,
    the **Pentaho Live** shortcut or the `pentaho-live` command).
 2. Restart the agent (or `/reload-plugins` in Claude Code) so it connects to the MCP.
-3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":57}`, or call the
+3. Check: `curl http://127.0.0.1:8765/ping` → `{"ok":true,"spoon":true,"tools":58}`, or call the
    `status` tool of the `pentaho` MCP.
 4. Suggest a first try: *"build a transformation that reads a CSV, filters it and writes the result"*.
 

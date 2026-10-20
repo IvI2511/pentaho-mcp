@@ -46,7 +46,7 @@ import io.github.ivi2511.pentahomcp.informes.navegador.Chromium;
 import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
- * La parte MCP de los informes (WP10, diseno §1.5): los esquemas de las 57 tools son JSON Schema
+ * La parte MCP de los informes (WP10, diseno §1.5): los esquemas de las 58 tools son JSON Schema
  * validos y las tres nuevas tienen los argumentos del diseno; generate_report no cambio; los
  * argumentos se validan antes de tocar Spoon; get_report_data devuelve el modelo en ingles y sin
  * binarios; y build_report sobre una captura de archivo (sin Spoon) escribe todos los formatos que
@@ -57,7 +57,7 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 public class PruebaMcpInformes {
 
   /** 54 tools de 0.4.0 + build_report, get_report_data y show_report. */
-  private static final int TOOLS = 57;
+  private static final int TOOLS = 58;
 
   private McpHttpServer server;
   private int puerto;

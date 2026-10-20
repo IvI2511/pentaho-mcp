@@ -28,7 +28,9 @@ starts Spoon and returns right away: ask the user first (it opens a window), wai
    something is wrong nothing changes and you get the full list of problems), animates the nodes so
    the user watches them appear, arranges the canvas at the end and is a single Ctrl+Z. Per step:
    `type`, `name`, `config_xml`, `after`; `hops` for what `after` can't express (lookup stream, second
-   input of a join, the other branch of Filter rows, error hops with `error=true`).
+   input of a join, the other branch of Filter rows, error hops with `error=true`). To name the fields
+   an error hop adds to the failing rows (e.g. a reason column), `set_error_handling` with
+   `description_field`, `count_field`... after building.
    **One step at a time** (a one-off change to an existing flow):
    - `list_step_types search=...` if you don't know the exact id (the `<type>` is NOT the name shown
      on screen).

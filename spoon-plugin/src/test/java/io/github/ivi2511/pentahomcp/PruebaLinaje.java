@@ -38,6 +38,7 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Informe;
 import io.github.ivi2511.pentahomcp.informes.modelo.ModeloJson;
 import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
 import io.github.ivi2511.pentahomcp.informes.modelo.Tabla;
+import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
  * Linaje (WP3): metaverse contra el motor propio en 01-06 (mismos caminos, origenes y operaciones),
@@ -223,6 +224,40 @@ public class PruebaLinaje {
     falso( base.exists(), "07: no se creo la base" );
     falso( base.getParentFile().exists(), "07: ni la carpeta salida" );
     igual( mapaAntes, LinajeMetaverse.entradasEnMapa(), "mapa limpio" );
+  }
+
+  /**
+   * La base SQLite existe y la carpeta del .ktr tiene espacios: ${Internal.Entry.Current.Directory} llega
+   * como URI con %20 y el linaje la daba por faltante (pasaba con el ejemplo del repo, «Pentaho MCP - ...»).
+   */
+  public void pruebaBaseEnCarpetaConEspacios() throws Exception {
+    File dir = new File( EntornoKettle.carpeta(), "linaje con espacios ñ" );
+    java.nio.file.Path p = dir.toPath();
+    if ( dir.exists() ) {
+      try ( java.util.stream.Stream<java.nio.file.Path> w = java.nio.file.Files.walk( p ) ) {
+        w.sorted( java.util.Comparator.reverseOrder() ).forEach( x -> x.toFile().delete() );
+      }
+    }
+    File ktr = new File( dir, "07_conexion_sqlite.ktr" );
+    java.nio.file.Files.createDirectories( new File( dir, "salida" ).toPath() );
+    java.nio.file.Files.copy( EntornoKettle.ejemplo( "07" ).toPath(), ktr.toPath() );
+    File base = new File( dir, "salida/demo.sqlite" );
+    java.nio.file.Files.copy( EntornoKettle.copiaDw().toPath(), base.toPath() );
+    TransMeta tm = new TransMeta( ktr.getAbsolutePath() );
+    contiene( tm.environmentSubstitute( "${Internal.Entry.Current.Directory}" ), "%20", "la variable es una URI con %20" );
+    Captura c = new Captura();
+    c.copia = tm;
+    c.docId = "prueba:espacios";
+    c.nombre = tm.getName();
+    c.archivo = ktr.getAbsolutePath();
+    c.tipo = Captura.TRANSFORMACION;
+    c.capturado = new java.util.Date();
+    Pedido ped = new Pedido();
+    ped.idioma = "es";
+    Seccion s = new SecLinaje().armar( new ContextoPrueba( c, ped, new Tema() ) );
+    String todo = String.valueOf( s.motivo ) + " " + s.datos.path( "unresolved_steps" );
+    falso( todo.contains( "no existe" ), "la base existe: no se da por faltante (" + s.motivo + ")" );
+    cierto( base.exists() && base.length() > 0, "la base sigue ahi" );
   }
 
   public void pruebaSeccion06DosDestinos() throws Exception {

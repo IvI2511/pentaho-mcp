@@ -9,6 +9,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `set_error_handling` (58 tools): configures a step's error handling, as in Spoon's "Define error
+  handling...": the target step, the extra fields of the failing rows (count, description, field names,
+  codes) and the limits. It creates the error hop if needed and is a single Ctrl+Z.
 - `instalar.sh` on a Mac with an Apple chip (M1–M4): step 3 says what it would install (Rosetta 2 and
   Temurin 21 x64 in `~/pentaho/java-x64`, checked with the SHA-256 from the Adoptium API) and does it only
   after an explicit `y`, or with `--rosetta`; it leaves `spoon-rosetta.sh` next to `spoon.sh`.
@@ -61,6 +64,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `close_document` left the closed tab visible in Spoon (an orphan tab with no document behind it).
+- Reports: the field lineage gave a SQLite or H2 database inside a folder with spaces as missing (the
+  folder variable is a URI with `%20`), so the lineage came out partial.
 - `instalar.sh --pdi` works with the plugin zips of 0.4.0 and 0.4.1 (backslash paths, folders without the
   execute bit) and gives the `.sh` scripts, `spoon.command` and the macOS app their permissions back.
 

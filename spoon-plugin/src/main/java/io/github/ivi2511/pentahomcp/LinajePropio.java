@@ -747,7 +747,12 @@ final class LinajePropio {
     return false;
   }
 
-  /** Ruta de la base de archivo (SQLite, H2) que usa el step y no existe, o null. */
+  /**
+   * Ruta de la base de archivo que usa el step y no existe, o null. Es la misma comprobacion que hacen el
+   * diccionario y la validacion (SecDestino.archivoFaltante): SQLite, H2, HSQLDB y JDBC generico, con la
+   * URI de ${Internal.Entry.Current.Directory} decodificada. La copia propia que habia aca no decodificaba
+   * los %20 y daba por faltante cualquier base dentro de una carpeta con espacios.
+   */
   private String baseFaltante( StepMeta s ) {
     DatabaseMeta[] dbs;
     try {
@@ -759,9 +764,9 @@ final class LinajePropio {
       return null;
     }
     for ( DatabaseMeta db : dbs ) {
-      String ruta = rutaDeArchivo( db );
-      if ( ruta != null && !existe( ruta, db ) ) {
-        return relativa( ruta );
+      File f = SecDestino.archivoFaltante( db, tm );
+      if ( f != null ) {
+        return relativa( f.getPath() );
       }
     }
     return null;
@@ -773,9 +778,8 @@ final class LinajePropio {
       String dir = tm.environmentSubstitute( "${Internal.Entry.Current.Directory}" );
       if ( !vacio( dir ) && !dir.contains( "${" ) ) {
         String a = new File( ruta ).getAbsolutePath();
-        String sinEsquema = dir.replaceFirst( "^file:/*(?=[A-Za-z]:)", "" ).replaceFirst( "^file://", "" )
-          .replaceFirst( "^file:", "" );
-        String b = new File( sinEsquema ).getAbsolutePath() + File.separator;
+        // ${Internal.Entry.Current.Directory} es una URI: una carpeta con espacios llega con %20.
+        String b = new File( InformeServicio.Txt.local( dir ) ).getAbsolutePath() + File.separator;
         if ( a.toLowerCase().startsWith( b.toLowerCase() ) ) {
           return a.substring( b.length() ).replace( '\\', '/' );
         }
@@ -784,46 +788,6 @@ final class LinajePropio {
       // la ruta tal cual
     }
     return ruta;
-  }
-
-  /** La ruta del archivo de la base si es SQLite o H2 nativa en disco; si no, null. */
-  private String rutaDeArchivo( DatabaseMeta db ) {
-    if ( db == null || db.getAccessType() != DatabaseMeta.TYPE_ACCESS_NATIVE ) {
-      return null;
-    }
-    String id = db.getPluginId();
-    if ( !"SQLITE".equalsIgnoreCase( id ) && !"H2".equalsIgnoreCase( id ) ) {
-      return null;
-    }
-    String ruta = tm.environmentSubstitute( db.getDatabaseName() );
-    if ( vacio( ruta ) ) {
-      return null;
-    }
-    ruta = ruta.trim();
-    String bajo = ruta.toLowerCase();
-    if ( bajo.startsWith( "mem:" ) || bajo.startsWith( "tcp:" ) || bajo.startsWith( "ssl:" ) || bajo.contains( "://" )
-      && !bajo.startsWith( "file:" ) || ":memory:".equals( bajo ) ) {
-      return null;
-    }
-    if ( bajo.startsWith( "file:" ) ) {
-      ruta = ruta.replaceFirst( "^(?i)file:/*(?=[A-Za-z]:)", "" ).replaceFirst( "^(?i)file://", "" )
-        .replaceFirst( "^(?i)file:", "" );
-    }
-    int pc = ruta.indexOf( ';' ); // opciones de H2
-    if ( pc > 0 && "H2".equalsIgnoreCase( id ) ) {
-      ruta = ruta.substring( 0, pc );
-    }
-    return ruta;
-  }
-
-  private static boolean existe( String ruta, DatabaseMeta db ) {
-    if ( new File( ruta ).exists() ) {
-      return true;
-    }
-    if ( "H2".equalsIgnoreCase( db.getPluginId() ) ) {
-      return new File( ruta + ".mv.db" ).exists() || new File( ruta + ".h2.db" ).exists();
-    }
-    return false;
   }
 
   // ---------------------------------------------------------------- clases y etiquetas
