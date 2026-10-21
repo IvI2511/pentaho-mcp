@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.github.ivi2511.pentahomcp.informes.modelo.Esquema;
+
 /**
  * Grafo de un diagrama propio: el flujo de una transformacion, un job o el linaje de campos hacia un step.
  * Lo arman los recolectores (GrafoFlujo, el linaje) y lo dibuja {@link Diagramas}; no sabe nada de Kettle.
@@ -154,6 +156,105 @@ public final class Grafo {
       }
     }
     return d;
+  }
+
+  // ================================================================== modelo (Esquema)
+
+  /** La forma serializable del grafo, para el modelo del informe (Diagrama.grafo). */
+  public Esquema esquema() {
+    Esquema e = new Esquema();
+    e.tipo = tipo;
+    e.titulo = titulo;
+    e.leyenda = leyenda;
+    Map<Grupo, Integer> indices = new IdentityHashMap<>();
+    for ( Grupo g : grupos ) {
+      Esquema.Grupo x = new Esquema.Grupo();
+      x.nombre = g.nombre;
+      x.op = g.op;
+      x.destino = g.destino;
+      indices.put( g, e.grupos.size() );
+      e.grupos.add( x );
+    }
+    for ( Nodo n : nodos ) {
+      Esquema.Nodo x = new Esquema.Nodo();
+      x.id = n.id;
+      x.titulo = n.titulo;
+      x.lineas = n.lineas.isEmpty() ? null : new ArrayList<>( n.lineas );
+      x.op = n.op;
+      x.multi = n.multi;
+      x.copias = n.copias;
+      x.falta = n.falta;
+      x.inicio = n.inicio;
+      x.grupo = n.grupo == null ? null : indices.get( n.grupo );
+      e.nodos.add( x );
+    }
+    for ( Arista a : aristas ) {
+      Esquema.Arista x = new Esquema.Arista();
+      x.a = a.a.id;
+      x.b = a.b.id;
+      x.clase = a.clase;
+      x.rotulo = a.rotulo;
+      x.activa = a.activa;
+      e.aristas.add( x );
+    }
+    return e;
+  }
+
+  /**
+   * El grafo de un Esquema del modelo. Nodos repetidos, aristas con un extremo que no existe y grupos fuera
+   * de rango se ignoran (un JSON editado a mano no rompe el informe).
+   */
+  public static Grafo desde( Esquema e ) {
+    Grafo g = new Grafo( e == null ? FLUJO : e.tipo, e == null ? null : e.titulo );
+    if ( e == null ) {
+      return g;
+    }
+    g.leyenda = e.leyenda;
+    List<Grupo> gs = new ArrayList<>();
+    if ( e.grupos != null ) {
+      for ( Esquema.Grupo x : e.grupos ) {
+        Grupo gr = g.grupo( x == null ? "" : x.nombre );
+        if ( x != null ) {
+          gr.op = x.op;
+          gr.destino = x.destino;
+        }
+        gs.add( gr );
+      }
+    }
+    if ( e.nodos != null ) {
+      for ( Esquema.Nodo x : e.nodos ) {
+        if ( x == null || x.id == null || g.buscar( x.id ) != null ) {
+          continue;
+        }
+        Grupo gr = x.grupo != null && x.grupo >= 0 && x.grupo < gs.size() ? gs.get( x.grupo ) : null;
+        Nodo n = gr != null ? g.campo( gr, x.id, x.titulo ) : g.nodo( x.id, x.titulo );
+        if ( x.lineas != null ) {
+          for ( String l : x.lineas ) {
+            if ( l != null ) {
+              n.lineas.add( l );
+            }
+          }
+        }
+        n.op = x.op;
+        n.multi = x.multi;
+        n.copias = Math.max( 1, x.copias );
+        n.falta = x.falta;
+        n.inicio = x.inicio;
+      }
+    }
+    if ( e.aristas != null ) {
+      for ( Esquema.Arista x : e.aristas ) {
+        Nodo a = x == null ? null : g.buscar( x.a );
+        Nodo b = x == null ? null : g.buscar( x.b );
+        if ( a == null || b == null ) {
+          continue;
+        }
+        Arista ar = g.arista( a, b, x.clase );
+        ar.rotulo = x.rotulo;
+        ar.activa = x.activa;
+      }
+    }
+    return g;
   }
 
   // ================================================================== copia y preparacion

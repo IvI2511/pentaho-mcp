@@ -21,6 +21,9 @@ import io.github.ivi2511.pentahomcp.informes.Renderizador;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Diagramas;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
@@ -44,10 +47,14 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  * HTML de un solo archivo, autocontenido y offline (diseno §3.1). Dos modos con el mismo codigo y el
  * mismo CSS (apto IE11):
  * <ul>
- * <li>{@link Modo#INTERACTIVO}: Mermaid 11.4.1 inline (unos 2,6 MB). No hace ninguna peticion de red.</li>
+ * <li>{@link Modo#INTERACTIVO}: el bundle de Mermaid 11.4.1 (unos 2,6 MB) solo si queda algun diagrama
+ * Mermaid sin grafo propio (el modelo entidad-relacion). No hace ninguna peticion de red.</li>
  * <li>{@link Modo#ESTATICO}: vista previa IE11 y "HTML liviano". Sin ningun &lt;script&gt;: los diagramas
- * van como SVG pre-renderizado (PrerenderMermaid.svg); si falta, un recuadro y la tabla alternativa.</li>
+ * Mermaid van como SVG pre-renderizado (PrerenderMermaid.svg); si falta, un recuadro y la tabla alternativa.</li>
  * </ul>
+ * Los diagramas con grafo (flujo, job, linaje) se dibujan con el motor propio (informes.diagramas) como SVG
+ * inline en los dos modos: para la pantalla con la caja {@link Objetivo#PANTALLA} y para imprimir con la
+ * hoja A4 o carta, partidos en varias figuras si la letra quedaria chica.
  * El archivo no tiene ninguna URL http(s) salvo los xmlns de los SVG: el bundle de Mermaid se mete con
  * "://" escrito como ":\/\/", que en JavaScript es la misma cadena (solo aparece en textos de error,
  * comentarios de licencia y espacios de nombres).
@@ -111,6 +118,20 @@ public final class RenderHtml implements Renderizador {
   public static int altoFiguraMm( Tema tema ) {
     boolean carta = tema != null && Tema.LETTER.equalsIgnoreCase( tema.pagina );
     return carta ? 207 : 225;
+  }
+
+  /** Alto util de la hoja impresa en px CSS: A4 297 mm o Letter 279,4 mm menos los margenes de 18 y 20 mm. */
+  static double altoHojaPx( Tema tema ) {
+    boolean carta = tema != null && Tema.LETTER.equalsIgnoreCase( tema.pagina );
+    return ( ( carta ? 279.4 : 297 ) - 38 ) / 25.4 * 96;
+  }
+
+  /** La caja de los diagramas propios: la hoja (A4 o carta) para imprimir, la pantalla si no. */
+  Objetivo objetivo( Tema tema ) {
+    if ( !paraImprimir ) {
+      return Objetivo.PANTALLA;
+    }
+    return tema != null && Tema.LETTER.equalsIgnoreCase( tema.pagina ) ? Objetivo.LETTER : Objetivo.A4;
   }
 
   /** El HTML completo como texto (lo usan las pruebas y quien necesite el texto sin archivo). */
@@ -348,6 +369,13 @@ public final class RenderHtml implements Renderizador {
     final String primario;
     final String acento;
     final String secundario;
+    /** Algun diagrama quedo como pre.mermaid: el HTML interactivo lleva el bundle. */
+    boolean hayMermaid;
+    /**
+     * Para imprimir: alto estimado (px) de lo que va desde el principio de la pagina de la seccion actual, o
+     * NaN si ya no se sabe (despues de una figura o de una tabla larga).
+     */
+    double usado = Double.NaN;
 
     Escritor( Informe inf, Tema tema, Progreso p, List<String> avisos ) {
       this.inf = inf;
@@ -654,6 +682,10 @@ public final class RenderHtml implements Renderizador {
     }
 
     void seccion( Seccion s, boolean corta ) {
+      // en la hoja impresa una seccion larga empieza pagina: se lleva la cuenta de lo que va arriba de la
+      // primera figura (para que el titulo no quede solo en una hoja y la figura en la siguiente)
+      usado = paraImprimir && !corta ? 45 + lineas( s.motivo, 100 ) * 20 + lineas( s.resumen, 90 ) * 21 + ( vacio(
+        s.resumen ) ? 0 : 30 ) : Double.NaN;
       sb.append( "<section class=\"seccion" ).append( corta ? " corta" : "" ).append( "\" id=\"" ).append( id(
         anclaSeccion( s ) ) ).append( "\">\n<h2>" );
       sb.append( Html.esc( tituloSeccion( s ) ) );
@@ -673,9 +705,56 @@ public final class RenderHtml implements Renderizador {
         Bloque x = Html.sinRepetirResumen( b, s.resumen );
         if ( x != null ) {
           bloque( x );
+          sumar( x );
         }
       }
       sb.append( "</section>\n" );
+    }
+
+    /** Suma el alto estimado de un bloque de texto a {@link #usado}; una figura o una tabla larga lo cortan. */
+    void sumar( Bloque b ) {
+      if ( Double.isNaN( usado ) ) {
+        return;
+      }
+      double h = 16 + ( vacio( b.titulo ) ? 0 : 42 ) + ( vacio( b.nota ) ? 0 : lineas( b.nota, 110 ) * 18 + 4 );
+      if ( b instanceof Parrafo ) {
+        h += lineas( ( (Parrafo) b ).texto, 95 ) * 21 + 10;
+      } else if ( b instanceof Aviso ) {
+        h += lineas( ( (Aviso) b ).texto, 100 ) * 20 + 28;
+      } else if ( b instanceof Lista ) {
+        for ( String it : Html.lista( ( (Lista) b ).items ) ) {
+          h += lineas( it, 90 ) * 21 + 4;
+        }
+        h += 10;
+      } else if ( b instanceof Indicadores ) {
+        h += Math.ceil( Html.lista( ( (Indicadores) b ).items ).size() / 4.0 ) * 92;
+      } else if ( b instanceof Tabla && Html.lista( ( (Tabla) b ).filas ).size() <= 12 ) {
+        h += 34 + Html.lista( ( (Tabla) b ).filas ).size() * 30;
+      } else {
+        usado = Double.NaN; // figuras y tablas largas: ya no se sabe donde queda la pagina
+        return;
+      }
+      usado += h;
+      double hoja = altoHojaPx( tema );
+      if ( usado > hoja ) {
+        usado = usado % hoja;
+      }
+    }
+
+    /** Lineas aproximadas de un texto de {@code porLinea} caracteres por linea (0 si esta vacio). */
+    int lineas( String texto, int porLinea ) {
+      if ( vacio( texto ) ) {
+        return 0;
+      }
+      int n = 0;
+      for ( String l : texto.trim().split( "\\r?\\n" ) ) {
+        n += Math.max( 1, (int) Math.ceil( l.length() / (double) porLinea ) );
+      }
+      return n;
+    }
+
+    boolean vacio( String t ) {
+      return t == null || t.trim().isEmpty();
     }
 
     void bloque( Bloque b ) {
@@ -825,6 +904,11 @@ public final class RenderHtml implements Renderizador {
     }
 
     void diagrama( Diagrama d ) {
+      List<Dibujo> ds = Figuras.dibujos( d, objetivo( tema ), inf.idioma );
+      if ( ds != null ) {
+        propio( d, ds );
+        return;
+      }
       sb.append( "<div class=\"figura diagrama\">\n" );
       boolean hayImagen = d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0;
       if ( hayImagen ) {
@@ -844,6 +928,7 @@ public final class RenderHtml implements Renderizador {
           sb.append( " title=\"" ).append( Html.esc( d.alt ) ).append( '"' );
         }
         sb.append( '>' ).append( Html.esc( d.mermaid.trim() ) ).append( "</pre>\n" );
+        hayMermaid = true;
         if ( alt != null ) {
           sb.append( "<div class=\"alternativa mermaid-fallo\" id=\"" ).append( alt ).append( "\">" );
           tabla( d.alternativa );
@@ -871,6 +956,60 @@ public final class RenderHtml implements Renderizador {
         sb.append( "</div>\n" );
       }
       sb.append( "</div>\n" );
+    }
+
+    /**
+     * Diagrama del motor propio: una figura por parte (SVG inline del tamano final, con «Parte i de n» si se
+     * partio) y despues el lienzo de Spoon si no es una tira; una tira va plegada en la pantalla y no se
+     * imprime. Al imprimir, la primera figura de la seccion se achica (hasta el 60 % y sin bajar de la letra
+     * minima) si asi entra debajo del titulo: si no, pasaria entera a la hoja siguiente.
+     */
+    void propio( Diagrama d, List<Dibujo> ds ) {
+      sb.append( "<div class=\"diagrama propio\">\n" );
+      for ( Dibujo x : ds ) {
+        double w = x.anchoFinal();
+        double h = x.altoFinal();
+        if ( paraImprimir && x.parte == 1 && !Double.isNaN( usado ) ) {
+          double libre = altoHojaPx( tema ) - usado - ( ds.size() > 1 ? 26 : 0 ) - 24;
+          double k = libre / h;
+          if ( k < 1 && k >= 0.6 && x.letra * k >= x.objetivo.letraMin ) {
+            w *= k;
+            h *= k;
+          }
+        }
+        String svg = Html.svgInline( x.conTamano( redondo( w ), redondo( h ) ), Integer.MAX_VALUE );
+        sb.append( "<div class=\"figura\">\n" );
+        if ( ds.size() > 1 ) {
+          sb.append( "<p class=\"parte\">" ).append( Html.esc( Figuras.parte( inf.idioma, x.parte, x.partes ) ) )
+            .append( "</p>\n" );
+        }
+        sb.append( "<div class=\"svg\" role=\"img\"" );
+        if ( d.alt != null ) {
+          sb.append( " aria-label=\"" ).append( Html.esc( d.alt ) ).append( '"' );
+        }
+        sb.append( '>' ).append( svg == null ? "" : svg ).append( "</div>\n</div>\n" );
+      }
+      Imagen lienzo = Figuras.lienzo( d );
+      if ( lienzo != null ) {
+        String alt = lienzo.alt != null ? lienzo.alt : d.alt;
+        if ( Figuras.proporcionada( lienzo ) ) {
+          sb.append( "<div class=\"figura lienzo\">" );
+          imagen( lienzo, alt );
+          sb.append( "</div>\n" );
+        } else if ( !paraImprimir ) {
+          String resumen = Rotulos.de( Diagramas.AREA, inf.idioma ).s( "lienzo.plegado" );
+          sb.append( "<details class=\"lienzo-plegado\"><summary>" ).append( Html.esc( resumen ) ).append(
+            "</summary><div class=\"lienzo-ancho\">" );
+          imagen( lienzo, alt );
+          sb.append( "</div></details>\n" );
+        }
+      }
+      sb.append( "</div>\n" );
+      usado = Double.NaN;
+    }
+
+    double redondo( double v ) {
+      return Math.round( v * 100 ) / 100.0;
     }
 
     void grafico( Grafico g ) {
@@ -909,10 +1048,11 @@ public final class RenderHtml implements Renderizador {
     // ------------------------------------------------------------ scripts (solo INTERACTIVO)
 
     void scripts() {
-      String js = mermaidJs();
-      if ( js == null ) {
+      // el bundle (2,6 MB) solo si queda algun pre.mermaid: flujo, job y linaje ya van como SVG propio
+      String js = hayMermaid ? mermaidJs() : null;
+      if ( hayMermaid && js == null ) {
         avisos.add( t( "no_mermaid" ) );
-      } else {
+      } else if ( js != null ) {
         sb.append( "<script>\n" ).append( js ).append( "\n</script>\n" );
       }
       // ES5: corre tambien en IE11, donde el bundle no carga y quedan las tablas alternativas

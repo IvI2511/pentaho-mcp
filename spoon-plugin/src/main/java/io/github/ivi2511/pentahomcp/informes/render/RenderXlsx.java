@@ -81,7 +81,7 @@ public final class RenderXlsx implements Renderizador {
   /** Formato.XLSX (se busca por clave). */
   @Override
   public Formato formato() {
-    return Formato.deClave( CLAVE );
+    return Formato.XLSX;
   }
 
   /** null si POI puede escribir Excel en este proceso; si no, el motivo traducido. */

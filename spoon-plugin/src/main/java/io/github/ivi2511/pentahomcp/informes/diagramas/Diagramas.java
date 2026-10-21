@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
+import io.github.ivi2511.pentahomcp.informes.modelo.Esquema;
 
 /**
  * Diagramas propios (flujo, job y linaje de campos) dibujados en Java en vez de Mermaid: mas cuadrados
@@ -59,6 +60,14 @@ public final class Diagramas {
       i++;
     }
     return out;
+  }
+
+  /** Los dibujos del grafo de un Diagrama del modelo (Diagrama.grafo); lista vacia si no hay grafo. */
+  public static List<Dibujo> dibujar( Esquema e, Objetivo obj, String idioma ) {
+    if ( e == null || e.nodos == null || e.nodos.isEmpty() ) {
+      return new ArrayList<>();
+    }
+    return dibujar( Grafo.desde( e ), obj, idioma );
   }
 
   /** Un solo dibujo sin partir (aunque la letra quede chica): para el Markdown y las comparaciones. */

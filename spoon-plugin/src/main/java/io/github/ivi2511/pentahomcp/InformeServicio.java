@@ -75,9 +75,12 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
 import io.github.ivi2511.pentahomcp.informes.navegador.Chromium;
 import io.github.ivi2511.pentahomcp.informes.navegador.PrerenderMermaid;
 import io.github.ivi2511.pentahomcp.informes.navegador.RenderPdf;
+import io.github.ivi2511.pentahomcp.informes.render.RenderDocx;
 import io.github.ivi2511.pentahomcp.informes.render.RenderHtml;
+import io.github.ivi2511.pentahomcp.informes.render.RenderImagenes;
 import io.github.ivi2511.pentahomcp.informes.render.RenderMarkdown;
 import io.github.ivi2511.pentahomcp.informes.render.RenderPptx;
+import io.github.ivi2511.pentahomcp.informes.render.RenderXlsx;
 import io.github.ivi2511.pentahomcp.informes.tema.Ajustes;
 import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
@@ -690,8 +693,15 @@ public final class InformeServicio {
       case MARKDOWN:
         return new RenderMarkdown();
       case PPTX:
-        // sin PNG, PptxDiapos pone los diagramas como tablas y ya lo avisa: aca no se repite
-        return new RenderPptx( prerenderPng( inf, t, null, pr ) );
+        // sin PNG, PptxDiapos pone los diagramas Mermaid como tablas y ya lo avisa: aca no se repite
+        return new RenderPptx( prerenderPng( inf, t, null, pr ) ).conAnexo( t != null && t.salida != null
+          && t.salida.pptxAnexo );
+      case DOCX:
+        return new RenderDocx( prerenderPng( inf, t, null, pr ) );
+      case XLSX:
+        return new RenderXlsx();
+      case IMAGENES:
+        return new RenderImagenes( prerenderPng( inf, t, null, pr ), prerenderSvg( inf, t, null, pr ) );
       case JSON:
         return new RenderJson();
       default:
@@ -699,7 +709,10 @@ public final class InformeServicio {
     }
   }
 
-  /** Los diagramas con texto Mermaid del informe. */
+  /**
+   * Los diagramas que se dibujan con Mermaid (los que tienen texto Mermaid y no grafo propio: el modelo
+   * entidad-relacion). Flujo, job y linaje los dibuja el motor propio sin navegador.
+   */
   static List<Diagrama> diagramas( Informe inf ) {
     List<Diagrama> l = new ArrayList<Diagrama>();
     for ( Seccion s : inf.secciones ) {
@@ -707,7 +720,8 @@ public final class InformeServicio {
         continue;
       }
       for ( Bloque b : s.bloques ) {
-        if ( b instanceof Diagrama && Txt.vacio( ( (Diagrama) b ).mermaid ) != null ) {
+        if ( b instanceof Diagrama && Txt.vacio( ( (Diagrama) b ).mermaid ) != null && ( (Diagrama) b ).grafo
+          == null ) {
           l.add( (Diagrama) b );
         }
       }
@@ -900,9 +914,13 @@ public final class InformeServicio {
     return base;
   }
 
-  /** El archivo de un formato: base.html, base.light.html, base.pdf, base.md, base.pptx, base.json. */
+  /**
+   * El archivo de un formato: base.html, base.light.html, base.pdf, base.md, base.pptx, base.docx, base.xlsx,
+   * base.json; para las imagenes, la carpeta base_imagenes.
+   */
   public static File archivo( File carpeta, String base, Formato f ) {
-    String nombre = f == Formato.HTML_ESTATICO ? base + ".light.html" : base + "." + f.extension;
+    String nombre = f == Formato.HTML_ESTATICO ? base + ".light.html" : f == Formato.IMAGENES ? base
+      + RenderImagenes.SUFIJO : base + "." + f.extension;
     return new File( carpeta, nombre );
   }
 

@@ -100,6 +100,14 @@ pre.mermaid[data-processed] { color: {{texto}}; }
 .pendiente { margin: 0 0 8px; padding: 18px 12px; text-align: center; font-size: 13px; color: {{tenue}};
   background: {{fondoTenue}}; border: 1px dashed {{borde}}; }
 .alternativa { margin: 8px 0 0; }
+/* diagramas propios (flujo, job, linaje): una figura por parte, y el lienzo de Spoon si es una tira, plegado */
+.propio { margin: 0 0 16px; }
+.propio .figura { margin: 0 0 12px; }
+.parte { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: {{tenue}}; }
+.lienzo-plegado { margin: 0 0 16px; }
+.lienzo-plegado summary { cursor: pointer; font-size: 12px; color: {{tenue}}; }
+.lienzo-ancho { overflow-x: auto; margin: 8px 0 0; }
+.lienzo-ancho img { max-width: none; }
 
 /* ---- pie y marca de agua */
 .pie { margin: 32px 0 0; padding: 8px 0 0; border-top: 1px solid {{borde}}; font-size: 7.5pt; color: {{tenue}}; }
@@ -127,6 +135,8 @@ pre.mermaid[data-processed] { color: {{texto}}; }
   .figura pre.mermaid svg, .figura .svg svg { max-height: {{altoFigura}}; }
   .figura img { max-height: {{altoFigura}}; object-fit: contain; }
   pre.mermaid, .figura .svg, .figura .lienzo { page-break-inside: avoid; break-inside: avoid; }
+  .parte { page-break-after: avoid; break-after: avoid; }
+  .lienzo-plegado { display: none; }
 }
 /*==IMPRIMIR==*/
 @page { size: {{pagina}}; margin: 18mm 16mm 20mm;

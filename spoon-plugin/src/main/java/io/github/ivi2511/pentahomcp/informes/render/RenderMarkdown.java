@@ -16,6 +16,9 @@ import io.github.ivi2511.pentahomcp.informes.Renderizador;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Diagramas;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
@@ -36,7 +39,9 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  * PNG del lienzo, las imagenes y los SVG de los graficos.
  * <ul>
  * <li>Front matter YAML: title, date, tags, source, generator.</li>
- * <li>Diagramas: la imagen (si la hay) y un bloque {@code ```mermaid} con el mismo texto que el HTML.</li>
+ * <li>Diagramas de flujo, job y linaje: el dibujo propio como .svg (uno por parte si se partio), el lienzo de
+ * Spoon y, plegado en una llamada de Obsidian, el codigo {@code ```mermaid} (GitHub y Obsidian lo dibujan).
+ * El modelo entidad-relacion: la imagen (si la hay) y el bloque {@code ```mermaid}.</li>
  * <li>Tablas GFM con {@code |} escapado; indicadores como tabla de 2 columnas.</li>
  * <li>Avisos como {@code > [!NOTE]}, {@code > [!WARNING]} y {@code > [!CAUTION]} (los entienden los dos).</li>
  * <li>Una linea final en cursiva: "Generado con Pentaho Live · IDC Studios". Sin marca de agua.</li>
@@ -570,6 +575,11 @@ public final class RenderMarkdown implements Renderizador {
     }
 
     void diagrama( Diagrama d ) throws Exception {
+      List<Dibujo> ds = Figuras.dibujos( d, Objetivo.PANTALLA, inf.idioma );
+      if ( ds != null ) {
+        propio( d, ds );
+        return;
+      }
       boolean hayImagen = d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0;
       if ( hayImagen ) {
         boolean lienzo = !lienzoUsado && ( Diagrama.FLUJO.equals( d.clase ) || Diagrama.JOB.equals( d.clase ) );
@@ -583,6 +593,55 @@ public final class RenderMarkdown implements Renderizador {
         sb.append( c ).append( "mermaid\n" ).append( texto ).append( '\n' ).append( c ).append( "\n\n" );
       } else if ( !hayImagen && d.alternativa != null ) {
         tabla( d.alternativa );
+      }
+    }
+
+    /**
+     * Diagrama propio: cada parte como .svg en la carpeta de archivos, el lienzo (como imagen si no es una
+     * tira; si lo es, un enlace al .png) y el codigo Mermaid plegado ({@code > [!note]-}: Obsidian lo
+     * muestra cerrado y dibuja el diagrama al abrirlo; GitHub lo muestra como cita).
+     */
+    void propio( Diagrama d, List<Dibujo> ds ) throws Exception {
+      String base = d.id != null ? d.id : "diagrama";
+      String alt = d.alt != null ? d.alt : d.titulo != null ? d.titulo : "";
+      for ( Dibujo x : ds ) {
+        String nombre = archivo( ds.size() > 1 ? base + "-" + x.parte : base, "svg" );
+        File f = new File( carpeta, nombre );
+        Html.escribir( f, RenderImagenes.suelto( x.svgEscalado() ) );
+        archivos.add( f );
+        if ( ds.size() > 1 ) {
+          cursiva( Figuras.parte( inf.idioma, x.parte, x.partes ) );
+        }
+        sb.append( "![" ).append( esc( alt ) ).append( "](" ).append( ruta( carpeta.getName(), nombre ) ).append(
+          ")\n\n" );
+      }
+      Imagen lz = Figuras.lienzo( d );
+      if ( lz != null ) {
+        boolean lienzo = !lienzoUsado && ( Diagrama.FLUJO.equals( d.clase ) || Diagrama.JOB.equals( d.clase ) );
+        lienzoUsado |= lienzo;
+        String nombreLz = lienzo ? "lienzo" : lz.id != null ? lz.id : base + "-lienzo";
+        String altLz = lz.alt != null ? lz.alt : alt;
+        if ( Figuras.proporcionada( lz ) ) {
+          imagen( lz, nombreLz, altLz );
+        } else {
+          String nombre = archivo( nombreLz, Imagen.JPG.equals( lz.mime ) ? "jpg" : "png" );
+          File f = new File( carpeta, nombre );
+          Html.escribir( f, lz.datos );
+          archivos.add( f );
+          String texto = Rotulos.de( Diagramas.AREA, inf.idioma ).s( "lienzo.enlace" );
+          sb.append( '[' ).append( esc( texto ) ).append( "](" ).append( ruta( carpeta.getName(), nombre ) ).append(
+            ")\n\n" );
+        }
+      }
+      if ( d.mermaid != null && !d.mermaid.trim().isEmpty() ) {
+        String texto = d.mermaid.replace( "\r\n", "\n" ).trim();
+        String c = cerca( texto );
+        sb.append( "> [!note]- " ).append( esc( t( "mermaid_code" ) ) ).append( '\n' );
+        sb.append( "> " ).append( c ).append( "mermaid\n" );
+        for ( String l : texto.split( "\n" ) ) {
+          sb.append( l.isEmpty() ? ">" : "> " + l ).append( '\n' );
+        }
+        sb.append( "> " ).append( c ).append( "\n\n" );
       }
     }
 

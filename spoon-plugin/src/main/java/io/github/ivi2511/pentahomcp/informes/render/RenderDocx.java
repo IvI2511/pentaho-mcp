@@ -81,6 +81,8 @@ import io.github.ivi2511.pentahomcp.informes.Renderizador;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.graficos.SvgAPng;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
@@ -150,7 +152,7 @@ public final class RenderDocx implements Renderizador {
   /** Formato.DOCX (se busca por clave). */
   @Override
   public Formato formato() {
-    return Formato.deClave( CLAVE );
+    return Formato.DOCX;
   }
 
   /** null si POI puede escribir Word en este proceso; si no, el motivo traducido (como RenderPptx.problema). */
@@ -317,6 +319,8 @@ public final class RenderDocx implements Renderizador {
     static final double ACHICAR_MIN = 0.6;
     /** Un PNG de Mermaid o del lienzo (escala 2) puede agrandarse hasta su tamano en pixeles. */
     static final double AMPLIAR_MAX = 2.0;
+    /** Pixeles del PNG de un diagrama propio por px CSS del tamano final: unos 200 ppp en la hoja. */
+    static final double PPP_DIAGRAMA = 2.1;
     /** Ancho medio de un caracter de Segoe UI en fracciones del cuerpo (estimaciones). */
     static final double ANCHO_CARACTER = 0.55;
     /** Lo mismo con margen, para la palabra mas larga de una columna (no se tiene que partir). */
@@ -1351,8 +1355,16 @@ public final class RenderDocx implements Renderizador {
 
     // ------------------------------------------------------------------ figuras
 
-    /** El lienzo (si hay) y el Mermaid como PNG; sin PNG, la tabla alternativa. */
+    /**
+     * Con grafo, el diagrama propio (una figura por parte, para la hoja de Word) y despues el lienzo si no es
+     * una tira. Sin grafo: el lienzo (si hay) y el Mermaid como PNG; sin PNG, la tabla alternativa.
+     */
     void diagrama( Diagrama d ) throws Exception {
+      List<Dibujo> ds = Figuras.dibujos( d, Objetivo.DOCX, idioma );
+      if ( ds != null ) {
+        propio( d, ds );
+        return;
+      }
       boolean algo = d.imagen != null && figuraSegura( d.imagen, d.imagen.alt != null ? d.imagen.alt : d.alt );
       byte[] png = d.id == null || PptxDiapos.vacio( d.mermaid ) ? null : pngs.get( d.id );
       if ( png != null && png.length > 0 ) {
@@ -1374,6 +1386,31 @@ public final class RenderDocx implements Renderizador {
         nota( r.s( "diagrama_como_tabla" ) );
       } else {
         nota( r.s( "diagrama_no_disponible" ) + ( PptxDiapos.vacio( d.alt ) ? "" : " " + d.alt ) );
+      }
+    }
+
+    /**
+     * Las partes del diagrama propio como PNG a ~200 ppp del tamano final (Objetivo.DOCX ya es la hoja de
+     * Word: no se agranda), cada una con «Parte i de n» encima si se partio, pegado a la figura.
+     */
+    void propio( Diagrama d, List<Dibujo> ds ) throws Exception {
+      for ( Dibujo x : ds ) {
+        if ( ds.size() > 1 ) {
+          XWPFParagraph p = doc.createParagraph();
+          p.setStyle( "PliveNota" );
+          org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr ppr = p.getCTP().isSetPPr() ? p.getCTP()
+            .getPPr() : p.getCTP().addNewPPr();
+          ppr.addNewKeepNext();
+          correr( p, Figuras.parte( idioma, x.parte, x.partes ), 0, null, true, false );
+          ocupar( 18 );
+        }
+        byte[] png = x.png( PPP_DIAGRAMA );
+        int[] wh = PptxDiapos.medir( png );
+        figura( png, Imagen.PNG, wh[ 0 ], wh[ 1 ], (float) ( wh[ 0 ] / x.anchoFinal() ), 1.0, d.alt );
+      }
+      Imagen lz = Figuras.lienzo( d );
+      if ( lz != null && Figuras.proporcionada( lz ) ) {
+        figuraSegura( lz, lz.alt != null ? lz.alt : d.alt );
       }
     }
 

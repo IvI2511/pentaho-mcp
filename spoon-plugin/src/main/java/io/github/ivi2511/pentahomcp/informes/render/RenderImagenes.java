@@ -18,6 +18,8 @@ import io.github.ivi2511.pentahomcp.informes.Renderizador;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.graficos.SvgAPng;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
@@ -33,8 +35,10 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  * presentacion o un documento:
  * <ul>
  * <li>el lienzo de Spoon (el PNG del modelo, a escala 2);</li>
- * <li>cada diagrama Mermaid como PNG (PrerenderMermaid.png, escala 2) y como SVG estatico
- * (PrerenderMermaid.svg: sin foreignObject, se pega bien en Office);</li>
+ * <li>cada diagrama de flujo, job o linaje como lo dibuja el motor propio para una diapositiva 16:9 (uno por
+ * parte si se partio): PNG al doble y SVG;</li>
+ * <li>cada diagrama Mermaid (el modelo entidad-relacion) como PNG (PrerenderMermaid.png, escala 2) y como SVG
+ * estatico (PrerenderMermaid.svg: sin foreignObject, se pega bien en Office);</li>
  * <li>cada grafico como SVG (GraficosSvg) y como PNG de {@value #ANCHO_PNG_GRAFICO} px (Batik);</li>
  * <li>las imagenes sueltas de las secciones (el logo de la portada no).</li>
  * </ul>
@@ -82,7 +86,7 @@ public final class RenderImagenes implements Renderizador {
   /** Formato.IMAGENES (se busca por clave). */
   @Override
   public Formato formato() {
-    return Formato.deClave( CLAVE );
+    return Formato.IMAGENES;
   }
 
   /** "C:\x\informe" -> "C:\x\informe_imagenes" (la carpeta por defecto para un nombre base). */
@@ -131,6 +135,27 @@ public final class RenderImagenes implements Renderizador {
           if ( d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0 ) {
             String base = nombre( usados, ++n, sec, r.s( "lienzo" ) );
             escribir( res, new File( dir, base + extension( d.imagen.mime ) ), d.imagen.datos );
+          }
+          List<Dibujo> ds = Figuras.dibujos( d, Objetivo.DIAPOSITIVA, idioma );
+          if ( ds != null ) {
+            String base = nombre( usados, ++n, sec, que( b, r.s( "diagrama" ) ) );
+            for ( Dibujo x : ds ) {
+              String nb = ds.size() > 1 ? base + "-" + x.parte : base;
+              byte[] png;
+              try {
+                png = x.png( 2 );
+              } catch ( Throwable e ) {
+                png = null;
+              }
+              if ( png != null && png.length > 0 ) {
+                escribir( res, new File( dir, nb + ".png" ), png );
+              } else {
+                soloSvg++;
+              }
+              escribir( res, new File( dir, nb + ".svg" ), suelto( x.svgEscalado() ).getBytes(
+                StandardCharsets.UTF_8 ) );
+            }
+            continue;
           }
           if ( PptxDiapos.vacio( d.mermaid ) ) {
             continue;
