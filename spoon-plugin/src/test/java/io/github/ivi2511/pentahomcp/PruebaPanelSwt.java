@@ -371,6 +371,8 @@ public class PruebaPanelSwt {
       igual( r.s( "band_diagrams" ), ui( () -> ( (Label) buscar( "banda" ) ).getText() ), "texto de la banda" );
       esperarHtml( "base" );
       archivo( pantalla( "panel-sin-navegador.png" ), 5000, "captura con la banda" );
+      // el perfil de datos deja marcar varios steps (una lista con casillas, no un combo de uno)
+      cierto( ui( () -> ( buscar( "perfil_steps" ).getStyle() & SWT.CHECK ) != 0 ), "perfil: lista con casillas" );
     } finally {
       servicio.navegador = true;
     }
@@ -382,7 +384,7 @@ public class PruebaPanelSwt {
       return null;
     } );
     esperar( "liviana del job", () -> !buscar( "linaje_step" ).getParent().getVisible(), 10000 );
-    falso( ui( () -> buscar( "perfil_step" ).getParent().getVisible() ), "sin step de perfil en un job" );
+    falso( ui( () -> buscar( "perfil_steps" ).getParent().getVisible() ), "sin steps de perfil en un job" );
     cierto( ui( () -> buscar( "medir" ).getParent().getVisible() ), "Medir sigue a mano en un job" );
   }
 
@@ -841,8 +843,27 @@ public class PruebaPanelSwt {
       try {
         if ( VISIBLES ) {
           gc.copyArea( img, b.x, b.y );
-        } else if ( !host.print( gc ) ) {
-          System.out.println( "  (print(GC) no soportado: la captura queda vacia)" );
+        } else {
+          // Shell.print() de SWT en Windows siempre devuelve false: se dibuja cada hijo de la Shell (el deck,
+          // que la llena) con PrintWindow, que funciona fuera de la pantalla y detras de otras ventanas
+          boolean alguno = false;
+          for ( Control hijo : host.getChildren() ) {
+            Rectangle h = hijo.getBounds();
+            Image parte = new Image( display, Math.max( 1, h.width ), Math.max( 1, h.height ) );
+            GC gp = new GC( parte );
+            try {
+              if ( hijo.print( gp ) ) {
+                gc.drawImage( parte, h.x, h.y );
+                alguno = true;
+              }
+            } finally {
+              gp.dispose();
+              parte.dispose();
+            }
+          }
+          if ( !alguno ) {
+            System.out.println( "  (print(GC) no soportado: la captura queda vacia)" );
+          }
         }
       } finally {
         gc.dispose();
