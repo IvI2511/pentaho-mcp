@@ -18,12 +18,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   quality score (grades A-D) and the points each rule takes away; any error caps it at 74. It opens no
   dialogs, does not run the transformation and never connects to a SQLite, H2 or HSQLDB file that does not
   exist (Kettle would create it empty); `include_kettle_checks` adds Spoon's own Verify, which never changes
-  the score.
+  the score and skips the steps that would touch such a file.
 - Deep mode, `lint_etl` with `deep=true`: reads up to 5000 rows of the sources to confirm or rule out the
   unsorted input and decimal symbol findings. An unsorted input is proven by running the step with and
   without a Sort rows before it ("gives 4 rows instead of 10"), and becomes an error; sorted data or integer
-  values, with the whole input read, lower the finding to info. It runs only through steps known to be read-only, never creates a
-  missing SQLite, H2 or HSQLDB file, and `deep_timeout_s` (default 60) caps it.
+  values, with the whole input read, lower the finding to info. It runs only through steps known to be read-only (a
+  Table input only with a plain SELECT/WITH query and no SQL run on connect), writes nothing to the log tables,
+  never creates a missing SQLite, H2 or HSQLDB file, and `deep_timeout_s` (default 60) caps it. In a report,
+  `"mostrar_valores": false` keeps the values it read out of the quality section.
 - `apply_lint_fixes`: applies the fixes `lint_etl` proposes, by key. `all_auto` takes the safe ones
   (proposed names for default step and entry names, START renamed, Calculator operands swapped); the rest
   (a Sort rows or an `ORDER BY`, copy mode, paths, the decimal symbol, output fields, the failure hop to an
@@ -58,6 +60,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `rename_step` now also updates the steps that name the renamed step as plain text: Prioritize streams,
+  Block this step until steps finish, Steps metrics, Multiway merge join, XML join and Join rows (they kept
+  the old name and failed at the next run).
 - Reports: a table cell with a very long word (a path, a `${…}` value) no longer pushes the table past the
   edge of the PDF page, where the last column was cut off.
 - Reports panel: "Preview ready (1 section)" in the singular.

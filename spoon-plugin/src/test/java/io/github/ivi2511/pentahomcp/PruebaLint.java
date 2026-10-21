@@ -12,6 +12,8 @@ import static io.github.ivi2511.pentahomcp.Verificador.noNulo;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +36,7 @@ import io.github.ivi2511.pentahomcp.lint.BaseFaltante;
 import io.github.ivi2511.pentahomcp.lint.Catalogo;
 import io.github.ivi2511.pentahomcp.lint.LintJson;
 import io.github.ivi2511.pentahomcp.lint.LintMotor;
+import io.github.ivi2511.pentahomcp.lint.NoEvaluado;
 import io.github.ivi2511.pentahomcp.lint.Opciones;
 import io.github.ivi2511.pentahomcp.lint.Regla;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
@@ -242,6 +245,22 @@ public class PruebaLint {
       for ( JsonNode n : o.path( "not_evaluated" ) ) {
         distinto( "error", n.path( "code" ).asText(), "ninguna regla revento: " + n );
       }
+      // include_kettle_checks: el Verify de Spoon (TableInputMeta.check se conecta) tampoco revisa esos steps
+      final Opciones conVerify = LintTools.opciones( McpHttpServer.JSON.readTree(
+        "{\"language\":\"en\",\"include_kettle_checks\":true}" ) );
+      conVerify.entorno = env;
+      Resultado rk = RunMotor.enSegundoPlano( () -> LintMotor.analizar( copia, conVerify ), LintTools.MS_LINT,
+        env::cancelar, "The lint" );
+      falso( base.exists(), "kettle_check tampoco creo la base vacia: " + base );
+      List<String> saltados = new ArrayList<String>();
+      for ( NoEvaluado n : rk.notEvaluated ) {
+        if ( "kettle_check".equals( n.rule ) ) {
+          saltados.add( n.step );
+          contiene( n.reason, "does not exist", "con el motivo: " + n.reason );
+        }
+      }
+      cierto( saltados.contains( "Consultar SQLite" ) && saltados.contains( "Escribir consulta" ),
+        "kettle_check salta el Table input y lo que tiene detras: " + saltados );
     } finally {
       base.delete();
       dir.delete();

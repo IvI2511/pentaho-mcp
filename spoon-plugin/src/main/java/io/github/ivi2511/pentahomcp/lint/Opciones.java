@@ -21,6 +21,11 @@ public final class Opciones {
   public boolean honorSuppressions = true;
   /** Presupuesto de todo el modo profundo (deep_timeout_s); cada sonda, además, 30 s como mucho. */
   public long deepBudgetMs = 60000;
+  /**
+   * El modo profundo no cita los valores que leyó (claves desordenadas, el ejemplo con separador, cómo se lee, el
+   * error de Kettle): los informes con "mostrar_valores": false. Los cuenta igual.
+   */
+  public boolean ocultarValores;
   /** en, es o pt (textos de los hallazgos). */
   public String lang = "en";
   /**

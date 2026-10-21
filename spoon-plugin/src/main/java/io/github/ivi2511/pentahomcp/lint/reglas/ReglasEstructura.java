@@ -294,7 +294,36 @@ public final class ReglasEstructura {
       List<CheckResultInterface> r = new ArrayList<CheckResultInterface>();
       if ( ctx.esTrans() ) {
         TransMeta tm = ctx.trans();
-        tm.checkSteps( r, false, null, tm, null, tm.getMetaStore() );
+        // check() de Table input/output se conecta: los steps que tocarían una base de archivo que no existe no se
+        // revisan (Kettle la crearía vacía), como en RunMotor.validar con saltear
+        List<StepMeta> pasos = tm.getSteps();
+        boolean[] van = new boolean[ pasos.size() ];
+        int quedan = 0;
+        for ( int i = 0; i < pasos.size(); i++ ) {
+          String[] falta = ctx.entorno().baseFaltante( pasos.get( i ) );
+          van[ i ] = falta == null;
+          quedan += van[ i ] ? 1 : 0;
+          if ( falta != null ) {
+            ctx.noEvaluado( "fields", pasos.get( i ).getName(), null, ctx.t( "ne.check_db_missing", "connection",
+              falta[ 0 ], "file", falta[ 1 ] ) );
+          }
+        }
+        if ( quedan == pasos.size() ) {
+          tm.checkSteps( r, false, null, tm, null, tm.getMetaStore() );
+        } else if ( quedan > 0 ) { // con onlySelected y ninguno seleccionado, checkSteps revisa todos
+          boolean[] antes = new boolean[ pasos.size() ];
+          try {
+            for ( int i = 0; i < pasos.size(); i++ ) {
+              antes[ i ] = pasos.get( i ).isSelected();
+              pasos.get( i ).setSelected( van[ i ] );
+            }
+            tm.checkSteps( r, true, null, tm, null, tm.getMetaStore() );
+          } finally {
+            for ( int i = 0; i < pasos.size(); i++ ) {
+              pasos.get( i ).setSelected( antes[ i ] );
+            }
+          }
+        }
       } else {
         JobMeta jm = ctx.job();
         jm.checkJobEntries( r, false, null, jm, null, jm.getMetaStore() );

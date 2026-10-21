@@ -248,6 +248,130 @@ public class PruebaProfundo {
     falso( env.soloLectura( s ), "con un directorio de líneas de error escribe" );
   }
 
+  /**
+   * Table input: corre su consulta de verdad, así que es de solo lectura solo con un SELECT/WITH que solo lee, sin
+   * otra sentencia y con una conexión que no corre SQL al conectarse (también con la consulta resuelta).
+   */
+  public void pruebaTableInputQueEscribe() throws Exception {
+    for ( String sql : new String[] { "SELECT producto, importe FROM ventas", "select * from ventas;",
+      "-- ventas del mes\n/* sin filtro */ SELECT a FROM t WHERE fecha > ?", "WITH x AS (SELECT 1 AS a) SELECT a FROM x",
+      "(SELECT a FROM x) UNION (SELECT a FROM y)", "SELECT deleted, updated_at FROM t" } ) {
+      cierto( LintEntorno.consultaQueSoloLee( sql ), "solo lee: " + sql );
+    }
+    for ( String sql : new String[] { "WITH lote AS (DELETE FROM cola_eventos RETURNING *) SELECT * FROM lote",
+      "EXEC dbo.usp_extraer_y_marcar @desde=?", "SELECT * INTO copia FROM ventas", "SELECT 1; DELETE FROM ventas",
+      "SELECT nextval('seq')", "SELECT * FROM t FOR UPDATE", "CALL extraer()", "SET NOCOUNT ON; SELECT 1",
+      "-- DELETE FROM t\nSELECT 1", "TRUNCATE t", "" } ) {
+      falso( LintEntorno.consultaQueSoloLee( sql ), "no se sabe que solo lee: " + sql );
+    }
+    EntornoKettle.iniciar();
+    TransMeta tm = new TransMeta();
+    org.pentaho.di.core.database.DatabaseMeta db = new org.pentaho.di.core.database.DatabaseMeta( "pg", "POSTGRESQL",
+      "Native", "localhost", "ventas", "5432", "u", "" );
+    tm.addDatabase( db );
+    TransOps.agregarStep( tm, "TableInput", "Leer", "<connection>pg</connection><sql>SELECT a FROM ventas</sql>",
+      100, 100, null, null, null );
+    StepMeta s = tm.findStep( "Leer" );
+    org.pentaho.di.trans.steps.tableinput.TableInputMeta m =
+      (org.pentaho.di.trans.steps.tableinput.TableInputMeta) s.getStepMetaInterface();
+    LintEntorno env = new LintEntorno( tm );
+    cierto( env.soloLectura( s ), "un SELECT en una base que no es de archivo" );
+    m.setSQL( "WITH lote AS (DELETE FROM cola RETURNING *) SELECT * FROM lote" );
+    falso( env.soloLectura( s ), "un CTE que borra" );
+    m.setSQL( "SELECT a FROM ${TABLA}" );
+    m.setVariableReplacementActive( true );
+    tm.setVariable( "TABLA", "ventas" );
+    cierto( env.soloLectura( s ), "con la variable resuelta, un SELECT" );
+    tm.setVariable( "TABLA", "ventas; DELETE FROM ventas" );
+    falso( env.soloLectura( s ), "la variable resuelta trae otra sentencia" );
+    tm.setVariable( "TABLA", "ventas" );
+    db.setConnectSQL( "UPDATE sesiones SET ultima = now()" );
+    falso( env.soloLectura( s ), "la conexión corre SQL al conectarse" );
+  }
+
+  /**
+   * Una sonda no escribe en las tablas de log, ni en las de la transformación ni en las de kettle.properties
+   * (KETTLE_TRANS_LOG_DB/TABLE): con una base SQLite de log que no existe, Kettle la habría creado al escribir el
+   * START.
+   */
+  public void pruebaSondaSinTablasDeLog() throws Exception {
+    File base = new File( EntornoKettle.salida( "profundo" ), "log_de_sondas.sqlite" );
+    base.delete();
+    TransMeta c = (TransMeta) ReportTools.clonar( EntornoKettle.trans( "03" ) );
+    c.addDatabase( new org.pentaho.di.core.database.DatabaseMeta( "logs", "SQLITE", "Native", "",
+      base.getAbsolutePath(), "-1", "", "" ) );
+    // tablas como recién cargadas (las del clon miran las conexiones y variables del original)
+    c.setTransLogTable( org.pentaho.di.core.logging.TransLogTable.getDefault( c, c, c.getSteps() ) );
+    c.setStepLogTable( org.pentaho.di.core.logging.StepLogTable.getDefault( c, c ) );
+    c.setVariable( "KETTLE_TRANS_LOG_DB", "logs" ); // como un kettle.properties con log central
+    c.setVariable( "KETTLE_TRANS_LOG_TABLE", "trans_log" );
+    c.getStepLogTable().setConnectionName( "logs" ); // y una tabla propia
+    c.getStepLogTable().setTableName( "step_log" );
+    cierto( c.getTransLogTable().isDefined(), "precondición: tabla de log por las variables globales" );
+    cierto( c.getStepLogTable().isDefined(), "precondición: tabla de log propia" );
+    RunMotor.Filas f = RunMotor.filas( c, "Leer ventas", 5000, 30000 );
+    igual( "finished", f.estado, "la sonda corre: " + f.error );
+    cierto( f.completa, "y lee todo" );
+    for ( org.pentaho.di.core.logging.LogTableInterface l : c.getLogTables() ) {
+      falso( l.isDefined(), "sin tabla de log: " + l.getClass().getSimpleName() );
+    }
+    falso( base.exists(), "no se conectó a la base de log (Kettle la habría creado)" );
+  }
+
+  /**
+   * El init que se pasa del plazo no se interrumpe: sigue en su hilo y, cuando termina, sus steps se liberan
+   * (dispose cierra las conexiones y archivos que abrieron).
+   */
+  public void pruebaInitConPlazo() throws Exception {
+    TransMeta c = (TransMeta) ReportTools.clonar( EntornoKettle.trans( "03" ) );
+    RunMotor.recortar( c, c.findStep( "Leer ventas" ) );
+    RunMotor.sinTablasDeLog( c );
+    org.pentaho.di.trans.Trans t = new org.pentaho.di.trans.Trans( c );
+    t.setPreview( true );
+    RunMotor.prepararVariables( t, c );
+    boolean vencio = false;
+    try {
+      RunMotor.prepararConPlazo( t, 1, "Preparing 'Leer ventas'" );
+      RunMotor.liberarPasos( t ); // terminó en 1 ms: la sonda la liberaría al terminar
+    } catch ( McpHttpServer.ToolError e ) {
+      vencio = true;
+      contiene( e.getMessage(), "did not finish", "vence con ToolError" );
+    }
+    long hasta = System.currentTimeMillis() + 15000;
+    boolean liberados = false;
+    while ( !liberados && System.currentTimeMillis() < hasta ) {
+      List<org.pentaho.di.trans.step.StepMetaDataCombi> pasos = t.getSteps();
+      liberados = pasos != null && !pasos.isEmpty();
+      for ( int i = 0; liberados && i < pasos.size(); i++ ) {
+        liberados = pasos.get( i ).data.getStatus() == org.pentaho.di.trans.step.BaseStepData.StepExecutionStatus
+          .STATUS_DISPOSED;
+      }
+      RunMotor.dormir( 50 );
+    }
+    cierto( liberados, "los steps quedan liberados (" + ( vencio ? "init abandonado" : "init a tiempo" ) + ")" );
+  }
+
+  /** Un informe con "mostrar_valores": false: el modo profundo juzga igual, pero no cita los valores que leyó. */
+  public void pruebaSinValores() throws Exception {
+    TransMeta m01 = mutacion( "03", "m01_sin_valores_prueba.ktr", x -> enStep( x, "Leer ventas",
+      s -> s.replaceFirst( "(?s)(<name>precio_unitario</name>.*?)<decimal>\\.</decimal>", "$1<decimal/>" ) ) );
+    Opciones op = new Opciones();
+    op.deep = true;
+    op.lang = "en";
+    op.deepBudgetMs = 60000;
+    op.sondas = new LintSondas();
+    op.ocultarValores = true;
+    Hallazgo h = uno( analizar( m01, op ), "empty_decimal_symbol" );
+    igual( Sev.ERROR, h.severity, "juzga igual: error" );
+    igual( LintSondas.OCULTO, h.evidence.get( "deep_example" ), "sin el ejemplo: " + h.evidence );
+    falso( h.evidence.containsKey( "deep_read_as" ) || h.evidence.containsKey( "deep_read_error" ),
+      "ni cómo se lee el valor" );
+    String profundo = h.message.substring( h.message.indexOf( "Deep check:" ) ); // el estático dice «2.50» de ejemplo
+    cierto( !profundo.contains( "2.50" ) && !profundo.contains( "1.80" ) && profundo.contains( LintSondas.OCULTO ),
+      "lo que agrega el modo profundo no cita valores: " + profundo );
+    igual( ".", h.fix.preview, "el símbolo que usan los datos sí (no es un dato)" );
+  }
+
   /** Sin presupuesto: nada corre, todo queda como el estático y not_evaluated lo dice. */
   public void pruebaPresupuesto() throws Exception {
     TransMeta tm = sample( "Merge Join - Join 2 sorted data sets.ktr" );

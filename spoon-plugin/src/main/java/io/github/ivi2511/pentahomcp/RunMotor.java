@@ -34,17 +34,25 @@ import org.pentaho.di.base.AbstractMeta;
 import org.pentaho.di.core.CheckResultInterface;
 import org.pentaho.di.core.Result;
 import org.pentaho.di.core.exception.KettleStepException;
+import org.pentaho.di.core.logging.BaseLogTable;
+import org.pentaho.di.core.logging.ChannelLogTable;
 import org.pentaho.di.core.logging.KettleLogStore;
 import org.pentaho.di.core.logging.LogLevel;
+import org.pentaho.di.core.logging.LogTableInterface;
 import org.pentaho.di.core.logging.LoggingObjectInterface;
 import org.pentaho.di.core.logging.LoggingObjectType;
 import org.pentaho.di.core.logging.LoggingRegistry;
+import org.pentaho.di.core.logging.MetricsLogTable;
+import org.pentaho.di.core.logging.PerformanceLogTable;
 import org.pentaho.di.core.logging.SimpleLoggingObject;
+import org.pentaho.di.core.logging.StepLogTable;
+import org.pentaho.di.core.logging.TransLogTable;
 import org.pentaho.di.core.plugins.PluginInterface;
 import org.pentaho.di.core.plugins.PluginRegistry;
 import org.pentaho.di.core.plugins.StepPluginType;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.row.ValueMetaInterface;
+import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.job.Job;
 import org.pentaho.di.job.JobEntryResult;
 import org.pentaho.di.job.JobHopMeta;
@@ -778,6 +786,7 @@ final class RunMotor {
       throw new ToolError( "The plugin of '" + nombre + "' is missing (type " + objetivo.getStepID() + "): it cannot run" );
     }
     recortar( copia, objetivo );
+    sinTablasDeLog( copia ); // una sonda no es una corrida: nada de START/END en las tablas de log
     final Filas r = new Filas();
     final boolean[] descartadas = { false };
     long inicio = System.currentTimeMillis();
@@ -785,13 +794,11 @@ final class RunMotor {
     t.setLogLevel( LogLevel.BASIC );
     t.setPreview( true );
     prepararVariables( t, copia );
+    sinTablasDeLog( copia, t );
     try {
       try {
         // init conecta a las BD: con una que no contesta, que no se coma el plazo de la sonda
-        enSegundoPlano( () -> {
-          t.prepareExecution( null );
-          return null;
-        }, Math.max( 1, ms ), t::stopAll, "Preparing '" + nombre + "'" );
+        prepararConPlazo( t, Math.max( 1, ms ), "Preparing '" + nombre + "'" );
       } catch ( ToolError e ) {
         r.estado = "timeout";
         r.error = e.getMessage();
@@ -871,6 +878,96 @@ final class RunMotor {
     } finally {
       r.ms = System.currentTimeMillis() - inicio;
       liberarLog( t.getLogChannelId() );
+    }
+  }
+
+  /**
+   * prepareExecution con plazo (init se conecta a las BD). Si vence, la Trans queda abandonada sin interrumpir su
+   * init (con el join interrumpido Kettle libera los steps mientras uno todavía se conecta, y esa conexión no la cierra
+   * nadie): cuando el init termina, {@link #liberarPasos} cierra lo que abrió. Lanza ToolError al vencer.
+   */
+  static void prepararConPlazo( final Trans t, long ms, String que ) throws Exception {
+    final AtomicInteger estado = new AtomicInteger( 0 ); // 0 preparando, 1 terminó, 2 abandonada
+    Future<Void> f = POOL.submit( () -> {
+      boolean ok = false;
+      try {
+        t.prepareExecution( null );
+        ok = true;
+        return null;
+      } finally {
+        // si falló, Kettle ya liberó los steps; si salió bien y nadie la espera, se liberan acá
+        if ( !estado.compareAndSet( 0, 1 ) && ok ) {
+          liberarPasos( t );
+        }
+      }
+    } );
+    try {
+      f.get( ms, TimeUnit.MILLISECONDS );
+    } catch ( TimeoutException e ) {
+      if ( estado.compareAndSet( 0, 2 ) ) {
+        throw new ToolError( que + " did not finish in " + Math.max( 1, ms / 1000 ) + " s and was stopped" );
+      }
+      resultado( f ); // terminó justo al vencer: sigue como si nada
+    } catch ( ExecutionException e ) {
+      throw causa( e );
+    }
+  }
+
+  private static void resultado( Future<?> f ) throws Exception {
+    try {
+      f.get();
+    } catch ( ExecutionException e ) {
+      throw causa( e );
+    }
+  }
+
+  private static Exception causa( ExecutionException e ) {
+    Throwable c = e.getCause();
+    return c instanceof Exception ? (Exception) c : new RuntimeException( c );
+  }
+
+  /** Libera los steps de una Trans preparada que no va a correr: dispose cierra sus conexiones y archivos. */
+  static void liberarPasos( Trans t ) {
+    List<StepMetaDataCombi> pasos = t.getSteps();
+    if ( pasos != null ) {
+      for ( StepMetaDataCombi c : new ArrayList<StepMetaDataCombi>( pasos ) ) {
+        try {
+          c.step.dispose( c.meta, c.data );
+        } catch ( Throwable ignored ) {
+          // los demás igual se liberan
+        }
+      }
+    }
+    liberarLog( t.getLogChannelId() );
+  }
+
+  /**
+   * La copia de una sonda sin tablas de log: prepareExecution escribe el START (y al terminar el END, los steps, la
+   * performance y los canales) en las tablas de la transformación o, si no tiene, en las de kettle.properties
+   * (KETTLE_TRANS_LOG_DB/TABLE…), aunque sea una preview. Tablas nuevas sin conexión ni nombre y esas variables vacías
+   * en la copia (el VariableSpace de las tablas nuevas): isDefined() da false.
+   */
+  static void sinTablasDeLog( TransMeta tm ) {
+    tm.setTransLogTable( TransLogTable.getDefault( tm, tm, tm.getSteps() ) );
+    tm.setStepLogTable( StepLogTable.getDefault( tm, tm ) );
+    tm.setPerformanceLogTable( PerformanceLogTable.getDefault( tm, tm ) );
+    tm.setChannelLogTable( ChannelLogTable.getDefault( tm, tm ) );
+    tm.setMetricsLogTable( MetricsLogTable.getDefault( tm, tm ) );
+    sinTablasDeLog( tm, tm );
+  }
+
+  /** Las variables globales de las tablas de log de tm, vacías en vars (la copia y la Trans). */
+  static void sinTablasDeLog( TransMeta tm, VariableSpace vars ) {
+    for ( LogTableInterface l : tm.getLogTables() ) {
+      if ( l instanceof BaseLogTable ) {
+        BaseLogTable b = (BaseLogTable) l;
+        for ( String v : new String[] { b.getConnectionNameVariable(), b.getSchemaNameVariable(),
+          b.getTableNameVariable() } ) {
+          if ( v != null ) {
+            vars.setVariable( v, "" );
+          }
+        }
+      }
     }
   }
 

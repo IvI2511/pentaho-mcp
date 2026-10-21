@@ -194,7 +194,8 @@ Todo corre en tu computadora. No hay servidores, cuentas, analíticas ni telemet
 - Solo se escriben archivos donde le pedís a Claude que guarde; las transformaciones se ejecutan solo
   cuando lo pedís.
 - Los informes nunca llevan contraseñas. Pueden llevar nombres de hosts, rutas de archivos y, en el perfil
-  de datos, valores reales de tus datos (se pueden ocultar en los ajustes del informe). El perfil y la
+  de datos y la revisión profunda de calidad, valores reales de tus datos (se pueden ocultar en los ajustes
+  del informe). El perfil y la
   opción «Medir» ejecutan una copia de la transformación solo cuando lo pedís, y esa copia escribe sus
   salidas como una ejecución normal.
 - La revisión de calidad (`lint_etl`) no ejecuta la transformación. Su modo profundo lee hasta 5000 filas

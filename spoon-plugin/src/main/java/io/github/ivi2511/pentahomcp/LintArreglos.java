@@ -51,6 +51,7 @@ import io.github.ivi2511.pentahomcp.lint.Resultado;
 import io.github.ivi2511.pentahomcp.lint.Rutas;
 import io.github.ivi2511.pentahomcp.lint.Supresiones;
 import io.github.ivi2511.pentahomcp.lint.Textos;
+import io.github.ivi2511.pentahomcp.lint.reglas.ReglasSeguridad;
 
 /**
  * apply_lint_fixes y suppress_lint (docs/linter-diseno.md §6-§7, WP5), sin Spoon: LintTools pone el hilo de UI, el
@@ -74,8 +75,6 @@ final class LintArreglos {
   static final String TODOS_AUTO = "all_auto";
   static final String YA_NO_ESTA = "no longer found: the rules no longer report it (already fixed, or the document "
     + "changed). Run lint_etl again for the current keys";
-  /** Un valor que es una variable de Kettle: lo único que se escribe en lugar de una contraseña. */
-  static final Pattern VARIABLE = Pattern.compile( "\\$\\{[^}]+\\}|%%[^%\\s]+%%" );
   static final Pattern IDENTIFICADOR = Pattern.compile( "[A-Za-z_][A-Za-z0-9_]*" );
   /** Consultas a las que no se les puede agregar un ORDER BY al final sin cambiarles el significado. */
   static final Pattern SQL_NO_ORDENABLE = Pattern.compile( "(?is).*\\b(order\\s+by|limit|offset|fetch|union|intersect"
@@ -302,6 +301,11 @@ final class LintArreglos {
     final Set<String> reservados = new HashSet<String>();
     /** Parámetros que declaran los arreglos de rutas de esta llamada, con su default (DIR_DATOS → carpeta). */
     final Map<String, String> parametros = new LinkedHashMap<String, String>();
+    /**
+     * Table inputs (en minúsculas) que ya reciben un ORDER BY en esta llamada: una consulta tiene un solo ORDER BY,
+     * así que el segundo consumidor del mismo Table input lleva un Sort rows.
+     */
+    final Set<String> consultasOrdenadas = new HashSet<String>();
 
     Aplicacion( AbstractMeta meta, String lang, UndoGrupo undo, Repository rep, IMetaStore ms ) {
       this.meta = meta;
@@ -651,6 +655,11 @@ final class LintArreglos {
         refs.add( "'" + otros.get( i )[ 1 ].getName() + "'" );
       }
       ap.undo.cambio( desde, hasta, idx ); // el step y los que lo nombran: una sola acción, como rename_step
+      List<String> quedan = TransOps.nombranTodavia( ap.tm, s, viejo );
+      if ( !quedan.isEmpty() ) { // un plugin que guarda el nombre como texto y Kettle no lo actualiza
+        ap.notas.add( String.join( ", ", quedan ) + " still name '" + viejo + "' as text: check that it points to '"
+          + nombre + "' (open it in Spoon), or undo the rename." );
+      }
       return "Renamed step '" + viejo + "' to '" + nombre + "'"
         + ( refs.isEmpty() ? "" : " (references updated in " + String.join( ", ", refs ) + ")" );
     }
@@ -811,9 +820,9 @@ final class LintArreglos {
       super( e );
       Hallazgo h = e.h;
       valor = e.valor == null ? "" : e.valor.trim();
-      if ( !VARIABLE.matcher( valor ).find() ) {
-        throw new Saltar( "the value must be a variable such as ${DB_PASSWORD} (defined in kettle.properties): a fix "
-          + "never writes a password into the file" );
+      if ( !ReglasSeguridad.esVariable( valor ) ) { // entero: «clave${X}» sigue siendo una clave en el archivo
+        throw new Saltar( "the value must be only a variable such as ${DB_PASSWORD} (defined in kettle.properties), "
+          + "with no text around it: a fix never writes a password into the file" );
       }
       if ( Hallazgo.CONNECTION.equals( h.scope ) ) {
         db = ap.meta.findDatabase( h.object );
@@ -849,7 +858,7 @@ final class LintArreglos {
       for ( Element[] x : Nodos.hojas( raiz ) ) {
         String v = x[ 0 ].getTextContent().trim();
         if ( x[ 0 ].getTagName().equals( e.h.attribute ) && !v.isEmpty() && !v.equals( "Encrypted" )
-          && !v.matches( "(?i)Y|N|true|false" ) && !VARIABLE.matcher( v ).find() ) {
+          && !v.matches( "(?i)Y|N|true|false" ) && !ReglasSeguridad.esVariable( v ) ) {
           l.add( x[ 0 ] );
         }
       }
@@ -1000,7 +1009,8 @@ final class LintArreglos {
             simples &= IDENTIFICADOR.matcher( x ).matches();
           }
           if ( simples && SQL_SELECT.matcher( sql ).matches() && !SQL_NO_ORDENABLE.matcher( sql ).matches()
-            && !sql.contains( "${" ) && !sql.contains( "%%" ) ) {
+            && !sql.contains( "${" ) && !sql.contains( "%%" )
+            && ap.consultasOrdenadas.add( t.getName().toLowerCase( Locale.ROOT ) ) ) {
             return new OrdenEnConsulta( e, t, k );
           }
         }
@@ -1203,7 +1213,11 @@ final class LintArreglos {
     String hacer( Aplicacion ap ) throws Exception {
       Element raiz = xml( t );
       Element sql = Nodos.hijo( raiz, "sql" );
-      String q = sql.getTextContent().replaceAll( "[\\s;]+$", "" );
+      String q = sql == null ? "" : sql.getTextContent().replaceAll( "[\\s;]+$", "" );
+      if ( !SQL_SELECT.matcher( q ).matches() || SQL_NO_ORDENABLE.matcher( q ).matches() ) {
+        throw new Saltar( "the query of '" + t.getName() + "' changed (it already has an ORDER BY, or cannot take "
+          + "one): insert a Sort rows instead" );
+      }
       sql.setTextContent( q + "\nORDER BY " + String.join( ", ", claves ) );
       releer( ap, t, raiz );
       return "Added ORDER BY " + String.join( ", ", claves ) + " to the query of '" + t.getName() + "'";

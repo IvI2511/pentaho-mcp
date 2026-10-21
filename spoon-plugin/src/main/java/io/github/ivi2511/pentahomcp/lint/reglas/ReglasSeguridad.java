@@ -28,6 +28,8 @@ import io.github.ivi2511.pentahomcp.lint.Sev;
 public final class ReglasSeguridad {
 
   static final Pattern TAG_CLAVE = Pattern.compile( "(?i)(.*_)?(password|passwd|pwd)|.*password" );
+  /** Solo variables (${A}, %%B%%, ${A}${B}): «S3cret!${SUFIJO}» es una clave en claro con una variable pegada. */
+  static final Pattern SOLO_VARIABLES = Pattern.compile( "\\s*(\\$\\{[^}]+\\}|%%[^%\\s]+%%)+\\s*" );
 
   private ReglasSeguridad() {
   }
@@ -36,8 +38,9 @@ public final class ReglasSeguridad {
     return Collections.<Regla>singletonList( new ClaveEnArchivo() );
   }
 
-  static boolean esVariable( String v ) {
-    return v.contains( "${" ) || v.contains( "%%" );
+  /** El valor entero es una o más variables de Kettle (nada de texto fijo alrededor). */
+  public static boolean esVariable( String v ) {
+    return v != null && SOLO_VARIABLES.matcher( v ).matches();
   }
 
   /** null si no es una contraseña guardada (vacía, Y/N, variable); si no, E (en claro) o W (Encrypted). */
@@ -148,7 +151,8 @@ public final class ReglasSeguridad {
     }
 
     private void terminar( Ctx ctx, Hallazgo h, String tipo, String nombre, Sev sev ) {
-      String donde = tipo == null ? ctx.t( "word.document" ) : ctx.t( "word." + tipo ) + " «" + nombre + "»";
+      // las comillas del nombre van en el texto de cada idioma ('X' en inglés, «X» en es/pt)
+      String donde = tipo == null ? ctx.t( "word.document" ) : ctx.t( "word." + tipo, "name", nombre );
       h.message = ctx.t( sev == Sev.ERROR ? "password_in_file.msg.plain" : "password_in_file.msg.encrypted", "where", donde );
       h.evidencia( "stored", sev == Sev.ERROR ? "plain text" : "Encrypted (reversible)" );
       String var = variable( nombre );

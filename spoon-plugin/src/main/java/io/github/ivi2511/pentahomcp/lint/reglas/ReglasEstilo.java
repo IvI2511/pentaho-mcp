@@ -33,8 +33,12 @@ public final class ReglasEstilo {
   static final Pattern CREDENCIAL = Pattern.compile( "(?i).*(pass|pwd|user|token|secret|key).*" );
   /** Entradas cuyo nombre por defecto ya explica todo (y START, que tiene que llamarse así). */
   static final Set<String> ENTRADAS_SIN_NOMBRE = new HashSet<String>( Arrays.asList( "SUCCESS", "ABORT", "DUMMY", "SPECIAL" ) );
-  /** Los nombra otro archivo (el que llama al mapping): renombrar pide confirmación. */
-  static final Set<String> NOMBRADOS_DE_AFUERA = new HashSet<String>( Arrays.asList( "MappingInput", "MappingOutput" ) );
+  /**
+   * Los nombra otro archivo (el que llama al mapping; el Single threader o el programa que le inyecta filas al
+   * Injector): renombrar pide confirmación.
+   */
+  static final Set<String> NOMBRADOS_DE_AFUERA = new HashSet<String>( Arrays.asList( "MappingInput", "MappingOutput",
+    "Injector" ) );
 
   private ReglasEstilo() {
   }

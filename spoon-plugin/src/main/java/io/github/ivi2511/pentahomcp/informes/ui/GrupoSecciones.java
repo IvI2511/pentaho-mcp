@@ -274,6 +274,9 @@ final class GrupoSecciones {
     }
     if ( calidadProfunda.isEnabled() ) {
       calidadProfunda.setSelection( p.calidadProfunda );
+      if ( p.calidadProfunda ) {
+        marcar( SeccionId.CALIDAD, true ); // setSelection no dispara el listener que la marca
+      }
     }
   }
 

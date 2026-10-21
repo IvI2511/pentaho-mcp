@@ -68,6 +68,8 @@ final class LintSondas implements Sondas {
   static final Set<String> SIN_ORDEN_FIJO = new HashSet<String>( Arrays.asList( "copies", "merges", "multi" ) );
   private static final Pattern DIGITO = Pattern.compile( "\\d" );
   private static final int MAX_VALOR = 40;
+  /** Lo que va en lugar de un valor leído con op.ocultarValores (informes con "mostrar_valores": false). */
+  static final String OCULTO = "…";
 
   @Override
   public void sondear( TransMeta copia, List<Hallazgo> hallazgos, Opciones op, Textos tx, Profundo prof,
@@ -142,6 +144,11 @@ final class LintSondas implements Sondas {
       return Math.max( 1, Math.min( MS_SONDA, fin - System.currentTimeMillis() ) );
     }
 
+    /** Un valor leído de los datos (o un error de Kettle, que puede traer uno): oculto si op.ocultarValores. */
+    String dato( String s ) {
+      return op.ocultarValores ? OCULTO : s;
+    }
+
     TransMeta clon() {
       TransMeta c = (TransMeta) ReportTools.clonar( base );
       c.setRepository( base.getRepository() );
@@ -167,7 +174,7 @@ final class LintSondas implements Sondas {
     /** Por qué una corrida no sirve (o no entera). */
     String porQue( RunMotor.Filas f ) {
       if ( f.errores > 0 || "init_failed".equals( f.estado ) ) {
-        return tx.t( "deep.why.failed", "detail", f.error == null ? "?" : f.error );
+        return tx.t( "deep.why.failed", "detail", f.error == null ? "?" : dato( f.error ) );
       }
       if ( "row_limit".equals( f.estado ) ) {
         return tx.t( "deep.why.row_limit", "n", f.filas.size() );
@@ -260,7 +267,7 @@ final class LintSondas implements Sondas {
         try {
           muestra( h, cons, input, comparan, causa, aComparar );
         } catch ( Throwable e ) {
-          noEvaluado( h, "deep_failed", tx.t( "deep.ne.failed", "detail", RunMotor.primeraLinea( e ) ) );
+          noEvaluado( h, "deep_failed", tx.t( "deep.ne.failed", "detail", dato( RunMotor.primeraLinea( e ) ) ) );
         }
       }
       if ( aComparar.isEmpty() ) {
@@ -275,7 +282,8 @@ final class LintSondas implements Sondas {
         try {
           d = diferencial( cons, grupo );
         } catch ( Throwable e ) {
-          d = Diferencial.fallo( "deep_failed", tx.t( "deep.why.failed", "detail", RunMotor.primeraLinea( e ) ) );
+          d = Diferencial.fallo( "deep_failed", tx.t( "deep.why.failed", "detail",
+            dato( RunMotor.primeraLinea( e ) ) ) );
         }
       }
       for ( Hallazgo h : aComparar ) {
@@ -355,8 +363,8 @@ final class LintSondas implements Sondas {
         }
         return;
       }
-      h.evidencia( "deep_disorder", d.grupo ? tx.t( "deep.disorder.group", "value", d.valor, "row", d.fila )
-        : tx.t( "deep.disorder.order", "value", d.valor, "row", d.fila, "prev", d.anterior ) );
+      h.evidencia( "deep_disorder", d.grupo ? tx.t( "deep.disorder.group", "value", dato( d.valor ), "row", d.fila )
+        : tx.t( "deep.disorder.order", "value", dato( d.valor ), "row", d.fila, "prev", dato( d.anterior ) ) );
       aComparar.add( h );
     }
 
@@ -441,7 +449,7 @@ final class LintSondas implements Sondas {
       try {
         columna( h );
       } catch ( Throwable e ) {
-        noEvaluado( h, "deep_failed", tx.t( "deep.ne.failed", "detail", RunMotor.primeraLinea( e ) ) );
+        noEvaluado( h, "deep_failed", tx.t( "deep.ne.failed", "detail", dato( RunMotor.primeraLinea( e ) ) ) );
       }
     }
 
@@ -522,9 +530,10 @@ final class LintSondas implements Sondas {
         }
         return;
       }
-      h.evidencia( "deep_with_separator", conSeparador ).evidencia( "deep_example", corto( ejemplo ) );
+      h.evidencia( "deep_with_separator", conSeparador ).evidencia( "deep_example", dato( corto( ejemplo ) ) );
       String[] sep = separadores( separados );
-      String texto = tx.t( "deep.decimal.separators", "with", conSeparador, "values", valores, "example", corto( ejemplo ) );
+      String texto = tx.t( "deep.decimal.separators", "with", conSeparador, "values", valores, "example",
+        dato( corto( ejemplo ) ) );
       String leido = comoLoLee( h, campo, filaEjemplo, corto( ejemplo ) );
       resultado( h, Sev.ERROR, Profundo.SEPARATORS, texto + ( leido == null ? "" : "; " + leido ) + "."
         + ( sep[ 0 ] == null ? "" : " " + tx.t( "deep.decimal.suggest", "symbol", sep[ 0 ] ) ) );
@@ -538,7 +547,8 @@ final class LintSondas implements Sondas {
 
     /** Cómo lee esta JVM el primer valor con separador (el step tal cual), si queda tiempo. */
     String comoLoLee( Hallazgo h, String campo, int fila, String ejemplo ) {
-      if ( sinTiempo() != null || fin - System.currentTimeMillis() < 1000 ) {
+      // sin valores, «… se lee como …» no dice nada: ni se corre
+      if ( op.ocultarValores || sinTiempo() != null || fin - System.currentTimeMillis() < 1000 ) {
         return null;
       }
       String loc = Locale.getDefault( Locale.Category.FORMAT ).toLanguageTag();
@@ -573,8 +583,8 @@ final class LintSondas implements Sondas {
     }
 
     private String leeMal( Hallazgo h, String loc, String error ) {
-      h.evidencia( "deep_read_error", error ).evidencia( "deep_locale", loc );
-      return tx.t( "deep.decimal.read_fails", "locale", loc, "error", error );
+      h.evidencia( "deep_read_error", dato( error ) ).evidencia( "deep_locale", loc );
+      return tx.t( "deep.decimal.read_fails", "locale", loc, "error", dato( error ) );
     }
   }
 

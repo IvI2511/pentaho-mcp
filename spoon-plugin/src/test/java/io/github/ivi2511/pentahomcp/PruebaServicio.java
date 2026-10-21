@@ -164,6 +164,10 @@ public class PruebaServicio {
     tema.secciones = Arrays.asList( SeccionId.PORTADA, SeccionId.CONEXIONES, SeccionId.FLUJO_JOB );
     igual( Arrays.asList( SeccionId.PORTADA, SeccionId.CONEXIONES ), InformeServicio.seleccion( EntornoKettle
       .captura( "03" ), pedido( "en" ), tema, null ), "tema.secciones, solo las que aplican" );
+    Pedido profunda = pedido( "en" );
+    profunda.calidadProfunda = true;
+    igual( Arrays.asList( SeccionId.PORTADA, SeccionId.CALIDAD, SeccionId.CONEXIONES ), InformeServicio.seleccion(
+      EntornoKettle.captura( "03" ), profunda, tema, null ), "quality_deep suma quality aunque el tema no la marque" );
 
     List<String> avisos = new ArrayList<String>();
     Pedido x = pedido( "en" );

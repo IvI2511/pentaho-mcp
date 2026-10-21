@@ -437,7 +437,7 @@ Queda abierto (no se tocó):
 - **`password_in_file` en memoria**: no cuenta las conexiones y slave servers compartidos (`shared.xml`), que no
   están en el archivo.
 - **`default_step_name`**: el arreglo sale como `rename` con `needs_value` hasta que `LintPropuestas` (WP5) ponga
-  el nombre; `confirm` solo para Mapping input/output (los nombra otro archivo).
+  el nombre; `confirm` solo para Mapping input/output e Injector (los nombra otro archivo).
 - **Textos**: `{marcador}` simple, sin `MessageFormat` (los apóstrofos no se escapan). El cómo se arregla
   genérico (`<id>.fix`) puede usar la evidencia del hallazgo (`{keys}`, `{file}`).
 - **Lista blanca de solo lectura** (`LintEntorno.SOLO_LECTURA`): armada con las categorías de los 216 tipos de

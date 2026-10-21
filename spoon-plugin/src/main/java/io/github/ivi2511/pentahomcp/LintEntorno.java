@@ -10,8 +10,10 @@ import org.pentaho.di.base.AbstractMeta;
 import org.pentaho.di.core.database.DatabaseMeta;
 import org.pentaho.di.core.exception.KettleStepException;
 import org.pentaho.di.core.row.RowMetaInterface;
+import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
+import org.pentaho.di.trans.steps.tableinput.TableInputMeta;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
 import io.github.ivi2511.pentahomcp.lint.BaseFaltante;
@@ -35,8 +37,9 @@ final class LintEntorno implements Entorno {
    * filtro, orden, joins y búsquedas en memoria. Una lista negra no alcanza: RunMotor.escribe deja pasar en 9.4
    * Call DB procedure, Dynamic SQL row, REST/HTTP, Trans/Job executor, Mapping, Metadata injection, SSH, Zip,
    * SFTP put, Set session variables, JavaScript/UDJC y productores de colas. Sin probar contra los 216 tipos [NP].
-   * Además, {@link #soloLectura} rechaza los steps cuyo plugin falta, las entradas que escriben archivos de errores y los
-   * que se conectarían a una base de archivo que no existe (la crearían vacía).
+   * Además, {@link #soloLectura} rechaza los steps cuyo plugin falta, las entradas que escriben archivos de errores, los
+   * que se conectarían a una base de archivo que no existe (la crearían vacía) y los Table input cuya consulta no es un
+   * SELECT/WITH que solo lee o cuya conexión corre SQL al conectarse ({@link #sqlQueNoSoloLee}).
    */
   static final Set<String> SOLO_LECTURA = new HashSet<String>( Arrays.asList(
     // entrada
@@ -123,6 +126,12 @@ final class LintEntorno implements Entorno {
     }
   }
 
+  /** Para kettle_check: el propio step y lo que tiene antes (como SecValidacion). */
+  @Override
+  public String[] baseFaltante( StepMeta s ) {
+    return tm == null ? null : baseFaltante( s, false );
+  }
+
   @Override
   public int salidasNormales( TransMeta t, StepMeta s ) {
     return TransOps.salidasNormales( t, s );
@@ -131,7 +140,51 @@ final class LintEntorno implements Entorno {
   @Override
   public boolean soloLectura( StepMeta s ) {
     return s.getStepID() != null && !s.isMissing() && SOLO_LECTURA.contains( s.getStepID() ) && !RunMotor.escribe( s )
-      && !escribeArchivosDeError( s ) && !creaBase( s );
+      && !escribeArchivosDeError( s ) && !creaBase( s ) && !sqlQueNoSoloLee( s );
+  }
+
+  /** Lo que hace que una consulta deje de ser solo de lectura (o que no se pueda saber): se busca en el texto crudo. */
+  static final Pattern SQL_QUE_ESCRIBE = Pattern.compile( "(?i)\\b(insert|update|delete|merge|upsert|exec|execute|"
+    + "call|into|truncate|drop|alter|create|grant|revoke|nextval|setval|lock)\\b" );
+  /** Comentarios al principio de la consulta: «-- ventas del mes\nSELECT …». */
+  private static final Pattern COMENTARIOS_INICIALES = Pattern.compile( "^(\\s+|--[^\\n]*(\\n|$)|/\\*.*?\\*/)*",
+    Pattern.DOTALL );
+  private static final Pattern LEE = Pattern.compile( "(?is)^[\\s(]*(select|with)\\b.*" );
+  /** Un ';' con algo después: otra sentencia (algunos drivers las corren todas). */
+  private static final Pattern VARIAS = Pattern.compile( ";\\s*\\S" );
+
+  /**
+   * Un Table input corre su consulta de verdad (y al conectarse, el «SQL to execute after connecting» de la conexión):
+   * es de solo lectura solo si la consulta empieza con SELECT o WITH, no tiene otra sentencia ni palabras que escriban
+   * (INSERT, UPDATE, DELETE, MERGE, EXEC, CALL, INTO, TRUNCATE, DROP… aunque estén en un comentario: mejor no evaluar
+   * que escribir) y la conexión no corre SQL al conectarse. Con la sustitución de variables activa, se mira también la
+   * consulta resuelta. Una función del usuario que escribe no se puede ver. true = no es de solo lectura.
+   */
+  boolean sqlQueNoSoloLee( StepMeta s ) {
+    if ( !"TableInput".equals( s.getStepID() ) ) {
+      return false;
+    }
+    try {
+      TableInputMeta m = (TableInputMeta) s.getStepMetaInterface();
+      DatabaseMeta db = m.getDatabaseMeta();
+      if ( db != null && db.getConnectSQL() != null && !db.getConnectSQL().trim().isEmpty() ) {
+        return true;
+      }
+      String sql = m.getSQL() == null ? "" : m.getSQL();
+      if ( !consultaQueSoloLee( sql ) ) {
+        return true;
+      }
+      VariableSpace vars = tm != null ? tm : s.getParentTransMeta();
+      return m.isVariableReplacementActive() && vars != null && !consultaQueSoloLee( vars.environmentSubstitute( sql ) );
+    } catch ( Exception e ) {
+      return true;
+    }
+  }
+
+  static boolean consultaQueSoloLee( String sql ) {
+    String q = sql == null ? "" : sql;
+    return LEE.matcher( COMENTARIOS_INICIALES.matcher( q ).replaceFirst( "" ) ).matches()
+      && !SQL_QUE_ESCRIBE.matcher( q ).find() && !VARIAS.matcher( q ).find();
   }
 
   /**

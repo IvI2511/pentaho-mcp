@@ -106,6 +106,8 @@ final class SecCalidad implements Recolector {
       op.deep = true;
       op.sondas = new LintSondas();
       op.deepBudgetMs = Math.max( 1000L, Math.min( MS_PROFUNDO, tope - MS_RESERVA ) );
+      // "mostrar_valores": false (como el perfil): el modo profundo no cita los valores que lee
+      op.ocultarValores = ctx.tema() != null && ctx.tema().perfil != null && !ctx.tema().perfil.mostrarValores;
     }
     Resultado res;
     try {
@@ -494,6 +496,11 @@ final class SecCalidad implements Recolector {
     @Override
     public boolean soloLectura( StepMeta s ) {
       return base.soloLectura( s );
+    }
+
+    @Override
+    public String[] baseFaltante( StepMeta s ) {
+      return base.baseFaltante( s );
     }
 
     @Override

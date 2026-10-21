@@ -321,8 +321,8 @@ public final class InformeServicio {
   /**
    * Las secciones que se arman, en el orden del informe. Con {@code p.secciones} explicitas van todas
    * las validas (las que no aplican salen "omitidas" con su motivo); sin ellas, las marcadas por
-   * defecto ({@code tema.secciones} o §2.3) que aplican, mas profile si hay perfilStep y narrative si
-   * hay conclusiones.
+   * defecto ({@code tema.secciones} o §2.3) que aplican, mas profile si hay perfilStep, quality si se pide
+   * la revision profunda y narrative si hay conclusiones.
    */
   static List<String> seleccion( Captura c, Pedido p, Tema tema, List<String> avisos ) {
     String idioma = Rotulos.normalizar( p.idioma );
@@ -348,6 +348,8 @@ public final class InformeServicio {
             && ( hubo || Pedido.METRICAS_COPIA.equals( p.metricas ) );
         } else if ( SeccionId.PERFIL.equals( id ) ) {
           marcada = Txt.vacio( p.perfilStep ) != null;
+        } else if ( SeccionId.CALIDAD.equals( id ) ) {
+          marcada = marcada || p.calidadProfunda; // la revision profunda es de la seccion de calidad
         } else if ( SeccionId.NARRATIVA.equals( id ) ) {
           marcada = p.narrativa != null && Txt.vacio( p.narrativa.conclusiones ) != null;
         }

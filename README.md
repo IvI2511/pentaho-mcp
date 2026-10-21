@@ -190,8 +190,8 @@ Everything runs on your computer. There are no servers, accounts, analytics or t
 - Database passwords are masked before anything is returned to Claude. The recommended way is to type
   passwords yourself in Spoon.
 - Files are written only where you ask Claude to save; transformations run only when you ask.
-- Reports never include passwords. They can include host names, file paths and, in the data profile, real
-  values from your data (you can hide them in the report settings). The profile and the "Measure" option
+- Reports never include passwords. They can include host names, file paths and, in the data profile and the
+  deep quality check, real values from your data (you can hide them in the report settings). The profile and the "Measure" option
   run a copy of the transformation only when you ask, and that copy writes its outputs like a normal run.
 - The quality check (`lint_etl`) does not run the transformation. Its deep mode reads up to 5000 rows of
   your sources only when you ask, through previews limited to read-only steps, and its findings can quote

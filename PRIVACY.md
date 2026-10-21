@@ -30,14 +30,16 @@ receives any of your data.
 - **Reports.** The Reports perspective and `build_report` write the report files only to the folder you
   choose (by default an `informes` folder next to the `.ktr`/`.kjb`), plus previews in `%TEMP%\plive`,
   which are deleted after a day. A report can contain host names, file paths, parameter values and, only
-  if you add the data profile, real values from your data (most frequent values, minimum and maximum; set
-  `"mostrar_valores": false` to leave them out). It never contains passwords. To print the PDF and draw
+  if you add the data profile or the deep quality check, real values from your data (most frequent values,
+  minimum and maximum; keys and numbers that the deep check quotes; set `"mostrar_valores": false` to leave
+  them out of both). It never contains passwords. To print the PDF and draw
   the diagrams, the plugin runs the Edge or Chrome already installed on your computer in headless mode,
   with a temporary profile, on local files only.
 - **Quality check.** `lint_etl` and the reports' technical quality section read the transformation or job
   (and, like listing a step's fields, may connect to its databases to learn the field types); they never
   run it. Only when you ask for the deep mode do they read up to 5000 rows of the sources, through previews
-  limited to steps that only read, and then the findings can quote values they read (a key, a number).
+  limited to steps that only read, and then the findings can quote values they read (a key, a number);
+  in a report, `"mostrar_valores": false` leaves those values out. The deep mode writes no log tables.
   Silencing a rule stores a note inside the `.ktr` / `.kjb`, written when you save it.
 - **Nothing is stored** by the plugins beyond what Spoon itself keeps (your open documents, recent files)
   and your report settings (author, institution, colors and logo), saved in

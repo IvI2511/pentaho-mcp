@@ -29,7 +29,7 @@ two never disagree on them.
 - After building or changing an ETL, before `save`: `validate` → `preview_step` → `lint_etl`.
 - When the user asks to "review", "check", "is this OK?", "best practices", or before an assignment is handed in.
 - When a result is wrong with exit 0: every silent error of `03-errores-comunes.md` §D has a rule (the id is
-  next to each heading there).
+  next to each heading there), except a `${X}` in a Filter rows value (D9): check that condition by hand.
 - Not after every single step: the static check is fast (milliseconds, more if fields must be computed against
   a database) but its answer is long. To look at one part, pass `steps` or `min_severity: "warning"`.
 
@@ -116,7 +116,7 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `unsorted_input` | W (E with proof) | Group by, Merge join, Unique rows, Merge rows, Row denormaliser, Analytic query or Sorted merge gets rows not sorted by its key (E when a Data grid visibly is not, or the deep mode proves it) | confirm: insert a Sort rows (or `ORDER BY`) | D5, D6 |
 | `calculator_integer_first` | E / W | Calculator with A Integer and B Number: B is rounded (E); Integer / Integer is an integer division (W) | auto: swap A and B (ADD, MULTIPLY); otherwise by hand | D4 |
 | `empty_decimal_symbol` | W (E or I with deep) | Number read from text with an empty decimal symbol: depends on the computer's locale | value: `.` or `,` | D3 |
-| `variable_in_constant` | E | `${X}` in Add constants / Generate rows: it comes out literally | by hand: Get variables | D9 |
+| `variable_in_constant` | E | `${X}` in Add constants / Generate rows: it comes out literally (a Filter rows value is not checked) | by hand: Get variables | D9 |
 | `text_output_without_fields` | W / I | Text file output without declared fields: Strings padded with spaces (I if nothing would be padded today) | confirm: declare the fields | D8, C23 |
 | `absolute_path` | W | `C:\…`, `\\server\…`, `/home/…`: only works on this computer | confirm: `${Internal.Entry.Current.Directory}/…` or a `DIR_DATOS` parameter | — |
 | `relative_path` | E | Relative path without a variable: resolved against PDI's folder | confirm: prefix `${Internal.Entry.Current.Directory}/` | C15 |
@@ -126,7 +126,7 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `failure_branch_ends_in_success` | E / W | A job's red branch ends in Success: Kitchen returns 0 (E direct, W through unconditional hops). Not for conditions (File exists…), whose red branch is the "else" | E: confirm, point it to an Abort; W: by hand | D10 |
 | `start_not_named_start` | E | The start entry has another name: the job does not start | auto: rename to START | C24 |
 | `job_without_start` | E | Job without a START entry | by hand | C24 |
-| `default_step_name`, `default_entry_name` | I | "Text file output 2": the diagram documents nothing | auto when a name is proposed (about half); otherwise value | — |
+| `default_step_name`, `default_entry_name` | I | "Text file output 2": the diagram documents nothing | auto when a name is proposed (about half); otherwise value; confirm for Mapping input/output and Injector, which another file names | — |
 | `no_description` | I | No description and no notes | value: a description | — |
 | `select_star` | I | Table input with `SELECT *` | by hand | — |
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
@@ -156,11 +156,15 @@ The static check cannot know whether a file already comes sorted, or whether a c
 **Safety.** It only runs a copy cut down to the step being checked, and only when **every** step left is on a
 read-only list (file inputs, Table input, Data grid, Generate rows, transforms, sorts, joins and in-memory
 lookups). Anything that writes, runs code or talks to the network blocks the probe: the finding stays as it was,
-with `deep_not_read_only`. Each probe gets 30 s; `deep_timeout_s` (default 60, max 300) caps the total. It does
-not run on jobs or with a cycle.
+with `deep_not_read_only`. A Table input counts only with a plain `SELECT`/`WITH` query (no `INSERT`, `UPDATE`,
+`DELETE`, `MERGE`, `EXEC`, `CALL`, `INTO`…, no second statement) and a connection without SQL run on connect; a
+database function that writes, called from the query, cannot be seen. The probes write nothing to the log
+tables. Each probe gets 30 s; `deep_timeout_s` (default 60, max 300) caps the total. It does not run on jobs or
+with a cycle.
 
 **Ask first** when the sources are large or a production database: it runs the Table input queries. And the
-messages can quote values it read (a group key, `2.50`): mind it if the data is personal.
+messages can quote values it read (a group key, `2.50`): mind it if the data is personal (in a report,
+`"mostrar_valores": false` leaves them out).
 
 ## 7. Fixing: `apply_lint_fixes`
 

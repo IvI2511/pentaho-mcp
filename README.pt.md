@@ -195,7 +195,8 @@ Tudo roda no seu computador. Não há servidores, contas, analytics nem telemetr
 - Arquivos só são gravados onde você pede ao Claude para salvar; as transformações só rodam quando você
   pede.
 - Os relatórios nunca incluem senhas. Podem incluir nomes de hosts, caminhos de arquivos e, no perfil de
-  dados, valores reais dos seus dados (dá para ocultá-los nas configurações do relatório). O perfil e a
+  dados e na revisão profunda de qualidade, valores reais dos seus dados (dá para ocultá-los nas
+  configurações do relatório). O perfil e a
   opção «Medir» rodam uma cópia da transformação só quando você pede, e essa cópia grava suas saídas como
   uma execução normal.
 - A revisão de qualidade (`lint_etl`) não executa a transformação. O modo profundo lê até 5000 linhas das

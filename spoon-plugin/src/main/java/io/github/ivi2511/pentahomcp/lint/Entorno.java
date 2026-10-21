@@ -24,6 +24,14 @@ public interface Entorno {
   /** Si el step está en la lista blanca de solo lectura del modo profundo (§3.3). */
   boolean soloLectura( StepMeta s );
 
+  /**
+   * {conexión, archivo} si revisar el step con Kettle (check(), getPrevStepFields) se conectaría a una base de archivo
+   * que no existe (SQLite, H2, HSQLDB): Kettle la crearía vacía. null si no (o si no se sabe).
+   */
+  default String[] baseFaltante( StepMeta s ) {
+    return null;
+  }
+
   boolean cancelado();
 
   long msRestantes();

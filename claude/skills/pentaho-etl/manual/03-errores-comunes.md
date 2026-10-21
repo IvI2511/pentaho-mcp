@@ -2,7 +2,7 @@
 
 Every case in this file was triggered on purpose by breaking one of the examples and running it with Pan/Kitchen 9.4 + Java 21. The messages are **verbatim** (long paths are cut with `…`). The broken variants were left in the session scratchpad; to reproduce one, apply the indicated change to the corresponding example.
 
-With the `pentaho` MCP, `lint_etl` catches many of these before anything runs, including every silent error of section D: the rule id is next to each heading (D1 · `duplicate_step_name`), and `06-calidad.md` explains the linter.
+With the `pentaho` MCP, `lint_etl` catches many of these before anything runs, including the silent errors of section D (all but the Filter rows case of D9): the rule id is next to each heading (D1 · `duplicate_step_name`), and `06-calidad.md` explains the linter.
 
 About language: step messages almost always come out **in English** even when the JVM is in Spanish; what changes is the "frame" (`Unexpected error` → `Error desconocido`, `Error initializing step` → `Error inicializando paso`, `Transformation detected one or more steps with errors.` → `Transformación detectada …`). For 100 % English logs: `PENTAHO_DI_JAVA_OPTIONS=-Xms1024m -Xmx2048m -Duser.language=en -Duser.country=US` (this is what `ejemplos/correr.ps1 -Ingles` does).
 
@@ -320,9 +320,9 @@ With `<enabled>N</enabled>` on the only hop into `Escribir CSV`, that step **doe
 
 With an empty `<fields>` all fields are written, but Strings come out padded with spaces up to their metadata length (`Ana Pérez                                         ;Madrid                        ;`). See C23 for the extreme case.
 
-### D9. Variables in Generate rows / Add constants / Filter rows values · `variable_in_constant`
+### D9. Variables in Generate rows / Add constants / Filter rows values · `variable_in_constant` (not Filter rows)
 
-`${ARCHIVO_SALIDA}` as the value of an Add constants field comes out literally in the CSV. **Fix:** Get variables (`GetVariable`).
+`${ARCHIVO_SALIDA}` as the value of an Add constants field comes out literally in the CSV. **Fix:** Get variables (`GetVariable`). `variable_in_constant` checks Add constants and Generate rows only: a `${X}` typed as the value of a Filter rows condition is not checked, so look at the condition yourself.
 
 ### D10. Error branch that ends in SUCCESS · `failure_branch_ends_in_success`
 

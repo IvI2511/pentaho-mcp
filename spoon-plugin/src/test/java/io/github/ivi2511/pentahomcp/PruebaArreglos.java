@@ -36,6 +36,7 @@ import io.github.ivi2511.pentahomcp.lint.LintMotor;
 import io.github.ivi2511.pentahomcp.lint.Opciones;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
 import io.github.ivi2511.pentahomcp.lint.Supresiones;
+import io.github.ivi2511.pentahomcp.lint.reglas.ReglasSeguridad;
 
 /**
  * apply_lint_fixes y suppress_lint sin Spoon (docs/linter-diseno.md §6-§7, WP5): las keys se resuelven todas antes de
@@ -404,6 +405,88 @@ public class PruebaArreglos {
     igual( "Escribir 06_errores", destino == null ? null : destino.getName(), "manejo de errores tras guardar y abrir" );
   }
 
+  /**
+   * Los steps que guardan el nombre de otro como texto (Prioritize streams, Block this step until steps finish,
+   * Multiway merge join, Join rows, XML join): el renombre de all_auto (y rename_step) los reescribe y siguen
+   * resueltos tras guardar y abrir. Lo que queda nombrando el nombre viejo se avisa. El Injector lo nombra otro
+   * archivo: pide confirmación.
+   */
+  public void pruebaRenombresConReferenciasDeTexto() throws Exception {
+    EntornoKettle.iniciar();
+    TransMeta tm = new TransMeta();
+    tm.setName( "referencias de texto" );
+    TransOps.agregarStep( tm, "RowGenerator", "Generate rows", "<limit>5</limit>", 100, 100, null, null, null );
+    TransOps.agregarStep( tm, "RowGenerator", "Leer otro", "<limit>3</limit>", 100, 250, null, null, null );
+    TransOps.agregarStep( tm, "PrioritizeStreams", "Priorizar", "<steps><step><name>Generate rows</name></step>"
+      + "<step><name>Leer otro</name></step></steps>", 300, 150, "Generate rows", null, null );
+    tm.addTransHop( new TransHopMeta( tm.findStep( "Leer otro" ), tm.findStep( "Priorizar" ) ) );
+    TransOps.agregarStep( tm, "BlockUntilStepsFinish", "Esperar", "<steps><step><name>Generate rows</name>"
+      + "<CopyNr>0</CopyNr></step></steps>", 500, 150, "Priorizar", null, null );
+    TransOps.agregarStep( tm, "Constant", "Etiquetar", "<fields><field><name>origen</name><type>String</type>"
+      + "<nullif>Generate rows</nullif></field></fields>", 700, 150, "Esperar", null, null );
+    TransOps.resolverReferencias( tm );
+
+    Resultado r = lint( tm, "en" );
+    String k = "default_step_name:step:Generate rows:name";
+    Hallazgo h = hallazgo( r, k );
+    noNulo( h, "Generate rows por defecto: " + claves( r ) );
+    String nuevo = h.fix.preview;
+    noNulo( nuevo, "con propuesta" );
+    Corrida c = arreglar( tm, "{\"keys\":[\"all_auto\"]}" );
+    cierto( c.aplicadas().contains( k ), "all_auto lo renombra: " + c.texto() );
+    String cambio = c.hecho.aplicados.get( c.aplicadas().indexOf( k ) ).path( "change" ).asText();
+    contiene( cambio, "'Priorizar'", "dice que actualizó el Prioritize streams: " + cambio );
+    contiene( cambio, "'Esperar'", "y el Block until steps finish" );
+    contiene( xml( tm.findStep( "Priorizar" ) ), "<name>" + nuevo + "</name>", "Prioritize streams reescrito" );
+    noContiene( xml( tm.findStep( "Priorizar" ) ), "<name>Generate rows</name>", "sin el nombre viejo" );
+    contiene( xml( tm.findStep( "Esperar" ) ), "<name>" + nuevo + "</name>", "Block until steps finish reescrito" );
+    contiene( String.join( " ", c.hecho.notas ), "'Etiquetar' (nullif) still name 'Generate rows'",
+      "avisa lo que sigue nombrando el nombre viejo: " + c.hecho.notas );
+    TransMeta otra = guardarYAbrir( tm, "arr_texto_guardado.ktr" );
+    igual( Arrays.asList( nuevo, "Leer otro" ), Arrays.asList( ( (org.pentaho.di.trans.steps.prioritizestreams
+      .PrioritizeStreamsMeta) otra.findStep( "Priorizar" ).getStepMetaInterface() ).getStepName() ),
+      "Prioritize streams tras guardar y abrir" );
+    contiene( xml( otra.findStep( "Esperar" ) ), "<name>" + nuevo + "</name>", "Block until tras guardar y abrir" );
+
+    // rename_step: Multiway merge join (step0, step1) y Join rows (main), releídos por Kettle
+    tm = new TransMeta();
+    TransOps.agregarStep( tm, "RowGenerator", "Uno", "<limit>1</limit>", 100, 100, null, null, null );
+    TransOps.agregarStep( tm, "RowGenerator", "Dos", "<limit>1</limit>", 100, 250, null, null, null );
+    TransOps.agregarStep( tm, "MultiwayMergeJoin", "Unir", "<join_type>INNER</join_type><step0>Uno</step0>"
+      + "<step1>Dos</step1><number_input>2</number_input><keys><key>id</key><key>id</key></keys>", 300, 150, "Uno",
+      null, null );
+    tm.addTransHop( new TransHopMeta( tm.findStep( "Dos" ), tm.findStep( "Unir" ) ) );
+    TransOps.agregarStep( tm, "JoinRows", "Cruzar", "<main>Uno</main>", 300, 400, null, null, null );
+    tm.addTransHop( new TransHopMeta( tm.findStep( "Uno" ), tm.findStep( "Cruzar" ) ) );
+    TransOps.resolverReferencias( tm );
+    TransOps.renombrar( tm, tm.findStep( "Uno" ), "Leer uno", null );
+    org.pentaho.di.trans.steps.multimerge.MultiMergeJoinMeta mm = (org.pentaho.di.trans.steps.multimerge
+      .MultiMergeJoinMeta) tm.findStep( "Unir" ).getStepMetaInterface();
+    igual( Arrays.asList( "Leer uno", "Dos" ), Arrays.asList( mm.getInputSteps() ), "Multiway merge join releído" );
+    StepMeta info = mm.getStepIOMeta().getInfoStreams().get( 0 ).getStepMeta();
+    igual( "Leer uno", info == null ? null : info.getName(), "y resuelto" );
+    org.pentaho.di.trans.steps.joinrows.JoinRowsMeta jr = (org.pentaho.di.trans.steps.joinrows.JoinRowsMeta) tm
+      .findStep( "Cruzar" ).getStepMetaInterface();
+    igual( "Leer uno", jr.getMainStepname(), "Join rows: main" );
+    igual( "Leer uno", jr.getMainStep() == null ? null : jr.getMainStep().getName(), "Join rows: main resuelto" );
+    // XML join (plugin aparte): la reescritura sola, sin mayúsculas como Kettle
+    String xj = TransOps.reescribirReferencias( "XMLJoin", "<step><name>Unir XML</name><targetXMLstep>table input"
+      + "</targetXMLstep><sourceXMLstep>Otro</sourceXMLstep></step>", "Table input", "Leer ventas" );
+    contiene( xj, "<targetXMLstep>Leer ventas</targetXMLstep>", "XML join: target" );
+    contiene( xj, "<sourceXMLstep>Otro</sourceXMLstep>", "XML join: el otro queda" );
+    nulo( TransOps.reescribirReferencias( "XMLJoin", "<step><targetXMLstep>A</targetXMLstep></step>", "Table input",
+      "T" ), "no lo nombra: nada que reescribir" );
+    nulo( TransOps.reescribirReferencias( "Dummy", "<step><name>Table input</name></step>", "Table input", "T" ),
+      "un tipo que no guarda nombres" );
+
+    // el Injector lo nombra otro archivo (Single threader, un programa): renombrarlo pide confirmación
+    tm = new TransMeta();
+    TransOps.agregarStep( tm, "Injector", "Injector", null, 100, 100, null, null, null );
+    h = hallazgo( lint( tm, "en" ), "default_step_name:step:Injector:name" );
+    noNulo( h, "Injector por defecto" );
+    cierto( h.fix.confirm, "confirm: lo nombra otro archivo" );
+  }
+
   // ---------------------------------------------------------------- suppress_lint
 
   /** En el step (con undo) y en el documento; viaja dentro del .ktr; se quita. */
@@ -576,6 +659,33 @@ public class PruebaArreglos {
       "ORDER BY al final, sin el punto y coma" );
     igual( 2, tm.nrSteps(), "sin steps nuevos" );
     igual( 0, cuenta( lint( tm, "en" ), "unsorted_input" ), "ordenado por la consulta" );
+
+    // un Table input (copiando) con dos Group by: un solo ORDER BY; el segundo lleva un Sort rows
+    tm = new TransMeta();
+    tm.setName( "dos agrupaciones" );
+    tm.addDatabase( new DatabaseMeta( "dw", "SQLITE", "Native", "", "dw.sqlite", "-1", "", "" ) );
+    TransOps.agregarStep( tm, "TableInput", "Leer ventas", "<connection>dw</connection>"
+      + "<sql>SELECT producto, cliente, importe FROM ventas</sql>", 100, 100, null, null, null );
+    TransOps.agregarStep( tm, "GroupBy", "Total por producto", "<group><field><name>producto</name></field></group>"
+      + "<fields><field><aggregate>total</aggregate><subject>importe</subject><type>SUM</type></field></fields>", 300,
+      50, "Leer ventas", null, null );
+    TransOps.agregarStep( tm, "GroupBy", "Total por cliente", "<group><field><name>cliente</name></field></group>"
+      + "<fields><field><aggregate>total</aggregate><subject>importe</subject><type>SUM</type></field></fields>", 300,
+      200, "Leer ventas", null, null );
+    tm.findStep( "Leer ventas" ).setDistributes( false );
+    r = lint( tm, "en" );
+    String kp = "unsorted_input:step:Total por producto:input";
+    String kc = "unsorted_input:step:Total por cliente:input";
+    cierto( hallazgo( r, kp ) != null && hallazgo( r, kc ) != null, "los dos Group by: " + claves( r ) );
+    c = arreglar( tm, "{\"keys\":[\"" + kp + "\",\"" + kc + "\"]}" );
+    igual( 2, c.hecho.cambios, c.texto() );
+    String sql = ( (TableInputMeta) tm.findStep( "Leer ventas" ).getStepMetaInterface() ).getSQL();
+    igual( "SELECT producto, cliente, importe FROM ventas\nORDER BY producto", sql, "un solo ORDER BY" );
+    StepMeta orden2 = tm.findStep( "Sort by cliente" );
+    noNulo( orden2, "Sort rows para el segundo: " + c.texto() );
+    cierto( tm.findTransHop( tm.findStep( "Leer ventas" ), orden2 ) != null
+      && tm.findTransHop( orden2, tm.findStep( "Total por cliente" ) ) != null, "entre el Table input y el segundo" );
+    igual( 0, cuenta( lint( tm, "en" ), "unsorted_input" ), "los dos ordenados" );
   }
 
   /** Los demás arreglos de transformaciones: copiar, ruta + DIR_DATOS, decimal, campos de salida y contraseña. */
@@ -643,13 +753,24 @@ public class PruebaArreglos {
     k = "password_in_file:connection:sqlite_demo:password";
     noNulo( hallazgo( lint( tm, "en" ), k ), "contraseña: " + claves( lint( tm, "en" ) ) );
     c = arreglar( tm, "{\"values\":{\"" + k + "\":\"otraClave\"}}" );
-    contiene( c.saltada( k ), "must be a variable", "nunca escribe una clave" );
+    contiene( c.saltada( k ), "must be only a variable", "nunca escribe una clave" );
+    c = arreglar( tm, "{\"values\":{\"" + k + "\":\"S3cret!${ENV}\"}}" );
+    contiene( c.saltada( k ), "must be only a variable", "una clave con una variable pegada sigue siendo una clave" );
+    igual( 0, c.hecho.cambios, "nada aplicado" );
+    cierto( ReglasSeguridad.esVariable( "${A}${B}" ) && ReglasSeguridad.esVariable( " %%PASS%% " ),
+      "solo variables" );
+    falso( ReglasSeguridad.esVariable( "S3cret!${ENV}" ) || ReglasSeguridad.esVariable( "${A} x" ), "texto fijo" );
     c = arreglar( tm, "{\"values\":{\"" + k + "\":\"${SQLITE_PASSWORD}\"}}" );
     igual( 1, c.hecho.cambios, c.texto() );
     cierto( c.hecho.aplicados.get( 0 ).path( "undoable" ).asBoolean(), "en una transformación se deshace" );
     igual( "${SQLITE_PASSWORD}", tm.findDatabase( "sqlite_demo" ).getPassword(), "variable" );
     noContiene( tm.getXML(), "secreto123", "la clave ya no está en el XML" );
     nulo( hallazgo( lint( tm, "en" ), k ), "arreglado" );
+    tm.findDatabase( "sqlite_demo" ).setPassword( "clave${SUFIJO}" );
+    Hallazgo mezcla = hallazgo( lint( tm, "en" ), k );
+    noNulo( mezcla, "texto con una variable: sigue contando como contraseña guardada" );
+    contiene( mezcla.message, "connection 'sqlite_demo'", "en inglés el nombre va entre comillas simples" );
+    contiene( hallazgo( lint( tm, "es" ), k ).message, "conexión «sqlite_demo»", "en castellano, con «»" );
 
     // dry_run: sobre una copia, el documento no cambia
     tm = trans( variante( "03", "arr_ensayo.ktr", "Ordenar por producto", "Sort rows" ) );

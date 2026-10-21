@@ -4,8 +4,11 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -21,9 +24,11 @@ import org.pentaho.di.trans.step.StepErrorMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInterface;
 import org.pentaho.metastore.api.IMetaStore;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
+import io.github.ivi2511.pentahomcp.lint.Nodos;
 
 /**
  * Logica pura de edicion de transformaciones: recibe un TransMeta y no toca Spoon (ni undo, ni
@@ -409,6 +414,10 @@ final class TransOps {
     for ( int i = 0; i < otros.size(); i++ ) {
       StepMeta s = otros.get( i );
       String x = xmlSeguro( s );
+      String reescrito = x == null ? null : reescribirReferencias( s.getStepID(), x, antes.getName(), n );
+      if ( reescrito != null ) {
+        x = reescrito; // nombra al step como texto: el XML no cambia solo
+      }
       if ( x == null || x.equals( xmlAntes.get( i ) ) ) {
         continue;
       }
@@ -434,6 +443,90 @@ final class TransOps {
     } catch ( Exception e ) {
       return null;
     }
+  }
+
+  /**
+   * Steps que guardan el nombre de otro step como texto (un String, no el StepMeta resuelto): su getXML no cambia al
+   * renombrar el otro y searchInfoAndTargetSteps vuelve a buscar el nombre viejo, asi que hay que reescribir el tag.
+   * Rutas desde &lt;step&gt;; "step#" = step0, step1... (visto en el bytecode de PDI 9.4). Mapping, Metadata injection
+   * y los executors se actualizan solos (onStepChange o StepMeta resuelto).
+   */
+  static final Map<String, String[]> REFERENCIAS_DE_TEXTO = new HashMap<String, String[]>();
+
+  static {
+    REFERENCIAS_DE_TEXTO.put( "PrioritizeStreams", new String[] { "steps/step/name" } );
+    REFERENCIAS_DE_TEXTO.put( "BlockUntilStepsFinish", new String[] { "steps/step/name" } );
+    REFERENCIAS_DE_TEXTO.put( "StepsMetrics", new String[] { "steps/step/name" } );
+    REFERENCIAS_DE_TEXTO.put( "MultiwayMergeJoin", new String[] { "step#" } );
+    REFERENCIAS_DE_TEXTO.put( "XMLJoin", new String[] { "targetXMLstep", "sourceXMLstep" } );
+    REFERENCIAS_DE_TEXTO.put( "JoinRows", new String[] { "main" } );
+  }
+
+  /** El XML del step con las referencias de texto a 'viejo' cambiadas a 'nuevo', o null si no nombra a 'viejo'. */
+  static String reescribirReferencias( String tipo, String xml, String viejo, String nuevo ) {
+    String[] rutas = tipo == null ? null : REFERENCIAS_DE_TEXTO.get( tipo );
+    if ( rutas == null || viejo == null ) {
+      return null;
+    }
+    try {
+      Element raiz = Nodos.parse( xml );
+      boolean cambio = false;
+      for ( String r : rutas ) {
+        cambio |= reemplazar( raiz, r.split( "/" ), 0, viejo, nuevo );
+      }
+      return cambio ? Xml.texto( raiz ) : null;
+    } catch ( Exception e ) {
+      McpLifecycleListener.LOG.logDebug( "No se pudieron reescribir las referencias de un " + tipo + ": " + e );
+      return null;
+    }
+  }
+
+  private static boolean reemplazar( Element e, String[] ruta, int i, String viejo, String nuevo ) {
+    boolean cambio = false;
+    String tag = ruta[ i ];
+    for ( Element k : Nodos.hijos( e, null ) ) {
+      boolean va = tag.endsWith( "#" ) ? k.getTagName().matches( Pattern.quote( tag.substring( 0, tag.length() - 1 ) )
+        + "\\d+" ) : k.getTagName().equals( tag );
+      if ( !va ) {
+        continue;
+      }
+      if ( i < ruta.length - 1 ) {
+        cambio |= reemplazar( k, ruta, i + 1, viejo, nuevo );
+      } else if ( Nodos.esHoja( k ) && k.getTextContent().equalsIgnoreCase( viejo ) ) { // Kettle busca sin mayusculas
+        k.setTextContent( nuevo );
+        cambio = true;
+      }
+    }
+    return cambio;
+  }
+
+  /**
+   * Los otros steps que todavia nombran 'viejo' como texto en alguna hoja de su XML (despues de renombrar): una
+   * referencia que Kettle no actualiza y que no esta en {@link #REFERENCIAS_DE_TEXTO} (un plugin de terceros). Para
+   * avisar; como "'X' (tag)".
+   */
+  static List<String> nombranTodavia( TransMeta tm, StepMeta renombrado, String viejo ) {
+    List<String> r = new ArrayList<String>();
+    for ( StepMeta s : tm.getSteps() ) {
+      if ( s == renombrado ) {
+        continue;
+      }
+      String x = xmlSeguro( s );
+      if ( x == null ) {
+        continue;
+      }
+      try {
+        for ( Element[] h : Nodos.hojas( Nodos.parse( x ) ) ) { // su propio <name> no: ningun otro se llama asi
+          if ( h[ 0 ].getTextContent().trim().equalsIgnoreCase( viejo ) ) {
+            r.add( "'" + s.getName() + "' (" + h[ 0 ].getTagName() + ")" );
+            break;
+          }
+        }
+      } catch ( Exception e ) {
+        // no se puede leer: no se avisa
+      }
+    }
+    return r;
   }
 
   // ---------------------------------------------------------------- modo de salida (copy / distribute)
