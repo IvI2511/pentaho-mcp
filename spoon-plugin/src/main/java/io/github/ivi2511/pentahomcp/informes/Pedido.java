@@ -1,6 +1,11 @@
 package io.github.ivi2511.pentahomcp.informes;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import io.github.ivi2511.pentahomcp.informes.modelo.Narrativa;
 
@@ -25,6 +30,8 @@ public final class Pedido {
   public String linajeStep;
   /** Step a perfilar; sin step la seccion profile no corre (ejecuta la transformacion). */
   public String perfilStep;
+  /** Varios steps a perfilar (en una sola corrida de la copia); se suma a perfilStep. */
+  public List<String> perfilSteps = new ArrayList<>();
   public int perfilFilas = 5000;
   /** last_run | run_copy | none. */
   public String metricas = METRICAS_ULTIMA;
@@ -41,4 +48,21 @@ public final class Pedido {
    * validacion 60 s, Chromium 60 s.
    */
   public long timeoutMs = 120000;
+
+  /** Los steps a perfilar: perfilStep y perfilSteps juntos, en orden, sin repetidos ni vacios. */
+  @JsonIgnore
+  public List<String> pasosPerfil() {
+    Set<String> l = new LinkedHashSet<>();
+    if ( perfilStep != null && !perfilStep.trim().isEmpty() ) {
+      l.add( perfilStep.trim() );
+    }
+    if ( perfilSteps != null ) {
+      for ( String x : perfilSteps ) {
+        if ( x != null && !x.trim().isEmpty() ) {
+          l.add( x.trim() );
+        }
+      }
+    }
+    return new ArrayList<>( l );
+  }
 }

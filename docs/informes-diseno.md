@@ -323,16 +323,16 @@ Hay cuatro condiciones:
 | Tipo de step | Regla |
 |---|---|
 | Select values | `getFieldnameLineage()` |
-| Calculator | `getCalculation()`, incluso las encadenadas |
+| Calculator | `getCalculation()`, incluso las encadenadas; una constante (`CONSTANT`) es un valor, no un campo, y la operación es la cuenta entera, por ejemplo `ADD(DIVIDE(SUBTRACT(mes, 1), 4), 1)` |
 | Group by y Memory group by | Agregado sobre el campo sujeto |
 | Stream lookup | Valor que devuelve el step de búsqueda |
-| Merge join | Campos por posición |
+| Merge join y Multiway merge join | Campos por posición, de cada entrada |
 | Formula | Lee el XML y busca las referencias `[campo]` |
-| Cualquier otro | Mismo nombre → pasa igual; sin entradas → es fuente; si no, «creado por <tipo>» |
+| Cualquier otro | Mismo nombre en una entrada → pasa igual (todas las entradas que lo traen, también las que llegan por un stream de info: el head y el tail de Append, Merge rows…); sin entradas → es fuente; si no, «creado por <tipo>» |
 
 `ValueMetaInterface.getOrigin()` es solo una pista. `TransDataLineage` es un stub: no sirve.
 
-**Salida.** `datos` tiene la forma `{"section":"lineage","engine":"metaverse|kettle-metadata|mixed",…}` de la investigación (`mixed`: metaverse falló en algún destino y ese lo cubrió el motor propio), con `kind` ∈ {source, pass, rename, convert, calc, aggregate, lookup, join, created, unknown}. En `origins`, `role:"key"` marca las claves de lookup o join, que metaverse mezcla con los valores.
+**Salida.** `datos` tiene la forma `{"section":"lineage","engine":"metaverse|kettle-metadata|mixed",…}` de la investigación (`mixed`: metaverse falló en algún destino o campo y ese lo cubrió el motor propio; si falla con todos los campos juntos se reintenta campo por campo; donde hay de los dos se suman los caminos del propio que metaverse no trajo, porque metaverse a veces pierde una entrada de un Append). El detalle técnico de un fallo de metaverse va al log de Spoon y a `metaverse.error` de los datos; el informe solo dice qué motor se usó y para qué campos. La sección abre con un párrafo de para qué sirve el linaje, con `kind` ∈ {source, pass, rename, convert, calc, aggregate, lookup, join, created, unknown}. En `origins`, `role:"key"` marca las claves de lookup o join, que metaverse mezcla con los valores.
 
 **Diagrama.** `flowchart LR`: un `subgraph` por step, con sus campos adentro y la operación escrita sobre la flecha. Hay un tope de unos 40 campos o 150 nodos; si se pasa, va solo la tabla con un aviso. El linaje se calcula hacia el step destino: por defecto, cada step final que escribe; el usuario puede elegir otro en el panel (`Pedido.linajeStep`).
 
@@ -373,8 +373,8 @@ Si la corrida sigue en curso, la sección queda `parcial` con el motivo «ejecuc
 
 - Indicadores: duración, filas leídas y escritas, errores, step más lento.
 - `barras_h`: filas escritas y ms por step, ordenadas, como mucho 25.
-- `gantt`: tramos `init` y `exec`.
-- `linea`: filas por intervalo de los 5 steps con más volumen, si hay snapshots.
+- `gantt`: tramos `init` y `exec`, todos los steps hasta 40; si hay más, quedan los más lentos y la nota nombra los demás. En un job pasa lo mismo con sus filas (las entradas y, anidados, los steps de cada sub-transformación).
+- `linea`: «Ritmo de cada step durante la ejecución», en filas por segundo, de los 5 steps con más filas, con una frase que lo explica, si hay snapshots y la corrida dura 2 s o más con 4 mediciones o más; si no, una nota de una línea.
 - Tabla de StepStatus.
 
 En jobs, el Gantt va por entrada, con las sub-transformaciones anidadas.
@@ -490,6 +490,7 @@ mermaid.run({ querySelector:'pre.mermaid' });
 - `@page { size: A4; margin: 18mm 16mm 20mm }`, o Letter según el `Tema`.
 - `@bottom-left { content: "Pentaho Live · IDC Studios" }` y `@bottom-right { content: "<Página> " counter(page) " <de> " counter(pages) }`. El experimento lo probó en Edge 155 [P]. Hay que usar el carácter «·» literal; escapado salió roto [P].
 - `break-before: page` en cada sección y `break-inside: avoid` en las filas, figuras y tarjetas.
+- Una figura (Mermaid, gráfico o imagen) nunca es más alta que la página: tope de 225 mm en A4 y 207 mm en Letter (el alto útil menos el título y la nota). Un SVG o una imagen no se parten, y sin el tope Chromium los pasaba enteros a la página siguiente: quedaba el título solo, un marco vacío y páginas en blanco. El SVG se achica centrado; a la imagen se le baja el ancho.
 - `svg { max-width:100%; height:auto }`.
 - Las páginas apaisadas para diagramas anchos (`@page ancho { size: A4 landscape }` con `page: ancho`) son [NP]. Son opcionales.
 

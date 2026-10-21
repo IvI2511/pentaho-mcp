@@ -1,6 +1,7 @@
 <#
-  Deja en instalador\staging\ todo lo que empaqueta instalador.iss (el paso previo a compilar
-  con Inno Setup 7). No compila el instalador: eso es abrir instalador.iss y apretar F9.
+  Deja en build\instalador\staging\ todo lo que empaqueta instalador.iss (el paso previo a compilar
+  con Inno Setup 7; este script y el .iss van en la raiz del repo, como en las otras apps).
+  No compila el instalador: eso es abrir instalador.iss y apretar F9.
 
   Que arma:
     staging\data-integration\   copia limpia de PDI 9.4 (sin logs\, sin .ruff_cache, sin el
@@ -12,16 +13,18 @@
     staging\licenses\           la licencia y el NOTICE de Temurin
     staging\bin\                el comando pentaho-live.cmd (+ el de Git Bash) y el lanzador de los
                                 accesos: IDCLauncher.exe, idc-launcher.ini e idc-launcher.png (su
-                                splash), de instalador\launcher\ (el .exe va compilado: su codigo es
+                                splash), de launcher\ (el .exe va compilado: su codigo es
                                 privado; -FuenteLanzador lo recompila desde la plantilla)
-    staging\asistente\          las imagenes del asistente (BMP), de generar_imagenes.py
-    staging\pentaho-live.ico    el icono (generar_imagenes.py tambien regenera instalador\pentaho-live.ico)
+    staging\asistente\          las imagenes del asistente (BMP), de tools\instalador\generar_imagenes.py
+    staging\pentaho-live.ico    el icono (tools\instalador\generar_imagenes.py tambien regenera launcher\pentaho-live.ico)
     staging\LICENSE.txt, staging\instalar.ps1   del repo
 
-  El zip del JRE queda en instalador\cache\ (con la respuesta de la API), asi no se baja cada vez.
+  El zip del JRE queda en build\instalador\cache\ (con la respuesta de la API), asi no se baja cada vez.
+  build\ no se versiona; en instalador\ queda solo el Instalador_PentahoLive_X.Y.Z.exe que compila Inno Setup.
 
   Uso:
-    powershell -ExecutionPolicy Bypass -File instalador\preparar.ps1 -PdiHome "<...>\data-integration"
+    powershell -ExecutionPolicy Bypass -File preparar_instalador.ps1 -PdiHome "<...>\data-integration"
+    (con -SinCompilar usa el plugin de spoon-plugin\dist\pentaho-mcp sin volver a correr build.ps1)
 
   Requiere: un JDK (para compilar el plugin, ver spoon-plugin\build.ps1), Python con
   playwright y pillow (pip install playwright pillow) y Google Chrome, con -FuenteLanzador el csc.exe de .NET
@@ -33,21 +36,27 @@ param(
   # https://api.adoptium.net/v3/info/release_names?version=[21,22)&release_type=ga&vendor=eclipse
   [string]$JreRelease = "jdk-21.0.12.1+1",
   # La carpeta plantillas del portafolio de IDC Studios (privada): con ella se recompilan
-  # instalador\launcher\IDCLauncher.exe e idc-launcher.png. Sin ella se usan los del repo.
-  [string]$FuenteLanzador = $env:IDC_PLANTILLAS
+  # launcher\IDCLauncher.exe e idc-launcher.png. Sin ella se usan los del repo.
+  [string]$FuenteLanzador = $env:IDC_PLANTILLAS,
+  # No corre spoon-plugin\build.ps1: usa el plugin que ya dejo en spoon-plugin\dist\pentaho-mcp
+  # (tiene que ser el de VERSION). Para cuando el build se acaba de hacer o no se puede repetir.
+  [switch]$SinCompilar
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # Invoke-WebRequest es lentisimo con la barra de progreso
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-$aqui    = $PSScriptRoot
-$repo    = Split-Path $aqui -Parent
-$staging = Join-Path $aqui "staging"
-$cache   = Join-Path $aqui "cache"
+$repo    = $PSScriptRoot
+$staging = Join-Path $repo "build\instalador\staging"
+$cache   = Join-Path $repo "build\instalador\cache"
+# launcher\: lo que va a {app}\bin (IDCLauncher, su .ini y su splash, los comandos pentaho-live) y el icono
+$dirLanzador = Join-Path $repo "launcher"
+$ico     = Join-Path $dirLanzador "pentaho-live.ico"
+$generador = Join-Path $repo "tools\instalador\generar_imagenes.py"
 
 function Paso($texto) { Write-Host ""; Write-Host "== $texto" }
-function Falla($texto) { throw "preparar.ps1: $texto" }
+function Falla($texto) { throw "preparar_instalador.ps1: $texto" }
 
 # ------------------------------------------------------------------ version y PDI
 $Version = (Get-Content -Raw (Join-Path $repo "VERSION")).Trim()
@@ -60,11 +69,18 @@ Write-Host "PDI de origen: $PdiHome"
 
 # ------------------------------------------------------------------ 1. plugin
 Paso "1. Plugin de Spoon (spoon-plugin\build.ps1)"
-& (Join-Path $repo "spoon-plugin\build.ps1") -PdiHome $PdiHome
+if ($SinCompilar) {
+  Write-Host "   -SinCompilar: se usa el de spoon-plugin\dist\pentaho-mcp tal como esta"
+} else {
+  & (Join-Path $repo "spoon-plugin\build.ps1") -PdiHome $PdiHome
+}
 $distPlugin = Join-Path $repo "spoon-plugin\dist\pentaho-mcp"
 if (-not (Test-Path (Join-Path $distPlugin "pentaho-mcp-core-$Version.jar"))) {
-  Falla "build.ps1 no dejo pentaho-mcp-core-$Version.jar en $distPlugin"
+  Falla "no esta pentaho-mcp-core-$Version.jar en $distPlugin (correr spoon-plugin\build.ps1)"
 }
+# Uno solo: un jar de otra version al lado cargaria dos veces las mismas clases en Spoon.
+$jars = @(Get-ChildItem $distPlugin -Filter "pentaho-mcp-core-*.jar")
+if ($jars.Count -ne 1) { Falla "en $distPlugin hay $($jars.Count) pentaho-mcp-core-*.jar (tiene que haber uno)" }
 
 # ------------------------------------------------------------------ 2. staging limpio + PDI
 Paso "2. Copia limpia de PDI"
@@ -154,9 +170,9 @@ $destBin = Join-Path $staging "bin"
 New-Item -ItemType Directory -Force $destBin | Out-Null
 # El .cmd siempre con CRLF (cmd se confunde con los saltos de etiqueta si viene con LF solo);
 # el script de Git Bash siempre con LF.
-$cmdTexto = [IO.File]::ReadAllText((Join-Path $aqui "bin\pentaho-live.cmd")) -replace "`r`n", "`n" -replace "`n", "`r`n"
+$cmdTexto = [IO.File]::ReadAllText((Join-Path $dirLanzador "pentaho-live.cmd")) -replace "`r`n", "`n" -replace "`n", "`r`n"
 [IO.File]::WriteAllText((Join-Path $destBin "pentaho-live.cmd"), $cmdTexto, [Text.Encoding]::ASCII)
-$shTexto = [IO.File]::ReadAllText((Join-Path $aqui "bin\pentaho-live")) -replace "`r`n", "`n"
+$shTexto = [IO.File]::ReadAllText((Join-Path $dirLanzador "pentaho-live")) -replace "`r`n", "`n"
 [IO.File]::WriteAllText((Join-Path $destBin "pentaho-live"), $shTexto, [Text.Encoding]::ASCII)
 Copy-Item (Join-Path $repo "LICENSE") (Join-Path $staging "LICENSE.txt")
 Copy-Item (Join-Path $repo "instalar.ps1") (Join-Path $staging "instalar.ps1")
@@ -167,9 +183,9 @@ Paso "6. Icono e imagenes del asistente (generar_imagenes.py)"
 $python = Get-Command python -ErrorAction SilentlyContinue
 if (-not $python) { $python = Get-Command py -ErrorAction SilentlyContinue }
 if (-not $python) { Falla "No hay Python en el PATH (hace falta con: pip install playwright pillow)." }
-& $python.Source (Join-Path $aqui "generar_imagenes.py") --salida (Join-Path $staging "asistente") --version $Version
+& $python.Source $generador --salida (Join-Path $staging "asistente") --version $Version
 if ($LASTEXITCODE -ne 0) { Falla "generar_imagenes.py fallo (codigo $LASTEXITCODE). Hace falta: pip install playwright pillow, y Google Chrome." }
-Copy-Item (Join-Path $aqui "pentaho-live.ico") (Join-Path $staging "pentaho-live.ico")
+Copy-Item $ico (Join-Path $staging "pentaho-live.ico")
 
 # ------------------------------------------------------------------ 7. lanzador de los accesos
 # IDCLauncher (convencion 03 del portafolio): el splash de 760x400 que se ve enseguida al abrir
@@ -178,10 +194,9 @@ Copy-Item (Join-Path $aqui "pentaho-live.ico") (Join-Path $staging "pentaho-live
 # PyInstaller, copia ..\VERSION y es la copia canonica que se compara entre las apps.
 Paso "7. Lanzador IDCLauncher.exe y su splash"
 # Su codigo es privado (la plantilla del portafolio de IDC Studios, no MIT; ver
-# instalador\launcher\NOTICE.md): en el repo van el .exe ya compilado y su splash. Con
+# launcher\NOTICE.md): en el repo van el .exe ya compilado y su splash. Con
 # -FuenteLanzador <carpeta plantillas del portafolio> se recompilan los dos y se actualizan en
-# instalador\launcher\. Hay que hacerlo en cada version: los dos llevan el numero.
-$dirLanzador = Join-Path $aqui "launcher"
+# launcher\. Hay que hacerlo en cada version: los dos llevan el numero.
 $exeRepo = Join-Path $dirLanzador "IDCLauncher.exe"
 $pngRepo = Join-Path $dirLanzador "idc-launcher.png"
 $recompilado = $false
@@ -212,7 +227,7 @@ if ($FuenteLanzador) {
   # PowerShell 5.1 una linea de stderr redirigida corta el script antes de ver el codigo).
   $salidaCsc = & $csc /nologo /target:winexe /optimize+ /platform:anycpu `
     /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
-    "/win32icon:$(Join-Path $aqui 'pentaho-live.ico')" "/out:$exeRepo" $fuenteCs $asmInfo
+    "/win32icon:$ico" "/out:$exeRepo" $fuenteCs $asmInfo
   if ($LASTEXITCODE -ne 0) { Falla ("csc no compilo IDCLauncher.cs (codigo $LASTEXITCODE):`n" + ($salidaCsc -join "`n")) }
   # El splash, en ingles como el banner del asistente. El punto medio y los puntos suspensivos van
   # con [char]: este .ps1 es ASCII (PowerShell 5.1 lo leeria como ANSI).
@@ -220,15 +235,15 @@ if ($FuenteLanzador) {
   $suspensivos = [char]0x2026
   & $python.Source $fuenteSplash --titulo "Pentaho Live" `
     --subtitulo "Claude builds your ETLs live, in Spoon." --version $Version `
-    --icono (Join-Path $aqui "pentaho-live.ico") --salida $pngRepo `
+    --icono $ico --salida $pngRepo `
     --rotulo "Pentaho Data Integration 9.4" --estado "OPENING SPOON" `
     --espera "This takes about 30-60 seconds$suspensivos" --ficha "Windows  $punto  Spoon 9.4  $punto  MCP"
   if ($LASTEXITCODE -ne 0) { Falla "generar_splash.py fallo (codigo $LASTEXITCODE). Hace falta: pip install pillow." }
   $recompilado = $true
-  Write-Host "   recompilados desde $FuenteLanzador : instalador\launcher\IDCLauncher.exe e idc-launcher.png"
+  Write-Host "   recompilados desde $FuenteLanzador : launcher\IDCLauncher.exe e idc-launcher.png"
 }
 foreach ($f in @("IDCLauncher.exe", "idc-launcher.png", "idc-launcher.ini")) {
-  if (-not (Test-Path (Join-Path $dirLanzador $f))) { Falla "falta instalador\launcher\$f" }
+  if (-not (Test-Path (Join-Path $dirLanzador $f))) { Falla "falta launcher\$f" }
   Copy-Item (Join-Path $dirLanzador $f) (Join-Path $destBin $f)
   Write-Host "   bin\$f"
 }
@@ -329,7 +344,7 @@ if ($problemas.Count) {
 
 $mb = { param($d) "{0:N0} MB" -f ((Get-ChildItem -Recurse -File $d | Measure-Object Length -Sum).Sum / 1MB) }
 Write-Host ""
-Write-Host "Listo: instalador\staging (version $Version)"
+Write-Host "Listo: build\instalador\staging (version $Version)"
 Write-Host ("   data-integration " + (& $mb $destPdi) + ", jre " + (& $mb $destJre) + ", total " + (& $mb $staging))
-Write-Host "Siguiente: abrir instalador\instalador.iss con Inno Setup 7 y compilar (F9)."
+Write-Host "Siguiente: abrir instalador.iss (raiz del repo) con Inno Setup 7 y compilar (F9)."
 Write-Host "Sale: instalador\Instalador_PentahoLive_$Version.exe"

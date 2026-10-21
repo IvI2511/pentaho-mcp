@@ -34,6 +34,7 @@ import io.github.ivi2511.pentahomcp.informes.Recolector;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
+import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
 import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.ModeloJson;
 import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
@@ -103,8 +104,8 @@ final class SecPerfil implements Recolector {
     if ( motivo != null ) {
       return Seccion.omitida( id(), titulo, motivo );
     }
-    String step = ctx.pedido().perfilStep;
-    if ( step == null || step.trim().isEmpty() ) {
+    List<String> pasos = ctx.pedido().pasosPerfil();
+    if ( pasos.isEmpty() ) {
       return Seccion.omitida( id(), titulo, r.s( "profile.no_step" ) );
     }
     int filas = ctx.pedido().perfilFilas > 0 ? ctx.pedido().perfilFilas
@@ -115,17 +116,35 @@ final class SecPerfil implements Recolector {
     TransMeta copia = (TransMeta) ReportTools.clonar( c.copia );
     copia.setRepository( c.copia.getRepository() );
     copia.setMetaStore( c.copia.getMetaStore() );
-    StepMeta objetivo = CorridaMedida.buscarStep( copia, step );
-    if ( objetivo == null ) {
+    List<StepMeta> objetivos = new ArrayList<StepMeta>();
+    List<String> faltan = new ArrayList<String>();
+    for ( String step : pasos ) {
+      StepMeta o = CorridaMedida.buscarStep( copia, step );
+      if ( o == null ) {
+        faltan.add( step );
+      } else if ( !objetivos.contains( o ) ) {
+        objetivos.add( o );
+      }
+    }
+    if ( objetivos.isEmpty() ) {
       Seccion s = new Seccion( id(), titulo );
       s.estado = Seccion.ERROR;
-      s.motivo = r.f( "profile.no_such_step", step );
+      s.motivo = r.f( "profile.no_such_step", faltan.isEmpty() ? pasos.get( 0 ) : faltan.get( 0 ) );
       return s;
     }
-    ctx.progreso().paso( r.f( "profile.running", objetivo.getName() ), 0, 0 );
     long espera = Math.max( 1000, Math.min( TOPE_MS, ctx.msRestantes() - 2000 ) );
-    Perfil p = perfilar( copia, objetivo, filas, espera, SecMetricas.progreso( ctx ) );
-    return seccion( p, titulo, r, mostrar );
+    if ( objetivos.size() == 1 && faltan.isEmpty() ) {
+      ctx.progreso().paso( r.f( "profile.running", objetivos.get( 0 ).getName() ), 0, 0 );
+      Perfil p = perfilar( copia, objetivos.get( 0 ), filas, espera, SecMetricas.progreso( ctx ) );
+      return seccion( p, titulo, r, mostrar );
+    }
+    List<String> nombres = new ArrayList<String>();
+    for ( StepMeta o : objetivos ) {
+      nombres.add( o.getName() );
+    }
+    ctx.progreso().paso( r.f( "profile.running", CorridaMedida.lista( nombres, r ) ), 0, 0 );
+    List<Perfil> ps = perfilarVarios( copia, objetivos, filas, espera, SecMetricas.progreso( ctx ) );
+    return seccionVarios( ps, faltan, titulo, r, mostrar );
   }
 
   // ---------------------------------------------------------------- ejecutar y escuchar
@@ -153,22 +172,57 @@ final class SecPerfil implements Recolector {
    */
   static Perfil perfilar( TransMeta copia, StepMeta objetivo, final int maxFilas, long esperaMs, Progreso pr )
     throws Exception {
-    final Perfil p = new Perfil();
-    p.step = objetivo.getName();
-    p.limite = maxFilas;
-    p.escritores.addAll( CorridaMedida.escritoresAguasArriba( copia, objetivo.getName() ) );
-    if ( objetivo.isMissing() ) {
-      p.faltaPlugin = objetivo.getName();
-      p.estado = FALLO_INICIO;
-      return p;
-    }
-    p.quitados = RunMotor.recortar( copia, objetivo );
-    for ( StepMeta s : copia.getSteps() ) {
-      if ( s.isMissing() ) {
-        p.faltaPlugin = s.getName();
-        p.estado = FALLO_INICIO;
-        return p;
+    return perfilarVarios( copia, Collections.singletonList( objetivo ), maxFilas, esperaMs, pr ).get( 0 );
+  }
+
+  /**
+   * Perfila varios steps en UNA corrida de la copia (recortada a los ancestros de todos): un RowListener y
+   * una cuenta por step. Para cuando todos llegaron a su tope de filas, termina la corrida, se acaba el
+   * tiempo o se cancela. Cada step tiene su propio estado; los escritores son la union de todos.
+   */
+  static List<Perfil> perfilarVarios( TransMeta copia, List<StepMeta> objetivos, final int maxFilas, long esperaMs,
+    Progreso pr ) throws Exception {
+    final List<Perfil> ps = new ArrayList<Perfil>();
+    List<String> escritores = new ArrayList<String>();
+    for ( StepMeta o : objetivos ) {
+      for ( String w : CorridaMedida.escritoresAguasArriba( copia, o.getName() ) ) {
+        if ( !escritores.contains( w ) ) {
+          escritores.add( w );
+        }
       }
+    }
+    for ( StepMeta o : objetivos ) {
+      Perfil p = new Perfil();
+      p.step = o.getName();
+      p.limite = maxFilas;
+      p.escritores.addAll( escritores );
+      ps.add( p );
+    }
+    String falta = null;
+    for ( StepMeta o : objetivos ) {
+      if ( o.isMissing() ) {
+        falta = o.getName();
+        break;
+      }
+    }
+    if ( falta == null ) {
+      int quitados = RunMotor.recortar( copia, objetivos );
+      for ( Perfil p : ps ) {
+        p.quitados = quitados;
+      }
+      for ( StepMeta s : copia.getSteps() ) {
+        if ( s.isMissing() ) {
+          falta = s.getName();
+          break;
+        }
+      }
+    }
+    if ( falta != null ) {
+      for ( Perfil p : ps ) {
+        p.faltaPlugin = falta;
+        p.estado = FALLO_INICIO;
+      }
+      return ps;
     }
     final Trans t = new Trans( copia, RunMotor.padreDeLog() );
     t.setLogLevel( LogLevel.MINIMAL );
@@ -180,44 +234,56 @@ final class SecPerfil implements Recolector {
       try {
         t.prepareExecution( null );
       } catch ( Exception e ) {
-        p.estado = FALLO_INICIO;
-        p.falloInicio = RunMotor.primeraLinea( e );
-        p.errores = Math.max( 1, t.getErrors() );
-        p.log = RunMotor.colaLog( t.getLogChannelId(), true );
-        return p;
+        String fallo = RunMotor.primeraLinea( e );
+        String log = RunMotor.colaLog( t.getLogChannelId(), true );
+        for ( Perfil p : ps ) {
+          p.estado = FALLO_INICIO;
+          p.falloInicio = fallo;
+          p.errores = Math.max( 1, t.getErrors() );
+          p.log = log;
+        }
+        return ps;
       }
-      final long[] cuenta = { 0 };
-      for ( StepInterface si : t.findStepInterfaces( objetivo.getName() ) ) {
-        si.addRowListener( new RowAdapter() {
-          @Override
-          public void rowWrittenEvent( RowMetaInterface rm, Object[] row ) throws KettleStepException {
-            synchronized ( p ) { // varias copias del step escriben a la vez
-              if ( cuenta[ 0 ] >= maxFilas ) {
-                return;
-              }
-              try {
-                if ( p.campos.isEmpty() ) {
-                  for ( ValueMetaInterface v : rm.getValueMetaList() ) {
-                    p.campos.add( new Campo( v ) );
+      final long[] cuentas = new long[ ps.size() ];
+      for ( int k = 0; k < ps.size(); k++ ) {
+        final int j = k;
+        final Perfil p = ps.get( k );
+        for ( StepInterface si : t.findStepInterfaces( objetivos.get( k ).getName() ) ) {
+          si.addRowListener( new RowAdapter() {
+            @Override
+            public void rowWrittenEvent( RowMetaInterface rm, Object[] row ) throws KettleStepException {
+              synchronized ( ps ) { // varias copias del step (y varios steps) escriben a la vez
+                if ( cuentas[ j ] >= maxFilas ) {
+                  return;
+                }
+                try {
+                  if ( p.campos.isEmpty() ) {
+                    for ( ValueMetaInterface v : rm.getValueMetaList() ) {
+                      p.campos.add( new Campo( v ) );
+                    }
                   }
+                  for ( int i = 0; i < p.campos.size(); i++ ) {
+                    p.campos.get( i ).agregar( row != null && i < row.length ? row[ i ] : null );
+                  }
+                  cuentas[ j ]++;
+                } catch ( Exception e ) {
+                  throw new KettleStepException( e );
                 }
-                for ( int i = 0; i < p.campos.size(); i++ ) {
-                  p.campos.get( i ).agregar( row != null && i < row.length ? row[ i ] : null );
-                }
-                cuenta[ 0 ]++;
-              } catch ( Exception e ) {
-                throw new KettleStepException( e );
               }
             }
-          }
-        } );
+          } );
+        }
       }
       t.startThreads();
       long limite = inicio + esperaMs;
       String fin = TERMINADA;
       while ( !t.isFinished() ) {
-        synchronized ( p ) {
-          if ( cuenta[ 0 ] >= maxFilas ) {
+        synchronized ( ps ) {
+          boolean todos = true;
+          for ( long n : cuentas ) {
+            todos &= n >= maxFilas;
+          }
+          if ( todos ) {
             fin = TOPE_FILAS;
             break;
           }
@@ -236,29 +302,31 @@ final class SecPerfil implements Recolector {
         t.stopAll();
         RunMotor.esperarFin( t, 10000 );
       }
-      synchronized ( p ) {
-        p.filas = cuenta[ 0 ];
-        if ( TERMINADA.equals( fin ) && p.filas >= maxFilas ) {
-          fin = TOPE_FILAS;
+      long ms = System.currentTimeMillis() - inicio;
+      long erroresCorrida = t.getErrors();
+      String log = erroresCorrida > 0 ? RunMotor.colaLog( t.getLogChannelId(), true ) : null;
+      for ( int k = 0; k < ps.size(); k++ ) {
+        Perfil p = ps.get( k );
+        synchronized ( ps ) {
+          p.filas = cuentas[ k ];
         }
-      }
-      p.estado = fin;
-      p.ms = System.currentTimeMillis() - inicio;
-      p.errores = TOPE_FILAS.equals( fin ) || CANCELADA.equals( fin ) || TIEMPO.equals( fin ) ? 0 : t.getErrors();
-      if ( p.errores > 0 ) {
-        p.log = RunMotor.colaLog( t.getLogChannelId(), true );
-      }
-      if ( p.campos.isEmpty() ) { // no salio ninguna fila: los campos igual se conocen
-        try {
-          RowMetaInterface rm = copia.getStepFields( objetivo );
-          for ( ValueMetaInterface v : rm.getValueMetaList() ) {
-            p.campos.add( new Campo( v ) );
+        p.estado = p.filas >= maxFilas ? TOPE_FILAS : fin;
+        p.ms = ms;
+        p.errores = TOPE_FILAS.equals( p.estado ) || CANCELADA.equals( p.estado ) || TIEMPO.equals( p.estado ) ? 0
+          : erroresCorrida;
+        p.log = p.errores > 0 ? log : null;
+        if ( p.campos.isEmpty() ) { // no salio ninguna fila: los campos igual se conocen
+          try {
+            RowMetaInterface rm = copia.getStepFields( objetivos.get( k ) );
+            for ( ValueMetaInterface v : rm.getValueMetaList() ) {
+              p.campos.add( new Campo( v ) );
+            }
+          } catch ( Exception ignored ) {
+            // sin campos
           }
-        } catch ( Exception ignored ) {
-          // sin campos
         }
       }
-      return p;
+      return ps;
     } catch ( Exception e ) {
       t.stopAll();
       throw e;
@@ -536,6 +604,7 @@ final class SecPerfil implements Recolector {
     Tabla num = new Tabla( r.s( "col.field" ), r.s( "col.mean" ), r.s( "col.stddev" ), r.s( "col.sum" ) );
     num.id = "profile-numeric";
     num.titulo = r.s( "table.numeric.title" );
+    num.anexo = true;
     num.alineacion = new ArrayList<String>( java.util.Arrays.asList( "l", "r", "r", "r" ) );
     for ( Campo c : p.campos ) {
       if ( c.numericos > 0 ) {
@@ -553,6 +622,7 @@ final class SecPerfil implements Recolector {
       Tabla top = new Tabla( r.s( "col.field" ), r.s( "col.top" ) );
       top.id = "profile-top";
       top.titulo = r.s( "table.top.title" );
+      top.anexo = true;
       for ( Campo c : p.campos ) {
         List<Map.Entry<Object, long[]>> tops = c.opaco ? null : c.top();
         if ( tops == null || tops.isEmpty() || tops.get( 0 ).getValue()[ 0 ] < 2 ) {
@@ -570,6 +640,88 @@ final class SecPerfil implements Recolector {
       }
     }
     return s;
+  }
+
+  /**
+   * La seccion de un perfil de varios steps (una sola corrida): un resumen comun; los escritores que
+   * corrieron, los errores y el aviso de valores ocultos una sola vez; y por cada step sus avisos, tablas y
+   * grafico con el nombre del step en el titulo y el id con el sufijo "-k" (1, 2...).
+   */
+  static Seccion seccionVarios( List<Perfil> ps, List<String> faltan, String titulo, Rotulos r, boolean mostrar ) {
+    Perfil p0 = ps.get( 0 );
+    if ( p0.faltaPlugin != null || FALLO_INICIO.equals( p0.estado ) ) {
+      Seccion e = seccion( p0, titulo, r, mostrar ); // la corrida es una: el mismo fallo para todos
+      e.datos = datosVarios( ps, mostrar );
+      return e;
+    }
+    Seccion s = new Seccion( SeccionId.PERFIL, titulo );
+    s.datos = datosVarios( ps, mostrar );
+    List<String> nombres = new ArrayList<String>();
+    for ( Perfil p : ps ) {
+      nombres.add( p.step );
+    }
+    s.resumen = r.f( "summary.profile.multi", ps.size(), CorridaMedida.lista( nombres, r ) );
+    int m = 0;
+    for ( String f : faltan ) {
+      s.estado = Seccion.PARCIAL;
+      String motivo = r.f( "profile.no_such_step", f );
+      s.motivo = s.motivo == null ? motivo : s.motivo;
+      s.con( SecMetricas.aviso( Aviso.ERROR, motivo, "profile-missing-" + ( ++m ) ) );
+    }
+    if ( !p0.escritores.isEmpty() ) {
+      s.con( SecMetricas.aviso( Aviso.WARN, r.f( "profile.writers", CorridaMedida.lista( p0.escritores, r ) ),
+        "profile-writers" ) );
+    }
+    for ( Perfil p : ps ) {
+      if ( p.errores > 0 ) {
+        String e = SecMetricas.primerError( p.log );
+        s.con( SecMetricas.aviso( Aviso.ERROR, r.f( "profile.errors", p.errores ) + ( e == null ? "" : " " + r.f(
+          "metrics.first_error", e ) ), "profile-errors" ) );
+        break;
+      }
+    }
+    if ( !mostrar ) {
+      s.con( SecMetricas.aviso( Aviso.INFO, r.s( "profile.hidden" ), "profile-hidden" ) );
+    }
+    int k = 0;
+    for ( Perfil p : ps ) {
+      k++;
+      Seccion u = seccion( p, titulo, r, mostrar );
+      if ( Seccion.PARCIAL.equals( u.estado ) && !Seccion.PARCIAL.equals( s.estado ) ) {
+        s.estado = Seccion.PARCIAL;
+        s.motivo = u.motivo;
+      }
+      for ( Bloque b : u.bloques ) {
+        if ( b == null || "profile-writers".equals( b.id ) || "profile-errors".equals( b.id ) || "profile-hidden"
+          .equals( b.id ) ) {
+          continue;
+        }
+        if ( "profile-fields".equals( b.id ) ) {
+          b.titulo = r.f( "table.profile.title_step", p.step );
+        } else if ( "profile-nulls".equals( b.id ) ) {
+          b.titulo = r.f( "chart.nulls.title_step", p.step );
+        } else if ( "profile-numeric".equals( b.id ) ) {
+          b.titulo = r.f( "table.numeric.title_step", p.step );
+        } else if ( "profile-top".equals( b.id ) ) {
+          b.titulo = r.f( "table.top.title_step", p.step );
+        }
+        b.id = b.id == null ? null : b.id + "-" + k;
+        s.con( b );
+      }
+    }
+    return s;
+  }
+
+  /** datos de varios steps: el primero arriba (compatibilidad con un solo step), mas "steps" y "profiles". */
+  static ObjectNode datosVarios( List<Perfil> ps, boolean mostrar ) {
+    ObjectNode o = datos( ps.get( 0 ), mostrar );
+    ArrayNode st = o.putArray( "steps" );
+    ArrayNode pr = o.putArray( "profiles" );
+    for ( Perfil p : ps ) {
+      st.add( p.step );
+      pr.add( datos( p, mostrar ) );
+    }
+    return o;
   }
 
   // ---------------------------------------------------------------- JSON

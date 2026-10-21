@@ -417,8 +417,17 @@ public class PruebaServicio {
    * espera al navegador.
    */
   public void pruebaLivianoSinNavegador() throws Exception {
+    // 0.5.1: flujo, job y linaje los dibuja el motor propio; Mermaid queda para lo que no tiene grafo propio
+    // (el modelo de destino). Se simula quitando el grafo a los diagramas de 03.
     Informe inf = armar( EntornoKettle.captura( "03" ), pedido( "es" ), 300 );
-    cierto( !InformeServicio.diagramas( inf ).isEmpty(), "03 tiene diagramas Mermaid" );
+    for ( Seccion s : inf.secciones ) {
+      for ( io.github.ivi2511.pentahomcp.informes.modelo.Bloque b : s.bloques ) {
+        if ( b instanceof io.github.ivi2511.pentahomcp.informes.modelo.Diagrama ) {
+          ( (io.github.ivi2511.pentahomcp.informes.modelo.Diagrama) b ).grafo = null;
+        }
+      }
+    }
+    cierto( !InformeServicio.diagramas( inf ).isEmpty(), "03 sin grafo propio queda con diagramas Mermaid" );
     File dir = EntornoKettle.salida( "liviano-sin-navegador" );
     String antes = System.getProperty( io.github.ivi2511.pentahomcp.informes.navegador.Chromium.PROPIEDAD );
     System.setProperty( io.github.ivi2511.pentahomcp.informes.navegador.Chromium.PROPIEDAD, "none" );

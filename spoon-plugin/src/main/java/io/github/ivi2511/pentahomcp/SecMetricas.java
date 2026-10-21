@@ -22,9 +22,11 @@ import io.github.ivi2511.pentahomcp.informes.Recolector;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
+import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
 import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Indicador;
 import io.github.ivi2511.pentahomcp.informes.modelo.Indicadores;
+import io.github.ivi2511.pentahomcp.informes.modelo.Parrafo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
 import io.github.ivi2511.pentahomcp.informes.modelo.Serie;
 import io.github.ivi2511.pentahomcp.informes.modelo.Tabla;
@@ -33,8 +35,9 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Tramo;
 /**
  * Seccion metrics (diseno §2.4.2): la ultima corrida de Spoon (last_run, solo lectura) o una copia
  * medida (run_copy: "Medir...", ejecuta y ESCRIBE las salidas). Para transformaciones: indicadores,
- * barras de filas y tiempo por step, Gantt (real con metricas; si no, aproximado y lo dice), linea de
- * filas por intervalo si hay snapshots y la tabla de StepStatus. Para jobs: indicadores, Gantt por
+ * barras de filas y tiempo por step, Gantt (real con metricas; si no, aproximado y lo dice; con mas de 40
+ * steps quedan los mas lentos), el ritmo de los steps (filas por segundo) si hay snapshots y la corrida dura
+ * 2 s o mas (si no, una nota) y la tabla de StepStatus. Para jobs: indicadores, Gantt por
  * entrada con los sub-jobs y (en run_copy) los steps de cada sub-transformacion anidados, y tablas.
  *
  * @dueño WP4
@@ -47,6 +50,10 @@ final class SecMetricas implements Recolector {
   static final int MAX_BARRAS = 25;
   /** Tope de series del grafico de linea. */
   static final int MAX_SERIES = 5;
+  /** El grafico de ritmo (filas por segundo) solo sale si la corrida duro al menos esto... */
+  static final long MIN_MS_RITMO = 2000;
+  /** ...y tiene al menos estos snapshots; si no, una nota de una linea. */
+  static final int MIN_PUNTOS_RITMO = 4;
   /** Tope de filas de las tablas de steps de sub-transformaciones. */
   static final int MAX_FILAS_TABLA = 60;
   /** Ninguna seccion espera mas que esto a una medicion, aunque el pedido tenga mas tiempo. */
@@ -180,13 +187,28 @@ final class SecMetricas implements Recolector {
     }
     s.con( barras );
 
-    // Gantt
+    // Gantt: todos los steps hasta MAX_FILAS_GANTT; si hay mas, quedan los mas lentos (en el orden de la
+    // corrida) y la nota dice cuales no entraron. Antes se cortaba por orden y se perdia justo el ultimo, que
+    // suele ser la carga final y el mas lento.
+    List<PasoMedido> enGantt = new ArrayList<PasoMedido>( m.pasos );
+    List<String> fuera = new ArrayList<String>();
+    if ( enGantt.size() > CorridaMedida.MAX_FILAS_GANTT ) {
+      Set<PasoMedido> lentos = new HashSet<PasoMedido>( orden.subList( 0, CorridaMedida.MAX_FILAS_GANTT ) );
+      enGantt.clear();
+      for ( PasoMedido p : m.pasos ) {
+        if ( lentos.contains( p ) ) {
+          enGantt.add( p );
+        } else {
+          fuera.add( p.step );
+        }
+      }
+    }
     Grafico gantt = new Grafico();
     gantt.id = "metrics-gantt";
     gantt.clase = Grafico.GANTT;
     gantt.titulo = r.s( "chart.gantt.title" );
     gantt.unidad = "ms";
-    for ( PasoMedido p : m.pasos ) {
+    for ( PasoMedido p : enGantt ) {
       gantt.categorias.add( p.step );
       if ( m.metricasReales ) {
         if ( p.initIni > 0 ) {
@@ -200,24 +222,63 @@ final class SecMetricas implements Recolector {
       }
     }
     // con metricas reales la leyenda del Gantt (GraficosSvg) ya dice que el solapamiento es normal
-    gantt.nota = m.metricasReales ? null : r.s( "chart.gantt.approx" );
+    String nota = m.metricasReales ? null : r.s( "chart.gantt.approx" );
+    if ( !fuera.isEmpty() ) {
+      String mas = r.f( "chart.gantt.fastest_out", fuera.size(), lista( fuera, 8, r ) );
+      nota = nota == null ? mas : nota + " " + mas;
+    }
+    gantt.nota = nota;
     s.con( gantt );
 
-    // linea: filas por intervalo de los 5 steps con mas volumen
-    Grafico linea = linea( m, r );
-    if ( linea != null ) {
-      s.con( linea );
+    // ritmo: filas por segundo de los 5 steps con mas volumen, solo si la corrida da para verlo
+    Bloque ritmo = ritmo( m, r );
+    if ( ritmo != null ) {
+      s.con( ritmo );
     }
 
     s.con( tablaPasos( m.pasos, r, "metrics-steps-table", r.s( "table.steps.title" ), null ) );
     return s;
   }
 
-  private static Grafico linea( CorridaMedida m, Rotulos r ) {
+  /** "«a», «b», «c» y 3 más": como mucho {@code max} nombres entre comillas. */
+  static String lista( List<String> nombres, int max, Rotulos r ) {
+    StringBuilder sb = new StringBuilder();
+    for ( int i = 0; i < nombres.size() && i < max; i++ ) {
+      sb.append( i == 0 ? "" : ", " ).append( r.f( "quoted", nombres.get( i ) ) );
+    }
+    if ( nombres.size() > max ) {
+      sb.append( ' ' ).append( r.f( "and_more", nombres.size() - max ) );
+    }
+    return sb.toString();
+  }
+
+  /**
+   * El grafico de ritmo (filas por segundo de los 5 steps que mas filas escribieron, a lo largo de la
+   * corrida), o una nota de una linea si la corrida fue tan corta que el grafico no diria nada (una de
+   * medio segundo daba 3 puntos sueltos). null si no hubo snapshots (la corrida no tenia el monitoreo).
+   */
+  static Bloque ritmo( CorridaMedida m, Rotulos r ) {
     CorridaMedida.Snapshots sn = m.snapshots;
-    if ( sn == null || sn.instantes.size() < 3 ) {
+    if ( sn == null || sn.instantes.isEmpty() ) {
       return null;
     }
+    if ( m.ms() < MIN_MS_RITMO || sn.instantes.size() < MIN_PUNTOS_RITMO ) {
+      Parrafo p = new Parrafo( m.ms() < MIN_MS_RITMO ? r.f( "chart.line.short", duracion( m.ms(), r ) )
+        : r.f( "chart.line.few", sn.instantes.size() ) );
+      p.id = "metrics-throughput";
+      return p;
+    }
+    return linea( m, r );
+  }
+
+  private static Grafico linea( CorridaMedida m, Rotulos r ) {
+    CorridaMedida.Snapshots sn = m.snapshots;
+    if ( sn == null || sn.instantes.size() < MIN_PUNTOS_RITMO ) {
+      return null;
+    }
+    // cada snapshot trae las filas escritas DESDE el anterior: se pasan a filas por segundo con el
+    // intervalo real (el primero, desde el inicio de la corrida)
+    long[] dt = intervalos( sn.instantes, m.inicio );
     List<Map.Entry<String, List<Long>>> series = new ArrayList<Map.Entry<String, List<Long>>>( sn.porStep.entrySet() );
     Collections.sort( series, new Comparator<Map.Entry<String, List<Long>>>() {
       @Override
@@ -230,6 +291,7 @@ final class SecMetricas implements Recolector {
     g.clase = Grafico.LINEA;
     g.titulo = r.s( "chart.line.title" );
     g.unidad = r.s( "chart.line.unit" );
+    g.nota = r.s( "chart.line.note" );
     for ( Long x : sn.instantes ) {
       g.categorias.add( x < 0 ? "" : segundos( x - m.inicio, r ) );
     }
@@ -241,11 +303,38 @@ final class SecMetricas implements Recolector {
       Serie se = new Serie();
       se.nombre = e.getKey();
       for ( int k = 0; k < sn.instantes.size(); k++ ) {
-        se.valores.add( k < e.getValue().size() ? (double) e.getValue().get( k ) : null );
+        Long filas = k < e.getValue().size() ? e.getValue().get( k ) : null;
+        se.valores.add( filas == null ? null : (double) Math.round( filas * 1000.0 / dt[ k ] ) );
       }
       g.series.add( se );
     }
     return g.series.isEmpty() ? null : g;
+  }
+
+  /**
+   * ms entre cada snapshot y el anterior (el primero, desde el inicio). Si un instante falta o no avanza,
+   * la mediana de los intervalos buenos (o el de Medir...): nunca 0.
+   */
+  static long[] intervalos( List<Long> instantes, long inicio ) {
+    int n = instantes.size();
+    long[] dt = new long[ n ];
+    List<Long> buenos = new ArrayList<Long>();
+    for ( int k = 0; k < n; k++ ) {
+      long x = instantes.get( k ) == null ? -1 : instantes.get( k );
+      long antes = k == 0 ? inicio : instantes.get( k - 1 ) == null ? -1 : instantes.get( k - 1 );
+      dt[ k ] = x > 0 && antes > 0 && x > antes ? x - antes : -1;
+      if ( dt[ k ] > 0 && k > 0 ) {
+        buenos.add( dt[ k ] );
+      }
+    }
+    Collections.sort( buenos );
+    long tipico = buenos.isEmpty() ? CorridaMedida.INTERVALO_SNAPSHOT_MS : buenos.get( buenos.size() / 2 );
+    for ( int k = 0; k < n; k++ ) {
+      if ( dt[ k ] <= 0 ) {
+        dt[ k ] = tipico;
+      }
+    }
+    return dt;
   }
 
   private static long suma( List<Long> l ) {
@@ -402,45 +491,60 @@ final class SecMetricas implements Recolector {
     gantt.clase = Grafico.GANTT;
     gantt.titulo = r.s( "chart.gantt.job.title" );
     gantt.unidad = "ms";
-    Set<String> usadas = new HashSet<String>();
-    int filas = 0;
-    int sinLugar = 0;
-    boolean anidados = false;
+    // primero todas las filas (entradas y, anidados, los steps de cada sub-transformacion); si pasan del tope
+    // quedan las mas lentas en su orden y la nota nombra las que no entraron. Antes se cortaba por orden y
+    // se perdian las ultimas, que suelen ser la carga final y las mas lentas.
+    List<FilaJob> todas = new ArrayList<FilaJob>();
     for ( EntradaMedida e : m.entradas ) {
       if ( esStart( e ) ) {
         continue;
       }
-      if ( filas >= CorridaMedida.MAX_FILAS_GANTT ) {
-        sinLugar++;
-        continue;
-      }
-      String cat = unica( sangria( e.nivel ) + e.nombre, usadas );
-      gantt.categorias.add( cat );
-      filas++;
       long ini = e.ini < 0 ? 0 : e.ini - m.inicio;
       long fi = e.fin < 0 ? m.fin - m.inicio : e.fin - m.inicio;
-      gantt.tramos.add( new Tramo( cat, Tramo.EXEC, ini, Math.max( ini, fi ) ) );
+      todas.add( new FilaJob( e.nombre, e.nivel, false, -1, -1, ini, Math.max( ini, fi ) ) );
       if ( e.hija != null ) {
         for ( PasoMedido p : e.hija.pasos ) {
           if ( p.execIni <= 0 ) {
             continue;
           }
-          if ( filas >= CorridaMedida.MAX_FILAS_GANTT ) {
-            sinLugar++;
-            continue;
-          }
-          String sc = unica( sangria( e.nivel + 1 ) + p.step, usadas );
-          gantt.categorias.add( sc );
-          anidados = true;
-          filas++;
-          if ( p.initIni > 0 ) {
-            gantt.tramos.add( new Tramo( sc, Tramo.INIT, p.initIni - m.inicio, p.initFin - m.inicio ) );
-          }
-          gantt.tramos.add( new Tramo( sc, Tramo.EXEC, p.execIni - m.inicio, p.execFin - m.inicio ) );
+          todas.add( new FilaJob( p.step, e.nivel + 1, true, p.initIni > 0 ? p.initIni - m.inicio : -1,
+            p.initFin - m.inicio, p.execIni - m.inicio, p.execFin - m.inicio ) );
         }
       }
     }
-    gantt.nota = sinLugar > 0 ? r.f( "chart.gantt.job.more", sinLugar ) : r.s( "chart.gantt.job.note" );
+    List<String> fuera = new ArrayList<String>();
+    if ( todas.size() > CorridaMedida.MAX_FILAS_GANTT ) {
+      List<FilaJob> porDuracion = new ArrayList<FilaJob>( todas );
+      Collections.sort( porDuracion, new Comparator<FilaJob>() {
+        @Override
+        public int compare( FilaJob a, FilaJob b ) {
+          return Long.compare( b.fin - b.ini, a.fin - a.ini );
+        }
+      } );
+      Set<FilaJob> lentas = new HashSet<FilaJob>( porDuracion.subList( 0, CorridaMedida.MAX_FILAS_GANTT ) );
+      List<FilaJob> quedan = new ArrayList<FilaJob>();
+      for ( FilaJob f : todas ) {
+        if ( lentas.contains( f ) ) {
+          quedan.add( f );
+        } else {
+          fuera.add( f.nombre );
+        }
+      }
+      todas = quedan;
+    }
+    Set<String> usadas = new HashSet<String>();
+    boolean anidados = false;
+    for ( FilaJob f : todas ) {
+      String cat = unica( sangria( f.nivel ) + f.nombre, usadas );
+      gantt.categorias.add( cat );
+      anidados |= f.paso;
+      if ( f.initIni >= 0 ) {
+        gantt.tramos.add( new Tramo( cat, Tramo.INIT, f.initIni, f.initFin ) );
+      }
+      gantt.tramos.add( new Tramo( cat, Tramo.EXEC, f.ini, f.fin ) );
+    }
+    gantt.nota = fuera.isEmpty() ? r.s( "chart.gantt.job.note" )
+      : r.f( "chart.gantt.job.fastest_out", fuera.size(), lista( fuera, 8, r ) );
     // las entradas del job corren una tras otra: la leyenda de siempre ("los steps corren en paralelo")
     // solo vale para los steps anidados de las sub-transformaciones
     gantt.leyenda = r.s( anidados ? "chart.gantt.job.legend_nested" : "chart.gantt.job.legend" );
@@ -508,6 +612,27 @@ final class SecMetricas implements Recolector {
       sb.append( "  " );
     }
     return sb.append( "↳ " ).toString();
+  }
+
+  /** Una fila del Gantt del job: una entrada o, anidado, un step de su sub-transformacion (ms desde el inicio). */
+  private static final class FilaJob {
+    final String nombre;
+    final int nivel;
+    final boolean paso;
+    final long initIni;
+    final long initFin;
+    final long ini;
+    final long fin;
+
+    FilaJob( String nombre, int nivel, boolean paso, long initIni, long initFin, long ini, long fin ) {
+      this.nombre = nombre;
+      this.nivel = nivel;
+      this.paso = paso;
+      this.initIni = initIni;
+      this.initFin = initFin;
+      this.ini = ini;
+      this.fin = fin;
+    }
   }
 
   /** Categoria unica del Gantt (dos entradas con el mismo nombre irian a la misma fila). */

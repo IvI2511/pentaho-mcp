@@ -43,4 +43,11 @@ public abstract class Bloque {
   public String nota;
   /** true si el texto lo redacto una IA (narrativa); con Tema.rotularIa se rotula. */
   public boolean ia;
+  /**
+   * Detalle de consulta (tablas largas de referencia: diccionario por step, lista de steps, metricas por
+   * step...). Solo cambia el PowerPoint, que es para presentar: ahi va a las diapositivas de anexo (si el tema
+   * las pide) o se deja para el informe completo. El resto de los formatos lo muestra en su lugar.
+   */
+  @JsonInclude( JsonInclude.Include.NON_DEFAULT )
+  public boolean anexo;
 }

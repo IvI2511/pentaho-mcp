@@ -498,16 +498,21 @@ final class ReportMotor {
     try {
       StepMetaInterface m = sm.getStepMetaInterface();
       if ( m instanceof CsvInputMeta ) {
-        partes.add( t.s( "reads" ) + ": " + codigo( ( (CsvInputMeta) m ).getFilename() ) );
+        partes.add( t.s( "reads" ) + ": " + codigo( relativaAlDoc( ( (CsvInputMeta) m ).getFilename(), tm.getFilename() ) ) );
       } else if ( m instanceof TextFileInputMeta ) {
         String[] f = ( (TextFileInputMeta) m ).inputFiles.fileName;
         if ( f != null && f.length > 0 ) {
-          partes.add( t.s( "reads" ) + ": " + listaCodigo( f ) );
+          String[] r = new String[ f.length ];
+          for ( int i = 0; i < f.length; i++ ) {
+            r[ i ] = relativaAlDoc( f[ i ], tm.getFilename() );
+          }
+          partes.add( t.s( "reads" ) + ": " + listaCodigo( r ) );
         }
       } else if ( m instanceof TextFileOutputMeta ) {
         TextFileOutputMeta o = (TextFileOutputMeta) m;
         String ext = vacioANull( o.getExtension() );
-        partes.add( t.s( "writes" ) + ": " + codigo( o.getFileName() + ( ext == null ? "" : "." + ext ) ) );
+        partes.add( t.s( "writes" ) + ": " + codigo( relativaAlDoc( o.getFileName(), tm.getFilename() ) + ( ext == null ? ""
+          : "." + ext ) ) );
       } else if ( m instanceof FilterRowsMeta ) {
         Condition c = ( (FilterRowsMeta) m ).getCondition();
         if ( c != null && !c.isEmpty() ) {
@@ -552,7 +557,7 @@ final class ReportMotor {
         partes.add( t.s( "join" ) + " " + celda( j.getJoinType() ) + ": " + listaCodigo( j.getKeyFields1() )
           + " = " + listaCodigo( j.getKeyFields2() ) );
       } else {
-        String archivos = archivosDe( m.getResourceDependencies( tm, sm ) );
+        String archivos = archivosDe( m.getResourceDependencies( tm, sm ), tm.getFilename() );
         if ( archivos != null ) {
           partes.add( t.s( "files" ) + ": " + archivos );
         }
@@ -566,8 +571,12 @@ final class ReportMotor {
     return unir( partes, "; " );
   }
 
-  /** Archivos que declara el step como dependencia (generico: ResourceReference de tipo FILE). */
-  private static String archivosDe( List<ResourceReference> refs ) {
+  /**
+   * Archivos que declara el step como dependencia (generico: ResourceReference de tipo FILE). Kettle los da
+   * resueltos y absolutos: se muestran relativos a la carpeta del documento ("../datos/ventas.csv"), para
+   * que un informe compartido no lleve las rutas de la maquina de quien lo hizo.
+   */
+  private static String archivosDe( List<ResourceReference> refs, String archivoDoc ) {
     if ( refs == null ) {
       return null;
     }
@@ -575,11 +584,31 @@ final class ReportMotor {
     for ( ResourceReference r : refs ) {
       for ( ResourceEntry e : r.getEntries() ) {
         if ( e.getResourcetype() == ResourceEntry.ResourceType.FILE && vacioANull( e.getResource() ) != null ) {
-          f.add( e.getResource() );
+          f.add( relativaAlDoc( e.getResource(), archivoDoc ) );
         }
       }
     }
     return f.isEmpty() ? null : listaCodigo( f.toArray( new String[ 0 ] ) );
+  }
+
+  /** Ruta relativa a la carpeta del documento (hasta 3 niveles hacia arriba); si no se puede, tal cual. */
+  static String relativaAlDoc( String ruta, String archivoDoc ) {
+    try {
+      String l = InformeServicio.Txt.local( ruta );
+      if ( l == null || archivoDoc == null || archivoDoc.trim().isEmpty() || l.contains( "${" ) ) {
+        return ruta;
+      }
+      java.nio.file.Path dir = new java.io.File( InformeServicio.Txt.local( archivoDoc ) ).getAbsoluteFile()
+        .getParentFile().toPath().normalize();
+      java.nio.file.Path p = new java.io.File( l ).getAbsoluteFile().toPath().normalize();
+      if ( dir.getRoot() == null || !dir.getRoot().equals( p.getRoot() ) ) {
+        return ruta;
+      }
+      String rel = dir.relativize( p ).toString().replace( '\\', '/' );
+      return rel.startsWith( "../../../../" ) ? ruta : rel;
+    } catch ( Exception e ) {
+      return ruta; // ruta rara: tal cual
+    }
   }
 
   /** Condicion compacta en una linea: "(a > b AND NOT c IS NULL)". */

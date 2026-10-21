@@ -34,6 +34,7 @@ import org.pentaho.di.trans.steps.getvariable.GetVariableMeta;
 import org.pentaho.di.trans.steps.groupby.GroupByMeta;
 import org.pentaho.di.trans.steps.memgroupby.MemoryGroupByMeta;
 import org.pentaho.di.trans.steps.mergejoin.MergeJoinMeta;
+import org.pentaho.di.trans.steps.multimerge.MultiMergeJoinMeta;
 import org.pentaho.di.trans.steps.selectvalues.SelectMetadataChange;
 import org.pentaho.di.trans.steps.selectvalues.SelectValuesMeta;
 import org.pentaho.di.trans.steps.streamlookup.StreamLookupMeta;
@@ -49,10 +50,12 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * <p>
  * Para cada step pide sus campos de salida a {@link Contexto#salida} (memo y timeout compartidos) y
  * anota de donde sale cada uno: step anterior, campo y operacion. Hay reglas para Select values,
- * Calculator, Group by, Memory group by, Stream lookup, Merge join, Formula y las filas de error; para
- * el resto, mismo nombre en un step anterior = pasa igual, sin steps anteriores = fuente, y si no,
- * creado por el step. Los steps anteriores son los de {@code findPreviousSteps(s, true)} menos los de
- * {@code getInfoStep}. {@code ValueMetaInterface.getOrigin()} no se usa: es solo una pista.
+ * Calculator (las constantes son valores, no campos), Group by, Memory group by, Stream lookup, Merge join,
+ * Multiway merge join, Formula y las filas de error; para el resto, mismo nombre en un step anterior =
+ * pasa igual, sin steps anteriores = fuente, y si no, creado por el step. Los steps anteriores son los de
+ * {@code findPreviousSteps(s, true)} menos los de {@code getInfoStep}; si el campo no viene de ninguno, se
+ * busca en los de {@code getInfoStep} (Append, Merge rows...: sus filas llegan por streams de info).
+ * {@code ValueMetaInterface.getOrigin()} no se usa: es solo una pista.
  * <p>
  * Tambien clasifica los nodos que devuelve metaverse ({@link #clasificar}) y les pone la misma
  * etiqueta ({@link #etiqueta}), asi los dos motores dan caminos comparables.
@@ -371,16 +374,12 @@ final class LinajePropio {
     l.add( r );
   }
 
+  /** Los steps anteriores por el flujo principal (sin los que llegan por un stream de info). */
   private List<StepMeta> anteriores( StepMeta s ) {
     List<StepMeta> todos = tm.findPreviousSteps( s, true );
-    StepMeta[] infos = tm.getInfoStep( s );
     Set<String> deInfo = new HashSet<>();
-    if ( infos != null ) {
-      for ( StepMeta i : infos ) {
-        if ( i != null ) {
-          deInfo.add( i.getName() );
-        }
-      }
+    for ( StepMeta i : infos( s ) ) {
+      deInfo.add( i.getName() );
     }
     List<StepMeta> main = new ArrayList<>();
     for ( StepMeta p : todos ) {
@@ -389,6 +388,23 @@ final class LinajePropio {
       }
     }
     return main;
+  }
+
+  /**
+   * Los steps que llegan por un stream de info, en el orden del step: el head y el tail de Append, la
+   * referencia y la comparacion de Merge rows, cada entrada de Multiway merge join, el lookup...
+   */
+  private List<StepMeta> infos( StepMeta s ) {
+    List<StepMeta> l = new ArrayList<>();
+    StepMeta[] infos = tm.getInfoStep( s );
+    if ( infos != null ) {
+      for ( StepMeta i : infos ) {
+        if ( i != null && !l.contains( i ) ) {
+          l.add( i );
+        }
+      }
+    }
+    return l;
   }
 
   private void analizar( Info in ) throws Exception {
@@ -430,6 +446,13 @@ final class LinajePropio {
     } else if ( m instanceof CalculatorMeta ) {
       Map<String, List<String>> intermedios = new HashMap<>();
       for ( CalculatorMetaFunction f : ( (CalculatorMeta) m ).getCalculation() ) {
+        if ( f.getCalcType() == CalculatorMetaFunction.CALC_CONSTANT ) {
+          // «Crear una constante»: field_a es el VALOR, no un campo (antes salia como un campo «1 (?)»)
+          intermedios.put( f.getFieldName(), new ArrayList<String>() );
+          in.nace.put( f.getFieldName(), new String[] { CREA, constante( f ) } );
+          hechos.add( f.getFieldName() );
+          continue;
+        }
         List<String> fuentes = new ArrayList<>();
         for ( String a : noVacios( f.getFieldA(), f.getFieldB(), f.getFieldC() ) ) {
           if ( intermedios.containsKey( a ) ) {
@@ -471,22 +494,27 @@ final class LinajePropio {
           null ) );
         hechos.add( sale );
       }
-    } else if ( m instanceof MergeJoinMeta ) {
-      List<StreamInterface> is = m.getStepIOMeta().getInfoStreams();
-      StepMeta a = tm.findStep( is.get( 0 ).getStepname() );
-      StepMeta b = tm.findStep( is.get( 1 ).getStepname() );
-      RowMetaInterface ca = campos( a );
-      RowMetaInterface cb = campos( b );
-      if ( ca != null && cb != null ) {
-        int na = ca.size();
-        for ( int i = 0; i < in.salida.size(); i++ ) {
+    } else if ( m instanceof MergeJoinMeta || m instanceof MultiMergeJoinMeta ) {
+      // la salida son los campos de cada entrada, en orden (los repetidos renombrados con _1, _2...)
+      List<StepMeta> entradas = new ArrayList<>();
+      List<RowMetaInterface> filas = new ArrayList<>();
+      for ( StreamInterface x : m.getStepIOMeta().getInfoStreams() ) {
+        StepMeta e = x.getStepname() == null ? null : tm.findStep( x.getStepname() );
+        RowMetaInterface ce = e == null ? null : campos( e );
+        if ( ce == null ) {
+          entradas.clear();
+          break;
+        }
+        entradas.add( e );
+        filas.add( ce );
+      }
+      int i = 0;
+      for ( int k = 0; k < entradas.size(); k++ ) {
+        for ( int j = 0; j < filas.get( k ).size() && i < in.salida.size(); j++, i++ ) {
           String f = in.salida.getValueMeta( i ).getName();
-          String desde = i < na ? ca.getValueMeta( i ).getName()
-            : i - na < cb.size() ? cb.getValueMeta( i - na ).getName() : null;
-          if ( desde != null ) {
-            ref( in, f, new Ref( ( i < na ? a : b ).getName(), desde, UNE, etiqueta( s, UNE, desde, f ), null ) );
-            hechos.add( f );
-          }
+          String desde = filas.get( k ).getValueMeta( j ).getName();
+          ref( in, f, new Ref( entradas.get( k ).getName(), desde, UNE, etiqueta( s, UNE, desde, f ), null ) );
+          hechos.add( f );
         }
       }
     } else if ( "Formula".equals( s.getStepID() ) ) {
@@ -527,7 +555,10 @@ final class LinajePropio {
       }
     }
 
-    // regla general: mismo nombre en un step anterior = pasa igual
+    // regla general: mismo nombre en un step anterior = pasa igual. Si no esta en el flujo principal se
+    // busca en los streams de info: Append (head y tail), Merge rows (diff), Fuzzy match... traen sus filas
+    // por ahi y sin esto todo campo quedaba como «creado» por el step (salvo Stream lookup, que tiene su regla)
+    List<StepMeta> porInfo = m instanceof StreamLookupMeta ? Collections.<StepMeta>emptyList() : infos( s );
     for ( ValueMetaInterface v : in.salida.getValueMetaList() ) {
       String f = v.getName();
       if ( hechos.contains( f ) ) {
@@ -535,20 +566,18 @@ final class LinajePropio {
       }
       boolean pasa = false;
       for ( StepMeta p : normales ) {
-        RowMetaInterface cp = campos( p );
-        if ( cp != null && cp.indexOfValue( f ) >= 0 ) {
-          ref( in, f, new Ref( p.getName(), f, PASA, null, null ) );
-          pasa = true;
-        }
+        pasa |= pasa( in, s, p, f );
       }
       for ( StepMeta p : conError ) {
         // una fila de error trae la entrada del step que fallo: viene de los anteriores a ese step
         for ( StepMeta pp : anteriores( p ) ) {
-          RowMetaInterface cp = campos( pp );
-          if ( cp != null && cp.indexOfValue( f ) >= 0 ) {
-            ref( in, f, new Ref( pp.getName(), f, PASA, null, null ) );
-            pasa = true;
-          }
+          pasa |= pasa( in, s, pp, f );
+        }
+      }
+      if ( !pasa ) {
+        // todas las entradas de info que lo traen son origenes (las dos de un Append)
+        for ( StepMeta p : porInfo ) {
+          pasa |= pasa( in, s, p, f );
         }
       }
       if ( !pasa ) {
@@ -568,6 +597,24 @@ final class LinajePropio {
         }
       }
     }
+  }
+
+  /**
+   * Si el step anterior p tiene el campo f, anota que pasa de ahi y devuelve true. Kettle compara los
+   * nombres sin mayusculas: si en p se llama «Fecha» y aca «fecha» (un Select values que solo cambia la
+   * mayuscula no lo cuenta como renombre), la Ref va al nombre de p, como renombre; con el nombre de aca el
+   * camino se cortaba en p con un origen desconocido.
+   */
+  private boolean pasa( Info in, StepMeta s, StepMeta p, String f ) {
+    RowMetaInterface cp = campos( p );
+    int i = cp == null ? -1 : cp.indexOfValue( f );
+    if ( i < 0 ) {
+      return false;
+    }
+    String alla = cp.getValueMeta( i ).getName();
+    ref( in, f, alla.equals( f ) ? new Ref( p.getName(), f, PASA, null, null )
+      : new Ref( p.getName(), alla, RENOMBRA, etiqueta( s, RENOMBRA, alla, f ), null ) );
+    return true;
   }
 
   private boolean mandaErrores( StepMeta p, StepMeta s ) {
@@ -628,11 +675,11 @@ final class LinajePropio {
       out.add( unNodo( new Nodo( step, campo, DESCONOCIDO, in.error ) ) );
       return;
     }
-    List<Ref> rs = in.refs.get( campo );
+    List<Ref> rs = sinMayusculas( in.refs, campo );
     if ( rs == null || rs.isEmpty() ) {
       String[] n = extras.get( clave );
       if ( n == null ) {
-        n = in.nace.get( campo );
+        n = sinMayusculas( in.nace, campo );
       }
       out.add( unNodo( n == null ? new Nodo( step, campo, DESCONOCIDO, null ) : new Nodo( step, campo, n[ 0 ],
         n[ 1 ] ) ) );
@@ -695,6 +742,19 @@ final class LinajePropio {
     RowMetaInterface rm = s == null ? null : campos( s );
     int i = rm == null ? -1 : rm.indexOfValue( n.campo );
     return i < 0 ? Integer.MAX_VALUE : i;
+  }
+
+  /** El valor de la clave, o el de una que solo cambia en mayusculas (Kettle no las distingue). */
+  private static <T> T sinMayusculas( Map<String, T> m, String clave ) {
+    T v = m.get( clave );
+    if ( v == null && clave != null ) {
+      for ( Map.Entry<String, T> e : m.entrySet() ) {
+        if ( clave.equalsIgnoreCase( e.getKey() ) ) {
+          return e.getValue();
+        }
+      }
+    }
+    return v;
   }
 
   private static List<Nodo> unNodo( Nodo n ) {
@@ -891,7 +951,7 @@ final class LinajePropio {
         return new String[] { BUSCA, null };
       }
     }
-    if ( m instanceof MergeJoinMeta ) {
+    if ( m instanceof MergeJoinMeta || m instanceof MultiMergeJoinMeta ) {
       return new String[] { UNE, null };
     }
     if ( nombre || !campo.equals( previo.campo ) ) {
@@ -924,11 +984,11 @@ final class LinajePropio {
     try {
       StepMetaInterface m = s.getStepMetaInterface();
       if ( CALCULA.equals( clase ) && m instanceof CalculatorMeta ) {
-        for ( CalculatorMetaFunction f : ( (CalculatorMeta) m ).getCalculation() ) {
-          if ( sale.equals( f.getFieldName() ) ) {
-            return f.getCalcTypeDesc() + "(" + SecLinaje.unir( Arrays.asList( noVacios( f.getFieldA(), f.getFieldB(),
-              f.getFieldC() ) ), ", " ) + ")";
-          }
+        CalculatorMetaFunction[] fs = ( (CalculatorMeta) m ).getCalculation();
+        int k = definicion( fs, sale, fs.length );
+        if ( k >= 0 ) {
+          return fs[ k ].getCalcType() == CalculatorMetaFunction.CALC_CONSTANT ? constante( fs[ k ] )
+            : expresion( fs, k, 0 );
         }
       } else if ( CALCULA.equals( clase ) && "Formula".equals( s.getStepID() ) ) {
         Document d = XMLHandler.loadXMLString( "<step>" + m.getXML() + "</step>" );
@@ -959,6 +1019,10 @@ final class LinajePropio {
       } else if ( UNE.equals( clase ) && m instanceof MergeJoinMeta ) {
         MergeJoinMeta mj = (MergeJoinMeta) m;
         return rot.f( "op.une", mj.getJoinType(), pares( mj.getKeyFields1(), mj.getKeyFields2() ) );
+      } else if ( UNE.equals( clase ) && m instanceof MultiMergeJoinMeta ) {
+        MultiMergeJoinMeta mj = (MultiMergeJoinMeta) m;
+        String[] ks = mj.getKeyFields();
+        return rot.f( "op.une", mj.getJoinType(), ks == null ? "" : SecLinaje.unir( Arrays.asList( ks ), " = " ) );
       } else if ( RENOMBRA.equals( clase ) ) {
         String conv = conversion( m, sale );
         return entra == null || entra.equals( sale ) ? conv : entra + " → " + sale + ( conv == null ? "" : ", " + conv );
@@ -969,6 +1033,48 @@ final class LinajePropio {
       // sin etiqueta
     }
     return null;
+  }
+
+  /** constante «1» de una funcion CONSTANT de Calculator (su field_a es el valor). */
+  private String constante( CalculatorMetaFunction f ) {
+    return rot.f( "op.constante", f.getFieldA() == null ? "" : f.getFieldA() );
+  }
+
+  /** Indice de la ultima funcion de Calculator antes de {@code antes} que calcula el campo, o -1. */
+  private static int definicion( CalculatorMetaFunction[] fs, String campo, int antes ) {
+    for ( int i = Math.min( antes, fs.length ) - 1; campo != null && i >= 0; i-- ) {
+      if ( campo.equals( fs[ i ].getFieldName() ) ) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * La cuenta entera de una funcion de Calculator: las constantes con su valor y los temporales (los que
+   * se quitan del resultado) desarmados, por ejemplo ADD(DIVIDE(SUBTRACT(mes, 1), 4), 1) en lugar de
+   * ADD(cociente, c1). Un campo calculado que queda en la salida va por su nombre.
+   */
+  private static String expresion( CalculatorMetaFunction[] fs, int k, int prof ) {
+    CalculatorMetaFunction f = fs[ k ];
+    List<String> args = new ArrayList<>();
+    for ( String a : noVacios( f.getFieldA(), f.getFieldB(), f.getFieldC() ) ) {
+      int j = definicion( fs, a, k );
+      if ( j >= 0 && fs[ j ].getCalcType() == CalculatorMetaFunction.CALC_CONSTANT ) {
+        args.add( literal( fs[ j ].getFieldA() ) );
+      } else if ( j >= 0 && fs[ j ].isRemovedFromResult() && prof < 6 ) {
+        args.add( expresion( fs, j, prof + 1 ) );
+      } else {
+        args.add( a );
+      }
+    }
+    return f.getCalcTypeDesc() + "(" + SecLinaje.unir( args, ", " ) + ")";
+  }
+
+  /** Un valor constante dentro de una cuenta: los numeros tal cual, el resto entre comillas simples. */
+  private static String literal( String v ) {
+    String x = v == null ? "" : v.trim();
+    return x.matches( "[-+]?\\d+([.,]\\d+)?" ) ? x : "'" + x + "'";
   }
 
   /** "a String (#,##0.00)" para el cambio de metadatos de Select values sobre el campo; null si no hay. */

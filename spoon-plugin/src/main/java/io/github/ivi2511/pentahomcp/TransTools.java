@@ -554,11 +554,8 @@ final class TransTools {
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
         AbstractMeta m = Docs.resolver( a );
-        TransLayout.Movimientos mov = TransLayout.ordenar( m );
-        if ( !mov.objetos.isEmpty() ) {
-          new UndoGrupo( sp, m ).posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
-          Docs.touched( m );
-        }
+        // el mismo camino que el boton «Ordenar lienzo» de la barra del lienzo
+        TransLayout.Movimientos mov = OrdenarLienzo.ordenar( sp, m );
         ObjectNode o = Tools.obj();
         o.put( "moved", mov.objetos.size() );
         o.put( "columns", mov.columnas );

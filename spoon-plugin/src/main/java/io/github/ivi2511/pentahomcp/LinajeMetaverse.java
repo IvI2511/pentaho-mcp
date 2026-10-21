@@ -69,9 +69,17 @@ final class LinajeMetaverse {
   static final class Respuesta {
     /** campo -&gt; caminos (del origen al destino), ya clasificados. */
     final Map<String, List<List<LinajePropio.Nodo>>> caminos = new LinkedHashMap<>();
-    /** Por que fallo este destino (texto tecnico); null si anduvo. */
+    /**
+     * Campos que metaverse no pudo recorrer aunque el destino anduvo (los resuelve el motor propio). El
+     * detalle tecnico va al log, no al informe.
+     */
+    final List<String> fallidos = new ArrayList<>();
+    /** Por que fallo el destino entero (texto tecnico, solo para el log y los datos); null si anduvo. */
     String error;
   }
+
+  /** Clave interna del mapa crudo con los campos que fallaron uno por uno. */
+  private static final String FALLIDOS = "\u0000fallidos";
 
   /** Lo que devolvio una corrida. */
   static final class Corrida {
@@ -169,11 +177,18 @@ final class LinajeMetaverse {
         r.error = (String) o;
       } else if ( o != null ) {
         @SuppressWarnings( "unchecked" )
-        Map<String, Set<List<StepFieldOperations>>> paths = (Map<String, Set<List<StepFieldOperations>>>) o;
+        Map<String, Object> paths = (Map<String, Object>) o;
         for ( String campo : e.getValue() ) {
-          Set<List<StepFieldOperations>> ps = paths.get( campo );
+          @SuppressWarnings( "unchecked" )
+          Set<List<StepFieldOperations>> ps = (Set<List<StepFieldOperations>>) paths.get( campo );
           if ( ps != null && !ps.isEmpty() ) {
             r.caminos.put( campo, convertir( ps, reglas ) );
+          }
+        }
+        Object fallidos = paths.get( FALLIDOS );
+        if ( fallidos instanceof List ) {
+          for ( Object f : (List<?>) fallidos ) {
+            r.fallidos.add( String.valueOf( f ) );
           }
         }
       }
@@ -211,12 +226,61 @@ final class LinajeMetaverse {
         try {
           out.put( e.getKey(), cliente.getOperationPaths( clon, e.getKey(), e.getValue() ) );
         } catch ( Throwable x ) {
-          out.put( e.getKey(), SecLinaje.motivoCorto( x ) );
+          out.put( e.getKey(), campoPorCampo( cliente, clon, e.getKey(), e.getValue(), x, plazo, t0 ) );
         }
       }
       return out;
     } finally {
       mapa.remove( clon );
+    }
+  }
+
+  /**
+   * metaverse fallo con todos los campos del destino juntos: basta un campo que no sabe recorrer (por
+   * ejemplo uno calculado con constantes de Calculator: sus vertices no tienen aristas de entrada y
+   * LineageClient tira NoSuchElementException) para que falle el destino entero. Se reintenta campo por
+   * campo y solo los que fallan quedan para el motor propio. El detalle tecnico va al log.
+   *
+   * @return el mapa campo -&gt; caminos (con {@link #FALLIDOS}), o el motivo si no anduvo ningun campo.
+   */
+  private static Object campoPorCampo( ILineageClient cliente, TransMeta clon, String step, List<String> campos,
+                                       Throwable error, long plazo, long t0 ) {
+    Map<String, Object> porCampo = new LinkedHashMap<>();
+    List<String> fallidos = new ArrayList<>();
+    for ( String campo : campos ) {
+      if ( System.currentTimeMillis() - t0 > plazo ) {
+        fallidos.add( campo );
+        continue;
+      }
+      try {
+        Map<String, Set<List<StepFieldOperations>>> uno = cliente.getOperationPaths( clon, step, Collections
+          .singletonList( campo ) );
+        Set<List<StepFieldOperations>> ps = uno == null ? null : uno.get( campo );
+        if ( ps != null ) {
+          porCampo.put( campo, ps );
+        }
+      } catch ( Throwable y ) {
+        fallidos.add( campo );
+      }
+    }
+    log( step, fallidos.size() == campos.size() ? campos : fallidos, error );
+    if ( porCampo.isEmpty() ) {
+      return SecLinaje.motivoCorto( error );
+    }
+    porCampo.put( FALLIDOS, fallidos );
+    return porCampo;
+  }
+
+  /** El fallo de metaverse al log de los informes (con la pila en el nivel detallado). Nunca lanza. */
+  static void log( String step, List<String> campos, Throwable error ) {
+    try {
+      InformeServicio.log().logBasic( "Informes: metaverse no pudo trazar " + ( campos == null ? "el linaje"
+        : campos.size() + " campo(s) de '" + step + "' " + campos ) + ": " + error + ". Se usa el motor propio." );
+      if ( error != null ) {
+        InformeServicio.log().logDetailed( org.pentaho.di.core.Const.getStackTracker( error ) );
+      }
+    } catch ( Throwable ignorado ) {
+      // sin log no se pierde nada del informe
     }
   }
 

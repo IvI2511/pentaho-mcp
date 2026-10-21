@@ -119,6 +119,11 @@ final class SecFlujo implements Recolector {
     d.id = "flow-diagrama";
     d.clase = Diagrama.FLUJO;
     d.mermaid = ReportMotor.mermaidTrans( tm, orden, t );
+    try {
+      d.grafo = GrafoFlujo.desde( tm, orden, t ).esquema(); // diagrama propio (sin grafo: el Mermaid de siempre)
+    } catch ( RuntimeException e ) {
+      d.grafo = null;
+    }
     d.imagen = lienzo( c, "flow-lienzo", r.f( "flujo.alt", nombre ) );
     d.alt = d.imagen != null ? r.f( "flujo.alt", nombre ) : r.f( "flujo.mermaid_alt", nombre );
     d.nota = r.s( "flujo.leyenda.trans" );
@@ -220,6 +225,11 @@ final class SecFlujo implements Recolector {
     d.id = "job-flow-diagrama";
     d.clase = Diagrama.JOB;
     d.mermaid = ReportMotor.mermaidJob( jm, orden, t );
+    try {
+      d.grafo = GrafoFlujo.desde( jm, orden, t ).esquema();
+    } catch ( RuntimeException e ) {
+      d.grafo = null;
+    }
     d.imagen = lienzo( c, "job-flow-lienzo", r.f( "flujo.alt", nombre ) );
     d.alt = d.imagen != null ? r.f( "flujo.alt", nombre ) : r.f( "flujo.mermaid_alt", nombre );
     d.nota = r.s( "flujo.leyenda.job" );

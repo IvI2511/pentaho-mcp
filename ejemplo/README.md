@@ -40,7 +40,7 @@ ejemplo/
 │   ├── 05_kpi_ventas.ktr        modelo estrella → KPI (tabla y CSV)
 │   └── RESULTADOS.md            los números comprobados de una ejecución con Kitchen
 ├── construido-en-vivo/          la misma ETL, construida por el MCP dentro de Spoon (ver abajo)
-├── informes/                    los informes que generó la pestaña Informes (PDF, PowerPoint, HTML, Markdown)
+├── informes/                    los informes que generó la pestaña Informes (PDF, PowerPoint, Word, HTML, Markdown)
 ├── capturas/                    el GIF de la construcción, el lienzo de cada transformación y páginas del informe
 ├── herramientas/                los scripts que repiten la construcción en vivo y los informes
 └── salida/                      lo que genera la ETL (no se versiona)
@@ -146,17 +146,18 @@ Para presentarlo en directo, con los mensajes listos para Claude y qué enseñar
 La pestaña **Informes** de Spoon documenta una transformación o un job sin escribir nada: portada con
 autor, institución y curso, resumen, diagrama (la imagen real del lienzo y el flujo en Mermaid),
 linaje de campos, diccionario de datos, modelo destino, perfil de los datos, métricas de la última
-ejecución, validación y conexiones. Exporta a HTML, PDF, Markdown y PowerPoint.
+ejecución, validación y conexiones. Exporta a HTML, PDF, Markdown, PowerPoint, Word, Excel e imágenes, de un documento o de varios juntos.
 
 ![La pestaña Informes en Spoon](capturas/spoon-pestana-informes.png)
 
 Los de este ejemplo los pidió Claude por el MCP (`build_report`). Las conclusiones las escribió a partir
 de los datos de la ejecución (`get_report_data`) y salen marcadas como asistidas por IA:
 
-| Informe | PDF | PowerPoint | HTML | Markdown |
-|---|---|---|---|---|
-| Carga de hechos de ventas (`04_hechos_ventas`) | [PDF, 20 págs.](informes/04_hechos_ventas.pdf) | [PPTX](informes/04_hechos_ventas.pptx) | [interactivo](informes/04_hechos_ventas.html) · [ligero](informes/04_hechos_ventas.light.html) | [MD](informes/04_hechos_ventas.md) |
-| Job de carga del modelo estrella (`job_carga_dw`) | [PDF](informes/job_carga_dw.pdf) | [PPTX](informes/job_carga_dw.pptx) | [ligero](informes/job_carga_dw.light.html) | [MD](informes/job_carga_dw.md) |
+| Informe | PDF | PowerPoint | Word | HTML | Markdown |
+|---|---|---|---|---|---|
+| Carga de hechos de ventas (`04_hechos_ventas`) | [PDF, 21 págs.](informes/04_hechos_ventas.pdf) | [PPTX](informes/04_hechos_ventas.pptx) | [DOCX](informes/04_hechos_ventas.docx) | [interactivo](informes/04_hechos_ventas.html) · [ligero](informes/04_hechos_ventas.light.html) | [MD](informes/04_hechos_ventas.md) |
+| Job de carga del modelo estrella (`job_carga_dw`) | [PDF](informes/job_carga_dw.pdf) | [PPTX](informes/job_carga_dw.pptx) | [DOCX](informes/job_carga_dw.docx) | [ligero](informes/job_carga_dw.light.html) | [MD](informes/job_carga_dw.md) |
+| Carga completa: el job y sus cinco transformaciones en un solo documento, con portada, índice y un capítulo por documento (`carga_completa`) | [PDF, 71 págs.](informes/carga_completa.pdf) | – | [DOCX](informes/carga_completa.docx) | – | – |
 
 | Linaje de campos | Métricas de ejecución |
 |---|---|

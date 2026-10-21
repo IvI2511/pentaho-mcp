@@ -34,6 +34,8 @@ public final class Seccion {
   public List<Bloque> bloques = new ArrayList<>();
   /** Forma cruda de la seccion (las de §2.4), para JSON y MCP; opcional. */
   public JsonNode datos;
+  /** Informe combinado: id del Capitulo al que pertenece; null = la parte general o un informe simple. */
+  public String capitulo;
 
   public Seccion() {
   }
