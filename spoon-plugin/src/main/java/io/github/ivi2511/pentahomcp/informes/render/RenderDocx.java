@@ -363,6 +363,13 @@ public final class RenderDocx implements Renderizador {
      * de una tabla, una figura o una seccion corta). Sirve para no dejar un titulo solo en una pagina.
      */
     private double ocupado = Double.NaN;
+    /**
+     * La ultima figura, que todavia sigue «pegada» a lo que venga (keepNext del estilo PliveFigura): solo
+     * vale para su nota o un aviso corto. Si viene otra figura, un titulo o una tabla, se suelta; si no, una
+     * cadena figura + figura + titulo + tabla que no entra en una hoja manda la figura a la pagina siguiente
+     * y deja el titulo de la seccion solo.
+     */
+    private XWPFParagraph figuraPegada;
 
     Escritor( XWPFDocument doc, Informe inf, Tema tema, Map<String, byte[]> pngMermaid, RenderPptx.ProveedorSvg svgs,
               Progreso p ) {
@@ -940,6 +947,7 @@ public final class RenderDocx implements Renderizador {
 
     /** Un titulo Heading n con marcador (para el indice) y, si se pide, en pagina nueva. */
     XWPFParagraph titulo( int nivel, String texto, String nombreMarcador, boolean saltoPagina ) {
+      soltarFigura();
       XWPFParagraph h = doc.createParagraph();
       h.setStyle( "Heading" + nivel );
       if ( saltoPagina ) {
@@ -964,6 +972,9 @@ public final class RenderDocx implements Renderizador {
     }
 
     void bloque( Bloque b, int nivelTitulo ) throws Exception {
+      if ( !( b instanceof Aviso ) ) {
+        soltarFigura(); // la figura anterior solo sigue pegada a un aviso corto
+      }
       if ( !PptxDiapos.vacio( b.titulo ) ) {
         titulo( nivelTitulo, b.titulo.trim(), null, false );
       }
@@ -1482,6 +1493,7 @@ public final class RenderDocx implements Renderizador {
     void propio( Diagrama d, List<Dibujo> ds ) throws Exception {
       for ( Dibujo x : ds ) {
         if ( ds.size() > 1 ) {
+          soltarFigura();
           XWPFParagraph p = doc.createParagraph();
           p.setStyle( "PliveNota" );
           org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr ppr = p.getCTP().isSetPPr() ? p.getCTP()
@@ -1511,10 +1523,12 @@ public final class RenderDocx implements Renderizador {
           double w = anchoUtil;
           double h = w * tam[ 1 ] / tam[ 0 ];
           double[] wh = encajar( w, h );
+          soltarFigura();
           XWPFParagraph p = doc.createParagraph();
           p.setStyle( "PliveFigura" );
           imagen( p.createRun(), png, Imagen.PNG, wh[ 0 ], wh[ 1 ], g.titulo != null ? g.titulo : g.id != null
             ? g.id : "grafico" );
+          figuraPegada = p;
           ocupado = Double.NaN;
           return;
         }
@@ -1559,10 +1573,26 @@ public final class RenderDocx implements Renderizador {
       double natural = w0 / (double) ( escala > 0 ? escala : 1f ) * 0.75;
       double w = Math.min( anchoUtil, natural * ampliar );
       double[] wh = encajar( w, w * h0 / (double) w0 );
+      soltarFigura();
       XWPFParagraph p = doc.createParagraph();
       p.setStyle( "PliveFigura" );
       imagen( p.createRun(), datos, mime, wh[ 0 ], wh[ 1 ], alt == null ? "figura" : alt );
+      figuraPegada = p;
       ocupado = Double.NaN;
+    }
+
+    /**
+     * La figura anterior deja de seguir pegada a lo que viene (keepNext en false sobre el del estilo): lo que
+     * sigue es otra figura, un titulo o una tabla, que no tienen por que ir en su misma pagina.
+     */
+    void soltarFigura() {
+      if ( figuraPegada == null ) {
+        return;
+      }
+      org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr ppr = figuraPegada.getCTP().isSetPPr()
+        ? figuraPegada.getCTP().getPPr() : figuraPegada.getCTP().addNewPPr();
+      ( ppr.isSetKeepNext() ? ppr.getKeepNext() : ppr.addNewKeepNext() ).setVal( STOnOff.FALSE );
+      figuraPegada = null;
     }
 
     /**

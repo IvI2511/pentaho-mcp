@@ -27,6 +27,7 @@ import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import io.github.ivi2511.pentahomcp.ModeloMuestra;
+import io.github.ivi2511.pentahomcp.informes.Combinar;
 import io.github.ivi2511.pentahomcp.informes.Formato;
 import io.github.ivi2511.pentahomcp.informes.Progreso;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
@@ -110,6 +111,75 @@ public class PruebaImagenes {
     File[] hay = dir.listFiles();
     noNulo( hay, "lista de la carpeta" );
     igual( fs.size() + 1, hay.length, "sin archivos de mas (ni .tmp)" );
+  }
+
+  /**
+   * Informe combinado: una subcarpeta «N_documento» por parte, cada una con las mismas figuras (y nombres)
+   * que el documento solo; los PNG de Mermaid se encuentran con el prefijo dN- de sus ids.
+   */
+  public void pruebaCombinado() throws Exception {
+    Informe a = ModeloMuestra.crear();
+    Informe b = ModeloMuestra.crear();
+    b.titulo = "Segundo documento";
+    Informe inf = Combinar.combinar( Arrays.asList( a, b ), null, "es", ModeloMuestra.tema() );
+    File dir = new File( carpeta, "combinado" + RenderImagenes.SUFIJO );
+    Resultado res = new RenderImagenes( ModeloMuestra.pngPrerender( inf ), ModeloMuestra.svgPrerender( inf ) )
+      .conSvgGraficos( PruebaDocx.SVG_MUESTRA ).escribir( inf, ModeloMuestra.tema(), dir, Progreso.NULO );
+    igual( new ArrayList<String>(), res.avisos, "sin avisos" );
+    File solo = new File( carpeta, "uno-para-combinado" + RenderImagenes.SUFIJO );
+    Resultado uno = new RenderImagenes( ModeloMuestra.pngPrerender( a ), ModeloMuestra.svgPrerender( a ) )
+      .conSvgGraficos( PruebaDocx.SVG_MUESTRA ).escribir( ModeloMuestra.crear(), ModeloMuestra.tema(), solo,
+        Progreso.NULO );
+    List<String> esperados = new ArrayList<>();
+    for ( File f : RenderImagenes.archivos( uno ) ) {
+      esperados.add( f.getName() );
+    }
+    File d1 = new File( dir, "1_ventas-por-producto" );
+    File d2 = new File( dir, "2_segundo-documento" );
+    cierto( d1.isDirectory() && d2.isDirectory(), "una subcarpeta por documento: " + Arrays.toString( dir.list() ) );
+    List<String> en1 = new ArrayList<>();
+    List<String> en2 = new ArrayList<>();
+    for ( File f : RenderImagenes.archivos( res ) ) {
+      cierto( f.getParentFile().equals( d1.getAbsoluteFile() ) || f.getParentFile().equals( d2.getAbsoluteFile() ),
+        "cada figura en la subcarpeta de su documento: " + f );
+      ( f.getParentFile().equals( d1.getAbsoluteFile() ) ? en1 : en2 ).add( f.getName() );
+    }
+    igual( esperados, en1, "las figuras del primer documento, con los nombres de siempre" );
+    igual( esperados, en2, "las del segundo, iguales" );
+  }
+
+  /**
+   * Diagramas con grafo (motor propio) sin navegador: flujo y linaje como PNG y SVG sueltos (sin
+   * foreignObject, se pegan bien en Office), sin avisos.
+   */
+  public void pruebaDiagramaPropio() throws Exception {
+    Informe inf = PruebaDiagramaPropio.conGrafos( false );
+    File dir = new File( carpeta, "propio" + RenderImagenes.SUFIJO );
+    Resultado res = new RenderImagenes( null, null ).conSvgGraficos( PruebaDocx.SVG_MUESTRA ).escribir( inf,
+      ModeloMuestra.tema(), dir, Progreso.NULO );
+    igual( new ArrayList<String>(), res.avisos, "sin avisos" );
+    int flujoPng = 0;
+    int flujoSvg = 0;
+    int linaje = 0;
+    for ( File f : RenderImagenes.archivos( res ) ) {
+      String n = f.getName();
+      if ( n.contains( "diagrama-de-flujo" ) && !n.contains( "lienzo" ) ) {
+        flujoPng += n.endsWith( ".png" ) ? 1 : 0;
+        flujoSvg += n.endsWith( ".svg" ) ? 1 : 0;
+      }
+      linaje += n.contains( "linaje-de-campos" ) ? 1 : 0;
+      if ( n.endsWith( ".svg" ) ) {
+        String x = new String( Files.readAllBytes( f.toPath() ), StandardCharsets.UTF_8 );
+        cierto( !x.contains( "foreignObject" ), "SVG sin foreignObject: " + n );
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        dbf.setNamespaceAware( true );
+        igual( "svg", dbf.newDocumentBuilder().parse( f ).getDocumentElement().getLocalName(), "SVG valido: " + n );
+      } else if ( n.endsWith( ".png" ) ) {
+        noNulo( ImageIO.read( f ), "PNG legible: " + n );
+      }
+    }
+    cierto( flujoPng >= 1 && flujoPng == flujoSvg, "flujo propio en PNG y SVG: " + flujoPng + "/" + flujoSvg );
+    cierto( linaje >= 2, "linaje propio en PNG y SVG: " + linaje );
   }
 
   /** Sin navegador: el lienzo sale; los Mermaid no, con aviso. En ingles, nombres en ingles. */

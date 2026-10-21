@@ -33,6 +33,7 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import io.github.ivi2511.pentahomcp.ModeloMuestra;
+import io.github.ivi2511.pentahomcp.informes.Combinar;
 import io.github.ivi2511.pentahomcp.informes.Formato;
 import io.github.ivi2511.pentahomcp.informes.Progreso;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
@@ -142,6 +143,44 @@ public class PruebaXlsx {
       XSSFSheet tarjetas = wb.getSheetAt( wb.getNumberOfSheets() - 1 );
       igual( "Sección", tarjetas.getRow( 0 ).getCell( 0 ).getStringCellValue(), "cabecera de indicadores" );
       igual( 4 + 6, tarjetas.getLastRowNum(), "4 indicadores del resumen y 6 de metricas" );
+      sinFormulas( wb );
+    }
+  }
+
+  /**
+   * Informe combinado de dos documentos: una hoja por tabla de cada documento (mas la de documentos de la
+   * parte general), nombres unicos, y en el indice la seccion con su numero «1.1» / «2.1».
+   */
+  public void pruebaCombinado() throws Exception {
+    Informe a = ModeloMuestra.crear();
+    Informe b = ModeloMuestra.crear();
+    b.titulo = "Segundo documento";
+    Informe inf = Combinar.combinar( Arrays.asList( a, b ), null, "es", ModeloMuestra.tema() );
+    File f = new File( carpeta, "combinado.xlsx" );
+    new RenderXlsx().escribir( inf, ModeloMuestra.tema(), f, Progreso.NULO );
+    int hojasUno;
+    File g = new File( carpeta, "uno-para-combinado.xlsx" );
+    new RenderXlsx().escribir( ModeloMuestra.crear(), ModeloMuestra.tema(), g, Progreso.NULO );
+    try ( XSSFWorkbook wb = abrir( g ) ) {
+      hojasUno = wb.getNumberOfSheets() - 2; // sin indice ni indicadores
+    }
+    try ( XSSFWorkbook wb = abrir( f ) ) {
+      igual( 1 + 1 + 2 * hojasUno + 1, wb.getNumberOfSheets(), "indice + documentos + las de cada parte + indicadores" );
+      Set<String> nombres = new HashSet<>();
+      for ( int i = 0; i < wb.getNumberOfSheets(); i++ ) {
+        cierto( nombres.add( wb.getSheetName( i ).toLowerCase( Locale.ROOT ) ), "hoja repetida: " + wb.getSheetName(
+          i ) );
+      }
+      StringBuilder secciones = new StringBuilder();
+      for ( Row r : wb.getSheetAt( 0 ) ) {
+        Cell c = r.getCell( 1 ); // columna «Seccion» del indice
+        if ( c != null && c.getCellType() == CellType.STRING ) {
+          secciones.append( c.getStringCellValue() ).append( '\n' );
+        }
+      }
+      // el resumen (1.1) no tiene tablas: la primera hoja de cada documento es la del flujo (1.2)
+      contiene( secciones.toString(), "1.2 Diagrama de flujo", "secciones del primer documento numeradas" );
+      contiene( secciones.toString(), "2.2 Diagrama de flujo", "secciones del segundo documento numeradas" );
       sinFormulas( wb );
     }
   }

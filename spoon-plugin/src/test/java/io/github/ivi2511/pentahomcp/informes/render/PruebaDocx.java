@@ -41,6 +41,7 @@ import org.openxmlformats.schemas.drawingml.x2006.wordprocessingDrawing.CTInline
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTDrawing;
 
 import io.github.ivi2511.pentahomcp.ModeloMuestra;
+import io.github.ivi2511.pentahomcp.informes.Combinar;
 import io.github.ivi2511.pentahomcp.informes.Formato;
 import io.github.ivi2511.pentahomcp.informes.Progreso;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
@@ -273,6 +274,116 @@ public class PruebaDocx {
     noContiene( ps.get( 0 ).texto, PIE, "la portada no lleva pie" );
     contiene( ps.get( 1 ).texto, "CONTENIDO", "el indice en la pagina 2" );
     contiene( ps.get( 1 ).texto, PIE, "pie desde la pagina 2" );
+    sinPaginasEnBlanco( ps, inf.titulo );
+  }
+
+  // ------------------------------------------------------------------ diagramas propios
+
+  /**
+   * Flujo de 26 steps y linaje con grafo (motor propio, sin navegador): cada parte como PNG del tamano de
+   * la hoja, ninguna pasa del area util, sin aviso de diagramas como tabla y, con LibreOffice, sin paginas
+   * en blanco.
+   */
+  public void pruebaDiagramaPropio() throws Exception {
+    Informe inf = PruebaDiagramaPropio.conGrafos( false );
+    File f = new File( carpeta, "propio.docx" );
+    Resultado res = new RenderDocx( null ).conSvgGraficos( SVG_MUESTRA ).escribir( inf, ModeloMuestra.tema(), f,
+      Progreso.NULO );
+    igual( new ArrayList<String>(), res.avisos, "sin avisos: el motor propio no necesita navegador" );
+    try ( XWPFDocument doc = abrir( f ) ) {
+      List<double[]> fs = figuras( doc );
+      // logo + flujo (1 o mas partes) + lienzo + linaje + 4 graficos
+      cierto( fs.size() >= 8, "figuras: " + fs.size() );
+      int grandes = 0;
+      for ( double[] wh : fs ) {
+        cierto( wh[ 0 ] <= ANCHO_UTIL_A4 + 0.5, "figura de " + wh[ 0 ] + " pt de ancho" );
+        cierto( wh[ 1 ] <= ALTO_UTIL_A4 - 89.5, "figura de " + wh[ 1 ] + " pt de alto" );
+        grandes += wh[ 0 ] >= ANCHO_UTIL_A4 * 0.6 && wh[ 1 ] >= 150 ? 1 : 0;
+      }
+      cierto( grandes >= 1, "el flujo de 26 steps no es una tira: ocupa la hoja" );
+    }
+    List<AyudaOffice.Pagina> ps = paginasPdf( f );
+    if ( ps == null ) {
+      return;
+    }
+    sinPaginasEnBlanco( ps, inf.titulo );
+    // el flujo va en la pagina de su titulo (antes el keepNext de la figura la encadenaba con el lienzo y
+    // la tabla siguientes, y la cadena entera saltaba a la pagina siguiente dejando el titulo solo)
+    AyudaOffice.Pagina flujo = null;
+    for ( AyudaOffice.Pagina p : ps ) {
+      if ( p.numero > 2 && AyudaOffice.contenido( p, inf.titulo ).startsWith( "Diagrama de flujo" ) ) {
+        flujo = p;
+      }
+    }
+    noNulo( flujo, "pagina que empieza con «Diagrama de flujo»: " + ps );
+    cierto( flujo.imagenes >= 2, "el diagrama del flujo en la pagina de su titulo (simbolo del pie + figura): "
+      + flujo );
+  }
+
+  // ------------------------------------------------------------------ informe combinado
+
+  /**
+   * Dos documentos en un archivo (Combinar): la parte general como Heading 1 sin numero, un Heading 1
+   * numerado por documento, sus secciones como Heading 2 «1.1», campo TOC de dos niveles, marcadores unicos,
+   * figuras dentro de la pagina y, con LibreOffice, sin paginas en blanco.
+   */
+  public void pruebaCombinado() throws Exception {
+    Informe a = ModeloMuestra.crear();
+    Informe b = ModeloMuestra.crear();
+    b.titulo = "Segundo documento";
+    b.nombreDoc = "segundo.ktr";
+    Informe inf = Combinar.combinar( Arrays.asList( a, b ), null, "es", ModeloMuestra.tema() );
+    File f = new File( carpeta, "combinado.docx" );
+    Resultado res = new RenderDocx( ModeloMuestra.pngPrerender( inf ) ).conSvgGraficos( SVG_MUESTRA ).escribir( inf,
+      ModeloMuestra.tema(), f, Progreso.NULO );
+    archivo( f, 30000, "docx combinado escrito" );
+    igual( new ArrayList<String>(), res.avisos, "sin avisos: los PNG de los diagramas tienen el prefijo dN-" );
+    String xml = parte( f, "word/document.xml" );
+    contiene( xml, "TOC \\o \"1-2\" \\h \\z \\u", "campo TOC de dos niveles" );
+    noContiene( xml, "w:type=\"page\"", "sin saltos de pagina manuales" );
+
+    List<String> h1 = new ArrayList<>();
+    List<String> h2 = new ArrayList<>();
+    for ( Capitulos.Grupo g : Capitulos.grupos( inf ) ) {
+      if ( g.capitulo == null ) {
+        for ( Seccion s : g.vivas() ) {
+          h1.add( s.titulo );
+        }
+        continue;
+      }
+      h1.add( g.numero + "  " + g.capitulo.titulo );
+      List<Seccion> vs = g.vivas();
+      for ( int i = 0; i < vs.size(); i++ ) {
+        h2.add( Capitulos.numero( g, i ) + "  " + vs.get( i ).titulo );
+      }
+    }
+    igual( 3, h1.size(), "parte general + 2 documentos" );
+    try ( XWPFDocument doc = abrir( f ) ) {
+      igual( h1, textos( doc, "Heading1" ), "Heading 1: «Documentos del informe», «1  ...» y «2  ...»" );
+      igual( h2, textos( doc, "Heading2" ), "Heading 2 numerados por documento, en orden" );
+      contiene( h1.get( 2 ), "Segundo documento", "el titulo de la segunda parte" );
+      contiene( todasLasCeldas( doc ), "segundo.ktr", "la tabla de documentos de la parte general" );
+      Set<String> marcadores = new HashSet<>();
+      Matcher mb = Pattern.compile( "<w:bookmarkStart [^>]*w:name=\"([^\"]+)\"" ).matcher( xml );
+      while ( mb.find() ) {
+        cierto( marcadores.add( mb.group( 1 ) ), "marcador repetido: " + mb.group( 1 ) );
+        cierto( mb.group( 1 ).matches( "[A-Za-z][A-Za-z0-9_]{0,39}" ), "marcador valido: " + mb.group( 1 ) );
+      }
+      cierto( marcadores.contains( "sec_d1_flow" ) && marcadores.contains( "sec_d2_flow" ),
+        "las secciones de cada documento con su propio marcador: " + marcadores );
+      Matcher m = Pattern.compile( "<w:hyperlink w:anchor=\"([^\"]+)\"" ).matcher( xml );
+      while ( m.find() ) {
+        cierto( marcadores.contains( m.group( 1 ) ), "vinculo a un marcador que existe: " + m.group( 1 ) );
+      }
+      for ( double[] wh : figuras( doc ) ) {
+        cierto( wh[ 0 ] <= ANCHO_UTIL_A4 + 0.5, "figura de " + wh[ 0 ] + " pt de ancho" );
+        cierto( wh[ 1 ] <= ALTO_UTIL_A4 - 89.5, "figura de " + wh[ 1 ] + " pt de alto" );
+      }
+    }
+    List<AyudaOffice.Pagina> ps = paginasPdf( f );
+    if ( ps == null ) {
+      return;
+    }
     sinPaginasEnBlanco( ps, inf.titulo );
   }
 
