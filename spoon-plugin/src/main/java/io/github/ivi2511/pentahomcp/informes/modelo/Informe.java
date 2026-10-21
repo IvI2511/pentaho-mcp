@@ -20,12 +20,14 @@ public final class Informe {
 
   public static final String TRANSFORMACION = "transformation";
   public static final String JOB = "job";
+  /** Informe combinado de varios documentos (un capitulo por documento). */
+  public static final String COMPILACION = "compilation";
 
   /** Version del esquema. */
   public int modelo = 1;
   public String titulo;
   public String subtitulo;
-  /** transformation | job. */
+  /** transformation | job | compilation. */
   public String tipoDoc;
   /** Ruta del .ktr/.kjb; null si no esta guardado. */
   public String archivo;
@@ -38,6 +40,19 @@ public final class Informe {
   public Map<String, String> rotulos = new LinkedHashMap<>();
   public List<Seccion> secciones = new ArrayList<>();
   public List<String> avisos = new ArrayList<>();
+  /**
+   * Informe combinado: los documentos, en orden. Vacio = informe de un solo documento (todo lo de antes).
+   * Cada Seccion de un capitulo lleva {@link Seccion#capitulo} = {@link Capitulo#id}; las de la parte
+   * general (portada e indice del conjunto) van con capitulo null y primero.
+   */
+  @JsonInclude( JsonInclude.Include.NON_EMPTY )
+  public List<Capitulo> capitulos = new ArrayList<>();
+
+  /** true si es un informe combinado (tiene capitulos). */
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public boolean combinado() {
+    return capitulos != null && !capitulos.isEmpty();
+  }
 
   /** La primera seccion con ese id, o null. */
   public Seccion seccion( String id ) {

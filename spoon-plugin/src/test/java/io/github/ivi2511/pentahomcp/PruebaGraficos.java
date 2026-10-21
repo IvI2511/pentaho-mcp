@@ -178,7 +178,8 @@ public class PruebaGraficos {
     gantt.tramos.add( new Tramo( "Entrada 0", Tramo.INIT, 5, 5 ) );
     gantt.tramos.add( new Tramo( "Entrada 1", Tramo.EXEC, 40, 30 ) );
     String g = verificar( "gantt-30", gantt, t, "es" );
-    contiene( g, "+5 más", "30 filas: 25 y «+5 más»" );
+    noContiene( g, "más</text>", "30 filas: entran todas (tope de 40; el recorte, en PruebaRitmoYGantt)" );
+    contiene( g, ">Entrada 29</text>", "la ultima fila tambien" );
     contiene( g, " ms</text>", "eje en ms" );
 
     // Gantt sin tramos: sin datos

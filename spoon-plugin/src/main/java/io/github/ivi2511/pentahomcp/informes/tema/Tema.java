@@ -108,6 +108,13 @@ public final class Tema {
     /** Agrega -AAAAMMDD-HHMM al nombre de los archivos. */
     @JsonProperty( "agregar_fecha" )
     public boolean agregarFecha;
+    /**
+     * PowerPoint: las tablas de detalle (diccionario, lista de steps...) y lo que no entra en las diapositivas
+     * de cada seccion van en un anexo al final. false = la presentacion queda sin ellas (estan en el HTML, el
+     * PDF y el Word).
+     */
+    @JsonProperty( "pptx_anexo" )
+    public boolean pptxAnexo;
   }
 
   /** Opciones de la seccion profile. */

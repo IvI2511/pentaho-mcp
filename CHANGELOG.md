@@ -37,8 +37,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   English, Spanish and Portuguese) and the score formula.
 - Reports: **Technical quality** section (`quality`, right after validation, on by default) with the score,
   one notice per error, the findings with the proposed fixes, where the missing points come from and what
-  could not be checked. `build_report`, `get_report_data` and `show_report` take `quality_deep`, and the
-  Reports panel has a "Deep check (reads data)" box under the section.
+  could not be checked. It is in every export, Word, Excel and combined reports included. `build_report`,
+  `get_report_data` and `show_report` take `quality_deep` (with `documents` it applies to each of them), and
+  the Reports panel has a "Deep check (reads data)" box under the section.
 - Skill: a Quality section in `SKILL.md` and the guide `manual/06-calidad.md` (when to run the linter, the
   score, the deep mode, fixing and silencing). MCP clients without the skill read it as the resource
   `pentaho://guide/quality`.
@@ -68,7 +69,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   key, suggests rules and a rubric, checks the solution with the other locale and writes a copy for students
   without the solution or the hidden cases), `validate_exercise_pack` (schema, paths, files, and the solution
   graded against its own pack), `grade_exercise` (one submission: a `.ktr`, a `.zip`, a folder or the open
-  transformation, with feedback as Markdown, HTML, PDF or PowerPoint), `grade_submissions` and
+  transformation, with feedback as Markdown, HTML, PDF, PowerPoint, Word or Excel), `grade_submissions` and
   `get_grading_status` (a whole folder in the background; Moodle folder names and an optional `alumnos.csv`).
   Trust mode cannot be enabled over MCP, and `allow_steps` only takes conditional steps.
 - Gradebook: `notas.csv` (for Excel in Spanish: BOM, `;`, decimal comma, every text cell defused) and
@@ -114,6 +115,56 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Reports: a table cell with a very long word (a path, a `${…}` value) no longer pushes the table past the
   edge of the PDF page, where the last column was cut off.
 - Reports panel: "Preview ready (1 section)" in the singular.
+
+## [0.5.1] - 2026-10-21
+
+### Added
+
+- Reports: export to **Word** (`.docx`, with a clickable table of contents, numbered headings and page
+  numbers), **Excel** (`.xlsx`, one sheet per report table plus an index sheet) and **images** (a folder
+  with a PNG and an SVG of every diagram and chart, ready to paste in slides). In the Reports tab and in
+  `build_report` (`docx`, `xlsx`, `images`).
+- Reports of **several documents at once**: in the Reports tab, a *Documents* group lists the open
+  transformations and jobs (and *Add the job's transformations* adds the ones a job runs); export them as
+  separate files or **all in one file** with a cover, a two-level table of contents and one numbered
+  chapter per document. In `build_report`: `documents`, `include_job_transformations` and `combine`.
+- Data profile of **several steps** in one run (a list with checkboxes in the Reports tab;
+  `profile_steps` in `build_report`, up to 10).
+- **Arrange canvas (Pentaho Live)** in Spoon: a button on the transformation and job canvas toolbars and
+  an item in the canvas right-click menu run the same auto-layout as `arrange_canvas` (one Ctrl+Z).
+- Field lineage: a short "what is this for" paragraph at the top of the section.
+
+### Changed
+
+- Flow, job and lineage diagrams are drawn by Pentaho Live itself instead of Mermaid: a long chain of
+  steps wraps into rows, so the diagram comes out roughly square and fills the page or the slide; a very
+  large diagram is split into numbered parts; lineage lines are ordered to cross as little as possible.
+  The Mermaid code is still in the Markdown export. The target table model (ER) still uses Mermaid.
+- PowerPoint: the data-dictionary annex and the reference tables are left out by default (they stay in
+  the HTML, PDF and Word); a long table takes at most two slides (a 26-step class exercise went from
+  47 slides to 14).
+- The "rows written per interval" chart is now **Pace of each step during the run**, with an
+  explanation, and only appears when the run is long enough to say something.
+- Run timeline (Gantt): when there are too many rows, the fastest ones are left out (and named), never
+  the slowest.
+- The "What it does" column of the step list shows file paths relative to the folder of the `.ktr` /
+  `.kjb`, so a shared report does not carry the author's local folders.
+- Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root,
+  `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and
+  fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`.
+  `preparar_instalador.ps1 -SinCompilar` reuses the plugin already built in `spoon-plugin/dist/`.
+
+### Fixed
+
+- A confirmation dialog of the Reports tab showed a literal `%n%n`.
+- PDF: a diagram taller than the page no longer leaves a page with only the heading and a page with an
+  empty frame; tall figures are scaled to fit under their heading.
+- Field lineage now follows **every** input of a step with several input hops (Append, Merge join,
+  Stream lookup...), instead of stopping at the first one; Calculator constants show their value
+  instead of "1 (?)".
+- Technical errors of the lineage engine (`metaverse`) go to the log, not into the report.
+- Validation messages that PDI 9.4 delivers in Spanish with a replacement character instead of an
+  accented vowel ("más", "carácter") are repaired for the known words.
 
 ## [0.5.0] - 2026-10-21
 

@@ -796,7 +796,7 @@ public class PruebaCorrectorModelo {
     o.comparacion.ejemplos.distintas.get( 0 ).esperado = "SECRETO-OCULTO";
     o.comparacion.puntajeValores = 0;
     r.casos.add( o );
-    r.pistas.add( "Revisá el tipo de agregación de importe_medio." );
+    r.pistas.add( "Revisa el tipo de agregación de importe_medio." );
     ResultadoCorreccion.Aviso av = new ResultadoCorreccion.Aviso( ResultadoCorreccion.Aviso.CONEXION_QUITADA,
       "mysql_de_clase" );
     av.step = null;

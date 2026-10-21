@@ -19,19 +19,29 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
- * Grupo «Exportar» y botones de accion (diseno §5.1 y §5.2): formatos (HTML, PDF, Markdown, PowerPoint),
- * carpeta, y [Vista previa (F5)] [Exportar] [Abrir en el navegador] [Abrir carpeta]. Mientras corre una
+ * Grupo «Exportar» y botones de accion (diseno §5.1 y §5.2): formatos (HTML, PDF, Markdown, Word, Excel,
+ * imagenes PNG/SVG, PowerPoint con su anexo opcional), carpeta, y [Vista previa (F5)] [Exportar] [Abrir en el navegador] [Abrir carpeta]. Mientras corre una
  * tarea pesada, Vista previa, Exportar y Abrir en el navegador quedan deshabilitados. (UI)
  *
  * @dueño WP1
  */
 final class GrupoExportar {
 
-  /** Claves de Formato en el orden de los checks. */
-  static final String[] CLAVES = { "html", "pdf", "md", "pptx" };
+  /**
+   * Claves de Formato en el orden de los checks (rejilla de 2 columnas; PowerPoint queda ultimo para que el
+   * check de su anexo vaya justo debajo).
+   */
+  static final String[] CLAVES = { "html", "pdf", "md", "docx", "xlsx", "images", "pptx" };
+  /** Los textos de cada check, en el orden de CLAVES. */
+  private static final String[] TEXTOS = { "fmt_html", "fmt_pdf", "fmt_md", "fmt_docx", "fmt_xlsx",
+    "fmt_images", "fmt_pptx" };
+  /** Los formatos que escribe POI (Office): si POI no puede en este proceso, se deshabilitan todos. */
+  static final String[] OFFICE = { "pptx", "docx", "xlsx" };
 
   final Group grupo;
   final Button[] formatos = new Button[ CLAVES.length ];
+  /** «Anexo con las tablas de detalle» (PowerPoint): Tema.salida.pptxAnexo. */
+  final Button anexoPptx;
   final Text carpeta;
   final Button elegirCarpeta;
   final Composite botones;
@@ -50,16 +60,41 @@ final class GrupoExportar {
     grupo.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
 
     Composite fs = new Composite( grupo, SWT.NONE );
-    GridLayout gf = new GridLayout( 2, true ); // 2 x 2: la columna es angosta
+    GridLayout gf = new GridLayout( 2, true ); // 2 columnas: la columna del panel es angosta
     gf.marginWidth = 0;
     gf.marginHeight = 0;
     fs.setLayout( gf );
-    String[] textos = { "fmt_html", "fmt_pdf", "fmt_md", "fmt_pptx" };
+    fs.setLayoutData( new GridData( SWT.FILL, SWT.CENTER, true, false ) );
     for ( int i = 0; i < CLAVES.length; i++ ) {
       formatos[ i ] = new Button( fs, SWT.CHECK );
-      formatos[ i ].setText( PanelInformes.esc( r.s( textos[ i ] ) ) );
+      formatos[ i ].setText( PanelInformes.esc( r.s( TEXTOS[ i ] ) ) );
       formatos[ i ].setData( PanelInformes.CLAVE, "fmt:" + CLAVES[ i ] );
+      if ( r.tiene( TEXTOS[ i ] + "_tip" ) ) {
+        formatos[ i ].setToolTipText( r.s( TEXTOS[ i ] + "_tip" ) );
+      }
     }
+    if ( CLAVES.length % 2 != 0 ) {
+      new Label( fs, SWT.NONE ); // completa la fila de PowerPoint
+    }
+    anexoPptx = new Button( fs, SWT.CHECK );
+    anexoPptx.setText( PanelInformes.esc( r.s( "pptx_appendix" ) ) );
+    anexoPptx.setToolTipText( r.s( "pptx_appendix_tip" ) );
+    anexoPptx.setData( PanelInformes.CLAVE, "pptx_anexo" );
+    GridData ga = new GridData( SWT.FILL, SWT.CENTER, true, false, 2, 1 );
+    ga.horizontalIndent = 18; // colgado de PowerPoint
+    anexoPptx.setLayoutData( ga );
+    anexoPptx.setEnabled( false );
+    final Button pptx = check( "pptx" );
+    pptx.addListener( SWT.Selection, e -> anexoPptx.setEnabled( pptx.getSelection() && pptx.isEnabled() ) );
+    anexoPptx.addListener( SWT.Selection, e -> {
+      Tema t = panel.tema();
+      if ( t != null ) {
+        if ( t.salida == null ) {
+          t.salida = new Tema.Salida();
+        }
+        t.salida.pptxAnexo = anexoPptx.getSelection();
+      }
+    } );
 
     Composite fc = new Composite( grupo, SWT.NONE );
     GridLayout gc = new GridLayout( 3, false );
@@ -119,28 +154,85 @@ final class GrupoExportar {
         || ( "html".equals( CLAVES[ i ] ) && f.contains( Formato.HTML_ESTATICO.clave ) );
       formatos[ i ].setSelection( marcado && formatos[ i ].isEnabled() );
     }
+    anexoPptx.setSelection( t.salida != null && t.salida.pptxAnexo );
+    Button pptx = check( "pptx" );
+    anexoPptx.setEnabled( pptx != null && pptx.getSelection() && pptx.isEnabled() );
     carpeta( t.salida == null || t.salida.carpeta == null ? "" : t.salida.carpeta );
   }
 
   /**
-   * Si POI no puede escribir PPTX en este proceso (RenderPptx.problema: XmlBeans que no es 3.1), el check
-   * de PowerPoint queda deshabilitado y su tooltip dice por que. Con {@code motivo == null} no hace nada.
+   * Si POI no puede escribir Office en este proceso (RenderPptx.problema, RenderDocx.problema: XmlBeans que
+   * no es 3.1, el mismo motivo para los tres), los checks de PowerPoint, Word y Excel quedan deshabilitados y
+   * su tooltip dice por que. Con {@code motivo == null} no hace nada.
    */
   void pptxNoDisponible( String motivo ) {
+    officeNoDisponible( motivo );
+  }
+
+  /** Lo mismo que {@link #pptxNoDisponible(String)}: PowerPoint, Word y Excel (y el anexo) deshabilitados. */
+  void officeNoDisponible( String motivo ) {
     if ( motivo == null ) {
       return;
     }
-    for ( int i = 0; i < CLAVES.length; i++ ) {
-      if ( "pptx".equals( CLAVES[ i ] ) ) {
-        formatos[ i ].setSelection( false );
-        formatos[ i ].setEnabled( false );
-        formatos[ i ].setToolTipText( motivo );
+    for ( String clave : OFFICE ) {
+      Button b = check( clave );
+      if ( b != null ) {
+        b.setSelection( false );
+        b.setEnabled( false );
+        b.setToolTipText( motivo );
       }
+    }
+    anexoPptx.setEnabled( false );
+  }
+
+  /** true si el check del anexo de PowerPoint esta marcado (Tema.salida.pptxAnexo). */
+  boolean anexoPptx() {
+    return anexoPptx.getSelection();
+  }
+
+  /** El nombre de un formato para la barra de estado («Exportando Word...»), en el idioma del panel. */
+  String nombreFormato( Formato f ) {
+    switch ( f ) {
+      case PDF:
+        return r.s( "fmt_pdf" );
+      case MARKDOWN:
+        return r.s( "fmt_md" );
+      case PPTX:
+        return r.s( "fmt_pptx" );
+      case DOCX:
+        return r.s( "fmt_docx" );
+      case XLSX:
+        return r.s( "fmt_xlsx" );
+      case IMAGENES:
+        return r.s( "fmt_images" );
+      case JSON:
+        return "JSON";
+      default:
+        return r.s( "fmt_html" );
     }
   }
 
-  /** Los formatos marcados; HTML es el interactivo o el liviano segun salida.html del tema. */
+  /** El check de un formato por su clave, o null. */
+  Button check( String clave ) {
+    for ( int i = 0; i < CLAVES.length; i++ ) {
+      if ( CLAVES[ i ].equals( clave ) ) {
+        return formatos[ i ];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Los formatos marcados; HTML es el interactivo o el liviano segun salida.html del tema. Tambien deja en
+   * el tema salida.pptxAnexo segun su check (el exportador lo lee de una copia de este tema).
+   */
   List<Formato> formatos( Tema t ) {
+    if ( t != null ) {
+      if ( t.salida == null ) {
+        t.salida = new Tema.Salida();
+      }
+      t.salida.pptxAnexo = anexoPptx.getSelection();
+    }
     List<Formato> out = new ArrayList<Formato>();
     for ( int i = 0; i < CLAVES.length; i++ ) {
       if ( !formatos[ i ].getSelection() || !formatos[ i ].isEnabled() ) {

@@ -75,13 +75,44 @@ public final class Rotulos {
     return Locale.US;
   }
 
-  /** El texto de la clave; si no existe en ningun idioma, la clave misma. */
+  /**
+   * El texto de la clave; si no existe en ningun idioma, la clave misma. Un {@code %n} del texto sale
+   * como salto de linea aunque no pase por {@link #f}: un dialogo que mostraba {@code s()} de un patron
+   * dejaba ver «%n%n» literal. El resto queda igual ({@code %%}, {@code %s}...), asi {@link #f} lo sigue
+   * pudiendo formatear.
+   */
   public String s( String clave ) {
     String v = propio.getProperty( clave );
     if ( v == null ) {
       v = ingles.getProperty( clave );
     }
-    return v == null ? clave : v;
+    return v == null ? clave : saltos( v );
+  }
+
+  /** Cambia cada {@code %n} por el separador de lineas, sin tocar {@code %%n} (un "%" literal y una n). */
+  public static String saltos( String texto ) {
+    if ( texto.indexOf( "%n" ) < 0 ) {
+      return texto;
+    }
+    StringBuilder sb = new StringBuilder( texto.length() );
+    for ( int i = 0; i < texto.length(); i++ ) {
+      char c = texto.charAt( i );
+      if ( c == '%' && i + 1 < texto.length() ) {
+        char d = texto.charAt( i + 1 );
+        if ( d == 'n' ) {
+          sb.append( System.lineSeparator() );
+          i++;
+          continue;
+        }
+        if ( d == '%' ) {
+          sb.append( "%%" );
+          i++;
+          continue;
+        }
+      }
+      sb.append( c );
+    }
+    return sb.toString();
   }
 
   /**
@@ -104,7 +135,8 @@ public final class Rotulos {
 
   /** El texto solo en el idioma pedido, sin caer al ingles; null si ese idioma no lo tiene. */
   public String propio( String clave ) {
-    return propio.getProperty( clave );
+    String v = propio.getProperty( clave );
+    return v == null ? null : saltos( v );
   }
 
   /** true si la clave existe en el idioma pedido o en ingles. */

@@ -402,7 +402,10 @@ public final class PrerenderMermaid {
 
   // ------------------------------------------------------------------------------------- SVG
 
-  /** id de Diagrama -> clave de cache, solo los que tienen id y mermaid. */
+  /**
+   * id de Diagrama -> clave de cache, solo los que tienen id y mermaid y no tienen grafo propio (flujo, job y
+   * linaje se dibujan con informes.diagramas, sin navegador: su Mermaid solo va plegado en el Markdown).
+   */
   private static Map<String, String> claves( List<Diagrama> diagramas, Tema t ) {
     Map<String, String> r = new LinkedHashMap<>();
     if ( diagramas == null ) {
@@ -410,7 +413,8 @@ public final class PrerenderMermaid {
     }
     String cfg = configuracion( t );
     for ( Diagrama d : diagramas ) {
-      if ( d != null && d.id != null && d.mermaid != null && !d.mermaid.trim().isEmpty() ) {
+      boolean propio = d != null && d.grafo != null && d.grafo.nodos != null && !d.grafo.nodos.isEmpty();
+      if ( d != null && !propio && d.id != null && d.mermaid != null && !d.mermaid.trim().isEmpty() ) {
         r.put( d.id, sha1( ( VERSION + "\n" + cfg + "\n" + d.mermaid ).getBytes( StandardCharsets.UTF_8 ) ) );
       }
     }

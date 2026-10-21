@@ -5,8 +5,8 @@
 ;  este instalado.
 ;
 ;  Como usar:
-;    1) powershell -ExecutionPolicy Bypass -File instalador\preparar.ps1 -PdiHome "<...>\data-integration"
-;       -> deja todo en instalador\staging\ (PDI limpio, plugin, JRE, lanzador
+;    1) powershell -ExecutionPolicy Bypass -File preparar_instalador.ps1 -PdiHome "<...>\data-integration"
+;       -> deja todo en build\instalador\staging\ (PDI limpio, plugin, JRE, lanzador
 ;          IDCLauncher.exe con su splash, pentaho-live, imagenes)
 ;    2) Abrir este archivo con Inno Setup 7 -> Build > Compile (F9)
 ;    3) El instalador queda en:
@@ -19,9 +19,9 @@
 ;  "Pentaho Live (prueba)" (su propia carpeta, menu Inicio, acceso y clave de
 ;  desinstalacion). El PATH del usuario si es el real: guardarlo antes.
 ;
-;  Va en instalador\ y no en la raiz (la convencion 04 lo pone en la raiz de la
-;  app): la raiz de este repo es el marketplace publico de Claude Code. Por eso
-;  las rutas son relativas a instalador\ y la version se lee de ..\VERSION.
+;  Va en la raiz del repo, como en las otras apps (convencion 04): las rutas son
+;  relativas a la raiz, lo que empaqueta sale de build\instalador\staging\ (no se
+;  versiona) y en instalador\ queda solo el .exe (OutputDir).
 ; ====================================================================
 
 #ifdef PRUEBA
@@ -35,18 +35,18 @@
 #endif
 ; La version se lee del archivo VERSION de la raiz del repo (fuente unica:
 ; tambien la leen spoon-plugin\build.ps1 y el plugin).
-#define VerHandle FileOpen(AddBackslash(SourcePath) + "..\VERSION")
+#define VerHandle FileOpen(AddBackslash(SourcePath) + "VERSION")
 #define MyAppVersion Trim(FileRead(VerHandle))
 #expr FileClose(VerHandle)
 #define MyAppPublisher "IDC Studios"
 #define MyAppURL "https://github.com/IvI2511/pentaho-mcp"
 #define MyDocsURL "https://github.com/IvI2511/pentaho-mcp/blob/main/INSTALL.md"
 
-#if !FileExists(AddBackslash(SourcePath) + "staging\data-integration\Spoon.bat")
-  #error Falta instalador\staging: correr antes instalador\preparar.ps1 -PdiHome "<...>\data-integration"
+#if !FileExists(AddBackslash(SourcePath) + "build\instalador\staging\data-integration\Spoon.bat")
+  #error Falta build\instalador\staging: correr antes preparar_instalador.ps1 -PdiHome "<...>\data-integration"
 #endif
-#if !FileExists(AddBackslash(SourcePath) + "staging\bin\IDCLauncher.exe")
-  #error Falta staging\bin\IDCLauncher.exe (el lanzador): correr de nuevo instalador\preparar.ps1
+#if !FileExists(AddBackslash(SourcePath) + "build\instalador\staging\bin\IDCLauncher.exe")
+  #error Falta build\instalador\staging\bin\IDCLauncher.exe (el lanzador): correr de nuevo preparar_instalador.ps1
 #endif
 
 [Setup]
@@ -72,9 +72,9 @@ DisableDirPage=auto
 AlwaysShowDirOnReadyPage=yes
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-SetupIconFile=staging\pentaho-live.ico
+SetupIconFile=build\instalador\staging\pentaho-live.ico
 UninstallDisplayIcon={app}\pentaho-live.ico
-OutputDir=.
+OutputDir=instalador
 OutputBaseFilename=Instalador_PentahoLive_{#MyAppVersion}{#MyOutputSuffix}
 Compression=lzma2
 SolidCompression=yes
@@ -86,8 +86,8 @@ WizardStyle=modern
 ; La pagina de bienvenida viene APAGADA por defecto con
 ; WizardStyle=modern, y es la unica donde se ve el banner.
 DisableWelcomePage=no
-WizardImageFile=staging\asistente\banner.bmp,staging\asistente\banner@2x.bmp
-WizardSmallImageFile=staging\asistente\logo.bmp,staging\asistente\logo@2x.bmp
+WizardImageFile=build\instalador\staging\asistente\banner.bmp,build\instalador\staging\asistente\banner@2x.bmp
+WizardSmallImageFile=build\instalador\staging\asistente\logo.bmp,build\instalador\staging\asistente\logo@2x.bmp
 ; El idioma sale del de Windows; el dialogo solo aparece si no coincide con ninguno.
 ShowLanguageDialog=auto
 ; {app}\bin va al PATH del usuario (lo hace [Code]): avisar a Explorer al terminar.
@@ -209,21 +209,21 @@ Type: files; Name: "{autodesktop}\{#MyAppName}.lnk"; Tasks: not desktopicon
 [Files]
 ; Primero lo chico: con SolidCompression, para llegar a un archivo hay que
 ; descomprimir todo lo anterior, y "solo el plugin" no tiene que pasar por PDI.
-Source: "staging\plugin\pentaho-mcp\*"; DestDir: "{code:CarpetaPluginExterna}"; Components: plugin; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "staging\bin\pentaho-live.cmd"; DestDir: "{app}\bin"; Flags: ignoreversion
-Source: "staging\bin\pentaho-live"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "build\instalador\staging\plugin\pentaho-mcp\*"; DestDir: "{code:CarpetaPluginExterna}"; Components: plugin; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\instalador\staging\bin\pentaho-live.cmd"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "build\instalador\staging\bin\pentaho-live"; DestDir: "{app}\bin"; Flags: ignoreversion
 ; El lanzador de los accesos (IDCLauncher, convencion 03): splash al instante y
-; corre bin\pentaho-live.cmd --launcher. Lo compila preparar.ps1.
-Source: "staging\bin\IDCLauncher.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
-Source: "staging\bin\idc-launcher.ini"; DestDir: "{app}\bin"; Flags: ignoreversion
-Source: "staging\bin\idc-launcher.png"; DestDir: "{app}\bin"; Flags: ignoreversion
-Source: "staging\pentaho-live.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "staging\instalar.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "staging\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+; corre bin\pentaho-live.cmd --launcher. Lo compila preparar_instalador.ps1.
+Source: "build\instalador\staging\bin\IDCLauncher.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "build\instalador\staging\bin\idc-launcher.ini"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "build\instalador\staging\bin\idc-launcher.png"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "build\instalador\staging\pentaho-live.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build\instalador\staging\instalar.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build\instalador\staging\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; La completa: PDI 9.4 CE (con su LICENSE.txt, y el plugin ya en plugins\pentaho-mcp) y el JRE.
-Source: "staging\licenses\*"; DestDir: "{app}\licenses"; Components: bundle; Flags: ignoreversion
-Source: "staging\jre\*"; DestDir: "{app}\jre"; Components: bundle; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "staging\data-integration\*"; DestDir: "{app}\data-integration"; Components: bundle; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\instalador\staging\licenses\*"; DestDir: "{app}\licenses"; Components: bundle; Flags: ignoreversion
+Source: "build\instalador\staging\jre\*"; DestDir: "{app}\jre"; Components: bundle; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\instalador\staging\data-integration\*"; DestDir: "{app}\data-integration"; Components: bundle; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Los accesos abren el lanzador: su splash se ve enseguida y se cierra cuando aparece

@@ -4,7 +4,7 @@
 # Uso:  powershell -ExecutionPolicy Bypass -File spoon-plugin\build.ps1 [-PdiHome <ruta data-integration>]
 #
 # La version sale del archivo VERSION de la raiz del repo (fuente unica: tambien la leen
-# instalador\instalador.iss y el plugin, por el recurso pentaho-mcp-version.txt del jar).
+# instalador.iss (raiz del repo) y el plugin, por el recurso pentaho-mcp-version.txt del jar).
 param(
   [string]$PdiHome = $env:PDI_HOME
 )

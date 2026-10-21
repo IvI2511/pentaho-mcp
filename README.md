@@ -40,8 +40,9 @@ and runs the transformation. Every change goes through Spoon's own undo, so **Ct
 **Reports.** Spoon gets a new **Reports** perspective that documents the open transformation or job by
 itself: cover, flow diagram, field lineage, data dictionary, target table model, data profile, run
 metrics with charts, validation, technical quality, connections and parameters. It exports HTML, PDF,
-Markdown (for Obsidian or GitHub) and PowerPoint, with your name, institution, logo and colors. Claude can
-build the same report for you and add a short narrative written from the real numbers.
+Markdown (for Obsidian or GitHub), PowerPoint, Word, Excel and images of every diagram, one document or
+several combined into one file, with your name, institution, logo and colors. Claude can build the same
+report for you and add a short narrative written from the real numbers.
 
 **Quality.** Claude can also review an ETL for what Kettle lets through without an error: Group by or
 Merge join without sorting, the empty decimal symbol that turns `2.50` into `250` on a computer set to
@@ -187,7 +188,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Parameters | List, set and delete parameters |
 | Canvas | Add notes, select steps, tidy the layout, take a screenshot of the canvas |
 | Grading | Build an exercise pack from a solution (cases, hidden cases, expected output, rules, rubric, a copy for students), validate it, grade one submission or a whole folder in separate JVMs, follow the job, get the gradebook and each student's feedback |
-| Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, JSON) with lineage, data dictionary, metrics, technical quality and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
+| Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, Word, Excel, images, JSON), alone or several documents combined, with lineage, data dictionary, metrics, technical quality and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
 
 </details>
 
@@ -246,11 +247,14 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
   table diagrams as tables. The preview inside Spoon uses the old Internet Explorer engine that PDI
   bundles, so it has no interactive diagrams: **Open in browser** shows the full report.
 
-## New in 0.5.0
+## New in 0.5.1
 
 The **Reports** perspective in Spoon and three MCP tools to go with it: `build_report` (writes the report
 in any format), `get_report_data` (the report data as JSON, so Claude can write a narrative from real
-numbers) and `show_report` (opens the report in Spoon). See [`CHANGELOG.md`](CHANGELOG.md).
+numbers) and `show_report` (opens the report in Spoon). Reports export to HTML, PDF, Markdown, PowerPoint,
+**Word**, **Excel** and **images** of every diagram; several documents (a job and its transformations, the
+exercises of an assignment) can go in one file with a cover and a table of contents. Flow and lineage
+diagrams wrap into rows so they fill a page or a slide. See [`CHANGELOG.md`](CHANGELOG.md).
 
 Also new:
 
@@ -262,6 +266,7 @@ Also new:
 - **Ready-made patterns** in the skill (`claude/skills/pentaho-etl/patrones/`): CSV to staging,
   deduplication, incremental load by date, SCD type 2 dimension and fact load with surrogate keys, each
   one tested with Kitchen.
+- **Arrange canvas** button and right-click item on Spoon's transformation and job canvases (one Ctrl+Z).
 - **`set_error_handling`** (58 tools): the error handling of a step, as in Spoon's "Define error
   handling...", so Claude can route rejects with a reason field.
 

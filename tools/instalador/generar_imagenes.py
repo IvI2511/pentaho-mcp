@@ -1,6 +1,6 @@
 """Genera las imágenes del instalador de Windows de Pentaho Live (Inno Setup).
 
-* ``instalador/pentaho-live.ico``: el ícono multi-tamaño (16, 24, 32, 48, 64, 128 y 256 px) del
+* ``launcher/pentaho-live.ico``: el ícono multi-tamaño (16, 24, 32, 48, 64, 128 y 256 px) del
   instalador, el desinstalador y los accesos directos. Se versiona, como el ``.ico`` de las apps del
   portafolio (convención 05); este script lo regenera.
 * ``<salida>/banner.bmp`` y ``banner@2x.bmp`` (164x314 y 328x628): ``WizardImageFile``, la franja
@@ -14,13 +14,13 @@ Las imágenes del asistente van en BMP (convención 04). Se dibujan con Chrome s
 (Playwright, canal "chrome"), como ``herramientas/exportar_png.py`` del manual de marca, y el
 ``.ico`` y los BMP los arma Pillow. Las piezas de la marca son las copias del repo
 (``docs/images/pentaho-live-*.svg``, que salen del manual de marca y no se editan) y las letras de
-``instalador/fuentes`` (Outfit e Inter, OFL). Todo va en línea en la página (SVG y letras en
+``tools/instalador/fuentes`` (Outfit e Inter, OFL). Todo va en línea en la página (SVG y letras en
 base64): una página de ``set_content`` no puede cargar ``file://``.
 
 Uso:
-    python instalador/generar_imagenes.py [--salida instalador/staging/asistente] [--version X.Y.Z]
+    python tools/instalador/generar_imagenes.py [--salida build/instalador/staging/asistente] [--version X.Y.Z]
 
-Lo corre ``instalador/preparar.ps1``. Requiere ``pip install playwright pillow`` y Chrome.
+Lo corre ``preparar_instalador.ps1`` (raíz del repo). Requiere ``pip install playwright pillow`` y Chrome.
 """
 
 from __future__ import annotations
@@ -37,11 +37,11 @@ from PIL import Image
 from playwright.sync_api import sync_playwright
 
 AQUI = Path(__file__).resolve().parent
-REPO = AQUI.parent
+REPO = AQUI.parent.parent  # tools/instalador -> raíz del repo
 IMAGENES = REPO / "docs" / "images"
 FUENTES = AQUI / "fuentes"
 
-ICO = AQUI / "pentaho-live.ico"
+ICO = REPO / "launcher" / "pentaho-live.ico"
 ICO_TAMANOS = (16, 24, 32, 48, 64, 128, 256)
 
 #: Los tamaños de la convención 04: el primero es el de referencia y el segundo el de alto DPI.
@@ -215,8 +215,8 @@ def generar(salida: Path, version: str) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--salida", type=Path, default=AQUI / "staging" / "asistente",
-                        help="carpeta de los BMP del asistente (default: instalador/staging/asistente)")
+    parser.add_argument("--salida", type=Path, default=REPO / "build" / "instalador" / "staging" / "asistente",
+                        help="carpeta de los BMP del asistente (default: build/instalador/staging/asistente)")
     parser.add_argument("--version", default=None,
                         help="versión que va en el banner (default: el archivo VERSION del repo)")
     args = parser.parse_args()

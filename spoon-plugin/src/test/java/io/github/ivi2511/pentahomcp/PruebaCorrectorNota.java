@@ -170,7 +170,7 @@ public class PruebaCorrectorNota {
     contiene( puntuado( "bruno_agregado_mal" ).pistas.get( 0 ), "«importe_medio»", "bruno: la columna" );
     igual( Arrays.asList( "values" ), pistas( "juan_tabla_max", null ), "juan" );
     igual( Arrays.asList( "missing_column" ), pistas( "carla_falta_columna", null ), "carla" );
-    igual( "Falta la columna «ultima_venta»: revisá la lista de campos del step de salida.",
+    igual( "Falta la columna «ultima_venta»: revisa la lista de campos del step de salida.",
       puntuado( "carla_falta_columna" ).pistas.get( 0 ), "carla: la frase del prototipo" );
     igual( Arrays.asList( "blocked_step" ), pistas( "diego_javascript", null ), "diego" );
     contiene( puntuado( "diego_javascript" ).pistas.get( 0 ), "«Calcular importe» (ScriptValueMod)",
@@ -581,7 +581,7 @@ public class PruebaCorrectorNota {
     contiene( docente, "**Nota: 6,5 / 10**", "nota con coma decimal" );
     contiene( docente, "| ✘ Valores correctos | 0,5 / 4 | visible 25%, oculto 0% |", "renglon de values" );
     contiene( docente, "## Pistas", "pistas" );
-    contiene( docente, "Revisá cómo calculás «importe\\_medio»", "pista escapada" );
+    contiene( docente, "Revisa cómo calculas «importe\\_medio»", "pista escapada" );
     contiene( docente, "| Café | importe\\_medio | 5.00 | 7.50 |", "ejemplo del visible" );
     contiene( docente, "Jugo", "el docente ve los ejemplos del oculto" );
     contiene( docente, "Filas: 4 esperadas, 4 tuyas, 1 iguales, 3 distintas", "conteos" );

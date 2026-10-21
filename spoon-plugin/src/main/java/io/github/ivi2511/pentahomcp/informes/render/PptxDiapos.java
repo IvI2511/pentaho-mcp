@@ -62,6 +62,8 @@ import org.openxmlformats.schemas.presentationml.x2006.main.CTShape;
 import io.github.ivi2511.pentahomcp.informes.Progreso;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
@@ -69,6 +71,7 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
 import io.github.ivi2511.pentahomcp.informes.modelo.Indicador;
 import io.github.ivi2511.pentahomcp.informes.modelo.Indicadores;
+import io.github.ivi2511.pentahomcp.informes.modelo.Capitulo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Informe;
 import io.github.ivi2511.pentahomcp.informes.modelo.Lista;
 import io.github.ivi2511.pentahomcp.informes.modelo.Parrafo;
@@ -121,6 +124,16 @@ final class PptxDiapos {
   static final float ESCALA_MERMAID = 2f;
   /** Por debajo de esto (respecto del tamano natural) el texto del diagrama queda chico: se avisa. */
   static final double ESCALA_LEGIBLE = 0.55;
+  /** Diapositivas de una seccion en el cuerpo; lo que sobra (tablas, graficos) pasa al anexo. */
+  static final int MAX_DIAPOS_SECCION = 4;
+  /** En la ultima diapositiva permitida de una seccion, con menos de esto libre ya no empieza otro bloque. */
+  static final double LUGAR_TABLA = 0.25;
+  /** Una tabla del cuerpo ocupa como mucho 2 diapositivas (20 filas); el resto va al anexo. */
+  static final int MAX_DIAPOS_TABLA = 2;
+  /** Un diagrama (lienzo o Mermaid a escala 2) puede agrandarse hasta 2 veces su tamano natural. */
+  static final double AMPLIAR_DIAGRAMA = 2.0;
+  /** Un diagrama sigue en la diapositiva actual si le queda al menos esta fraccion del area de contenido. */
+  static final double LUGAR_DIAGRAMA = 0.7;
 
   // ------------------------------------------------------------------ colores fijos (niveles)
   static final Color OK = new Color( 0x2F, 0x85, 0x5A );
@@ -169,8 +182,27 @@ final class PptxDiapos {
   private int diagramasComoTabla;
   private int graficosComoTabla;
 
+  /** true = el detalle de consulta (Bloque.anexo y lo que no entra) va en diapositivas de anexo al final. */
+  private final boolean conAnexo;
+  /** {titulo de la seccion, bloque} apartados para el anexo, en orden. */
+  private final List<Object[]> anexo = new ArrayList<>();
+  /** Sin anexo: titulos de lo que se dejo fuera en la seccion actual (van en una nota al final de ella). */
+  private final List<String> fuera = new ArrayList<>();
+  /** Diapositivas que lleva la seccion actual. */
+  private int diaposSeccion;
+  /** Se estan dibujando las diapositivas del anexo: ahi no se recorta nada. */
+  private boolean enAnexo;
+  /** Alto que un diagrama deja libre debajo para los avisos y parrafos cortos que lo siguen. */
+  private double reservaTras;
+
   PptxDiapos( XMLSlideShow ppt, Informe inf, Tema tema, Map<String, byte[]> pngMermaid,
               RenderPptx.ProveedorSvg proveedorSvg, Progreso progreso ) {
+    this( ppt, inf, tema, pngMermaid, proveedorSvg, progreso, false );
+  }
+
+  PptxDiapos( XMLSlideShow ppt, Informe inf, Tema tema, Map<String, byte[]> pngMermaid,
+              RenderPptx.ProveedorSvg proveedorSvg, Progreso progreso, boolean conAnexo ) {
+    this.conAnexo = conAnexo;
     this.ppt = ppt;
     this.inf = inf;
     this.tema = tema;
@@ -217,6 +249,10 @@ final class PptxDiapos {
   void armar() {
     propiedades();
     simbolos();
+    if ( inf.combinado() ) {
+      armarCombinado();
+      return;
+    }
 
     List<Seccion> secciones = new ArrayList<>();
     Seccion portada = null;
@@ -242,6 +278,10 @@ final class PptxDiapos {
       progreso.paso( r.f( "progreso", titulo ), i++, secciones.size() );
       seccion( s, titulo );
     }
+    if ( !anexo.isEmpty() ) {
+      cancelar( progreso );
+      diaposAnexo();
+    }
     if ( diapoAgenda != null ) {
       llenarAgenda( diapoAgenda );
     }
@@ -252,6 +292,110 @@ final class PptxDiapos {
       avisos.add( r.f( "aviso_graficos", graficosComoTabla ) );
     }
     fijarIdioma();
+  }
+
+  /** Las secciones de la parte general entran en la agenda; las de los capitulos no (solo el capitulo). */
+  private boolean seccionesEnAgenda = true;
+
+  /**
+   * Informe combinado: portada del conjunto, agenda con los documentos, y por cada documento una diapositiva
+   * de apertura («2  Nombre», tipo, datos de su portada y avisos) seguida de sus secciones («2.3 Titulo»).
+   */
+  private void armarCombinado() {
+    List<Capitulos.Grupo> grupos = Capitulos.grupos( inf );
+    Capitulos.Grupo general = !grupos.isEmpty() && grupos.get( 0 ).capitulo == null ? grupos.get( 0 ) : null;
+    cancelar( progreso );
+    portada( general == null ? null : general.portada );
+    XSLFSlide diapoAgenda = nuevaDiapo( tituloAgenda(), laySoloTitulo );
+    int total = 0;
+    for ( Capitulos.Grupo g : grupos ) {
+      total += g.vivas().size();
+    }
+    int i = 0;
+    for ( Capitulos.Grupo g : grupos ) {
+      if ( g.capitulo != null ) {
+        XSLFSlide d = aperturaCapitulo( g );
+        agenda.add( new Object[] { tituloCapitulo( g.capitulo ), ppt.getSlides().indexOf( d ) + 1, String.valueOf(
+          g.numero ) } );
+      }
+      seccionesEnAgenda = g.capitulo == null;
+      List<Seccion> vivas = g.vivas();
+      for ( int k = 0; k < vivas.size(); k++ ) {
+        cancelar( progreso );
+        Seccion s = vivas.get( k );
+        String num = Capitulos.numero( g, k );
+        String titulo = ( num == null ? "" : num + "  " ) + tituloDe( s );
+        progreso.paso( r.f( "progreso", titulo ), i++, total );
+        seccion( s, titulo );
+      }
+    }
+    seccionesEnAgenda = true;
+    if ( !anexo.isEmpty() ) {
+      cancelar( progreso );
+      diaposAnexo();
+    }
+    llenarAgenda( diapoAgenda );
+    if ( diagramasComoTabla > 0 ) {
+      avisos.add( r.f( "aviso_diagramas", diagramasComoTabla ) );
+    }
+    if ( graficosComoTabla > 0 ) {
+      avisos.add( r.f( "aviso_graficos", graficosComoTabla ) );
+    }
+    fijarIdioma();
+  }
+
+  private static String tituloCapitulo( Capitulo c ) {
+    return !vacio( c.titulo ) ? c.titulo.trim() : !vacio( c.nombreDoc ) ? c.nombreDoc.trim() : c.id;
+  }
+
+  private XSLFSlide aperturaCapitulo( Capitulos.Grupo g ) {
+    Capitulo c = g.capitulo;
+    XSLFSlide d = nuevaDiapo( g.numero + "  " + tituloCapitulo( c ), laySoloTitulo );
+    List<String> lineas = new ArrayList<>();
+    Rotulos rh = Rotulos.de( RenderHtml.AREA, idioma );
+    String tipo = Informe.JOB.equals( c.tipoDoc ) ? rh.s( "doc_job" ) : rh.s( "doc_transformation" );
+    if ( g.portada != null ) {
+      for ( Bloque b : g.portada.bloques == null ? new ArrayList<Bloque>() : g.portada.bloques ) {
+        if ( b instanceof Lista && ( (Lista) b ).items != null ) {
+          for ( String it : ( (Lista) b ).items ) {
+            if ( !vacio( it ) ) {
+              lineas.add( it );
+            }
+          }
+        }
+      }
+    }
+    XSLFTextBox tb = caja( d, X0 + 20, Y_CONTENIDO + 10, ANCHO_UTIL - 40, 40 );
+    run( parrafo( tb ), limpio( tipo.toUpperCase( locale ) + ( vacio( c.nombreDoc ) ? "" : "  ·  " + c.nombreDoc
+      .trim() ) ), 13, tenue, true, false );
+    double yy = Y_CONTENIDO + 56;
+    if ( !vacio( c.subtitulo ) ) {
+      XSLFTextBox st = caja( d, X0 + 20, yy, ANCHO_UTIL - 40, 30 );
+      run( parrafo( st ), limpio( c.subtitulo ), 16, texto, false, false );
+      yy += 36;
+    }
+    if ( !lineas.isEmpty() ) {
+      int n = Math.min( lineas.size(), 10 );
+      double size = n > 7 ? 12 : 14;
+      XSLFTextBox lb = caja( d, X0 + 20, yy, ANCHO_UTIL - 40, n * size * 1.6 + 8 );
+      for ( int k = 0; k < n; k++ ) {
+        XSLFTextParagraph p = parrafo( lb );
+        p.setSpaceAfter( -4.0 );
+        run( p, limpio( lineas.get( k ) ), size, texto, false, false );
+      }
+      yy += n * size * 1.6 + 16;
+    }
+    if ( c.avisos != null && !c.avisos.isEmpty() && yy < Y_LIMITE - 20 ) {
+      int n = Math.min( 3, c.avisos.size() );
+      XSLFTextBox ab = caja( d, X0 + 20, yy, ANCHO_UTIL - 40, n * 14 + 6 );
+      for ( int k = 0; k < n; k++ ) {
+        run( parrafo( ab ), limpio( c.avisos.get( k ) ), 10, WARN, false, true );
+      }
+    }
+    if ( g.portada != null && !vacio( g.portada.resumen ) ) {
+      notas( d, g.portada.resumen );
+    }
+    return d;
   }
 
   // ================================================================== idioma del texto
@@ -501,7 +645,10 @@ final class PptxDiapos {
       p.setTextAlign( TextAlign.LEFT );
       p.addTabStops( 34, TabStopType.LEFT );
       p.addTabStops( 600, TabStopType.RIGHT );
-      run( p, String.valueOf( n++ ), size, acento, true, false );
+      // en un combinado, el numero del documento (las secciones de la parte general van sin numero)
+      String num = e.length > 2 ? (String) e[ 2 ] : inf.combinado() ? "" : String.valueOf( n );
+      n++;
+      run( p, num, size, acento, true, false );
       run( p, "\t" + limpio( (String) e[ 0 ] ), size, texto, false, false );
       run( p, "\t" + e[ 1 ], size, tenue, false, false );
     }
@@ -519,7 +666,11 @@ final class PptxDiapos {
   private void seccion( Seccion s, String titulo ) {
     tituloSeccion = titulo;
     XSLFSlide primera = nuevaDiapo( titulo, laySoloTitulo );
-    agenda.add( new Object[] { titulo, ppt.getSlides().indexOf( primera ) + 1 } );
+    diaposSeccion = 1;
+    fuera.clear();
+    if ( seccionesEnAgenda ) {
+      agenda.add( new Object[] { titulo, ppt.getSlides().indexOf( primera ) + 1 } );
+    }
 
     if ( Seccion.PARCIAL.equals( s.estado ) || Seccion.ERROR.equals( s.estado ) ) {
       boolean error = Seccion.ERROR.equals( s.estado );
@@ -552,7 +703,20 @@ final class PptxDiapos {
           b = bs.get( k );
         }
       }
+      // presentacion: el detalle de consulta y lo que pasa de MAX_DIAPOS_SECCION va al anexo (o queda fuera);
+      // los diagramas propios no: son lo que se presenta (un linaje con 4 destinos ocupa mas de 4 diapositivas).
+      // Tambien lo que empezaria una diapositiva mas cuando la ultima permitida ya esta llena (la tabla de
+      // campos del linaje despues de sus 4 partes)
+      boolean pasado = diaposSeccion > MAX_DIAPOS_SECCION || diaposSeccion == MAX_DIAPOS_SECCION
+        && Y_LIMITE - y < LUGAR_TABLA * ( Y_LIMITE - Y_CONTENIDO );
+      if ( !enAnexo && ( detalle( b ) || ( pasado && !( b instanceof Parrafo )
+        && !( b instanceof Aviso ) && !( b instanceof Diagrama && Figuras.propio( (Diagrama) b ) ) ) ) ) {
+        apartar( titulo, b );
+        continue;
+      }
+      reservaTras = b instanceof Diagrama ? altoTextosSiguientes( bs, k + 1 ) : 0;
       bloque( b );
+      reservaTras = 0;
       if ( b.ia && b instanceof Parrafo && !vacio( ( (Parrafo) b ).texto ) ) {
         narrativa.append( "\n\n" ).append( ( (Parrafo) b ).texto );
       }
@@ -560,6 +724,10 @@ final class PptxDiapos {
     if ( !algo ) {
       String t = !vacio( s.resumen ) ? s.resumen : r.s( "sin_contenido" );
       texto( Arrays.asList( t ), 16, false );
+    }
+    String detalle = fuera.isEmpty() ? null : r.f( "detalle_documento", resumirTitulos( fuera ) );
+    if ( detalle != null && y + altoTexto( Arrays.asList( detalle ), 9.5, ANCHO_UTIL, 0 ) <= Y_LIMITE ) {
+      nota( detalle ); // si no entra, queda solo en las notas del orador (nunca una diapositiva para una nota)
     }
 
     StringBuilder notas = new StringBuilder();
@@ -573,6 +741,9 @@ final class PptxDiapos {
       notas.append( r.f( Seccion.ERROR.equals( s.estado ) ? "estado_error" : "estado_parcial", s.motivo ) );
     }
     notas.append( narrativa );
+    if ( detalle != null ) {
+      notas.append( "\n\n" ).append( detalle );
+    }
     notas( primera, notas.toString().trim() );
   }
 
@@ -631,6 +802,66 @@ final class PptxDiapos {
   /** Sigue la seccion actual en otra diapositiva: «Titulo (cont.)». */
   private void continuar() {
     nuevaDiapo( tituloSeccion + " " + r.s( "cont" ), laySoloTitulo );
+    diaposSeccion++;
+  }
+
+  // ================================================================== anexo
+
+  /**
+   * Detalle de consulta que no va en el cuerpo de la presentacion: {@link Bloque#anexo} y el anexo del
+   * diccionario (una tabla por step: 19 diapositivas en un ejercicio de clase). Va al anexo si el tema lo
+   * pide; si no, queda en el HTML, el PDF y el Word.
+   */
+  static boolean detalle( Bloque b ) {
+    // en un informe combinado los ids llevan el prefijo del capitulo ("d2-dictionary-anexo-...")
+    return b.anexo || b.id != null && b.id.replaceFirst( "^d\\d+-", "" ).startsWith( "dictionary-anexo" );
+  }
+
+  /** Aparta un bloque para el anexo; sin anexo, anota su titulo para la nota de la seccion. */
+  private void apartar( String seccion, Bloque b ) {
+    if ( conAnexo ) {
+      anexo.add( new Object[] { seccion, b } );
+    } else if ( !( b instanceof Parrafo ) && !vacio( b.titulo ) && !fuera.contains( b.titulo.trim() ) ) {
+      fuera.add( b.titulo.trim() );
+    }
+  }
+
+  /** "«a», «b», «c»" o "«a», «b», «c» … (7)". */
+  private static String resumirTitulos( List<String> l ) {
+    StringBuilder sb = new StringBuilder();
+    for ( int i = 0; i < l.size() && i < 3; i++ ) {
+      sb.append( i == 0 ? "" : ", " ).append( '\u00AB' ).append( l.get( i ) ).append( '\u00BB' );
+    }
+    if ( l.size() > 3 ) {
+      sb.append( " \u2026 (" ).append( l.size() ).append( ')' );
+    }
+    return sb.toString();
+  }
+
+  /** Diapositiva separadora «Anexo» y despues los bloques apartados, agrupados por seccion. */
+  private void diaposAnexo() {
+    enAnexo = true;
+    String titulo = r.s( "anexo" );
+    XSLFSlide sep = nuevaDiapo( titulo, laySoloTitulo );
+    agenda.add( new Object[] { titulo, ppt.getSlides().indexOf( sep ) + 1 } );
+    List<String> secciones = new ArrayList<>();
+    for ( Object[] x : anexo ) {
+      if ( !secciones.contains( x[ 0 ] ) ) {
+        secciones.add( (String) x[ 0 ] );
+      }
+    }
+    texto( Arrays.asList( r.f( "anexo_contiene", String.join( ", ", secciones ) ) ), 16, false );
+    String actual = null;
+    for ( Object[] x : anexo ) {
+      cancelar( progreso );
+      String sec = (String) x[ 0 ];
+      if ( !sec.equals( actual ) ) {
+        actual = sec;
+        tituloSeccion = r.f( "anexo_de", sec );
+        nuevaDiapo( tituloSeccion, laySoloTitulo );
+      }
+      bloque( (Bloque) x[ 1 ] );
+    }
   }
 
   private boolean vacia() {
@@ -790,7 +1021,9 @@ final class PptxDiapos {
   private void nota( String t ) {
     String n = limpio( t );
     double alto = altoTexto( Arrays.asList( n.split( "\r?\n" ) ), 9.5, ANCHO_UTIL, 0 );
-    if ( y + alto > Y_LIMITE && !vacia() ) {
+    // una nota corta que se pasa un poco del limite va en el margen de abajo (hasta el pie): abrir otra
+    // diapositiva solo para ella la dejaba casi vacia («+5 filas mas...» sola)
+    if ( y + alto > Y_LIMITE && !vacia() && y - ESPACIO + 4 + alto > Y_PIE - 2 ) {
       continuar();
     }
     // pegada al bloque de arriba
@@ -898,6 +1131,7 @@ final class PptxDiapos {
     double altoCab = conCabecera ? altoFila( cols, anchos, size ) : 0;
 
     int i = 0;
+    int trozos = 0;
     boolean primera = true;
     while ( primera || i < filas.size() ) {
       double altoTit = titulo != null ? ALTO_SUBTITULO : 0;
@@ -945,13 +1179,35 @@ final class PptxDiapos {
       }
       dibujarTabla( cols, filas.subList( i, i + n ), anchos, size, t.alineacion, conCabecera, altoCab );
       i += n;
+      trozos++;
       primera = false;
       if ( i < filas.size() ) {
+        if ( !enAnexo && trozos >= MAX_DIAPOS_TABLA ) {
+          cortarTabla( t, filas.subList( i, filas.size() ), titulo );
+          break;
+        }
         continuar();
       }
     }
     if ( !vacio( t.pie ) ) {
       nota( t.pie );
+    }
+  }
+
+  /** Lo que no entra en las MAX_DIAPOS_TABLA del cuerpo: al anexo (con «(cont.)») o una nota. */
+  private void cortarTabla( Tabla t, List<List<String>> resto, String titulo ) {
+    if ( conAnexo ) {
+      Tabla c = new Tabla();
+      c.columnas = t.columnas;
+      c.alineacion = t.alineacion;
+      c.filas = new ArrayList<>( resto );
+      c.titulo = ( titulo != null ? titulo : vacio( t.titulo ) ? tituloSeccion : t.titulo ) + " " + r.s( "cont" );
+      c.pie = t.pie;
+      c.anexo = true;
+      anexo.add( new Object[] { tituloSeccion, c } );
+      nota( r.f( "tabla_sigue_anexo", resto.size() ) );
+    } else {
+      nota( r.f( "tabla_sigue_documento", resto.size() ) );
     }
   }
 
@@ -1129,22 +1385,50 @@ final class PptxDiapos {
 
   // ================================================================== diagramas, graficos e imagenes
 
+  /**
+   * Un diagrama llena el area de contenido de su diapositiva (presentacion). Si hay lienzo y Mermaid, va el
+   * que queda mas grande en 880 x 414 pt y el otro pasa al anexo; sin PNG de Mermaid, la tabla alternativa.
+   */
   private void diagrama( Diagrama d ) {
-    if ( d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0 ) {
-      // el lienzo real (flow / job_flow), ajustado a la diapositiva y nunca mas grande que su tamano natural
-      figura( d.imagen.datos, d.imagen.mime, d.imagen.ancho, d.imagen.alto, 200, d.imagen.escala > 0
-        ? d.imagen.escala : 1f, r.s( "diagrama_reducido" ) );
+    if ( Figuras.propio( d ) && propio( d ) ) {
       return;
     }
-    byte[] png = d.id == null ? null : pngMermaid.get( d.id );
-    if ( png != null && png.length > 0 ) {
-      try {
-        // PrerenderMermaid los saca a escala 2: un diagrama de dos nodos no se agranda hasta el ancho entero
-        figura( png, Imagen.PNG, 0, 0, 200, ESCALA_MERMAID, r.s( "diagrama_reducido" ) );
-        return;
-      } catch ( RuntimeException e ) {
-        // PNG roto: sigue con la tabla
+    byte[] lienzo = d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0 ? d.imagen.datos : null;
+    byte[] png = d.id == null || vacio( d.mermaid ) ? null : pngMermaid.get( d.id );
+    if ( png != null && png.length == 0 ) {
+      png = null;
+    }
+    if ( lienzo != null && png != null ) {
+      double aL = areaAjustada( lienzo, d.imagen.ancho, d.imagen.alto, d.imagen.escala > 0 ? d.imagen.escala : 1f );
+      double aM = areaAjustada( png, 0, 0, ESCALA_MERMAID );
+      Diagrama otro = new Diagrama();
+      otro.id = d.id;
+      otro.clase = d.clase;
+      otro.alt = d.alt;
+      otro.titulo = d.titulo;
+      if ( aL >= aM ) {
+        otro.mermaid = d.mermaid;
+        png = null;
+      } else {
+        otro.imagen = d.imagen;
+        lienzo = null;
       }
+      if ( !enAnexo ) {
+        apartar( tituloSeccion, otro );
+      }
+    }
+    try {
+      if ( lienzo != null ) {
+        figuraGrande( lienzo, d.imagen.mime, d.imagen.ancho, d.imagen.alto, d.imagen.escala > 0 ? d.imagen.escala
+          : 1f );
+        return;
+      }
+      if ( png != null ) {
+        figuraGrande( png, Imagen.PNG, 0, 0, ESCALA_MERMAID );
+        return;
+      }
+    } catch ( RuntimeException e ) {
+      // PNG roto: sigue con la tabla
     }
     if ( d.alternativa != null ) {
       if ( d.mermaid != null ) {
@@ -1162,6 +1446,160 @@ final class PptxDiapos {
     reservar( 30 );
     String alt = vacio( d.alt ) ? "" : " " + d.alt;
     nota( r.s( "diagrama_no_disponible" ) + alt );
+  }
+
+  /**
+   * Diagrama del motor propio (flujo, job, linaje): cada parte en su diapositiva, llenando el area de contenido
+   * (880 x 414 pt menos el subtitulo y los avisos cortos que lo siguen), como PNG al doble con el SVG como
+   * imagen vectorial (PowerPoint muestra el SVG; quien no lo entiende, el PNG). El lienzo de Spoon va despues
+   * en su propia diapositiva si no es una tira; si lo es, al anexo (con anexo) o fuera. false si el motor no
+   * pudo dibujarlo (sigue con el Mermaid o la tabla).
+   */
+  private boolean propio( Diagrama d ) {
+    String titulo = subtituloPendiente;
+    double extra = reservaTras > 0 ? reservaTras + ESPACIO + 2 : 0;
+    double y0 = vacia() ? y : Y_CONTENIDO;
+    double alto = Y_LIMITE - y0 - extra;
+    List<Dibujo> ds = Figuras.dibujos( d, caja( alto - ( titulo != null ? ALTO_SUBTITULO : 0 ) ), idioma );
+    if ( ds != null && ds.size() > 1 && titulo == null ) {
+      ds = Figuras.dibujos( d, caja( alto - ALTO_SUBTITULO ), idioma ); // lleva «Parte i de n» arriba
+    }
+    if ( ds == null ) {
+      return false;
+    }
+    // los PNG antes de tocar las diapositivas: si Batik falla, sigue el Mermaid o la tabla (nunca a medias)
+    List<byte[]> pngs = new ArrayList<>();
+    for ( Dibujo x : ds ) {
+      try {
+        pngs.add( x.png( 2 ) );
+      } catch ( Exception | LinkageError e ) {
+        return false;
+      }
+    }
+    subtituloPendiente = null;
+    for ( int k = 0; k < ds.size(); k++ ) {
+      Dibujo x = ds.get( k );
+      cancelar( progreso );
+      String parte = ds.size() > 1 ? Figuras.parte( idioma, x.parte, x.partes ) : null;
+      String sub = titulo == null ? parte : parte == null ? titulo : titulo + " \u00B7 " + parte;
+      // lo que queda debajo (sin el subtitulo ni, en la ultima parte, los avisos que siguen)
+      double tras = k == ds.size() - 1 ? extra : 0;
+      double libre = Y_LIMITE - y - tras - ( sub != null ? ALTO_SUBTITULO : 0 );
+      // la primera parte se queda debajo de lo que ya hay (el \u00ABPara que sirve\u00BB del linaje) si le queda al
+      // menos el 70 % del area, como figuraGrande: si no, la seccion gasta una diapositiva en tres lineas
+      if ( !vacia() && ( k > 0 || libre < LUGAR_DIAGRAMA * ( Y_LIMITE - Y_CONTENIDO ) ) ) {
+        continuar();
+      }
+      if ( sub != null ) {
+        subtitulo( sub );
+      }
+      double w = x.anchoFinal();
+      double h = Math.min( x.altoFinal(), Math.max( 40, Y_LIMITE - y - tras ) );
+      if ( h < x.altoFinal() ) {
+        w = w * h / x.altoFinal();
+      }
+      Rectangle2D ancla = new Rectangle2D.Double( X0 + ( ANCHO_UTIL - w ) / 2, y, w, h );
+      XSLFPictureShape ps = diapo.createPicture( ppt.addPicture( pngs.get( k ), PictureType.PNG ) );
+      try {
+        ps.setSvgImage( ppt.addPicture( x.svg.getBytes( StandardCharsets.UTF_8 ), PictureType.SVG ) );
+      } catch ( Throwable t ) {
+        // el SVG es un extra: queda el PNG
+      }
+      ps.setAnchor( ancla );
+      y += h + ESPACIO;
+    }
+    Imagen lz = Figuras.lienzo( d );
+    if ( lz != null && !enAnexo ) {
+      if ( Figuras.proporcionada( lz ) ) {
+        continuar();
+        subtituloPendiente = vacio( lz.alt ) ? d.alt : lz.alt;
+        figuraGrande( lz.datos, lz.mime, lz.ancho, lz.alto, lz.escala > 0 ? lz.escala : 1f );
+        subtituloPendiente = null;
+      } else if ( conAnexo ) {
+        // una tira de lienzo no se lee en una diapositiva: va al anexo con su titulo
+        Diagrama otro = new Diagrama();
+        otro.id = d.id;
+        otro.clase = d.clase;
+        otro.alt = d.alt;
+        otro.imagen = lz;
+        otro.titulo = vacio( lz.alt ) ? d.alt : lz.alt;
+        apartar( tituloSeccion, otro );
+      }
+    }
+    return true;
+  }
+
+  /** La caja de los diagramas propios: el ancho util por el alto dado (pt). */
+  private static Objetivo caja( double alto ) {
+    return Objetivo.DIAPOSITIVA.conCaja( ANCHO_UTIL, Math.max( 120, alto ) );
+  }
+
+  /** Alto de los avisos y parrafos (no apartados) que siguen al bloque k, hasta el proximo de otro tipo. */
+  private double altoTextosSiguientes( List<Bloque> bs, int desde ) {
+    double alto = 0;
+    for ( int k = desde; k < bs.size(); k++ ) {
+      Bloque b = bs.get( k );
+      if ( detalle( b ) ) {
+        continue;
+      }
+      if ( b instanceof Aviso && !vacio( ( (Aviso) b ).texto ) ) {
+        alto += altoTexto( Arrays.asList( limpio( ( (Aviso) b ).texto ).split( "\r?\n" ) ), 13, ANCHO_UTIL - 14, 0 ) + 4
+          + ESPACIO;
+      } else if ( b instanceof Parrafo && !vacio( ( (Parrafo) b ).texto ) ) {
+        alto += altoLineas( Arrays.asList( limpio( ( (Parrafo) b ).texto ).split( "\r?\n" ) ), 14 ) + ESPACIO;
+      } else {
+        break;
+      }
+    }
+    return Math.min( alto, 0.3 * ( Y_LIMITE - Y_CONTENIDO ) );
+  }
+
+  /** Fraccion del area de contenido que ocupa la imagen ajustada a 880 x 414 pt (con el tope de agrandar). */
+  private double areaAjustada( byte[] datos, int anchoPx, int altoPx, float escala ) {
+    int[] wh = anchoPx > 0 && altoPx > 0 ? new int[] { anchoPx, altoPx } : medir( datos );
+    double w = wh[ 0 ] / (double) escala;
+    double h = wh[ 1 ] / (double) escala;
+    double alto = Y_LIMITE - Y_CONTENIDO - ALTO_SUBTITULO;
+    double k = Math.min( AMPLIAR_DIAGRAMA, Math.min( ANCHO_UTIL / w, alto / h ) );
+    return w * k * h * k / ( ANCHO_UTIL * alto );
+  }
+
+  /**
+   * Diagrama de presentacion: usa todo el lugar que queda (si queda menos del 70 % del area de contenido,
+   * pasa a otra diapositiva) y se agranda hasta AMPLIAR_DIAGRAMA veces su tamano natural.
+   */
+  private void figuraGrande( byte[] datos, String mime, int anchoPx, int altoPx, float escala ) {
+    int[] wh = anchoPx > 0 && altoPx > 0 ? new int[] { anchoPx, altoPx } : medir( datos );
+    double natural = wh[ 0 ] / (double) ( escala > 0 ? escala : 1f );
+    double proporcion = wh[ 1 ] / (double) wh[ 0 ];
+    double extra = subtituloPendiente != null ? ALTO_SUBTITULO : 0;
+    if ( !vacia() && Y_LIMITE - y - extra < LUGAR_DIAGRAMA * ( Y_LIMITE - Y_CONTENIDO ) ) {
+      continuar();
+    }
+    reservar( 0 );
+    // lo que sigue (avisos cortos) entra en la misma diapositiva: su alto, el espacio tras la figura y 2 pt
+    double disponible = Y_LIMITE - y - ( reservaTras > 0 ? reservaTras + ESPACIO + 2 : 0 );
+    double w = Math.min( ANCHO_UTIL, natural * AMPLIAR_DIAGRAMA );
+    double h = w * proporcion;
+    if ( h > disponible ) {
+      h = disponible;
+      w = h / proporcion;
+    }
+    if ( natural > 0 && w / natural < ESCALA_LEGIBLE ) {
+      // la aclaracion «diagrama reducido» tambien va en esta diapositiva
+      double hn = altoTexto( Arrays.asList( limpio( r.s( "diagrama_reducido" ) ) ), 9.5, ANCHO_UTIL, 0 ) + ESPACIO;
+      if ( h > disponible - hn ) {
+        h = Math.max( 40, disponible - hn );
+        w = h / proporcion;
+      }
+    }
+    XSLFPictureData pd = ppt.addPicture( datos, tipoImagen( mime ) );
+    XSLFPictureShape ps = diapo.createPicture( pd );
+    ps.setAnchor( new Rectangle2D.Double( X0 + ( ANCHO_UTIL - w ) / 2, y, w, h ) );
+    y += h + ESPACIO;
+    if ( natural > 0 && w / natural < ESCALA_LEGIBLE ) {
+      nota( r.s( "diagrama_reducido" ) );
+    }
   }
 
   /**

@@ -790,7 +790,7 @@ public final class CorreccionAInforme {
 
   /**
    * La correccion en varios formatos, en {@code carpeta} con el nombre {@code base} (los nombres de
-   * {@link InformeServicio#archivo}: base.html, base.light.html, base.pdf, base.md, base.pptx, base.json).
+   * {@link InformeServicio#archivo}: base.html, base.light.html, base.pdf, base.md, base.pptx, base.docx, base.xlsx, base.json).
    * {@link Formato#JSON} es el contrato, no el modelo del informe: el resultado tal cual (docente) o
    * {@link #paraAlumno} (alumno). Ojo con {@code base}: en la carpeta de un lote,
    * {@code <alumno>.json} ya es el resultado completo.

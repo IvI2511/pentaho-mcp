@@ -114,7 +114,7 @@ public class PruebaCorreccionAInforme {
     igual( "✔ Corre sin errores", rubrica.filas.get( 0 ).get( 0 ), "renglon aprobado" );
     igual( "Total: 6,5 de 10 puntos", rubrica.pie, "total" );
 
-    contiene( json( inf.seccion( CorreccionAInforme.SEC_PISTAS ) ), "Revisá cómo calculás «importe_medio»",
+    contiene( json( inf.seccion( CorreccionAInforme.SEC_PISTAS ) ), "Revisa cómo calculas «importe_medio»",
       "la pista de C5" );
 
     Seccion visible = inf.seccion( "case_visible" );
@@ -199,7 +199,7 @@ public class PruebaCorreccionAInforme {
     contiene( h, "<!DOCTYPE html>", "es HTML" );
     contiene( h, "Valores correctos", "rubrica" );
     contiene( h, "Café", "ejemplo del visible" );
-    contiene( h, "Revisá cómo calculás «importe_medio»", "pista" );
+    contiene( h, "Revisa cómo calculas «importe_medio»", "pista" );
     falso( h.toLowerCase( Locale.ROOT ).contains( "<script" ), "sin diagramas: sin los 2,6 MB de Mermaid" );
     cierto( html.length() < 400 * 1024, "HTML chico: " + html.length() + " bytes" );
     sinOcultos( h, "HTML del alumno" );
@@ -251,6 +251,61 @@ public class PruebaCorreccionAInforme {
     contiene( EntornoKettle.leer( new File( dir, "bruno-docente.light.html" ) ), "Jugo", "liviano del docente" );
     contiene( EntornoKettle.leer( new File( dir, "bruno-docente.md" ) ), "Jugo", "md del docente" );
     contiene( textoPptx( new File( dir, "bruno-docente.pptx" ) ), "Jugo", "PPTX del docente" );
+  }
+
+  /**
+   * Word y Excel (Informes 0.5.1) por el mismo puente: el docente ve el valor del caso oculto, el alumno no. Es lo
+   * que escribe grade_exercise con report_formats docx y xlsx.
+   */
+  public void pruebaWordYExcel() throws Exception {
+    ResultadoCorreccion r = bruno();
+    File dir = limpia( "c9-office" );
+    Thread hilo = Thread.currentThread();
+    ClassLoader antes = hilo.getContextClassLoader();
+    hilo.setContextClassLoader( CorreccionAInforme.class.getClassLoader() ); // POI (JAXB), como CorrectorTools
+    try {
+      List<Formato> office = Arrays.asList( Formato.DOCX, Formato.XLSX );
+      Map<Formato, Resultado> doc = CorreccionAInforme.exportar( r, false, office, dir, "bruno-docente", new Tema(),
+        Progreso.NULO );
+      Map<Formato, Resultado> al = CorreccionAInforme.exportar( r, true, office, dir, "bruno-alumno", new Tema(),
+        Progreso.NULO );
+      igual( 2, doc.size(), "docx y xlsx del docente" );
+      igual( 2, al.size(), "docx y xlsx del alumno" );
+      for ( String ext : Arrays.asList( "docx", "xlsx" ) ) {
+        File d = new File( dir, "bruno-docente." + ext );
+        File a = new File( dir, "bruno-alumno." + ext );
+        archivo( d, 2000, ext + " del docente" );
+        archivo( a, 2000, ext + " del alumno" );
+        contiene( textoZip( d ), "Jugo", ext + ": el docente ve el oculto" );
+        noContiene( textoZip( a ), "Jugo", ext + ": el alumno no ve el oculto" );
+      }
+    } finally {
+      hilo.setContextClassLoader( antes );
+    }
+  }
+
+  /** El texto de todas las partes XML de un docx/xlsx (sin las etiquetas). */
+  private static String textoZip( File f ) throws IOException {
+    StringBuilder b = new StringBuilder();
+    try ( java.util.zip.ZipFile z = new java.util.zip.ZipFile( f ) ) {
+      java.util.Enumeration<? extends java.util.zip.ZipEntry> en = z.entries();
+      while ( en.hasMoreElements() ) {
+        java.util.zip.ZipEntry e = en.nextElement();
+        if ( !e.getName().endsWith( ".xml" ) ) {
+          continue;
+        }
+        try ( InputStream in = z.getInputStream( e ) ) {
+          java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+          byte[] buf = new byte[8192];
+          for ( int n; ( n = in.read( buf ) ) > 0; ) {
+            o.write( buf, 0, n );
+          }
+          b.append( new String( o.toByteArray(), "UTF-8" ).replaceAll( "<[^>]+>", "" ) ).append( '
+' );
+        }
+      }
+    }
+    return b.toString();
   }
 
   /** JSON = el contrato (no el modelo del informe); devolucionHtml para el lote. */

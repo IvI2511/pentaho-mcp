@@ -41,9 +41,10 @@ siempre funciona.
 **Informes.** Spoon suma una perspectiva nueva, **Informes**, que documenta sola la transformación o el
 job abierto: portada, diagrama de flujo, linaje de campos, diccionario de datos, modelo de las tablas
 destino, perfil de datos, métricas de ejecución con gráficos, validación, calidad técnica, conexiones y
-parámetros. Exporta a HTML, PDF, Markdown (para Obsidian o GitHub) y PowerPoint, con tu nombre,
-institución, logo y colores. Claude puede armarte el mismo informe y sumarle una narrativa corta escrita a
-partir de los números reales.
+parámetros. Exporta a HTML, PDF, Markdown (para Obsidian o GitHub), PowerPoint, Word, Excel e imágenes de
+cada diagrama, de un documento o de varios combinados en un solo archivo, con tu nombre, institución, logo
+y colores. Claude puede armarte el mismo informe y sumarle una narrativa corta escrita a partir de los
+números reales.
 
 **Calidad.** Claude también puede revisar un ETL buscando lo que Kettle deja pasar sin error: Group by o
 Merge join sin ordenar, el símbolo decimal vacío que en una computadora en español convierte `2.50` en
@@ -190,7 +191,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Parámetros | Listar, definir y borrar parámetros |
 | Lienzo | Agregar notas, seleccionar steps, ordenar el lienzo, sacar una imagen del lienzo |
 | Corrector | Armar un pack de ejercicio desde una solución (casos, casos ocultos, salida esperada, reglas, rúbrica, copia para alumnos), validarlo, corregir una entrega o una carpeta entera en JVMs aparte, seguir el lote, y obtener la planilla y la devolución de cada alumno |
-| Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, JSON) con linaje, diccionario de datos, métricas, calidad técnica y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
+| Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imágenes, JSON), solo o con varios documentos combinados, con linaje, diccionario de datos, métricas, calidad técnica y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
 
 </details>
 
@@ -254,12 +255,15 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   Internet Explorer que trae PDI, así que no tiene diagramas interactivos: **Abrir en el navegador**
   muestra el informe completo.
 
-## Lo nuevo en 0.5.0
+## Lo nuevo en 0.5.1
 
 La perspectiva **Informes** en Spoon y tres herramientas MCP que la acompañan: `build_report` (escribe el
 informe en cualquier formato), `get_report_data` (los datos del informe en JSON, para que Claude escriba
-una narrativa con números reales) y `show_report` (abre el informe en Spoon). Detalle en
-[`CHANGELOG.md`](CHANGELOG.md).
+una narrativa con números reales) y `show_report` (abre el informe en Spoon). Los informes se exportan a
+HTML, PDF, Markdown, PowerPoint, **Word**, **Excel** e **imágenes** de cada diagrama; varios documentos (un
+job y sus transformaciones, los ejercicios de una entrega) pueden ir en un solo archivo con portada e
+índice. Los diagramas de flujo y de linaje se reparten en filas para llenar la página o la diapositiva.
+Detalle en [`CHANGELOG.md`](CHANGELOG.md).
 
 Además:
 
@@ -271,6 +275,7 @@ Además:
 - **Patrones listos** en la skill (`claude/skills/pentaho-etl/patrones/`): CSV a staging, deduplicación,
   carga incremental por fecha, dimensión SCD tipo 2 y carga de hechos con claves subrogadas, cada uno
   probado con Kitchen.
+- **Botón «Ordenar lienzo»** y opción del menú contextual en los lienzos de transformaciones y jobs de Spoon (un solo Ctrl+Z).
 - **`set_error_handling`** (58 herramientas): el manejo de errores de un step, como «Definir manejo de
   errores...» de Spoon, para que Claude mande los rechazos con un campo de motivo.
 

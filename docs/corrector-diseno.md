@@ -67,7 +67,7 @@ código 0,5, ≤ 8 steps 0,5; escala 10; **sin compuertas**):
 |---|---|---|---|---|
 | ana_orden_distinto | Correcta; Sort descendente (salen Té, Tostado, Medialuna, Café) y rutas de su PC | graded | **10,0** | 4/4 iguales en los dos casos; notas de redirección |
 | bruno_agregado_mal | `importe_medio` con MAX en vez de AVERAGE | graded | **6,5** | values: visible 25 %, oculto 0 %. «Café · importe_medio · esperado 5.00 · tuyo 7.50» y 2 más |
-| carla_falta_columna | Sin `ultima_venta` en el Text file output | graded | **9,7** | columns 5/6. Pista: «Falta la columna ultima_venta: revisá la lista de campos del step de salida» |
+| carla_falta_columna | Sin `ultima_venta` en el Text file output | graded | **9,7** | columns 5/6. Pista: «Falta la columna ultima_venta: revisa la lista de campos del step de salida» |
 | diego_javascript | Importe calculado con Modified JavaScript | blocked | **1,5** | No se ejecutó; falla «sin código»; suman Group by y ≤ 8 steps |
 | elena_sin_ordenar | Group by sin Sort rows (D5) | graded | **5,5** | 10 filas contra 4; claves repetidas Café ×4, Té ×3, Medialuna ×2; pista del Sort rows |
 | fede_bucle | Hop circular (D2) | timeout | **2,0** | Solo los puntos de reglas (ver compuertas, §5) |
@@ -283,7 +283,7 @@ el JSON y se deduplican entre casos.
 | Columna que falta / otra que sobra con los mismos valores | renombre |
 | Números con coma decimal (aceptados) | aviso sin descuento, salvo `strict_format` [NP] |
 | Claves con `�` o mojibake (`CafÃ©`) | declarar `UTF-8` en el step de salida (P17) [NP] |
-| Step bloqueado / lectura fuera del pack | «no está permitido en este ejercicio» / «leé los datos del enunciado» |
+| Step bloqueado / lectura fuera del pack | «no está permitido en este ejercicio» / «lee solo los datos del ejercicio» |
 | `hasLoop` / nombres repetidos | D2 / D1, sin ejecutar [NP] |
 | Merge join con claves perdidas | D6: ordenar las dos entradas [NP] |
 
@@ -357,6 +357,11 @@ es la perspectiva `pentaho-live-grader` (`GraderSpoonPlugin` + `GraderPerspectiv
 `PENTAHO_LIVE_GRADER=off` la apaga), con `PanelCorrector` y `AsistentePack` en la raíz del paquete. «Ajustar
 nota» es un campo del detalle y no una celda editable; «Volver a corregir con…» es `CorrectorLote.recorregir`.
 Quedan pendientes el menú por overlay XUL y la pestaña «Corrección» en `TransGraph.extraViewTabFolder`.
+
+**Estado (C10, 21-oct-2026).** Fusionado con `feat/0.6.0` (Informes 0.5.1 y linter): las devoluciones de
+`grade_exercise` salen también en Word y Excel (`report_formats`: `docx`, `xlsx`), por el mismo
+`InformeServicio.exportar`. Las pistas en español están en tú (sin voseo). Las pruebas de ventanas del corrector
+abren su Shell fuera de la pantalla y capturan con `Control.print(GC)`, como `PruebaPanelSwt`.
 
 **Dónde.** Una pestaña **Corrector** en la perspectiva de Informes. Hoy **no hay dónde**: su panel
 0.5.0 es un `GridLayout` con un `SashForm` (§5.1 de su diseño), sin pestañas. Hace falta que el dueño de
@@ -468,7 +473,7 @@ en el plan B). Textos: `informes/textos/corrector_{en,es,pt}.properties`, área 
 | **C7** | MCP | `CorrectorTools.java` (5 tools); *mod* `McpLifecycleListener.java` (registro + una línea de instrucciones), `PruebaMcpCorrector.java` | Esquemas válidos; `grade_exercise` de punta a punta; sin modo confianza por MCP |
 | **C8** | Spoon | `informes/ui/PanelCorrector.java`, `informes/ui/AsistentePack.java`; plan B `GraderSpoonPlugin.java` + `GraderPerspective.java` | Pestaña en el *harness* SWT de Informes; prueba en Spoon real (Iván) |
 | **C9** | Puente con Informes | `CorreccionAInforme.java` | El resultado de bruno en HTML, HTML liviano (IE11), PDF y PPTX con los renderizadores de Informes |
-| **C10** | Docs y skill | *mod* `README*.md`, `CHANGELOG.md`, `docs/roadmap.md`, `claude/skills/pentaho-etl/SKILL.md`; nuevo `manual/0N-corrector.md` (número al fusionar) y un pack de ejemplo en `manual/ejemplos/`; subir `version` de `claude/.claude-plugin/plugin.json` | Revisión de Iván |
+| **C10** | Docs y skill | *mod* `README*.md`, `CHANGELOG.md`, `docs/roadmap.md`, `claude/skills/pentaho-etl/SKILL.md`; nuevo `manual/07-corrector.md` y el pack de ejemplo `ejemplo/pack-correccion/` con sus entregas de ejemplo (la `version` de `plugin.json` la sube el release) | Revisión de Iván |
 
 **Dependencias:**
 

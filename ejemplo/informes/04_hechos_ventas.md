@@ -1,16 +1,16 @@
 ---
 title: 'Carga de hechos de ventas · Grano de Oro'
-date: 2026-10-20
+date: 2026-10-21
 tags: [pentaho, etl, informe]
 source: '../construido-en-vivo/04_hechos_ventas.ktr'
-generator: 'Pentaho Live 0.4.2'
+generator: 'Pentaho Live 0.5.1'
 ---
 
 # Carga de hechos de ventas · Grano de Oro
 
 **Transformación · 04_hechos_ventas**  
 Informe de la transformación 04_hechos_ventas  
-*Generado el 20 de octubre de 2026, 23:29*
+*Generado el 21 de octubre de 2026, 16:11*
 
 Transformación 04_hechos_ventas.
 
@@ -39,7 +39,7 @@ Esta transformación carga la tabla de hechos del modelo estrella de **Grano de 
 | Tablas escritas | 1 · hechos_ventas |
 | Conexiones | 1 |
 
-La última ejecución procesó 3.000 filas en 239 ms. El step más lento fue «Cargar hechos_ventas» (177 ms).
+La última ejecución procesó 3.000 filas en 292 ms. El step más lento fue «Cargar hechos_ventas» (206 ms).
 
 ### Lo más importante
 
@@ -55,7 +55,12 @@ La última ejecución procesó 3.000 filas en 239 ms. El step más lento fue «C
 
 *16 steps y 16 hops. Tiene 1 hop de error.*  
 
-![Lienzo de 04_hechos_ventas](04_hechos_ventas_archivos/lienzo.png)
+![Lienzo de 04_hechos_ventas](04_hechos_ventas_archivos/flow-diagrama.png)
+
+[Captura del lienzo de Spoon (muy ancha: ábrela para verla a tamaño real)](04_hechos_ventas_archivos/lienzo.png)
+
+<details>
+<summary>Código Mermaid del diagrama (para Obsidian y GitHub)</summary>
 
 ```mermaid
 flowchart LR
@@ -94,6 +99,8 @@ flowchart LR
   linkStyle 14 stroke:#d33,color:#d33
 ```
 
+</details>
+
 *Las flechas llenas llevan filas; las punteadas rojas son hops de error; las que terminan en x están deshabilitadas.*  
 
 ### Qué hace cada step
@@ -121,7 +128,24 @@ flowchart LR
 
 *Traza 22 campos de 2 steps destino hasta «Leer ventas (CSV)» (ventas_2026_09.csv). Operaciones: 6 cálculos, 1 conversión de tipo o formato y 5 campos creados en la transformación.*  
 
+**Para qué sirve:** muestra de dónde sale cada campo que escribe la transformación y qué le pasa por el camino. Sirve para saber qué se rompe si cambias una columna de origen (análisis de impacto), para encontrar en qué step se estropea un valor que sale mal y para documentar el proceso (auditorías y normativa).
+
 ### Linaje hacia «Cargar hechos_ventas»
+
+*Parte 1 de 3*  
+
+![Diagrama del linaje de los 13 campos de «Cargar hechos_ventas»](04_hechos_ventas_archivos/lineage-diagram-1-1.png)
+
+*Parte 2 de 3*  
+
+![Diagrama del linaje de los 13 campos de «Cargar hechos_ventas»](04_hechos_ventas_archivos/lineage-diagram-1-2.png)
+
+*Parte 3 de 3*  
+
+![Diagrama del linaje de los 13 campos de «Cargar hechos_ventas»](04_hechos_ventas_archivos/lineage-diagram-1-3.png)
+
+<details>
+<summary>Código Mermaid del diagrama (para Obsidian y GitHub)</summary>
 
 ```mermaid
 flowchart LR
@@ -129,66 +153,79 @@ flowchart LR
     c0["id_ticket"]
     c2["linea"]
     c4["fecha"]
-    c6["id_tienda"]
-    c8["codigo_producto"]
-    c10["cantidad"]
-    c12["precio_unitario"]
-    c15["metodo_pago"]
+    c7["id_tienda"]
+    c10["codigo_producto"]
+    c13["cantidad"]
+    c15["precio_unitario"]
+    c19["metodo_pago"]
   end
-  subgraph g1 ["Convertir precio a número"]
-    c13["precio_unitario"]
+  subgraph g1 ["Estandarizar textos"]
+    c8["id_tienda"]
+    c11["codigo_producto"]
+    c20["metodo_pago"]
   end
-  subgraph g2 ["Buscar tienda"]
-    c17["sk_tienda"]
+  subgraph g2 ["Normalizar fecha y precio"]
+    c5["fecha"]
+    c16["precio_unitario"]
   end
-  subgraph g3 ["Buscar producto"]
-    c19["sk_producto"]
+  subgraph g3 ["Convertir precio a número"]
+    c17["precio_unitario"]
   end
-  subgraph g4 ["Buscar fecha"]
-    c21["sk_fecha"]
+  subgraph g4 ["Buscar tienda"]
+    c22["sk_tienda"]
   end
-  subgraph g5 ["Clasificar línea"]
-    c23["motivo_rechazo"]
+  subgraph g5 ["Buscar producto"]
+    c24["sk_producto"]
   end
-  subgraph g6 ["¿Línea válida?"]
-    c27["2"]
+  subgraph g6 ["Buscar fecha"]
+    c26["sk_fecha"]
   end
-  subgraph g7 ["Calcular importe"]
-    c25["importe"]
+  subgraph g7 ["Clasificar línea"]
+    c28["motivo_rechazo"]
   end
-  subgraph g8 ["Cargar hechos_ventas"]
+  subgraph g8 ["Calcular importe"]
+    c30["importe"]
+  end
+  subgraph g9 ["Cargar hechos_ventas"]
     c1["id_ticket"]
     c3["linea"]
-    c5["fecha"]
-    c7["id_tienda"]
-    c9["codigo_producto"]
-    c11["cantidad"]
-    c14["precio_unitario"]
-    c16["metodo_pago"]
-    c18["sk_tienda"]
-    c20["sk_producto"]
-    c22["sk_fecha"]
-    c24["motivo_rechazo"]
-    c26["importe"]
+    c6["fecha"]
+    c9["id_tienda"]
+    c12["codigo_producto"]
+    c14["cantidad"]
+    c18["precio_unitario"]
+    c21["metodo_pago"]
+    c23["sk_tienda"]
+    c25["sk_producto"]
+    c27["sk_fecha"]
+    c29["motivo_rechazo"]
+    c31["importe"]
   end
   c0 --> c1
   c2 --> c3
-  c4 --> c5
-  c6 --> c7
+  c4 -->|"fecha -#62; [ replace [ ^(\d{2})/(\d{2})/(\d{4})$ with $3-$2-$1 ] ] -#62; fecha"| c5
+  c5 --> c6
+  c7 -->|"id_tienda { trim = [ both ] #38;#38; lower/upper = [ upper ] #38;#38; padding = [ none,  ] …"| c8
   c8 --> c9
-  c10 --> c11
-  c12 -->|"a Number (#35;.#35;#35;)"| c13
+  c10 -->|"codigo_producto { trim = [ both ] #38;#38; lower/upper = [ upper ] #38;#38; padding = [ non…"| c11
+  c11 --> c12
   c13 --> c14
-  c15 --> c16
+  c15 -->|"precio_unitario -#62; [ replace [ , with $3-$2-$1 ] ] -#62; precio_unitario"| c16
+  c16 -->|"a Number (#35;.#35;#35;)"| c17
   c17 --> c18
-  c19 --> c20
-  c21 --> c22
-  c23 --> c24
-  c10 -->|"ROUND_STD_2(importe_sin_redondear, dos_decimales)"| c25
-  c25 --> c26
-  c13 -->|"ROUND_STD_2(importe_sin_redondear, dos_decimales)"| c25
-  c27 -->|"ROUND_STD_2(importe_sin_redondear, dos_decimales)"| c25
+  c19 -->|"metodo_pago { trim = [ both ] #38;#38; lower/upper = [ upper ] #38;#38; padding = [ none,  …"| c20
+  c20 --> c21
+  c22 --> c23
+  c24 --> c25
+  c26 --> c27
+  c28 --> c29
+  c13 -->|"ROUND_STD_2(MULTIPLY(precio_unitario, cantidad), 2)"| c30
+  c30 --> c31
+  c15 -->|"a Number (#35;.#35;#35;)"| c17
+  c17 -->|"ROUND_STD_2(MULTIPLY(precio_unitario, cantidad), 2)"| c30
 ```
+
+</details>
 
 ### Campos de «Cargar hechos_ventas»
 
@@ -196,21 +233,26 @@ flowchart LR
 | --- | --- | --- | --- |
 | id_ticket | String | Leer ventas (CSV) (ventas_2026_09.csv): id_ticket | sin cambios |
 | linea | Integer | Leer ventas (CSV) (ventas_2026_09.csv): linea | sin cambios |
-| fecha | String | Leer ventas (CSV) (ventas_2026_09.csv): fecha | sin cambios |
-| id_tienda | String | Leer ventas (CSV) (ventas_2026_09.csv): id_tienda | sin cambios |
-| codigo_producto | String | Leer ventas (CSV) (ventas_2026_09.csv): codigo_producto | sin cambios |
+| fecha | String | Leer ventas (CSV) (ventas_2026_09.csv): fecha | fecha -\> \[ replace \[ ^(\\d{2})/(\\d{2})/(\\d{4})\$ with \$3-\$2-\$1 \] \] -\> fecha en «Normalizar fecha y precio» |
+| id_tienda | String | Leer ventas (CSV) (ventas_2026_09.csv): id_tienda | id_tienda { trim = \[ both \] \&\& lower/upper = \[ upper \] \&\& padding = \[ none,  \] \&\& cap = \[ no \] \&\& maskXML = \[ none \] \&\& digits = \[ none \] \&\& remove = \[ none \] } -\> id_tienda en «Estandarizar textos» |
+| codigo_producto | String | Leer ventas (CSV) (ventas_2026_09.csv): codigo_producto | codigo_producto { trim = \[ both \] \&\& lower/upper = \[ upper \] \&\& padding = \[ none,  \] \&\& cap = \[ no \] \&\& maskXML = \[ none \] \&\& digits = \[ none \] \&\& remove = \[ none \] } -\> codigo_producto en «Estandarizar textos» |
 | cantidad | Integer | Leer ventas (CSV) (ventas_2026_09.csv): cantidad | sin cambios |
-| precio_unitario | Number | Leer ventas (CSV) (ventas_2026_09.csv): precio_unitario | a Number (\#.\#\#) en «Convertir precio a número» |
-| metodo_pago | String | Leer ventas (CSV) (ventas_2026_09.csv): metodo_pago | sin cambios |
+| precio_unitario | Number | Leer ventas (CSV) (ventas_2026_09.csv): precio_unitario | precio_unitario -\> \[ replace \[ , with \$3-\$2-\$1 \] \] -\> precio_unitario en «Normalizar fecha y precio» → a Number (\#.\#\#) en «Convertir precio a número» |
+| metodo_pago | String | Leer ventas (CSV) (ventas_2026_09.csv): metodo_pago | metodo_pago { trim = \[ both \] \&\& lower/upper = \[ upper \] \&\& padding = \[ none,  \] \&\& cap = \[ no \] \&\& maskXML = \[ none \] \&\& digits = \[ none \] \&\& remove = \[ none \] } -\> metodo_pago en «Estandarizar textos» |
 | sk_tienda | Integer | Buscar tienda: sk_tienda (creado) | creado por Búsqueda en base de datos en «Buscar tienda» |
 | sk_producto | Integer | Buscar producto: sk_producto (creado) | creado por Búsqueda en base de datos en «Buscar producto» |
 | sk_fecha | Integer | Buscar fecha: sk_fecha (creado) | creado por Búsqueda en base de datos en «Buscar fecha» |
 | motivo_rechazo | String | Clasificar línea: motivo_rechazo (creado) | creado por Janino en «Clasificar línea» |
-| importe | Number | Leer ventas (CSV) (ventas_2026_09.csv): cantidad, precio_unitario; ¿Línea válida?: 2 (?) | ROUND_STD_2(importe_sin_redondear, dos_decimales) en «Calcular importe»; a Number (\#.\#\#) en «Convertir precio a número» → ROUND_STD_2(importe_sin_redondear, dos_decimales) en «Calcular importe» |
+| importe | Number | Leer ventas (CSV) (ventas_2026_09.csv): cantidad, precio_unitario | ROUND_STD_2(MULTIPLY(precio_unitario, cantidad), 2) en «Calcular importe»; a Number (\#.\#\#) en «Convertir precio a número» → ROUND_STD_2(MULTIPLY(precio_unitario, cantidad), 2) en «Calcular importe» |
 
-*Motor: motor propio de Pentaho Live (metadatos de Kettle) (metaverse falló (java.util.NoSuchElementException)).*  
+*Motor: metaverse de Pentaho y motor propio de Pentaho Live; metaverse no pudo trazar importe, así que esos campos los traza el motor propio.*  
 
 ### Linaje hacia «Escribir rechazos»
+
+![Diagrama del linaje de los 9 campos de «Escribir rechazos»](04_hechos_ventas_archivos/lineage-diagram-2.png)
+
+<details>
+<summary>Código Mermaid del diagrama (para Obsidian y GitHub)</summary>
 
 ```mermaid
 flowchart LR
@@ -257,19 +299,26 @@ flowchart LR
   c2 --> c3
   c4 -->|"fecha -#62; [ replace [ ^(\d{2})/(\d{2})/(\d{4})$ with $3-$2-$1 ] ] -#62; fecha"| c5
   c5 --> c6
+  c4 --> c6
   c7 -->|"id_tienda { trim = [ both ] #38;#38; lower/upper = [ upper ] #38;#38; padding = [ none,  ] …"| c8
   c8 --> c9
+  c7 --> c9
   c10 -->|"codigo_producto { trim = [ both ] #38;#38; lower/upper = [ upper ] #38;#38; padding = [ non…"| c11
   c11 --> c12
+  c10 --> c12
   c13 --> c14
   c15 -->|"precio_unitario -#62; [ replace [ , with $3-$2-$1 ] ] -#62; precio_unitario"| c16
   c16 -->|"a Number (#35;.#35;#35;)"| c17
   c17 --> c18
+  c15 -->|"a Number (#35;.#35;#35;)"| c17
   c19 -->|"metodo_pago { trim = [ both ] #38;#38; lower/upper = [ upper ] #38;#38; padding = [ none,  …"| c20
   c20 --> c21
+  c19 --> c21
   c22 --> c23
   c24 --> c23
 ```
+
+</details>
 
 ### Campos de «Escribir rechazos»
 
@@ -281,11 +330,11 @@ flowchart LR
 | id_tienda | String | Leer ventas (CSV) (ventas_2026_09.csv): id_tienda | id_tienda { trim = \[ both \] \&\& lower/upper = \[ upper \] \&\& padding = \[ none,  \] \&\& cap = \[ no \] \&\& maskXML = \[ none \] \&\& digits = \[ none \] \&\& remove = \[ none \] } -\> id_tienda en «Estandarizar textos» |
 | codigo_producto | String | Leer ventas (CSV) (ventas_2026_09.csv): codigo_producto | codigo_producto { trim = \[ both \] \&\& lower/upper = \[ upper \] \&\& padding = \[ none,  \] \&\& cap = \[ no \] \&\& maskXML = \[ none \] \&\& digits = \[ none \] \&\& remove = \[ none \] } -\> codigo_producto en «Estandarizar textos» |
 | cantidad | Integer | Leer ventas (CSV) (ventas_2026_09.csv): cantidad | sin cambios |
-| precio_unitario | Number | Leer ventas (CSV) (ventas_2026_09.csv): precio_unitario | precio_unitario -\> \[ replace \[ , with \$3-\$2-\$1 \] \] -\> precio_unitario en «Normalizar fecha y precio» → a Number (\#.\#\#) en «Convertir precio a número» |
+| precio_unitario | Number | Leer ventas (CSV) (ventas_2026_09.csv): precio_unitario | precio_unitario -\> \[ replace \[ , with \$3-\$2-\$1 \] \] -\> precio_unitario en «Normalizar fecha y precio» → a Number (\#.\#\#) en «Convertir precio a número»; a Number (\#.\#\#) en «Convertir precio a número» |
 | metodo_pago | String | Leer ventas (CSV) (ventas_2026_09.csv): metodo_pago | metodo_pago { trim = \[ both \] \&\& lower/upper = \[ upper \] \&\& padding = \[ none,  \] \&\& cap = \[ no \] \&\& maskXML = \[ none \] \&\& digits = \[ none \] \&\& remove = \[ none \] } -\> metodo_pago en «Estandarizar textos» |
 | motivo_rechazo | String | Clasificar línea: motivo_rechazo (creado); Marcar duplicado: motivo_rechazo (creado) | creado por Janino en «Clasificar línea»; constante «DUPLICADO» en «Marcar duplicado» |
 
-*Motor: metaverse de Pentaho.*  
+*Motor: metaverse de Pentaho y motor propio de Pentaho Live.*  
 
 ## Diccionario de datos
 
@@ -611,15 +660,15 @@ erDiagram
 
 ## Métricas de ejecución
 
-*La última ejecución procesó 3.000 filas en 239 ms. El step más lento fue «Cargar hechos_ventas» (177 ms).*  
+*La última ejecución procesó 3.000 filas en 292 ms. El step más lento fue «Cargar hechos_ventas» (206 ms).*  
 
 | Indicador | Valor |
 | --- | --- |
-| Duración | 239 ms · última ejecución en Spoon |
+| Duración | 292 ms · última ejecución en Spoon |
 | Filas leídas | 3.000 · de las fuentes |
 | Filas escritas | 3.000 · por los steps de salida |
 | Errores | 0 |
-| Step más lento | Cargar hechos_ventas · 177 ms |
+| Step más lento | Cargar hechos_ventas · 206 ms |
 
 ### Filas escritas y tiempo por step
 
@@ -633,22 +682,22 @@ erDiagram
 
 | Step | Leídas | Escritas | Entrada | Salida | Rechazadas | Errores | Estado | Tiempo | Filas/s |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
-| Leer ventas (CSV) | 0 | 3.000 | 3.001 | 0 | 0 | 0 | Terminado | 51 ms | 58.843 |
-| Estandarizar textos | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 57 ms | 52.632 |
-| Normalizar fecha y precio | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 63 ms | 47.619 |
-| Convertir precio a número | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 66 ms | 45.455 |
-| Ordenar por ticket y línea | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 79 ms | 37.975 |
-| Eliminar duplicados | 3.000 | 2.940 | 0 | 0 | 60 | 0 | Terminado | 87 ms | 34.483 |
-| Buscar tienda | 2.940 | 2.940 | 4 | 0 | 0 | 0 | Terminado | 95 ms | 30.947 |
-| Buscar producto | 2.940 | 2.940 | 28 | 0 | 0 | 0 | Terminado | 99 ms | 29.697 |
-| Buscar fecha | 2.940 | 2.940 | 30 | 0 | 0 | 0 | Terminado | 101 ms | 29.109 |
-| Clasificar línea | 2.940 | 2.940 | 0 | 0 | 0 | 0 | Terminado | 121 ms | 24.298 |
-| Marcar duplicado | 60 | 60 | 0 | 0 | 0 | 0 | Terminado | 92 ms | 652 |
-| ¿Línea válida? | 2.940 | 2.940 | 0 | 0 | 0 | 0 | Terminado | 126 ms | 23.333 |
-| Calcular importe | 2.885 | 2.885 | 0 | 0 | 0 | 0 | Terminado | 147 ms | 19.626 |
-| Cargar hechos_ventas | 2.885 | 2.885 | 0 | 2.885 | 0 | 0 | Terminado | 177 ms | 16.299 |
-| Preparar rechazo | 55 | 55 | 0 | 0 | 0 | 0 | Terminado | 130 ms | 423 |
-| Escribir rechazos | 115 | 115 | 0 | 116 | 0 | 0 | Terminado | 135 ms | 859 |
+| Leer ventas (CSV) | 0 | 3.000 | 3.001 | 0 | 0 | 0 | Terminado | 54 ms | 55.574 |
+| Estandarizar textos | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 64 ms | 46.875 |
+| Normalizar fecha y precio | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 69 ms | 43.478 |
+| Convertir precio a número | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 73 ms | 41.096 |
+| Ordenar por ticket y línea | 3.000 | 3.000 | 0 | 0 | 0 | 0 | Terminado | 86 ms | 34.884 |
+| Eliminar duplicados | 3.000 | 2.940 | 0 | 0 | 60 | 0 | Terminado | 100 ms | 30.000 |
+| Buscar tienda | 2.940 | 2.940 | 4 | 0 | 0 | 0 | Terminado | 109 ms | 26.972 |
+| Buscar producto | 2.940 | 2.940 | 28 | 0 | 0 | 0 | Terminado | 115 ms | 25.565 |
+| Buscar fecha | 2.940 | 2.940 | 30 | 0 | 0 | 0 | Terminado | 122 ms | 24.098 |
+| Clasificar línea | 2.940 | 2.940 | 0 | 0 | 0 | 0 | Terminado | 144 ms | 20.417 |
+| Marcar duplicado | 60 | 60 | 0 | 0 | 0 | 0 | Terminado | 103 ms | 583 |
+| ¿Línea válida? | 2.940 | 2.940 | 0 | 0 | 0 | 0 | Terminado | 148 ms | 19.865 |
+| Calcular importe | 2.885 | 2.885 | 0 | 0 | 0 | 0 | Terminado | 187 ms | 15.428 |
+| Cargar hechos_ventas | 2.885 | 2.885 | 0 | 2.885 | 0 | 0 | Terminado | 206 ms | 14.005 |
+| Preparar rechazo | 55 | 55 | 0 | 0 | 0 | 0 | Terminado | 153 ms | 359 |
+| Escribir rechazos | 115 | 115 | 0 | 116 | 0 | 0 | Terminado | 155 ms | 748 |
 
 ## Validación
 

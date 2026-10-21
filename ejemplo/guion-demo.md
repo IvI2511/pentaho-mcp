@@ -67,7 +67,7 @@ desconocidos dan **2.885 hechos y 115 rechazos**. Si el profesor quiere ver los 
 Claude lee los datos del informe (`get_report_data`), escribe la narrativa y genera los ficheros.
 El texto escrito por Claude sale marcado como asistido por IA. Abrir el PDF y enseñar:
 
-- **Diagrama de flujo**: la imagen real del lienzo y el mismo flujo en Mermaid.
+- **Diagrama de flujo**: la imagen real del lienzo y el mismo flujo dibujado en filas, que llena la página.
 - **Linaje de campos**: de qué columna del CSV sale cada columna de `hechos_ventas` y qué le pasa por
   el camino.
 - **Perfil de datos**, **métricas** (filas y tiempo por step) y **validación**.
@@ -75,7 +75,10 @@ El texto escrito por Claude sale marcado como asistido por IA. Abrir el PDF y en
 > Enséñamelo en Spoon.
 
 Se abre la pestaña **Informes** de Spoon, con la vista previa. Desde ahí se cambia la identidad
-(autor, institución, curso, logo, colores) y se exporta a HTML, PDF, Markdown o PowerPoint sin Claude.
+(autor, institución, curso, logo, colores) y se exporta a HTML, PDF, Markdown, PowerPoint, Word o
+Excel sin Claude. Con **Añadir transformaciones del job** y **Todo en un archivo**, el job y sus cinco
+transformaciones salen en un solo PDF o Word con portada, índice y un capítulo por documento
+([`carga_completa.pdf`](informes/carga_completa.pdf)).
 
 ## Si el profesor pide cambios en directo
 

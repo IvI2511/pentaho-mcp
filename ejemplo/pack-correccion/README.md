@@ -54,13 +54,13 @@ esa solución saca **10**, tanto con el idioma del pack (`es_ES`) como con `en_U
 | Rutas relativas a la transformación | 0,5 | la regla `absolute_path` del linter no encuentra nada |
 
 Los criterios de salida se promedian entre los dos casos. La nota es la suma sobre 10, redondeada a una
-décima. Los puntos se cambian en `pack.json` (`rubric`) o con el asistente al crear el pack.
+décima. Los puntos los cambias en `pack.json` (`rubric`) o con el asistente al crear el pack.
 
 ## Cómo se usa
 
 ### 1. Repartir el enunciado
 
-A los alumnos se les da `pack-correccion-alumnos.zip`: trae el enunciado, los datos del caso visible y
+A tus alumnos les das `pack-correccion-alumnos.zip`: trae el enunciado, los datos del caso visible y
 la salida esperada de ese caso, pero no la solución ni nada del caso oculto. Quien tenga Pentaho Live
 puede corregirse antes de entregar, contra el caso visible: pidiéndoselo a Claude con la transformación
 abierta en Spoon (`grade_exercise` con el zip como pack) o en la perspectiva Corrector, con el zip como pack
@@ -68,10 +68,10 @@ y una carpeta que tenga solo su `.ktr`.
 
 ### 2. Recoger las entregas
 
-Hace falta una carpeta con **una entrega por alumno**: un `.ktr`, un `.zip` o una subcarpeta. La
+Necesitas una carpeta con **una entrega por alumno**: un `.ktr`, un `.zip` o una subcarpeta. La
 descarga de una tarea de Moodle sirve tal cual (el corrector quita el sufijo `_123_assignsubmission_file_`
-del nombre de cada carpeta). Si se quiere poner el nombre real y el correo de cada alumno, se añade a
-esa carpeta un `alumnos.csv` con `archivo;alumno;email`.
+del nombre de cada carpeta). Si quieres poner el nombre real y el correo de cada alumno, añade a esa
+carpeta un `alumnos.csv` con `archivo;alumno;email`.
 
 ### 3. Corregir en Spoon
 
@@ -81,18 +81,18 @@ En la perspectiva **Corrector** (el desplegable de perspectivas de Spoon, junto 
 1. **Pack**: esta carpeta (`ejemplo/pack-correccion`) o un `.zip`. Al lado aparece el resumen: el
    título, los dos casos (uno oculto) y los 10 puntos.
 2. **Entregas**: la carpeta del paso anterior; al lado, cuántas entregas encontró.
-3. **Resultados**: dónde dejar la planilla y las devoluciones. Si se deja en blanco, se crea al lado de
+3. **Resultados**: dónde dejar la planilla y las devoluciones. Si lo dejas en blanco, se crea al lado de
    la de entregas («Entregas TP3 - corrección»).
-4. **Corregir**. Cada entrega corre en una JVM aparte (dos a la vez, se puede cambiar en *Procesos*) y
+4. **Corregir**. Cada entrega corre en una JVM aparte (dos a la vez; puedes cambiarlo en *Procesos*) y
    la tabla se va llenando: nota, estado y una marca por criterio (● todos los puntos, ◐ una parte,
    ○ ninguno). Para las cuatro entregas de ejemplo tarda unos veinte segundos.
 
-Al elegir una fila se ve la corrección completa a la derecha, con los ejemplos de las filas que no
+Al elegir una fila ves la corrección completa a la derecha, con los ejemplos de las filas que no
 coinciden. **Ver como el alumno** muestra lo que va a recibir el alumno, sin los valores del caso
 oculto. Además:
 
 - **Ajuste** y **Comentario**: puntos que se suman o se restan a la nota del corrector, con su motivo.
-  Van a la planilla (`nota_motor`, `ajuste`, `comentario`) y se conservan si se vuelve a corregir en
+  Van a la planilla (`nota_motor`, `ajuste`, `comentario`) y se conservan si vuelves a corregir en
   la misma carpeta de resultados.
 - **Abrir su .ktr** abre en Data Integration la copia que corrió el caso visible, con sus datos, para
   ejecutarla paso a paso. Nunca abre ni modifica la entrega original.
@@ -106,7 +106,7 @@ oculto. Además:
 
 ### 3 bis. Corregir con Claude
 
-Con el servidor MCP de Pentaho Live conectado, basta con pedirlo: «Corrige las entregas de
+Con el servidor MCP de Pentaho Live conectado, basta con pedírselo a Claude: «Corrige las entregas de
 `C:\…\Entregas TP3` con el pack `C:\…\ejemplo\pack-correccion` y deja los resultados en
 `C:\…\Notas TP3`». Claude usa `grade_submissions`, que devuelve un `job_id` y la tabla de notas a medida
 que avanzan, y `get_grading_status` para seguirlo. Una sola entrega se corrige con `grade_exercise`. El
@@ -116,7 +116,7 @@ instrucciones para Claude.
 
 ### 4. Devolver
 
-En la carpeta de resultados queda, por alumno, `<alumno>.html` (la devolución, que se puede subir tal
+En la carpeta de resultados queda, por alumno, `<alumno>.html` (la devolución, que puedes subir tal
 cual al aula virtual), `<alumno>.md` y `<alumno>.json` (el registro completo, solo para el docente).
 
 ## Las entregas de ejemplo
@@ -141,7 +141,7 @@ Este pack lo creó el propio corrector a partir de la solución. Para crear uno 
 
 1. Prepara los datos del caso oculto: mismos nombres de fichero, otros datos. Para este ejemplo,
    `python herramientas/generar_caso_oculto.py <carpeta>` usa el generador de la práctica con otra
-   semilla. En un curso de verdad conviene que el caso oculto sea propio: el de este ejemplo es
+   semilla. En un curso de verdad, usa un caso oculto propio: el de este ejemplo es
    público (el generador y la semilla están en el repositorio).
 2. Abre la solución en Spoon (aquí, `solucion-referencia/06_kpi_desde_ficheros.ktr`) y, en la
    perspectiva Corrector, pulsa **Crear pack desde esta transformación…**. El asistente tiene cuatro
@@ -157,7 +157,7 @@ Este pack lo creó el propio corrector a partir de la solución. Para crear uno 
 
 - Corregir es ejecutar código ajeno. El corrector lo hace en un proceso aparte, con un `KETTLE_HOME`
   vacío, una política de steps y topes de tiempo, filas y tamaño de salida, pero **no es un sandbox
-  real**. Para entregas de desconocidos, lo seguro es una máquina virtual.
+  real**. Si corriges entregas de desconocidos, hazlo en una máquina virtual.
 - Por ahora corrige transformaciones (`.ktr`); un job (`.kjb`) queda como «no se pudo abrir».
 - Las bases de datos que no sean la SQLite que trae el pack no se usan: un step que se conecta a otra
   base bloquea la entrega.

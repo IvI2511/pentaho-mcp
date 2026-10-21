@@ -16,9 +16,13 @@ import io.github.ivi2511.pentahomcp.informes.Renderizador;
 import io.github.ivi2511.pentahomcp.informes.Resultado;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Diagramas;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
+import io.github.ivi2511.pentahomcp.informes.modelo.Capitulo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
 import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
@@ -36,7 +40,9 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  * PNG del lienzo, las imagenes y los SVG de los graficos.
  * <ul>
  * <li>Front matter YAML: title, date, tags, source, generator.</li>
- * <li>Diagramas: la imagen (si la hay) y un bloque {@code ```mermaid} con el mismo texto que el HTML.</li>
+ * <li>Diagramas de flujo, job y linaje: el dibujo propio como .svg (uno por parte si se partio), el lienzo de
+ * Spoon y, plegado en una llamada de Obsidian, el codigo {@code ```mermaid} (GitHub y Obsidian lo dibujan).
+ * El modelo entidad-relacion: la imagen (si la hay) y el bloque {@code ```mermaid}.</li>
  * <li>Tablas GFM con {@code |} escapado; indicadores como tabla de 2 columnas.</li>
  * <li>Avisos como {@code > [!NOTE]}, {@code > [!WARNING]} y {@code > [!CAUTION]} (los entienden los dos).</li>
  * <li>Una linea final en cursiva: "Generado con Pentaho Live · IDC Studios". Sin marca de agua.</li>
@@ -277,6 +283,11 @@ public final class RenderMarkdown implements Renderizador {
     String documento() throws Exception {
       List<Seccion> secciones = RenderHtml.ordenadas( inf );
       frontMatter();
+      if ( inf.combinado() ) {
+        combinado( Capitulos.grupos( inf ) );
+        sb.append( "---\n\n*" ).append( esc( t( "generated_with" ) + " " + Tema.PIE ) ).append( "*\n" );
+        return sb.toString();
+      }
       portada( secciones );
       int n = secciones.size();
       int i = 0;
@@ -399,8 +410,96 @@ public final class RenderMarkdown implements Renderizador {
       return SeccionId.titulo( s.id, r.idioma() );
     }
 
+    /** "2.3 " delante del titulo de la seccion que se escribe (solo en los capitulos). */
+    String numeroSeccion;
+
+    /**
+     * Informe combinado: portada del conjunto, indice de documentos y secciones numeradas, y cada documento
+     * como capitulo ("# 2. Nombre", tipo y datos de su portada) con sus secciones ("## 2.3 Titulo").
+     */
+    void combinado( List<Capitulos.Grupo> grupos ) throws Exception {
+      Capitulos.Grupo general = !grupos.isEmpty() && grupos.get( 0 ).capitulo == null ? grupos.get( 0 ) : null;
+      List<Seccion> cab = new ArrayList<>();
+      if ( general != null ) {
+        if ( general.portada != null ) {
+          cab.add( general.portada );
+        }
+        cab.addAll( general.secciones );
+      }
+      portada( cab );
+      sb.append( "**" ).append( esc( t( "contents" ) ) ).append( "**\n\n" );
+      for ( Capitulos.Grupo g : grupos ) {
+        String sangria = "";
+        if ( g.capitulo != null ) {
+          sb.append( g.numero ).append( ". " ).append( esc( tituloCapitulo( g.capitulo ) ) ).append( '\n' );
+          sangria = "   ";
+        }
+        List<Seccion> vivas = g.vivas();
+        for ( int k = 0; k < vivas.size(); k++ ) {
+          String num = Capitulos.numero( g, k );
+          sb.append( sangria ).append( "- " ).append( num == null ? "" : num + " " ).append( esc( tituloSeccion(
+            vivas.get( k ) ) ) ).append( '\n' );
+        }
+      }
+      sb.append( '\n' );
+      int n = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        n += g.vivas().size();
+      }
+      int i = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        if ( g.capitulo != null ) {
+          capitulo( g );
+        }
+        List<Seccion> vivas = g.vivas();
+        for ( int k = 0; k < vivas.size(); k++ ) {
+          if ( p.cancelado() ) {
+            throw new CancellationException();
+          }
+          p.paso( t( "writing_markdown" ), ++i, n );
+          String num = Capitulos.numero( g, k );
+          numeroSeccion = num == null ? null : num + " ";
+          seccion( vivas.get( k ) );
+          numeroSeccion = null;
+        }
+      }
+    }
+
+    String tituloCapitulo( Capitulo c ) {
+      return c.titulo != null && !c.titulo.trim().isEmpty() ? c.titulo.trim() : c.nombreDoc != null && !c.nombreDoc
+        .trim().isEmpty() ? c.nombreDoc.trim() : c.id;
+    }
+
+    void capitulo( Capitulos.Grupo g ) throws Exception {
+      Capitulo c = g.capitulo;
+      sb.append( "# " ).append( g.numero ).append( ". " ).append( esc( tituloCapitulo( c ) ) ).append( "\n\n" );
+      String tipo = Informe.JOB.equals( c.tipoDoc ) ? t( "doc_job" ) : t( "doc_transformation" );
+      sb.append( "**" ).append( esc( tipo + ( c.nombreDoc == null || c.nombreDoc.trim().isEmpty() ? "" : " · "
+        + c.nombreDoc.trim() ) ) ).append( "**" );
+      if ( c.subtitulo != null && !c.subtitulo.trim().isEmpty() ) {
+        sb.append( "  \n" ).append( inicioSeguro( esc( c.subtitulo.trim() ) ) );
+      }
+      sb.append( "\n\n" );
+      if ( g.portada != null ) {
+        if ( g.portada.resumen != null && !g.portada.resumen.trim().isEmpty() ) {
+          parrafos( g.portada.resumen );
+        }
+        for ( Bloque b : Html.lista( g.portada.bloques ) ) {
+          if ( b != null && !( b instanceof Imagen ) ) {
+            bloque( b );
+          }
+        }
+      }
+      for ( String a : Html.lista( c.avisos ) ) {
+        if ( a != null && !a.trim().isEmpty() ) {
+          aviso( Aviso.WARN, null, a );
+        }
+      }
+    }
+
     void seccion( Seccion s ) throws Exception {
-      sb.append( "## " ).append( esc( tituloSeccion( s ) ) ).append( "\n\n" );
+      sb.append( "## " ).append( esc( ( numeroSeccion == null ? "" : numeroSeccion ) + tituloSeccion( s ) ) ).append(
+        "\n\n" );
       if ( Seccion.PARCIAL.equals( s.estado ) ) {
         aviso( Aviso.WARN, t( "status_partial" ), s.motivo );
       } else if ( Seccion.ERROR.equals( s.estado ) ) {
@@ -570,6 +669,11 @@ public final class RenderMarkdown implements Renderizador {
     }
 
     void diagrama( Diagrama d ) throws Exception {
+      List<Dibujo> ds = Figuras.dibujos( d, Objetivo.PANTALLA, inf.idioma );
+      if ( ds != null ) {
+        propio( d, ds );
+        return;
+      }
       boolean hayImagen = d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0;
       if ( hayImagen ) {
         boolean lienzo = !lienzoUsado && ( Diagrama.FLUJO.equals( d.clase ) || Diagrama.JOB.equals( d.clase ) );
@@ -583,6 +687,64 @@ public final class RenderMarkdown implements Renderizador {
         sb.append( c ).append( "mermaid\n" ).append( texto ).append( '\n' ).append( c ).append( "\n\n" );
       } else if ( !hayImagen && d.alternativa != null ) {
         tabla( d.alternativa );
+      }
+    }
+
+    /**
+     * Diagrama propio: cada parte como .png (doble resolucion) en la carpeta de archivos, el lienzo (como
+     * imagen si no es una tira; si lo es, un enlace al .png) y el codigo Mermaid plegado en un
+     * {@code <details>} (GitHub lo dibuja al abrirlo; Obsidian lo muestra como codigo). Si Batik falla, la
+     * parte va como .svg.
+     */
+    void propio( Diagrama d, List<Dibujo> ds ) throws Exception {
+      String base = d.id != null ? d.id : "diagrama";
+      String alt = d.alt != null ? d.alt : d.titulo != null ? d.titulo : "";
+      for ( Dibujo x : ds ) {
+        String parte = ds.size() > 1 ? base + "-" + x.parte : base;
+        byte[] png = null;
+        try {
+          png = x.png( 2 );
+        } catch ( Exception | LinkageError e ) {
+          png = null; // sin Batik: el SVG
+        }
+        String nombre = archivo( parte, png != null ? "png" : "svg" );
+        File f = new File( carpeta, nombre );
+        if ( png != null ) {
+          Html.escribir( f, png );
+        } else {
+          Html.escribir( f, RenderImagenes.suelto( x.svgEscalado() ) );
+        }
+        archivos.add( f );
+        if ( ds.size() > 1 ) {
+          cursiva( Figuras.parte( inf.idioma, x.parte, x.partes ) );
+        }
+        sb.append( "![" ).append( esc( alt ) ).append( "](" ).append( ruta( carpeta.getName(), nombre ) ).append(
+          ")\n\n" );
+      }
+      Imagen lz = Figuras.lienzo( d );
+      if ( lz != null ) {
+        boolean lienzo = !lienzoUsado && ( Diagrama.FLUJO.equals( d.clase ) || Diagrama.JOB.equals( d.clase ) );
+        lienzoUsado |= lienzo;
+        String nombreLz = lienzo ? "lienzo" : lz.id != null ? lz.id : base + "-lienzo";
+        String altLz = lz.alt != null ? lz.alt : alt;
+        if ( Figuras.proporcionada( lz ) ) {
+          imagen( lz, nombreLz, altLz );
+        } else {
+          String nombre = archivo( nombreLz, Imagen.JPG.equals( lz.mime ) ? "jpg" : "png" );
+          File f = new File( carpeta, nombre );
+          Html.escribir( f, lz.datos );
+          archivos.add( f );
+          String texto = Rotulos.de( Diagramas.AREA, inf.idioma ).s( "lienzo.enlace" );
+          sb.append( '[' ).append( esc( texto ) ).append( "](" ).append( ruta( carpeta.getName(), nombre ) ).append(
+            ")\n\n" );
+        }
+      }
+      if ( d.mermaid != null && !d.mermaid.trim().isEmpty() ) {
+        String texto = d.mermaid.replace( "\r\n", "\n" ).trim();
+        String c = cerca( texto );
+        sb.append( "<details>\n<summary>" ).append( Html.esc( t( "mermaid_code" ) ) ).append( "</summary>\n\n" );
+        sb.append( c ).append( "mermaid\n" ).append( texto ).append( '\n' ).append( c ).append( "\n\n" );
+        sb.append( "</details>\n\n" );
       }
     }
 

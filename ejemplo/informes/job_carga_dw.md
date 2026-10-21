@@ -1,16 +1,16 @@
 ---
 title: 'Job de carga del modelo estrella · Grano de Oro'
-date: 2026-10-20
+date: 2026-10-21
 tags: [pentaho, etl, informe]
 source: '../construido-en-vivo/job_carga_dw.kjb'
-generator: 'Pentaho Live 0.4.2'
+generator: 'Pentaho Live 0.5.1'
 ---
 
 # Job de carga del modelo estrella · Grano de Oro
 
 **Job · job_carga_dw**  
 Informe del job job_carga_dw  
-*Generado el 20 de octubre de 2026, 23:30*
+*Generado el 21 de octubre de 2026, 16:11*
 
 Job job_carga_dw.
 
@@ -38,7 +38,7 @@ El job orquesta la carga completa del modelo estrella: comprueba que estén los 
 | Jobs que ejecuta | 0 |
 | Conexiones | 1 |
 
-La última ejecución del job tardó 3,4 s y terminó bien; se ejecutaron 10 entradas. La entrada más lenta fue «Cargar dim_producto» (1,0 s).
+La última ejecución del job tardó 3,2 s y terminó bien; se ejecutaron 9 entradas. La entrada más lenta fue «Cargar dim_producto» (839 ms).
 
 ### Lo más importante
 
@@ -50,7 +50,12 @@ La última ejecución del job tardó 3,4 s y terminó bien; se ejecutaron 10 ent
 
 *12 entradas y 18 hops. Ejecuta 5 transformaciones (01_dim_tienda.ktr, 02_dim_producto.ktr, 03_dim_fecha.ktr, 04_hechos_ventas.ktr, 05_kpi_ventas.ktr).*  
 
-![Lienzo de job_carga_dw](job_carga_dw_archivos/lienzo.png)
+![Lienzo de job_carga_dw](job_carga_dw_archivos/job-flow-diagrama.png)
+
+[Captura del lienzo de Spoon (muy ancha: ábrela para verla a tamaño real)](job_carga_dw_archivos/lienzo.png)
+
+<details>
+<summary>Código Mermaid del diagrama (para Obsidian y GitHub)</summary>
 
 ```mermaid
 flowchart LR
@@ -102,6 +107,8 @@ flowchart LR
   linkStyle 16 stroke:#d33,color:#d33
 ```
 
+</details>
+
 *Verde: si termina bien; rojo punteado: si falla; negro: siempre; las que terminan en x están deshabilitadas.*  
 
 ### Entradas del job
@@ -133,15 +140,15 @@ flowchart LR
 
 ## Métricas de ejecución
 
-*La última ejecución del job tardó 3,4 s y terminó bien; se ejecutaron 10 entradas. La entrada más lenta fue «Cargar dim_producto» (1,0 s).*  
+*La última ejecución del job tardó 3,2 s y terminó bien; se ejecutaron 9 entradas. La entrada más lenta fue «Cargar dim_producto» (839 ms).*  
 
 | Indicador | Valor |
 | --- | --- |
-| Duración | 3,4 s · última ejecución en Spoon |
+| Duración | 3,2 s · última ejecución en Spoon |
 | Resultado | Bien |
-| Entradas ejecutadas | 10 |
+| Entradas ejecutadas | 9 |
 | Errores | 0 |
-| Entrada más lenta | Cargar dim_producto · 1,0 s |
+| Entrada más lenta | Cargar dim_producto · 839 ms |
 
 > [!NOTE]
 > Las filas de las transformaciones que ejecuta un job solo se conocen al medirlo (Medir…).
@@ -156,16 +163,16 @@ flowchart LR
 
 | Entrada | Job | Inicio | Duración | Resultado | Llegó por |
 | --- | --- | ---: | ---: | --- | --- |
-| START | job_carga_dw | +23 ms | 6 ms | Bien | el inicio del job |
-| Comprobar ficheros de entrada | job_carga_dw | +30 ms | 5 ms | Bien | un hop incondicional |
-| Crear carpeta salida | job_carga_dw | +36 ms | 1 ms | Bien | un hop «si termina bien» |
-| Crear modelo estrella | job_carga_dw | +38 ms | 552 ms | Bien | un hop «si termina bien» |
-| Cargar dim_tienda | job_carga_dw | +592 ms | 327 ms | Bien | un hop «si termina bien» |
-| Cargar dim_producto | job_carga_dw | +920 ms | 1,0 s | Bien | un hop «si termina bien» |
-| Cargar dim_fecha | job_carga_dw | +2,0 s | 461 ms | Bien | un hop «si termina bien» |
-| Cargar hechos_ventas | job_carga_dw | +2,4 s | 833 ms | Bien | un hop «si termina bien» |
-| Calcular KPI | job_carga_dw | +3,3 s | 142 ms | Bien | un hop «si termina bien» |
-| Carga correcta | job_carga_dw | +3,4 s | 0 ms | Bien | un hop «si termina bien» |
+| START | job_carga_dw | +26 ms | 5 ms | Bien | el inicio del job |
+| Comprobar ficheros de entrada | job_carga_dw | +32 ms | 5 ms | Bien | un hop incondicional |
+| Crear carpeta salida | job_carga_dw | +38 ms | 1 ms | Bien | un hop «si termina bien» |
+| Crear modelo estrella | job_carga_dw | +40 ms | 510 ms | Bien | un hop «si termina bien» |
+| Cargar dim_tienda | job_carga_dw | +552 ms | 324 ms | Bien | un hop «si termina bien» |
+| Cargar dim_producto | job_carga_dw | +878 ms | 839 ms | Bien | un hop «si termina bien» |
+| Cargar dim_fecha | job_carga_dw | +1,7 s | 449 ms | Bien | un hop «si termina bien» |
+| Cargar hechos_ventas | job_carga_dw | +2,2 s | 831 ms | Bien | un hop «si termina bien» |
+| Calcular KPI | job_carga_dw | +3,0 s | 155 ms | Bien | un hop «si termina bien» |
+| Carga correcta | job_carga_dw | +3,2 s | 0 ms | Bien | un hop «si termina bien» |
 
 ## Validación
 

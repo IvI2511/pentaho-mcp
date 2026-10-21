@@ -574,8 +574,15 @@ final class RunMotor {
    * sigan resolviendo; todo lo demas se quita. Devuelve cuantos steps se quitaron o vaciaron.
    */
   static int recortar( TransMeta c, StepMeta objetivo ) {
-    Set<StepMeta> quedan = new LinkedHashSet<StepMeta>();
-    quedan.add( objetivo );
+    return recortar( c, java.util.Collections.singletonList( objetivo ) );
+  }
+
+  /**
+   * Como {@link #recortar(TransMeta, StepMeta)} con varios objetivos (el perfil de varios steps en una
+   * sola corrida): quedan los ancestros de todos ellos.
+   */
+  static int recortar( TransMeta c, java.util.Collection<StepMeta> objetivos ) {
+    Set<StepMeta> quedan = new LinkedHashSet<StepMeta>( objetivos );
     boolean cambio = true;
     while ( cambio ) {
       cambio = false;
@@ -621,12 +628,14 @@ final class RunMotor {
       h.setClusterSchema( null );
       tocados++;
     }
-    if ( !c.isStepUsedInTransHops( objetivo ) ) {
-      // Trans solo arranca los steps que estan en algun hop: un step suelto necesita un destino
-      StepMeta fin = new StepMeta( "Dummy", c.getAlternativeStepname( "mcp_preview_end" ), new DummyTransMeta() );
-      fin.setLocation( objetivo.getLocation().x + 150, objetivo.getLocation().y );
-      c.addStep( fin );
-      c.addTransHop( new TransHopMeta( objetivo, fin ) );
+    for ( StepMeta objetivo : objetivos ) {
+      if ( !c.isStepUsedInTransHops( objetivo ) ) {
+        // Trans solo arranca los steps que estan en algun hop: un step suelto necesita un destino
+        StepMeta fin = new StepMeta( "Dummy", c.getAlternativeStepname( "mcp_preview_end" ), new DummyTransMeta() );
+        fin.setLocation( objetivo.getLocation().x + 150, objetivo.getLocation().y );
+        c.addStep( fin );
+        c.addTransHop( new TransHopMeta( objetivo, fin ) );
+      }
     }
     for ( StepMeta s : c.getSteps() ) {
       s.getStepMetaInterface().searchInfoAndTargetSteps( c.getSteps() );

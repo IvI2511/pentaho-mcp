@@ -195,7 +195,7 @@ public class PruebaMcpCorrector {
       "dangerous step" );
     error( "grade_exercise", "{\"pack_path\":" + pack + ",\"allow_steps\":[\"CsvInput\"]}", "always allowed" );
     error( "grade_exercise", "{\"pack_path\":" + pack + ",\"allow_steps\":[\"NoExiste\"]}", "unknown step type" );
-    error( "grade_exercise", "{\"pack_path\":" + pack + ",\"report_formats\":[\"docx\"]}", "Unknown report format" );
+    error( "grade_exercise", "{\"pack_path\":" + pack + ",\"report_formats\":[\"odt\"]}", "Unknown report format" );
     error( "grade_exercise", "{\"pack_path\":" + pack + ",\"capture\":\"csv\"}", "'capture'" );
     error( "grade_exercise", "{\"pack_path\":" + pack + ",\"language\":\"fr\"}", "'language'" );
     error( "grade_exercise", "{\"pack_path\":" + pack + ",\"submission\":" + bruno + ",\"document\":\"T1\"}",

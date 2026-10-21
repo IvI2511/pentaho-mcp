@@ -133,7 +133,8 @@ public class PruebaPanelCorrector {
       spoonShell = new Shell( display );
       GraderPerspective.padreSinSpoon = spoonShell;
       GraderPerspective.servicioPrueba = servicio;
-      host = new Shell( display, SWT.NO_TRIM | SWT.ON_TOP );
+      // fuera de la pantalla y sin boton en la barra de tareas, como PruebaPanelSwt; ON_TOP solo en el modo visible
+      host = new Shell( display, SWT.NO_TRIM | ( PruebaPanelSwt.VISIBLES ? SWT.ON_TOP : SWT.TOOL ) );
       host.setLayout( new FillLayout() );
       Composite deck = new Composite( host, SWT.NONE );
       StackLayout pila = new StackLayout();
@@ -141,7 +142,7 @@ public class PruebaPanelCorrector {
       tarjeta = new Composite( deck, SWT.NONE );
       tarjeta.setLayout( new GridLayout() );
       pila.topControl = tarjeta;
-      host.setBounds( 30, 30, 1280, 780 );
+      host.setBounds( PruebaPanelSwt.X, PruebaPanelSwt.Y, 1280, 780 );
       return null;
     } );
   }
@@ -184,7 +185,7 @@ public class PruebaPanelCorrector {
       cierto( raiz.getParent() == spoonShell, "getUI crea sobre la Shell de Spoon" );
       cierto( raiz.setParent( tarjeta ), "re-cuelgue (setParent) a la tarjeta del deck" );
       tarjeta.layout( true, true );
-      host.open();
+      PruebaPanelSwt.mostrar( host );
       host.layout( true, true );
       noNulo( perspectiva.panel(), "el panel se creo" );
       perspectiva.setActive( true );
@@ -877,23 +878,50 @@ public class PruebaPanelCorrector {
   }
 
   /**
-   * Captura de una ventana con copyArea del display: tiene que estar visible y arriba (la Shell del panel es ON_TOP y
-   * los dialogos son hijos suyos).
+   * Captura de una ventana. Por defecto se dibuja cada hijo de la Shell sobre una imagen ({@code Control.print(GC)},
+   * PrintWindow): funciona fuera de la pantalla y detras de otras ventanas, sin activar nada (los dialogos se abren
+   * centrados en el panel, tambien fuera de la pantalla). Con {@code -Dpruebas.ventanas.visibles=true}, copyArea del
+   * display (la ventana tiene que estar visible y arriba).
    */
   private File pantallaShell( final Shell s, final String nombre ) throws Exception {
+    final boolean visibles = PruebaPanelSwt.VISIBLES;
     ui( () -> {
-      s.forceActive();
+      if ( visibles ) {
+        s.forceActive();
+      }
       s.redraw();
       s.update();
       return null;
     } );
     Thread.sleep( 700 );
     return ui( () -> {
-      Rectangle b = s.getBounds();
-      Image img = new Image( display, b.width, b.height );
-      GC gc = new GC( display );
+      Rectangle b = visibles ? s.getBounds() : s.getClientArea();
+      Image img = new Image( display, Math.max( 1, b.width ), Math.max( 1, b.height ) );
+      GC gc = visibles ? new GC( display ) : new GC( img );
       try {
-        gc.copyArea( img, b.x, b.y );
+        if ( visibles ) {
+          gc.copyArea( img, b.x, b.y );
+        } else {
+          // Shell.print() de SWT en Windows siempre devuelve false: se dibuja cada hijo (PruebaPanelSwt.pantalla)
+          boolean alguno = false;
+          for ( Control hijo : s.getChildren() ) {
+            Rectangle h = hijo.getBounds();
+            Image parte = new Image( display, Math.max( 1, h.width ), Math.max( 1, h.height ) );
+            GC gp = new GC( parte );
+            try {
+              if ( hijo.print( gp ) ) {
+                gc.drawImage( parte, h.x, h.y );
+                alguno = true;
+              }
+            } finally {
+              gp.dispose();
+              parte.dispose();
+            }
+          }
+          if ( !alguno ) {
+            System.out.println( "  (print(GC) no soportado: la captura queda vacia)" );
+          }
+        }
       } finally {
         gc.dispose();
       }

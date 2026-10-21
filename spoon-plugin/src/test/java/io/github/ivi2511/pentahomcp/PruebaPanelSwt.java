@@ -6,6 +6,7 @@ import static io.github.ivi2511.pentahomcp.Verificador.contiene;
 import static io.github.ivi2511.pentahomcp.Verificador.falla;
 import static io.github.ivi2511.pentahomcp.Verificador.falso;
 import static io.github.ivi2511.pentahomcp.Verificador.igual;
+import static io.github.ivi2511.pentahomcp.Verificador.noContiene;
 import static io.github.ivi2511.pentahomcp.Verificador.noNulo;
 
 import java.io.File;
@@ -73,7 +74,10 @@ import io.github.ivi2511.pentahomcp.informes.ui.PanelInformes;
  * El panel de Informes en una Shell, con un servicio falso (diseno §8.2): la perspectiva crea su UI como
  * en Spoon (re-cuelgue en una tarjeta de un deck), arma sola la vista liviana, la vista completa, exporta,
  * cambia a un job, cancela, mide, aplica show_report, y se guardan capturas de pantalla en
- * {@code <prueba>\salida\panel\}. Abre una ventana real durante unos segundos (IE11 embebido incluido).
+ * {@code <prueba>\salida\panel\}. La ventana es real (IE11 embebido incluido) pero se abre fuera de la
+ * pantalla, sin activarla ni quitar el foco a nadie, y las capturas salen con {@code Control.print(GC)}: se
+ * puede usar el PC mientras corre. Con {@code -Dpruebas.ventanas.visibles=true} vuelve el modo antiguo
+ * (ventana visible arriba de todo y captura de la pantalla).
  * <p>
  * El SWT corre en un hilo propio ({@code ui-prueba}) con su bucle de eventos; los metodos de prueba le
  * mandan trabajo con syncExec y esperan, como hacen los workers del panel.
@@ -85,6 +89,12 @@ public class PruebaPanelSwt {
   static final List<String> DEFAULTS = Arrays.asList( SeccionId.PORTADA, SeccionId.RESUMEN, SeccionId.FLUJO,
     SeccionId.FLUJO_JOB, SeccionId.LINAJE, SeccionId.DICCIONARIO, SeccionId.DESTINO, SeccionId.VALIDACION,
     SeccionId.CALIDAD, SeccionId.CONEXIONES );
+
+  /** Modo antiguo: ventana visible, arriba de todo y activada; capturas de la pantalla (copyArea). */
+  static final boolean VISIBLES = Boolean.getBoolean( "pruebas.ventanas.visibles" );
+  /** Donde va la ventana: a la vista solo en el modo visible; si no, lejos de cualquier monitor. */
+  static final int X = VISIBLES ? 40 : -20000;
+  static final int Y = VISIBLES ? 40 : -20000;
 
   private Display display;
   private Thread hiloUi;
@@ -144,7 +154,9 @@ public class PruebaPanelSwt {
       spoonShell = new Shell( display );
       ReportsPerspective.padreSinSpoon = spoonShell;
       ReportsPerspective.servicioPrueba = servicio;
-      host = new Shell( display, SWT.NO_TRIM | SWT.ON_TOP );
+      // fuera de la pantalla y como ventana de herramientas (sin boton en la barra de tareas); ON_TOP solo en
+      // el modo visible
+      host = new Shell( display, SWT.NO_TRIM | ( VISIBLES ? SWT.ON_TOP : SWT.TOOL ) );
       host.setLayout( new FillLayout() );
       Composite deck = new Composite( host, SWT.NONE );
       StackLayout pila = new StackLayout();
@@ -152,7 +164,7 @@ public class PruebaPanelSwt {
       tarjeta = new Composite( deck, SWT.NONE );
       tarjeta.setLayout( new GridLayout() );
       pila.topControl = tarjeta;
-      host.setBounds( 40, 40, 1200, 760 );
+      host.setBounds( X, Y, 1200, 760 );
       return null;
     } );
   }
@@ -198,7 +210,7 @@ public class PruebaPanelSwt {
       cierto( raiz.getParent() == spoonShell, "getUI crea sobre la Shell de Spoon" );
       cierto( raiz.setParent( tarjeta ), "re-cuelgue (setParent) a la tarjeta del deck" );
       tarjeta.layout( true, true );
-      host.open();
+      mostrar( host );
       host.layout( true, true );
       noNulo( perspectiva.panel(), "el panel se creo" );
       perspectiva.setActive( true );
@@ -363,6 +375,8 @@ public class PruebaPanelSwt {
       igual( r.s( "band_diagrams" ), ui( () -> ( (Label) buscar( "banda" ) ).getText() ), "texto de la banda" );
       esperarHtml( "base" );
       archivo( pantalla( "panel-sin-navegador.png" ), 5000, "captura con la banda" );
+      // el perfil de datos deja marcar varios steps (una lista con casillas, no un combo de uno)
+      cierto( ui( () -> ( buscar( "perfil_steps" ).getStyle() & SWT.CHECK ) != 0 ), "perfil: lista con casillas" );
     } finally {
       servicio.navegador = true;
     }
@@ -374,7 +388,7 @@ public class PruebaPanelSwt {
       return null;
     } );
     esperar( "liviana del job", () -> !buscar( "linaje_step" ).getParent().getVisible(), 10000 );
-    falso( ui( () -> buscar( "perfil_step" ).getParent().getVisible() ), "sin step de perfil en un job" );
+    falso( ui( () -> buscar( "perfil_steps" ).getParent().getVisible() ), "sin steps de perfil en un job" );
     cierto( ui( () -> buscar( "medir" ).getParent().getVisible() ), "Medir sigue a mano en un job" );
   }
 
@@ -413,6 +427,7 @@ public class PruebaPanelSwt {
       return null;
     } );
     igual( conf + 1, servicio.confirmaciones.size(), "pregunto antes de conectarse" );
+    noContiene( servicio.confirmaciones.get( conf ), "%n", "la confirmacion con saltos de linea, sin «%n» literal" );
     falso( ui( () -> ( (Button) buscar( "consultar_base" ) ).getSelection() ), "sin confirmar queda desmarcado" );
     servicio.confirmar = true;
     ui( () -> {
@@ -630,7 +645,7 @@ public class PruebaPanelSwt {
   /** Ventana chica: el lado izquierdo pasa a tener scroll; captura para revisar la disposicion. */
   public void pruebaH_Estrecho() throws Exception {
     ui( () -> {
-      host.setBounds( 40, 40, 860, 520 );
+      host.setBounds( X, Y, 860, 520 );
       host.layout( true, true );
       return null;
     } );
@@ -843,10 +858,28 @@ public class PruebaPanelSwt {
     return out;
   }
 
-  /** Captura de pantalla de la ventana (copyArea del display: tiene que estar visible y arriba). */
+  /**
+   * Muestra la Shell. Fuera del modo visible no usa open() (que la trae al frente con BringWindowToTop y le da
+   * el foco): setVisible(true) de una Shell no modal hace ShowWindow con SW_SHOWNOACTIVATE.
+   */
+  static void mostrar( Shell s ) {
+    if ( VISIBLES ) {
+      s.open();
+    } else {
+      s.setVisible( true );
+    }
+  }
+
+  /**
+   * Captura de la ventana. Por defecto la ventana se dibuja sobre una imagen ({@code Control.print(GC)}), asi
+   * funciona fuera de la pantalla y detras de otras ventanas; en el modo visible, copyArea del display (la
+   * ventana tiene que estar visible y arriba).
+   */
   private File pantalla( final String nombre ) throws Exception {
     ui( () -> {
-      host.forceActive();
+      if ( VISIBLES ) {
+        host.forceActive();
+      }
       host.redraw();
       host.update();
       return null;
@@ -855,9 +888,32 @@ public class PruebaPanelSwt {
     return ui( () -> {
       Rectangle b = host.getBounds();
       Image img = new Image( display, b.width, b.height );
-      GC gc = new GC( display );
+      GC gc = VISIBLES ? new GC( display ) : new GC( img );
       try {
-        gc.copyArea( img, b.x, b.y );
+        if ( VISIBLES ) {
+          gc.copyArea( img, b.x, b.y );
+        } else {
+          // Shell.print() de SWT en Windows siempre devuelve false: se dibuja cada hijo de la Shell (el deck,
+          // que la llena) con PrintWindow, que funciona fuera de la pantalla y detras de otras ventanas
+          boolean alguno = false;
+          for ( Control hijo : host.getChildren() ) {
+            Rectangle h = hijo.getBounds();
+            Image parte = new Image( display, Math.max( 1, h.width ), Math.max( 1, h.height ) );
+            GC gp = new GC( parte );
+            try {
+              if ( hijo.print( gp ) ) {
+                gc.drawImage( parte, h.x, h.y );
+                alguno = true;
+              }
+            } finally {
+              gp.dispose();
+              parte.dispose();
+            }
+          }
+          if ( !alguno ) {
+            System.out.println( "  (print(GC) no soportado: la captura queda vacia)" );
+          }
+        }
       } finally {
         gc.dispose();
       }
