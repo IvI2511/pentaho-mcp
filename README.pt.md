@@ -41,7 +41,8 @@ reais de preview e executa a transformação. Toda alteração passa pelo desfaz
 **Relatórios.** O Spoon ganha uma nova perspectiva, **Relatórios**, que documenta sozinha a
 transformação ou o job aberto: capa, diagrama de fluxo, linhagem de campos, dicionário de dados, modelo
 das tabelas de destino, perfil de dados, métricas de execução com gráficos, validação, conexões e
-parâmetros. Exporta para HTML, PDF, Markdown (para Obsidian ou GitHub) e PowerPoint, com seu nome,
+parâmetros. Exporta para HTML, PDF, Markdown (para Obsidian ou GitHub), PowerPoint, Word, Excel e imagens de cada
+diagrama, de um documento ou de vários combinados num só arquivo, com seu nome,
 instituição, logo e cores. O Claude pode montar o mesmo relatório e acrescentar uma narrativa curta
 escrita a partir dos números reais.
 
@@ -171,7 +172,7 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Bancos de dados | Listar tipos de conexão; criar, testar e excluir conexões; ver tabelas e colunas; rodar consultas SQL (somente leitura, a menos que você peça escrita) |
 | Parâmetros | Listar, definir e excluir parâmetros |
 | Canvas | Adicionar notas, selecionar steps, organizar o layout, tirar uma imagem do canvas |
-| Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, JSON) com linhagem, dicionário de dados, métricas e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
+| Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imagens, JSON), sozinho ou com vários documentos combinados com linhagem, dicionário de dados, métricas e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
 
 </details>
 
@@ -223,12 +224,15 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
   Internet Explorer que vem com o PDI, então não tem diagramas interativos: **Abrir no navegador** mostra o
   relatório completo.
 
-## Novidades da 0.5.0
+## Novidades da 0.5.1
 
 A perspectiva **Relatórios** no Spoon e três ferramentas MCP que a acompanham: `build_report` (grava o
 relatório em qualquer formato), `get_report_data` (os dados do relatório em JSON, para o Claude escrever
-uma narrativa com números reais) e `show_report` (abre o relatório no Spoon). Detalhes no
-[`CHANGELOG.md`](CHANGELOG.md).
+uma narrativa com números reais) e `show_report` (abre o relatório no Spoon). Os relatórios são exportados
+para HTML, PDF, Markdown, PowerPoint, **Word**, **Excel** e **imagens** de cada diagrama; vários documentos
+(um job e suas transformações, os exercícios de uma entrega) podem ir num só arquivo com capa e sumário.
+Os diagramas de fluxo e de linhagem se distribuem em linhas para preencher a página ou o slide. Detalhes
+no [`CHANGELOG.md`](CHANGELOG.md).
 
 Também novo:
 
@@ -240,6 +244,7 @@ Também novo:
 - **Padrões prontos** na skill (`claude/skills/pentaho-etl/patrones/`): CSV para staging, deduplicação,
   carga incremental por data, dimensão SCD tipo 2 e carga de fatos com chaves substitutas, cada um testado
   com o Kitchen.
+- **Botão «Organizar tela»** e item do menu de contexto nas telas de transformações e jobs do Spoon (um só Ctrl+Z).
 - **`set_error_handling`** (58 ferramentas): o tratamento de erros de um step, como «Definir tratamento de
   erros...» do Spoon, para o Claude mandar as rejeições com um campo de motivo.
 

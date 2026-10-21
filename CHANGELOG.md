@@ -9,21 +9,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.5.1] - 2026-10-21
 
-<!-- Lo completa el integrador (pulido de Informes tras las pruebas del usuario). -->
-
 ### Added
 
-- **Arrange canvas (Pentaho Live)** in Spoon: a button on the transformation and job canvas toolbars and an item in the canvas right-click menu run the same auto-layout as `arrange_canvas` (one Ctrl+Z).
-- TODO (integrator): Word/Excel/image export, combined documents, own diagram engine...
+- Reports: export to **Word** (`.docx`, with a clickable table of contents, numbered headings and page
+  numbers), **Excel** (`.xlsx`, one sheet per report table plus an index sheet) and **images** (a folder
+  with a PNG and an SVG of every diagram and chart, ready to paste in slides). In the Reports tab and in
+  `build_report` (`docx`, `xlsx`, `images`).
+- Reports of **several documents at once**: in the Reports tab, a *Documents* group lists the open
+  transformations and jobs (and *Add the job's transformations* adds the ones a job runs); export them as
+  separate files or **all in one file** with a cover, a two-level table of contents and one numbered
+  chapter per document. In `build_report`: `documents`, `include_job_transformations` and `combine`.
+- Data profile of **several steps** in one run (a list with checkboxes in the Reports tab;
+  `profile_steps` in `build_report`, up to 10).
+- **Arrange canvas (Pentaho Live)** in Spoon: a button on the transformation and job canvas toolbars and
+  an item in the canvas right-click menu run the same auto-layout as `arrange_canvas` (one Ctrl+Z).
+- Field lineage: a short "what is this for" paragraph at the top of the section.
 
 ### Changed
 
-- Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root, `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`. `preparar_instalador.ps1 -SinCompilar` reuses the plugin already built in `spoon-plugin/dist/`.
-- TODO (integrator)
+- Flow, job and lineage diagrams are drawn by Pentaho Live itself instead of Mermaid: a long chain of
+  steps wraps into rows, so the diagram comes out roughly square and fills the page or the slide; a very
+  large diagram is split into numbered parts; lineage lines are ordered to cross as little as possible.
+  The Mermaid code is still in the Markdown export. The target table model (ER) still uses Mermaid.
+- PowerPoint: the data-dictionary annex and the reference tables are left out by default (they stay in
+  the HTML, PDF and Word); a long table takes at most two slides (a 26-step class exercise went from
+  47 slides to 16).
+- The "rows written per interval" chart is now **Pace of each step during the run**, with an
+  explanation, and only appears when the run is long enough to say something.
+- Run timeline (Gantt): when there are too many rows, the fastest ones are left out (and named), never
+  the slowest.
+- Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root,
+  `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and
+  fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`.
+  `preparar_instalador.ps1 -SinCompilar` reuses the plugin already built in `spoon-plugin/dist/`.
 
 ### Fixed
 
-- TODO (integrator)
+- A confirmation dialog of the Reports tab showed a literal `%n%n`.
+- PDF: a diagram taller than the page no longer leaves a page with only the heading and a page with an
+  empty frame; tall figures are scaled to fit under their heading.
+- Field lineage now follows **every** input of a step with several input hops (Append, Merge join,
+  Stream lookup...), instead of stopping at the first one; Calculator constants show their value
+  instead of "1 (?)".
+- Technical errors of the lineage engine (`metaverse`) go to the log, not into the report.
+- Validation messages that PDI 9.4 delivers in Spanish with a replacement character instead of an
+  accented vowel ("más", "carácter") are repaired for the known words.
 
 ## [0.5.0] - 2026-10-21
 

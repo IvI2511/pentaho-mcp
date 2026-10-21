@@ -51,12 +51,21 @@ if the user wants, to add a short **narrative** written from the real data.
 | `html` | One self-contained file (~2.6 MB), works offline, interactive diagrams | – |
 | `html_light` | `<name>-light.html`, no JavaScript, 50–300 KB | Edge or Chrome for the diagrams (without them: boxes and tables) |
 | `pdf` | A4 or Letter, page numbers, selectable text | Edge or Chrome. Without them you get a `.imprimir.html` to print from the browser, and a warning |
-| `md` | `<name>.md` + `<name>_archivos/` (canvas PNG, chart SVGs); Mermaid blocks render in Obsidian and GitHub | – |
-| `pptx` | 16:9 deck with speaker notes | Edge or Chrome for the lineage and table diagrams (without them they become tables) |
+| `md` | `<name>.md` + `<name>_archivos/` (canvas PNG, diagram PNGs, chart SVGs); the Mermaid code of each diagram goes in a collapsed block | – |
+| `pptx` | 16:9 deck with speaker notes; long diagrams split into parts, one per slide; the data-dictionary annex is left out (`pptx_appendix: true` adds it) | Edge or Chrome only for the target model (ER) diagram |
+| `docx` | Word document with a clickable table of contents, numbered headings and page numbers | – |
+| `xlsx` | Excel workbook: an index sheet and one sheet per report table | – |
+| `images` | Folder `<name>_imagenes/` with a PNG and an SVG of every diagram and chart, to paste in slides | – |
 | `json` | The full report model, images included | – |
 
 - Files go to `output_dir`, or to the folder in the user's report settings, or to an `informes` folder
   next to the `.ktr` / `.kjb`. The base name is the file name of the document unless you pass `file_name`.
+- **Several documents**: pass `documents` (ids or paths) instead of `document`, or
+  `include_job_transformations: true` with a job to add the transformations it runs. Without `combine`
+  each document gets its own files (same name: the second gets `-2`); with `combine: true` everything
+  goes in one file per format (cover, two-level contents, one numbered chapter per document; `file_name`
+  names it). Single-document options (`lineage_step`, `profile_steps`, `metrics: "run_copy"`) are an
+  error with several documents.
 - **Existing files with the same name are overwritten** (that keeps Obsidian links working). If the user
   wants to keep an earlier version, use another `file_name`.
 - Author, institution, logo, colors and page size come from the user's settings (edited in the Reports
@@ -76,10 +85,10 @@ Pass `sections` only to leave things out or to add `profile`.
 | `target_model` | transformation with Table output or Insert/Update | none; with `query_database=true` it connects to read primary and foreign keys (read-only) |
 | `validation` | both | runs Spoon's check; database steps may connect |
 | `metrics` | both | `last_run` (default) reads the last run made in Spoon; nothing if it never ran |
-| `profile` | transformation | **runs a copy** up to `profile_step`, reading `profile_rows` rows (default 5000) |
+| `profile` | transformation | **runs a copy** up to the step(s) in `profile_steps` (up to 10, one run; `profile_step` for one), reading `profile_rows` rows (default 5000) |
 | `narrative` | both | only if you pass `narrative.conclusions` |
 
-**Ask before running anything.** `profile_step` and `metrics: "run_copy"` execute a copy of the
+**Ask before running anything.** `profile_steps` and `metrics: "run_copy"` execute a copy of the
 transformation (or job), and **its output steps write their files and tables** like a normal run. Use
 them only when the user agreed, and say which outputs will be written. `get_report_data` never runs the
 transformation (it rejects `profile`).
