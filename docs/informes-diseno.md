@@ -372,8 +372,8 @@ Si la corrida sigue en curso, la sección queda `parcial` con el motivo «ejecuc
 
 - Indicadores: duración, filas leídas y escritas, errores, step más lento.
 - `barras_h`: filas escritas y ms por step, ordenadas, como mucho 25.
-- `gantt`: tramos `init` y `exec`, todos los steps hasta 40; si hay más, quedan los más lentos y la nota nombra los demás.
-- `linea`: el ritmo (filas por segundo) de los 5 steps con más filas, con una frase que lo explica, si hay snapshots y la corrida dura 2 s o más con 4 mediciones o más; si no, una nota de una línea.
+- `gantt`: tramos `init` y `exec`, todos los steps hasta 40; si hay más, quedan los más lentos y la nota nombra los demás. En un job pasa lo mismo con sus filas (las entradas y, anidados, los steps de cada sub-transformación).
+- `linea`: «Ritmo de cada step durante la ejecución», en filas por segundo, de los 5 steps con más filas, con una frase que lo explica, si hay snapshots y la corrida dura 2 s o más con 4 mediciones o más; si no, una nota de una línea.
 - Tabla de StepStatus.
 
 En jobs, el Gantt va por entrada, con las sub-transformaciones anidadas.
