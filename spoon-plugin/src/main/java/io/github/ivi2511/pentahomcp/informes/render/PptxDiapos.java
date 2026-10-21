@@ -126,6 +126,8 @@ final class PptxDiapos {
   static final double ESCALA_LEGIBLE = 0.55;
   /** Diapositivas de una seccion en el cuerpo; lo que sobra (tablas, graficos) pasa al anexo. */
   static final int MAX_DIAPOS_SECCION = 4;
+  /** En la ultima diapositiva permitida de una seccion, con menos de esto libre ya no empieza otro bloque. */
+  static final double LUGAR_TABLA = 0.25;
   /** Una tabla del cuerpo ocupa como mucho 2 diapositivas (20 filas); el resto va al anexo. */
   static final int MAX_DIAPOS_TABLA = 2;
   /** Un diagrama (lienzo o Mermaid a escala 2) puede agrandarse hasta 2 veces su tamano natural. */
@@ -702,8 +704,12 @@ final class PptxDiapos {
         }
       }
       // presentacion: el detalle de consulta y lo que pasa de MAX_DIAPOS_SECCION va al anexo (o queda fuera);
-      // los diagramas propios no: son lo que se presenta (un linaje con 4 destinos ocupa mas de 4 diapositivas)
-      if ( !enAnexo && ( detalle( b ) || ( diaposSeccion > MAX_DIAPOS_SECCION && !( b instanceof Parrafo )
+      // los diagramas propios no: son lo que se presenta (un linaje con 4 destinos ocupa mas de 4 diapositivas).
+      // Tambien lo que empezaria una diapositiva mas cuando la ultima permitida ya esta llena (la tabla de
+      // campos del linaje despues de sus 4 partes)
+      boolean pasado = diaposSeccion > MAX_DIAPOS_SECCION || diaposSeccion == MAX_DIAPOS_SECCION
+        && Y_LIMITE - y < LUGAR_TABLA * ( Y_LIMITE - Y_CONTENIDO );
+      if ( !enAnexo && ( detalle( b ) || ( pasado && !( b instanceof Parrafo )
         && !( b instanceof Aviso ) && !( b instanceof Diagrama && Figuras.propio( (Diagrama) b ) ) ) ) ) {
         apartar( titulo, b );
         continue;
@@ -1474,16 +1480,21 @@ final class PptxDiapos {
     for ( int k = 0; k < ds.size(); k++ ) {
       Dibujo x = ds.get( k );
       cancelar( progreso );
-      if ( !vacia() ) {
-        continuar();
-      }
       String parte = ds.size() > 1 ? Figuras.parte( idioma, x.parte, x.partes ) : null;
       String sub = titulo == null ? parte : parte == null ? titulo : titulo + " \u00B7 " + parte;
+      // lo que queda debajo (sin el subtitulo ni, en la ultima parte, los avisos que siguen)
+      double tras = k == ds.size() - 1 ? extra : 0;
+      double libre = Y_LIMITE - y - tras - ( sub != null ? ALTO_SUBTITULO : 0 );
+      // la primera parte se queda debajo de lo que ya hay (el \u00ABPara que sirve\u00BB del linaje) si le queda al
+      // menos el 70 % del area, como figuraGrande: si no, la seccion gasta una diapositiva en tres lineas
+      if ( !vacia() && ( k > 0 || libre < LUGAR_DIAGRAMA * ( Y_LIMITE - Y_CONTENIDO ) ) ) {
+        continuar();
+      }
       if ( sub != null ) {
         subtitulo( sub );
       }
       double w = x.anchoFinal();
-      double h = Math.min( x.altoFinal(), Math.max( 40, Y_LIMITE - y ) );
+      double h = Math.min( x.altoFinal(), Math.max( 40, Y_LIMITE - y - tras ) );
       if ( h < x.altoFinal() ) {
         w = w * h / x.altoFinal();
       }
