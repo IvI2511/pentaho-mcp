@@ -370,6 +370,9 @@ public final class RenderDocx implements Renderizador {
      * y deja el titulo de la seccion solo.
      */
     private XWPFParagraph figuraPegada;
+    /** La ultima tabla sin pie y su espacio: si la sigue un aviso, su ultima fila se pega a el. */
+    private XWPFTable tablaSuelta;
+    private XWPFParagraph espacioTabla;
 
     Escritor( XWPFDocument doc, Informe inf, Tema tema, Map<String, byte[]> pngMermaid, RenderPptx.ProveedorSvg svgs,
               Progreso p ) {
@@ -948,6 +951,8 @@ public final class RenderDocx implements Renderizador {
     /** Un titulo Heading n con marcador (para el indice) y, si se pide, en pagina nueva. */
     XWPFParagraph titulo( int nivel, String texto, String nombreMarcador, boolean saltoPagina ) {
       soltarFigura();
+      tablaSuelta = null;
+      espacioTabla = null;
       XWPFParagraph h = doc.createParagraph();
       h.setStyle( "Heading" + nivel );
       if ( saltoPagina ) {
@@ -974,7 +979,11 @@ public final class RenderDocx implements Renderizador {
     void bloque( Bloque b, int nivelTitulo ) throws Exception {
       if ( !( b instanceof Aviso ) ) {
         soltarFigura(); // la figura anterior solo sigue pegada a un aviso corto
+      } else if ( tablaSuelta != null && PptxDiapos.vacio( b.titulo ) ) {
+        pegarUltimaFila( tablaSuelta, espacioTabla ); // el aviso no queda solo despues de una tabla larga
       }
+      tablaSuelta = null;
+      espacioTabla = null;
       if ( !PptxDiapos.vacio( b.titulo ) ) {
         titulo( nivelTitulo, b.titulo.trim(), null, false );
       }
@@ -1097,10 +1106,11 @@ public final class RenderDocx implements Renderizador {
       ocupar( 10 );
     }
 
-    void espacio( int twips ) {
+    XWPFParagraph espacio( int twips ) {
       XWPFParagraph p = doc.createParagraph();
       p.setSpacingAfter( 0 );
       p.setSpacingBefore( twips );
+      return p;
     }
 
     /** Runs con **negrita** y *cursiva* (Html.trozos). size 0 / color null = los del estilo. */
@@ -1224,9 +1234,34 @@ public final class RenderDocx implements Renderizador {
         k++;
       }
       if ( !PptxDiapos.vacio( t.pie ) ) {
+        pegarUltimaFila( tb, null ); // el pie no queda solo en la pagina siguiente
         nota( t.pie.trim() );
       } else {
-        espacio( 60 ); // separa tablas seguidas (Word uniria dos tablas pegadas)
+        tablaSuelta = tb;
+        espacioTabla = espacio( 60 ); // separa tablas seguidas (Word uniria dos tablas pegadas)
+      }
+    }
+
+    /**
+     * La ultima fila de la tabla (y el espacio que la sigue, si se da) con keepNext: va a la misma pagina
+     * que lo que sigue. Asi una nota o un aviso corto despues de una tabla que llena la hoja no queda solo
+     * en una pagina casi vacia: baja con la ultima fila (y la cabecera repetida).
+     */
+    void pegarUltimaFila( XWPFTable tb, XWPFParagraph espacio ) {
+      if ( tb.getNumberOfRows() == 0 ) {
+        return;
+      }
+      for ( XWPFTableCell c : tb.getRow( tb.getNumberOfRows() - 1 ).getTableCells() ) {
+        for ( XWPFParagraph p : c.getParagraphs() ) {
+          org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr ppr = p.getCTP().isSetPPr() ? p.getCTP()
+            .getPPr() : p.getCTP().addNewPPr();
+          ( ppr.isSetKeepNext() ? ppr.getKeepNext() : ppr.addNewKeepNext() ).setVal( STOnOff.TRUE );
+        }
+      }
+      if ( espacio != null ) {
+        org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr ppr = espacio.getCTP().isSetPPr() ? espacio
+          .getCTP().getPPr() : espacio.getCTP().addNewPPr();
+        ( ppr.isSetKeepNext() ? ppr.getKeepNext() : ppr.addNewKeepNext() ).setVal( STOnOff.TRUE );
       }
     }
 
