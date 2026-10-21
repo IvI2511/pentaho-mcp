@@ -53,7 +53,9 @@ public class McpLifecycleListener implements LifecycleListener {
       + "(HTML, PDF, Markdown, PowerPoint, JSON): call get_report_data first if you want to add a narrative based on the real data, "
       + "and show_report only when the user asks to see it in Spoon's Reports perspective. Every change can be "
       + "undone with Ctrl+Z in Spoon. The step catalog and the guides are also available as MCP resources "
-      + "(pentaho://...) for clients that do not have the pentaho-etl skill.";
+      + "(pentaho://...) for clients that do not have the pentaho-etl skill. In class mode the explanations are "
+      + "lesson notes on the canvas: lesson_notes lists, adds, hides, shows, removes, restyles or re-places them "
+      + "(one Ctrl+Z each; notes the user wrote are never touched).";
 
   private McpHttpServer server;
 
@@ -112,6 +114,7 @@ public class McpLifecycleListener implements LifecycleListener {
       DbTools.register( server );
       ReportTools.register( server );
       LintTools.register( server );
+      LessonTools.register( server );
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("

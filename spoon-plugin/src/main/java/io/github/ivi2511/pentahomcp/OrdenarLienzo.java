@@ -68,6 +68,21 @@ final class OrdenarLienzo {
    * Docs.touched. Con sp null (pruebas) registra el undo directo en el meta y no redibuja. (UI)
    */
   static TransLayout.Movimientos ordenar( Spoon sp, AbstractMeta m ) throws ToolError {
+    if ( m instanceof org.pentaho.di.trans.TransMeta
+      && !LeccionNotas.reconocer( (org.pentaho.di.trans.TransMeta) m ).isEmpty() ) {
+      // documento con notas de leccion (modo clase): la regla de clase mueve steps y notas, mismo Ctrl+Z
+      LeccionNotas.MedidorCerrable med = LeccionNotas.medidor( LeccionNotas.tamFuente( (org.pentaho.di.trans.TransMeta) m ) );
+      try {
+        UndoGrupo u = new UndoGrupo( sp, m );
+        LeccionNotas.Resultado r = LeccionNotas.reacomodar( (org.pentaho.di.trans.TransMeta) m, med, u, -1 );
+        if ( sp != null && u.acciones() > 0 ) {
+          Docs.touched( m );
+        }
+        return r.movimientos;
+      } finally {
+        med.cerrar();
+      }
+    }
     TransLayout.Movimientos mov = TransLayout.ordenar( m );
     if ( !mov.objetos.isEmpty() ) {
       new UndoGrupo( sp, m ).posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
