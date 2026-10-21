@@ -116,6 +116,10 @@ foreach ($d in @("catalogo\steps", "catalogo\job-entries")) {
   $xmls | Copy-Item -Force -Destination (Join-Path $catJar $d)
   Write-Host ("Recursos: " + $xmls.Count + " .xml de " + $d)
 }
+# glosario del modo clase (pentaho://glossary); lo valida tools\generador-catalogo\glosario.py
+$glosario = Join-Path $skill "catalogo\glosario-clase.json"
+if (-not (Test-Path $glosario)) { throw "Falta $glosario (glosario del modo clase)" }
+Copy-Item -Force $glosario (Join-Path $catJar "catalogo\glosario-clase.json")
 
 # --- empaquetar
 $manifest = Join-Path $build "MANIFEST.MF"

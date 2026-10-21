@@ -32,3 +32,6 @@ grep -E "^(Steps|Job entries):" "$GEN/build/log_en.txt"
 
 echo "== INDICE.md"
 python "$GEN/indice.py" "$CAT"
+
+echo "== glosario-clase.json (sus ids tienen que seguir existiendo en steps.json)"
+python "$GEN/glosario.py" "$CAT"

@@ -1,0 +1,309 @@
+{
+  "version": 1,
+  "description": "Class glossary for class mode: per step type id, a one-line what, the typical why and an Excel/SQL analogy in en/es/pt, plus the codes of manual/03-errores-comunes.md that the step typically triggers (watch_out). Validated by tools/generador-catalogo/glosario.py.",
+  "languages": ["en", "es", "pt"],
+  "errors_guide": "manual/03-errores-comunes.md",
+  "any_step": ["D1", "D2", "D7"],
+  "steps": {
+    "CsvInput": {
+      "watch_out": ["C13", "C14", "C15", "C16", "C17", "D3"],
+      "en": {"what": "Reads a delimited text file (CSV) row by row into the stream.", "why": "It is the usual entry point when the source data comes as a file.", "analogy": "Like opening a CSV in Excel with Data > From text."},
+      "es": {"what": "Lee un archivo de texto delimitado (CSV) fila a fila y lo mete en el flujo.", "why": "Es la puerta de entrada habitual cuando los datos llegan en un archivo.", "analogy": "Como abrir un CSV en Excel con Datos > Desde texto."},
+      "pt": {"what": "Lê um arquivo de texto delimitado (CSV) linha a linha para o fluxo.", "why": "É a entrada habitual quando os dados chegam num arquivo.", "analogy": "Como abrir um CSV no Excel com Dados > De texto."}
+    },
+    "TextFileInput": {
+      "watch_out": ["C13", "C14", "C15", "C16", "C17", "D3"],
+      "en": {"what": "Reads text files (delimited or fixed width), even several at once with a wildcard.", "why": "Use it when CSV input falls short: many files, fixed width, headers or footers.", "analogy": "Like Excel's text import wizard, but for a whole folder."},
+      "es": {"what": "Lee archivos de texto (delimitados o de ancho fijo), incluso varios a la vez con un comodín.", "why": "Se usa cuando CSV input se queda corto: muchos archivos, ancho fijo, cabeceras o pies.", "analogy": "Como el asistente de importar texto de Excel, pero para una carpeta entera."},
+      "pt": {"what": "Lê arquivos de texto (delimitados ou de largura fixa), até vários de uma vez com curinga.", "why": "Usa-se quando o CSV input não chega: muitos arquivos, largura fixa, cabeçalhos ou rodapés.", "analogy": "Como o assistente de importar texto do Excel, mas para uma pasta inteira."}
+    },
+    "ExcelInput": {
+      "watch_out": ["C13", "C14", "C15"],
+      "en": {"what": "Reads sheets of an Excel workbook (xls or xlsx) as rows.", "why": "A lot of business data lives in spreadsheets.", "analogy": "Like copying a sheet's table and pasting it into the ETL."},
+      "es": {"what": "Lee hojas de un libro de Excel (xls o xlsx) como filas.", "why": "Muchos datos de negocio viven en hojas de cálculo.", "analogy": "Como copiar la tabla de una hoja y pegarla en el ETL."},
+      "pt": {"what": "Lê folhas de uma pasta de trabalho do Excel (xls ou xlsx) como linhas.", "why": "Muitos dados de negócio vivem em planilhas.", "analogy": "Como copiar a tabela de uma folha e colá-la no ETL."}
+    },
+    "TableInput": {
+      "watch_out": ["C8", "C9"],
+      "en": {"what": "Runs a SELECT on a database connection and sends its rows into the stream.", "why": "It reads from a database, letting the database filter and join first.", "analogy": "Exactly a SQL SELECT whose result becomes the stream."},
+      "es": {"what": "Ejecuta un SELECT sobre una conexión a base de datos y manda sus filas al flujo.", "why": "Lee de una base de datos y deja que la base filtre y una primero.", "analogy": "Es literalmente un SELECT de SQL cuyo resultado pasa a ser el flujo."},
+      "pt": {"what": "Executa um SELECT numa conexão de banco de dados e envia as linhas para o fluxo.", "why": "Lê de um banco de dados, deixando o banco filtrar e juntar antes.", "analogy": "É literalmente um SELECT de SQL cujo resultado vira o fluxo."}
+    },
+    "RowGenerator": {
+      "watch_out": ["C11", "C12", "D9"],
+      "en": {"what": "Generates a fixed number of identical rows with the fields you declare.", "why": "Handy for tests, for a single starting row or for fixed parameters.", "analogy": "Like typing a value in a cell and dragging it down N rows."},
+      "es": {"what": "Genera un número fijo de filas iguales con los campos que declaras.", "why": "Sirve para pruebas, para una fila de arranque o para parámetros fijos.", "analogy": "Como escribir un valor en una celda y arrastrarlo hacia abajo N filas."},
+      "pt": {"what": "Gera um número fixo de linhas iguais com os campos que você declara.", "why": "Serve para testes, para uma linha inicial ou para parâmetros fixos.", "analogy": "Como escrever um valor numa célula e arrastá-lo para baixo N linhas."}
+    },
+    "DataGrid": {
+      "watch_out": ["C11", "C12"],
+      "en": {"what": "A small table typed by hand inside the transformation.", "why": "Good for lookup lists, test data or mappings that rarely change.", "analogy": "Like a small reference table on a separate Excel sheet."},
+      "es": {"what": "Una tabla pequeña escrita a mano dentro de la transformación.", "why": "Va bien para listas de referencia, datos de prueba o equivalencias que casi no cambian.", "analogy": "Como una tablita de referencia en otra hoja de Excel."},
+      "pt": {"what": "Uma tabela pequena digitada à mão dentro da transformação.", "why": "Serve para listas de referência, dados de teste ou equivalências que quase não mudam.", "analogy": "Como uma tabelinha de referência noutra folha do Excel."}
+    },
+    "JsonInput": {
+      "watch_out": ["C13", "C15"],
+      "en": {"what": "Reads JSON from a file or a field and extracts fields with JSONPath.", "why": "APIs and many modern exports deliver JSON.", "analogy": "Like Power Query expanding a JSON record into columns."},
+      "es": {"what": "Lee JSON de un archivo o de un campo y extrae campos con JSONPath.", "why": "Las API y muchas exportaciones modernas entregan JSON.", "analogy": "Como Power Query expandiendo un registro JSON en columnas."},
+      "pt": {"what": "Lê JSON de um arquivo ou de um campo e extrai campos com JSONPath.", "why": "As APIs e muitas exportações modernas entregam JSON.", "analogy": "Como o Power Query expandindo um registro JSON em colunas."}
+    },
+    "SystemInfo": {
+      "watch_out": [],
+      "en": {"what": "Adds system values such as the current date, the transformation name or the host.", "why": "Useful to stamp each row with when and where it was loaded.", "analogy": "Like Excel's =NOW() in a column."},
+      "es": {"what": "Añade valores del sistema como la fecha actual, el nombre de la transformación o el equipo.", "why": "Sirve para marcar cada fila con cuándo y dónde se cargó.", "analogy": "Como el =AHORA() de Excel en una columna."},
+      "pt": {"what": "Adiciona valores do sistema como a data atual, o nome da transformação ou a máquina.", "why": "Serve para marcar cada linha com quando e onde foi carregada.", "analogy": "Como o =AGORA() do Excel numa coluna."}
+    },
+    "GetVariable": {
+      "watch_out": ["C14", "D11"],
+      "en": {"what": "Turns variables or parameters (${NAME}) into fields of the stream.", "why": "So that a parameter can be used in calculations or written out.", "analogy": "Like referencing a named cell from a formula."},
+      "es": {"what": "Convierte variables o parámetros (${NOMBRE}) en campos del flujo.", "why": "Para poder usar un parámetro en cálculos o escribirlo en la salida.", "analogy": "Como referenciar una celda con nombre desde una fórmula."},
+      "pt": {"what": "Transforma variáveis ou parâmetros (${NOME}) em campos do fluxo.", "why": "Para poder usar um parâmetro em cálculos ou gravá-lo na saída.", "analogy": "Como referenciar uma célula nomeada numa fórmula."}
+    },
+    "TextFileOutput": {
+      "watch_out": ["C6", "C21", "C23", "D8"],
+      "en": {"what": "Writes the rows to a text file (CSV or fixed width).", "why": "The usual way to hand the result to another system or person.", "analogy": "Like Excel's Save as CSV."},
+      "es": {"what": "Escribe las filas en un archivo de texto (CSV o ancho fijo).", "why": "La forma habitual de pasar el resultado a otro sistema o persona.", "analogy": "Como el Guardar como CSV de Excel."},
+      "pt": {"what": "Grava as linhas num arquivo de texto (CSV ou largura fixa).", "why": "A forma habitual de entregar o resultado a outro sistema ou pessoa.", "analogy": "Como o Salvar como CSV do Excel."}
+    },
+    "TypeExitExcelWriterStep": {
+      "watch_out": ["C21"],
+      "en": {"what": "Writes the rows to an xlsx workbook, even into an existing template.", "why": "When the result is a report someone will open in Excel.", "analogy": "Like pasting the result into a prepared Excel sheet."},
+      "es": {"what": "Escribe las filas en un libro xlsx, incluso sobre una plantilla existente.", "why": "Cuando el resultado es un informe que alguien abrirá en Excel.", "analogy": "Como pegar el resultado en una hoja de Excel ya preparada."},
+      "pt": {"what": "Grava as linhas numa pasta xlsx, até sobre um modelo existente.", "why": "Quando o resultado é um relatório que alguém vai abrir no Excel.", "analogy": "Como colar o resultado numa folha do Excel já preparada."}
+    },
+    "ExcelOutput": {
+      "watch_out": ["C21"],
+      "en": {"what": "Writes the rows to an old-format Excel file (xls).", "why": "Only when a legacy system needs xls; prefer Microsoft Excel writer.", "analogy": "Like Save as Excel 97-2003."},
+      "es": {"what": "Escribe las filas en un Excel de formato antiguo (xls).", "why": "Solo si un sistema antiguo pide xls; si no, mejor Microsoft Excel writer.", "analogy": "Como Guardar como Excel 97-2003."},
+      "pt": {"what": "Grava as linhas num Excel de formato antigo (xls).", "why": "Só quando um sistema antigo exige xls; senão, prefira o Microsoft Excel writer.", "analogy": "Como Salvar como Excel 97-2003."}
+    },
+    "TableOutput": {
+      "watch_out": ["C22"],
+      "en": {"what": "Inserts every row into a database table.", "why": "It is the load (L) of the ETL when the target is a database.", "analogy": "A SQL INSERT INTO ... for each row."},
+      "es": {"what": "Inserta cada fila en una tabla de la base de datos.", "why": "Es la carga (la L del ETL) cuando el destino es una base de datos.", "analogy": "Un INSERT INTO ... de SQL por cada fila."},
+      "pt": {"what": "Insere cada linha numa tabela do banco de dados.", "why": "É a carga (o L do ETL) quando o destino é um banco de dados.", "analogy": "Um INSERT INTO ... de SQL para cada linha."}
+    },
+    "InsertUpdate": {
+      "watch_out": [],
+      "en": {"what": "Looks up each row by its key: updates it if it exists, inserts it if not.", "why": "To reload data without creating duplicates.", "analogy": "A SQL MERGE (or upsert)."},
+      "es": {"what": "Busca cada fila por su clave: la actualiza si existe y la inserta si no.", "why": "Para recargar datos sin crear duplicados.", "analogy": "Un MERGE (o upsert) de SQL."},
+      "pt": {"what": "Procura cada linha pela chave: atualiza se existir, insere se não.", "why": "Para recarregar dados sem criar duplicados.", "analogy": "Um MERGE (ou upsert) de SQL."}
+    },
+    "Update": {
+      "watch_out": [],
+      "en": {"what": "Updates existing table rows that match the key; never inserts.", "why": "When only already loaded records may change.", "analogy": "A SQL UPDATE ... WHERE key = ?."},
+      "es": {"what": "Actualiza las filas de la tabla que coinciden con la clave; nunca inserta.", "why": "Cuando solo pueden cambiar registros ya cargados.", "analogy": "Un UPDATE ... WHERE clave = ? de SQL."},
+      "pt": {"what": "Atualiza as linhas da tabela que batem com a chave; nunca insere.", "why": "Quando só podem mudar registros já carregados.", "analogy": "Um UPDATE ... WHERE chave = ? de SQL."}
+    },
+    "JsonOutput": {
+      "watch_out": ["C21"],
+      "en": {"what": "Builds JSON from the rows and writes it to a file or a field.", "why": "To feed web applications or APIs.", "analogy": "Like exporting a table as a list of JSON objects."},
+      "es": {"what": "Construye JSON con las filas y lo escribe en un archivo o en un campo.", "why": "Para alimentar aplicaciones web o API.", "analogy": "Como exportar una tabla como lista de objetos JSON."},
+      "pt": {"what": "Monta JSON com as linhas e grava num arquivo ou num campo.", "why": "Para alimentar aplicações web ou APIs.", "analogy": "Como exportar uma tabela como lista de objetos JSON."}
+    },
+    "WriteToLog": {
+      "watch_out": [],
+      "en": {"what": "Prints the rows (or some fields) in the execution log.", "why": "To see what passes through a point while you debug.", "analogy": "Like a print() in the middle of a program."},
+      "es": {"what": "Escribe las filas (o algunos campos) en el log de la ejecución.", "why": "Para ver qué pasa por un punto mientras depuras.", "analogy": "Como un print() en medio de un programa."},
+      "pt": {"what": "Escreve as linhas (ou alguns campos) no log da execução.", "why": "Para ver o que passa por um ponto enquanto você depura.", "analogy": "Como um print() no meio de um programa."}
+    },
+    "Constant": {
+      "watch_out": ["C1", "C12", "D9"],
+      "en": {"what": "Adds fields with a fixed value to every row.", "why": "To label the source, add a default or a fixed currency.", "analogy": "Like a new Excel column with the same value in every row."},
+      "es": {"what": "Añade campos con un valor fijo a todas las filas.", "why": "Para etiquetar el origen, poner un valor por defecto o una moneda fija.", "analogy": "Como una columna nueva de Excel con el mismo valor en todas las filas."},
+      "pt": {"what": "Adiciona campos com um valor fixo a todas as linhas.", "why": "Para etiquetar a origem, pôr um valor padrão ou uma moeda fixa.", "analogy": "Como uma coluna nova do Excel com o mesmo valor em todas as linhas."}
+    },
+    "Sequence": {
+      "watch_out": [],
+      "en": {"what": "Adds a counter field (1, 2, 3...) or takes the next value of a database sequence.", "why": "To number rows or create surrogate keys.", "analogy": "Like Excel's =ROW() or an autoincrement column."},
+      "es": {"what": "Añade un campo contador (1, 2, 3...) o toma el siguiente valor de una secuencia de la base.", "why": "Para numerar filas o crear claves subrogadas.", "analogy": "Como el =FILA() de Excel o una columna autoincremental."},
+      "pt": {"what": "Adiciona um campo contador (1, 2, 3...) ou pega o próximo valor de uma sequência do banco.", "why": "Para numerar linhas ou criar chaves substitutas.", "analogy": "Como o =LIN() do Excel ou uma coluna autoincremento."}
+    },
+    "Calculator": {
+      "watch_out": ["D4"],
+      "en": {"what": "Computes new fields with predefined operations (A+B, A*B, date parts, rounding...).", "why": "The quickest way to derive amounts, differences or dates without code.", "analogy": "Like an Excel formula column, picked from a list."},
+      "es": {"what": "Calcula campos nuevos con operaciones predefinidas (A+B, A*B, partes de fecha, redondeo...).", "why": "La forma más rápida de sacar importes, diferencias o fechas sin código.", "analogy": "Como una columna con fórmula de Excel, elegida de una lista."},
+      "pt": {"what": "Calcula campos novos com operações predefinidas (A+B, A*B, partes de data, arredondamento...).", "why": "O jeito mais rápido de obter valores, diferenças ou datas sem código.", "analogy": "Como uma coluna com fórmula do Excel, escolhida de uma lista."}
+    },
+    "Formula": {
+      "watch_out": ["C8"],
+      "en": {"what": "Computes a field with a spreadsheet-style formula ([a] * [b], IF(...)).", "why": "When Calculator lacks the operation but you do not want to write code.", "analogy": "Literally an Excel formula, with fields in [brackets]."},
+      "es": {"what": "Calcula un campo con una fórmula estilo hoja de cálculo ([a] * [b], IF(...)).", "why": "Cuando a Calculator le falta la operación pero no quieres escribir código.", "analogy": "Literalmente una fórmula de Excel, con los campos entre [corchetes]."},
+      "pt": {"what": "Calcula um campo com uma fórmula estilo planilha ([a] * [b], IF(...)).", "why": "Quando falta a operação no Calculator mas você não quer escrever código.", "analogy": "Literalmente uma fórmula do Excel, com os campos entre [colchetes]."}
+    },
+    "Janino": {
+      "watch_out": ["C8"],
+      "en": {"what": "Computes fields with a one-line Java expression.", "why": "Fast and flexible for conditions and text or number logic.", "analogy": "Like a SQL CASE WHEN written in Java."},
+      "es": {"what": "Calcula campos con una expresión Java de una línea.", "why": "Rápido y flexible para condiciones y lógica de texto o números.", "analogy": "Como un CASE WHEN de SQL escrito en Java."},
+      "pt": {"what": "Calcula campos com uma expressão Java de uma linha.", "why": "Rápido e flexível para condições e lógica de texto ou números.", "analogy": "Como um CASE WHEN de SQL escrito em Java."}
+    },
+    "SelectValues": {
+      "watch_out": ["C4", "C11"],
+      "en": {"what": "Chooses, renames, reorders or removes fields and can change their type.", "why": "To keep only what you need with the right names and types.", "analogy": "The column list of a SQL SELECT (with AS and CAST)."},
+      "es": {"what": "Elige, renombra, reordena o quita campos y puede cambiarles el tipo.", "why": "Para quedarte solo con lo necesario, con los nombres y tipos correctos.", "analogy": "La lista de columnas de un SELECT de SQL (con AS y CAST)."},
+      "pt": {"what": "Escolhe, renomeia, reordena ou remove campos e pode mudar o tipo.", "why": "Para ficar só com o necessário, com os nomes e tipos certos.", "analogy": "A lista de colunas de um SELECT de SQL (com AS e CAST)."}
+    },
+    "SortRows": {
+      "watch_out": ["C7"],
+      "en": {"what": "Sorts the rows by one or more fields.", "why": "Group by, Merge join and Unique rows need sorted input.", "analogy": "SQL ORDER BY, or Excel's Sort button."},
+      "es": {"what": "Ordena las filas por uno o varios campos.", "why": "Group by, Merge join y Unique rows necesitan la entrada ordenada.", "analogy": "El ORDER BY de SQL o el botón Ordenar de Excel."},
+      "pt": {"what": "Ordena as linhas por um ou mais campos.", "why": "Group by, Merge join e Unique rows precisam da entrada ordenada.", "analogy": "O ORDER BY de SQL ou o botão Classificar do Excel."}
+    },
+    "Unique": {
+      "watch_out": ["D5"],
+      "en": {"what": "Removes consecutive duplicate rows (by all fields or some).", "why": "To deduplicate; sort first or only neighbouring duplicates go.", "analogy": "SQL SELECT DISTINCT, or Excel's Remove duplicates."},
+      "es": {"what": "Quita filas duplicadas consecutivas (por todos los campos o por algunos).", "why": "Para eliminar duplicados; ordena antes o solo quitará los que estén juntos.", "analogy": "El SELECT DISTINCT de SQL o Quitar duplicados de Excel."},
+      "pt": {"what": "Remove linhas duplicadas consecutivas (por todos os campos ou por alguns).", "why": "Para tirar duplicados; ordene antes ou só sairão os que estiverem juntos.", "analogy": "O SELECT DISTINCT de SQL ou Remover duplicadas do Excel."}
+    },
+    "GroupBy": {
+      "watch_out": ["D5"],
+      "en": {"what": "Groups rows by key fields and computes sums, counts, averages...", "why": "To summarise detail into totals per customer, month, product...", "analogy": "SQL GROUP BY, or an Excel pivot table."},
+      "es": {"what": "Agrupa filas por campos clave y calcula sumas, conteos, medias...", "why": "Para resumir el detalle en totales por cliente, mes, producto...", "analogy": "El GROUP BY de SQL o una tabla dinámica de Excel."},
+      "pt": {"what": "Agrupa linhas por campos-chave e calcula somas, contagens, médias...", "why": "Para resumir o detalhe em totais por cliente, mês, produto...", "analogy": "O GROUP BY de SQL ou uma tabela dinâmica do Excel."}
+    },
+    "MemoryGroupBy": {
+      "watch_out": [],
+      "en": {"what": "Like Group by but in memory, so the input does not need to be sorted.", "why": "Convenient when there are few groups; uses RAM for each one.", "analogy": "An Excel pivot table over unsorted data."},
+      "es": {"what": "Como Group by pero en memoria, así que la entrada no tiene que ir ordenada.", "why": "Cómodo cuando hay pocos grupos; gasta RAM por cada uno.", "analogy": "Una tabla dinámica de Excel sobre datos sin ordenar."},
+      "pt": {"what": "Como o Group by mas em memória, então a entrada não precisa estar ordenada.", "why": "Prático quando há poucos grupos; gasta RAM para cada um.", "analogy": "Uma tabela dinâmica do Excel sobre dados não ordenados."}
+    },
+    "ValueMapper": {
+      "watch_out": [],
+      "en": {"what": "Replaces values of a field using a from -> to list.", "why": "To normalise codes (M/F, Y/N) or translate categories.", "analogy": "A SQL CASE WHEN x THEN y, or a small VLOOKUP."},
+      "es": {"what": "Sustituye valores de un campo con una lista origen -> destino.", "why": "Para normalizar códigos (H/M, S/N) o traducir categorías.", "analogy": "Un CASE WHEN x THEN y de SQL o un BUSCARV pequeño."},
+      "pt": {"what": "Substitui valores de um campo com uma lista origem -> destino.", "why": "Para normalizar códigos (M/F, S/N) ou traduzir categorias.", "analogy": "Um CASE WHEN x THEN y de SQL ou um PROCV pequeno."}
+    },
+    "StringOperations": {
+      "watch_out": [],
+      "en": {"what": "Trims, changes case, pads or keeps only digits in text fields.", "why": "Text cleaning before comparing or joining.", "analogy": "Excel's TRIM, UPPER and LOWER."},
+      "es": {"what": "Recorta espacios, cambia mayúsculas, rellena o deja solo dígitos en campos de texto.", "why": "Limpieza de texto antes de comparar o unir.", "analogy": "El ESPACIOS, MAYUSC y MINUSC de Excel."},
+      "pt": {"what": "Apara espaços, muda maiúsculas, preenche ou deixa só dígitos em campos de texto.", "why": "Limpeza de texto antes de comparar ou juntar.", "analogy": "O ARRUMAR, MAIÚSCULA e MINÚSCULA do Excel."}
+    },
+    "ReplaceString": {
+      "watch_out": [],
+      "en": {"what": "Searches and replaces text inside a field (plain or with regular expressions).", "why": "To fix separators, remove symbols or recode text.", "analogy": "Excel's Find and replace, or SUBSTITUTE."},
+      "es": {"what": "Busca y reemplaza texto dentro de un campo (literal o con expresiones regulares).", "why": "Para arreglar separadores, quitar símbolos o recodificar texto.", "analogy": "El Buscar y reemplazar de Excel o SUSTITUIR."},
+      "pt": {"what": "Procura e substitui texto dentro de um campo (literal ou com expressões regulares).", "why": "Para corrigir separadores, tirar símbolos ou recodificar texto.", "analogy": "O Localizar e substituir do Excel ou SUBSTITUIR."}
+    },
+    "FieldSplitter": {
+      "watch_out": [],
+      "en": {"what": "Splits one field into several by a delimiter or by position.", "why": "When one column holds several values (\"Name Surname\", \"2024-05\").", "analogy": "Excel's Text to columns."},
+      "es": {"what": "Parte un campo en varios por un delimitador o por posición.", "why": "Cuando una columna trae varios valores (\"Nombre Apellido\", \"2024-05\").", "analogy": "El Texto en columnas de Excel."},
+      "pt": {"what": "Divide um campo em vários por um delimitador ou por posição.", "why": "Quando uma coluna traz vários valores (\"Nome Sobrenome\", \"2024-05\").", "analogy": "O Texto para colunas do Excel."}
+    },
+    "ConcatFields": {
+      "watch_out": [],
+      "en": {"what": "Joins several fields into one text field with a separator.", "why": "To build keys, full names or CSV-like lines.", "analogy": "Excel's CONCAT or the & operator."},
+      "es": {"what": "Junta varios campos en un campo de texto con un separador.", "why": "Para construir claves, nombres completos o líneas tipo CSV.", "analogy": "El CONCAT de Excel o el operador &."},
+      "pt": {"what": "Junta vários campos num campo de texto com um separador.", "why": "Para montar chaves, nomes completos ou linhas tipo CSV.", "analogy": "O CONCAT do Excel ou o operador &."}
+    },
+    "IfNull": {
+      "watch_out": [],
+      "en": {"what": "Replaces empty (null) values with a default value.", "why": "So that later sums, joins or outputs do not break on nulls.", "analogy": "SQL COALESCE, or Excel's IFERROR/IF(ISBLANK)."},
+      "es": {"what": "Sustituye los valores vacíos (null) por un valor por defecto.", "why": "Para que las sumas, uniones o salidas posteriores no fallen con nulos.", "analogy": "El COALESCE de SQL o el SI.ERROR/SI(ESBLANCO) de Excel."},
+      "pt": {"what": "Substitui valores vazios (null) por um valor padrão.", "why": "Para que somas, junções ou saídas posteriores não quebrem com nulos.", "analogy": "O COALESCE de SQL ou o SEERRO/SE(ÉCÉL.VAZIA) do Excel."}
+    },
+    "Normaliser": {
+      "watch_out": [],
+      "en": {"what": "Turns columns into rows (one row per column value).", "why": "To go from a wide table (jan, feb, mar) to a long one (month, value).", "analogy": "SQL UNPIVOT, or Power Query's Unpivot columns."},
+      "es": {"what": "Convierte columnas en filas (una fila por valor de columna).", "why": "Para pasar de una tabla ancha (ene, feb, mar) a una larga (mes, valor).", "analogy": "El UNPIVOT de SQL o Anular dinamización de Power Query."},
+      "pt": {"what": "Transforma colunas em linhas (uma linha por valor de coluna).", "why": "Para passar de uma tabela larga (jan, fev, mar) para uma longa (mês, valor).", "analogy": "O UNPIVOT de SQL ou Transformar colunas em linhas do Power Query."}
+    },
+    "Denormaliser": {
+      "watch_out": ["D5"],
+      "en": {"what": "Turns rows into columns, grouping by a key.", "why": "To go from a long table (month, value) to a wide one (jan, feb, mar).", "analogy": "SQL PIVOT, or an Excel pivot table with months as columns."},
+      "es": {"what": "Convierte filas en columnas, agrupando por una clave.", "why": "Para pasar de una tabla larga (mes, valor) a una ancha (ene, feb, mar).", "analogy": "El PIVOT de SQL o una tabla dinámica de Excel con los meses en columnas."},
+      "pt": {"what": "Transforma linhas em colunas, agrupando por uma chave.", "why": "Para passar de uma tabela longa (mês, valor) para uma larga (jan, fev, mar).", "analogy": "O PIVOT de SQL ou uma tabela dinâmica do Excel com os meses nas colunas."}
+    },
+    "FilterRows": {
+      "watch_out": ["C5", "C8", "C20", "D9"],
+      "en": {"what": "Sends each row to the true or the false branch depending on a condition.", "why": "To keep valid rows and set aside the rest.", "analogy": "SQL WHERE, or Excel's AutoFilter, with a second exit for the rejects."},
+      "es": {"what": "Manda cada fila a la rama verdadera o a la falsa según una condición.", "why": "Para quedarte con las filas válidas y apartar el resto.", "analogy": "El WHERE de SQL o el Autofiltro de Excel, con una segunda salida para los descartes."},
+      "pt": {"what": "Envia cada linha para o ramo verdadeiro ou falso conforme uma condição.", "why": "Para ficar com as linhas válidas e separar o resto.", "analogy": "O WHERE de SQL ou o Autofiltro do Excel, com uma segunda saída para os descartes."}
+    },
+    "SwitchCase": {
+      "watch_out": [],
+      "en": {"what": "Sends each row to a different step depending on the value of a field.", "why": "When there are more than two branches (one per country, type...).", "analogy": "A SQL CASE where each case goes to its own place."},
+      "es": {"what": "Manda cada fila a un step distinto según el valor de un campo.", "why": "Cuando hay más de dos ramas (una por país, tipo...).", "analogy": "Un CASE de SQL donde cada caso va a un sitio distinto."},
+      "pt": {"what": "Envia cada linha para um step diferente conforme o valor de um campo.", "why": "Quando há mais de dois ramos (um por país, tipo...).", "analogy": "Um CASE de SQL em que cada caso vai para um lugar diferente."}
+    },
+    "Append": {
+      "watch_out": ["C22"],
+      "en": {"what": "Joins two streams one after the other: first all of the head, then the tail.", "why": "To stack data with the same layout keeping the order.", "analogy": "SQL UNION ALL, or pasting one table under another."},
+      "es": {"what": "Une dos flujos uno detrás de otro: primero toda la cabeza y luego la cola.", "why": "Para apilar datos con la misma estructura respetando el orden.", "analogy": "El UNION ALL de SQL o pegar una tabla debajo de otra."},
+      "pt": {"what": "Junta dois fluxos um depois do outro: primeiro toda a cabeça, depois a cauda.", "why": "Para empilhar dados com a mesma estrutura mantendo a ordem.", "analogy": "O UNION ALL de SQL ou colar uma tabela embaixo de outra."}
+    },
+    "Dummy": {
+      "watch_out": ["D7"],
+      "en": {"what": "Does nothing: rows go in and come out unchanged.", "why": "A meeting point for branches, an end for discarded rows or a spot to preview.", "analogy": "Like an empty cell used as a marker."},
+      "es": {"what": "No hace nada: las filas entran y salen igual.", "why": "Punto de encuentro de ramas, final para filas descartadas o sitio donde previsualizar.", "analogy": "Como una celda vacía que sirve de marca."},
+      "pt": {"what": "Não faz nada: as linhas entram e saem iguais.", "why": "Ponto de encontro de ramos, fim para linhas descartadas ou lugar para pré-visualizar.", "analogy": "Como uma célula vazia usada como marcador."}
+    },
+    "Abort": {
+      "watch_out": [],
+      "en": {"what": "Stops the transformation with an error when rows reach it.", "why": "To fail loudly when data that must never appear shows up.", "analogy": "Like a THROW in SQL or an assert in code."},
+      "es": {"what": "Para la transformación con error cuando le llegan filas.", "why": "Para fallar de forma visible si aparecen datos que nunca deberían llegar.", "analogy": "Como un THROW de SQL o un assert en código."},
+      "pt": {"what": "Para a transformação com erro quando chegam linhas a ele.", "why": "Para falhar de forma visível se aparecerem dados que nunca deveriam chegar.", "analogy": "Como um THROW de SQL ou um assert em código."}
+    },
+    "StreamLookup": {
+      "watch_out": ["C18"],
+      "en": {"what": "Adds fields from a second stream by matching a key, with that stream held in memory.", "why": "To enrich rows with data from a small reference table.", "analogy": "Excel's VLOOKUP, or a SQL LEFT JOIN against a small table."},
+      "es": {"what": "Añade campos de un segundo flujo buscando por una clave, con ese flujo cargado en memoria.", "why": "Para enriquecer las filas con datos de una tabla de referencia pequeña.", "analogy": "Un BUSCARV en memoria, o un LEFT JOIN de SQL contra una tabla pequeña."},
+      "pt": {"what": "Adiciona campos de um segundo fluxo procurando por uma chave, com esse fluxo em memória.", "why": "Para enriquecer as linhas com dados de uma tabela de referência pequena.", "analogy": "Um PROCV em memória, ou um LEFT JOIN de SQL contra uma tabela pequena."}
+    },
+    "DBLookup": {
+      "watch_out": [],
+      "en": {"what": "Looks up each row's key in a database table and adds the fields found.", "why": "When the reference table is in a database and too big to load whole.", "analogy": "A SQL SELECT ... WHERE key = ? for each row, like a VLOOKUP against the database."},
+      "es": {"what": "Busca la clave de cada fila en una tabla de la base de datos y añade los campos encontrados.", "why": "Cuando la tabla de referencia está en una base y es demasiado grande para cargarla entera.", "analogy": "Un SELECT ... WHERE clave = ? por cada fila, como un BUSCARV contra la base."},
+      "pt": {"what": "Procura a chave de cada linha numa tabela do banco e adiciona os campos encontrados.", "why": "Quando a tabela de referência está num banco e é grande demais para carregar inteira.", "analogy": "Um SELECT ... WHERE chave = ? por linha, como um PROCV contra o banco."}
+    },
+    "MergeJoin": {
+      "watch_out": ["C19", "D6"],
+      "en": {"what": "Joins two streams sorted by the key (inner, left, right or full outer).", "why": "To join two big sources without holding either in memory.", "analogy": "A SQL JOIN ... ON a.key = b.key."},
+      "es": {"what": "Une dos flujos ordenados por la clave (inner, left, right o full outer).", "why": "Para unir dos fuentes grandes sin cargar ninguna en memoria.", "analogy": "Un JOIN ... ON a.clave = b.clave de SQL."},
+      "pt": {"what": "Junta dois fluxos ordenados pela chave (inner, left, right ou full outer).", "why": "Para juntar duas fontes grandes sem carregar nenhuma em memória.", "analogy": "Um JOIN ... ON a.chave = b.chave de SQL."}
+    },
+    "MergeRows": {
+      "watch_out": ["C22", "D6"],
+      "en": {"what": "Compares an old and a new stream by key and flags each row as new, changed, deleted or identical.", "why": "To detect what changed between two loads.", "analogy": "Like comparing two versions of a sheet row by row."},
+      "es": {"what": "Compara un flujo antiguo y uno nuevo por clave y marca cada fila como nueva, cambiada, borrada o igual.", "why": "Para detectar qué cambió entre dos cargas.", "analogy": "Como comparar dos versiones de una hoja fila a fila."},
+      "pt": {"what": "Compara um fluxo antigo e um novo pela chave e marca cada linha como nova, alterada, apagada ou igual.", "why": "Para detectar o que mudou entre duas cargas.", "analogy": "Como comparar duas versões de uma planilha linha a linha."}
+    },
+    "JoinRows": {
+      "watch_out": [],
+      "en": {"what": "Combines every row of one stream with every row of the other (cartesian product), optionally with a condition.", "why": "To attach a single row of parameters or totals to every row.", "analogy": "A SQL CROSS JOIN."},
+      "es": {"what": "Combina cada fila de un flujo con cada fila del otro (producto cartesiano), con condición opcional.", "why": "Para pegar a todas las filas una única fila de parámetros o totales.", "analogy": "Un CROSS JOIN de SQL."},
+      "pt": {"what": "Combina cada linha de um fluxo com cada linha do outro (produto cartesiano), com condição opcional.", "why": "Para anexar a todas as linhas uma única linha de parâmetros ou totais.", "analogy": "Um CROSS JOIN de SQL."}
+    },
+    "ScriptValueMod": {
+      "watch_out": ["C8", "C9"],
+      "en": {"what": "Runs JavaScript for each row to compute or change fields.", "why": "A last resort when no step does what you need.", "analogy": "Like an Excel macro run on every row."},
+      "es": {"what": "Ejecuta JavaScript por cada fila para calcular o cambiar campos.", "why": "Último recurso cuando ningún step hace lo que necesitas.", "analogy": "Como una macro de Excel que se ejecuta en cada fila."},
+      "pt": {"what": "Executa JavaScript para cada linha para calcular ou mudar campos.", "why": "Último recurso quando nenhum step faz o que você precisa.", "analogy": "Como uma macro do Excel executada em cada linha."}
+    },
+    "ExecSQL": {
+      "watch_out": ["C8", "C9"],
+      "en": {"what": "Runs SQL statements on a connection, once or once per row.", "why": "To create or empty tables before loading, or call procedures.", "analogy": "Running a SQL script by hand before the load."},
+      "es": {"what": "Ejecuta sentencias SQL en una conexión, una vez o una vez por fila.", "why": "Para crear o vaciar tablas antes de cargar, o llamar a procedimientos.", "analogy": "Ejecutar a mano un script SQL antes de la carga."},
+      "pt": {"what": "Executa comandos SQL numa conexão, uma vez ou uma vez por linha.", "why": "Para criar ou esvaziar tabelas antes de carregar, ou chamar procedimentos.", "analogy": "Rodar à mão um script SQL antes da carga."}
+    },
+    "DimensionLookup": {
+      "watch_out": [],
+      "en": {"what": "Maintains a slowly changing dimension table: finds or creates the version of each record and returns its key.", "why": "It is how data warehouse dimensions keep history (SCD type 1 and 2).", "analogy": "A smart upsert that keeps old versions with valid-from and valid-to dates."},
+      "es": {"what": "Mantiene una dimensión lentamente cambiante: busca o crea la versión de cada registro y devuelve su clave.", "why": "Es como las dimensiones de un data warehouse guardan la historia (SCD tipo 1 y 2).", "analogy": "Un upsert inteligente que conserva las versiones antiguas con fechas desde y hasta."},
+      "pt": {"what": "Mantém uma dimensão de mudança lenta: procura ou cria a versão de cada registro e devolve a chave.", "why": "É como as dimensões de um data warehouse guardam o histórico (SCD tipo 1 e 2).", "analogy": "Um upsert inteligente que guarda as versões antigas com datas de início e fim."}
+    },
+    "CombinationLookup": {
+      "watch_out": [],
+      "en": {"what": "Finds or inserts a combination of values in a junk dimension and returns its technical key.", "why": "To replace several low-cardinality fields with one surrogate key.", "analogy": "Like SELECT key ... or INSERT if the combination is new."},
+      "es": {"what": "Busca o inserta una combinación de valores en una dimensión basura y devuelve su clave técnica.", "why": "Para cambiar varios campos de pocos valores por una sola clave subrogada.", "analogy": "Como un SELECT clave ... o un INSERT si la combinación es nueva."},
+      "pt": {"what": "Procura ou insere uma combinação de valores numa dimensão lixo e devolve a chave técnica.", "why": "Para trocar vários campos de poucos valores por uma única chave substituta.", "analogy": "Como um SELECT chave ... ou um INSERT se a combinação for nova."}
+    },
+    "SetVariable": {
+      "watch_out": ["D11"],
+      "en": {"what": "Takes a field of the (single) incoming row and stores it as a variable for the job.", "why": "To pass a value to the next transformations of a job.", "analogy": "Like writing a result into a named cell other sheets read."},
+      "es": {"what": "Toma un campo de la (única) fila que llega y lo guarda como variable para el job.", "why": "Para pasar un valor a las transformaciones siguientes de un job.", "analogy": "Como escribir un resultado en una celda con nombre que leen otras hojas."},
+      "pt": {"what": "Pega um campo da (única) linha que chega e guarda como variável para o job.", "why": "Para passar um valor às transformações seguintes de um job.", "analogy": "Como escrever um resultado numa célula nomeada que outras folhas leem."}
+    }
+  }
+}
