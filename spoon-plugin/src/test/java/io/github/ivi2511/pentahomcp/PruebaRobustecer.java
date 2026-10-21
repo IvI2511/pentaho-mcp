@@ -685,6 +685,30 @@ public class PruebaRobustecer {
     noContiene( lint, "rejects_without_reason", "el linter tampoco lo marca" );
   }
 
+  /** Una dimensión cuya clave sale de un Add sequence: deduplicar por esa clave no quita nada, R06 lo explica. */
+  public void pruebaDedupeConClaveDeContador() throws Exception {
+    TransMeta tm = new TransMeta();
+    tm.setName( "dim_contador" );
+    tm.addDatabase( new DatabaseMeta( "dw", "SQLITE", "Native", "", "dw_contador.sqlite", "", "", "" ) );
+    TransOps.agregarStep( tm, "CsvInput", "Leer", CSV_TIPADO.replace( "<type>Integer</type>", "<type>String</type>" ),
+      100, 100, null, null, null );
+    TransOps.agregarStep( tm, "Sequence", "Numerar", "<valuename>sk</valuename><use_database>N</use_database>"
+      + "<use_counter>Y</use_counter><start_at>1</start_at><increment_by>1</increment_by><max_value>999999999"
+      + "</max_value>", 300, 100, "Leer", null, null );
+    TransOps.agregarStep( tm, "InsertUpdate", "Cargar", "<connection>dw</connection><commit>100</commit>"
+      + "<update_bypassed>N</update_bypassed><lookup><schema/><table>dim</table>" + clave( "sk" ) + valor( "sk", "N" )
+      + valor( "id", "Y" ) + "</lookup>", 500, 100, "Numerar", null, null );
+    TransOps.resolverReferencias( tm );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, pedido( "{\"recipes\":[\"all\"]}" ) );
+    falso( keys( plan.propuestas ).contains( "harden:dedupe_before_load:Cargar" ), "sin dedupe por sk: "
+      + keys( plan.propuestas ) );
+    StringBuilder d = new StringBuilder();
+    for ( String[] x : plan.descartadas ) {
+      d.append( Arrays.toString( x ) );
+    }
+    contiene( d.toString(), "comes from the counter 'Numerar'", "lo explica" );
+  }
+
   /** El patrón 06 de la guía ya es tolerante: harden_etl no propone nada automático. */
   public void pruebaPatronTolerante() throws Exception {
     File ktr = new File( EntornoKettle.recursos().getParentFile().getParentFile().getParentFile().getParentFile(),

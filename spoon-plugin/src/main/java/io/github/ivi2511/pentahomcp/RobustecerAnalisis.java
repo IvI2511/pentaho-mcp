@@ -1045,6 +1045,21 @@ final class RobustecerAnalisis {
       if ( !fuente || yaQuita ) {
         continue;
       }
+      // la clave sale de un contador (Add sequence): cada fila trae una nueva, así que deduplicar por ella no quita
+      // nada (los repetidos por el código de negocio se cargan con otra clave)
+      String contador = null;
+      for ( StepMeta a : arr ) {
+        if ( "Sequence".equals( a.getStepID() ) && claves.contains( txt( a, "valuename" ) ) ) {
+          contador = a.getName();
+        }
+      }
+      if ( contador != null ) {
+        plan.descartadas.add( new String[] { Receta.DEDUPE_BEFORE_LOAD, s.getName(), "the key " + String.join( ", ",
+          claves ) + " comes from the counter '" + contador + "': every row gets a new one, so a dedupe on it removes "
+          + "nothing. Pass keys={\"" + s.getName() + "\": [\"<business key>\"]} to dedupe on the business key, and "
+          + "make the key stable (stable_surrogate_keys)" } );
+        continue;
+      }
       List<TransHopMeta> ent = new ArrayList<TransHopMeta>();
       for ( TransHopMeta h : entrantes( s ) ) {
         if ( !h.isErrorHop() ) {
