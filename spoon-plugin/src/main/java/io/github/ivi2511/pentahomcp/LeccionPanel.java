@@ -330,8 +330,12 @@ final class LeccionPanel {
     item.addDisposeListener( e -> {
       if ( !propio ) {
         LeccionMotor.panelOculto( l );
-        if ( grafo != null && !grafo.isDisposed() ) {
-          vigilar( grafo, l, ent );
+        try {
+          if ( grafo != null && !grafo.isDisposed() && !grafo.getDisplay().isDisposed() ) {
+            vigilar( grafo, l, ent );
+          }
+        } catch ( RuntimeException ex ) {
+          // Spoon cerrandose: no hay panel que reponer
         }
       }
       if ( !raiz.isDisposed() ) {
