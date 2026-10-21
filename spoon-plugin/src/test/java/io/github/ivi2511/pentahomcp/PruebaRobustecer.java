@@ -554,6 +554,86 @@ public class PruebaRobustecer {
     TransOps.resolverReferencias( tm );
   }
 
+  /** Aplicar y deshacer todas las recetas sobre una transformación: devuelve el XML de antes. */
+  private static RobustecerAplicar.Hecho aplicarYDeshacer( TransMeta tm, String nombre ) throws Exception {
+    String xmlAntes = sinParametros( tm.getXML() );
+    RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"all\"],\"confirm\":[\"all\"],\"dry_run\":false}" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( plan, p ),
+      UndoGrupo.sinSpoon( tm ), null );
+    for ( String[] x : h.saltados ) {
+      falso( x[ 1 ].startsWith( "failed" ), nombre + ": " + x[ 0 ] + " " + x[ 1 ] );
+    }
+    System.out.println( "  " + nombre + ": " + keys( plan.propuestas ) + " -> " + h.aplicados.size() + " aplicadas" );
+    if ( h.cambios > 0 ) {
+      igual( 1, h.pasosDeshacer, nombre + ": un Ctrl+Z" );
+      deshacer( tm );
+    }
+    igual( xmlAntes, sinErroresApagados( sinParametros( tm.getXML() ) ), nombre + ": deshacer devuelve el XML" );
+    return h;
+  }
+
+  /** Los ejemplos de las pruebas: el análisis no falla, nada se salta por error y deshacer vuelve al XML. */
+  public void pruebaEjemplos() throws Exception {
+    File[] fs = EntornoKettle.ejemplos().listFiles();
+    Arrays.sort( fs );
+    int n = 0;
+    for ( File f : fs ) {
+      if ( f.getName().endsWith( ".ktr" ) ) {
+        aplicarYDeshacer( new TransMeta( f.getPath() ), f.getName() );
+        n++;
+      }
+    }
+    cierto( n >= 5, "ejemplos: " + n );
+  }
+
+  /** Una entrada con dos salidas: el filtro de obligatorios reparte con un Dummy como lo hacía la entrada. */
+  public void pruebaEntradaConVariasSalidas() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    TransOps.agregarStep( tm, "Dummy", "Contar", null, 280, 400, "Leer ventas", null, null );
+    tm.findStep( "Leer ventas" ).setDistributes( false );
+    RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"required_fields\"],\"confirm\":[\"all\"],"
+      + "\"language\":\"en\"}" );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( RobustecerAnalisis.analizar(
+      tm, p ), p ), UndoGrupo.sinSpoon( tm ), null );
+    igual( 1, h.aplicados.size(), "R03 aplicada: " + saltados( h ) );
+    StepMeta f = tm.findStep( "ventas complete?" );
+    StepMeta d = tm.findStep( "ventas complete" );
+    noNulo( f, "el filtro" );
+    noNulo( d, "el reparto" );
+    falso( d.isDistributes(), "copia como la entrada" );
+    noNulo( tm.findTransHop( tm.findStep( "Leer ventas" ), f ), "entrada -> filtro" );
+    noNulo( tm.findTransHop( f, d ), "filtro -> reparto" );
+    noNulo( tm.findTransHop( d, tm.findStep( "Convertir tipos" ) ), "reparto -> conversión" );
+    noNulo( tm.findTransHop( d, tm.findStep( "Contar" ) ), "reparto -> Contar" );
+    noNulo( tm.findTransHop( f, tm.findStep( "Reason ventas incomplete" ) ), "filtro -> motivo" );
+    contiene( f.getXML(), "<send_true_to>ventas complete</send_true_to>", "verdadero -> el reparto" );
+  }
+
+  /** El patrón 06 de la guía ya es tolerante: harden_etl no propone nada automático. */
+  public void pruebaPatronTolerante() throws Exception {
+    File ktr = new File( EntornoKettle.recursos().getParentFile().getParentFile().getParentFile().getParentFile(),
+      "claude/skills/pentaho-etl/patrones/06_carga_tolerante/06_carga_tolerante.ktr" );
+    if ( !ktr.isFile() ) {
+      Verificador.saltear( "sin el patrón 06" );
+    }
+    TransMeta tm = new TransMeta( ktr.getPath() );
+    RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"all\"]}" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    List<String> auto = new ArrayList<String>();
+    for ( Propuesta x : plan.propuestas ) {
+      if ( Receta.AUTO.equals( x.nivel ) ) {
+        auto.add( x.key );
+      }
+    }
+    List<String> desc = new ArrayList<String>();
+    for ( String[] d : plan.descartadas ) {
+      desc.add( Arrays.toString( d ) );
+    }
+    System.out.println( "  patrón 06: " + keys( plan.propuestas ) + "; descartadas " + desc );
+    igual( "[]", auto.toString(), "ninguna auto sobre el patrón ya tolerante" );
+  }
+
   /** El sub-puntaje de robustez del linter sube tras robustecer (si la familia robustness está en esta versión). */
   public void pruebaPuntajeDeRobustez() throws Exception {
     TransMeta tm = antes( "dw.sqlite" );

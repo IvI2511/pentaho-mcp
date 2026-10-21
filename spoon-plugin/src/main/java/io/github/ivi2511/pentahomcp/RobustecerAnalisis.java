@@ -1095,7 +1095,8 @@ final class RobustecerAnalisis {
       for ( StepMeta w : faltan ) {
         if ( desc.contains( w ) ) {
           plan.descartadas.add( new String[] { Receta.WAIT_FOR_LOADS, l.getName(), "would deadlock: '" + w.getName()
-            + "' gets its rows through '" + l.getName() + "'" } );
+            + "' gets its rows through '" + l.getName() + "' (fine when the lookup finds the existing keys of the rows "
+            + "being loaded, as in stable_surrogate_keys)" } );
           faltan = null;
           break;
         }
@@ -1199,9 +1200,12 @@ final class RobustecerAnalisis {
         StepMeta carga = null;
         for ( StepMeta c : cargas ) {
           if ( abajo( s ).contains( c ) ) {
+            // controlado: un Filter rows entre medio, o un Calculator con NVL (la clave estable de R07: si no
+            // está, se numera)
             boolean filtro = false;
             for ( StepMeta m : abajo( s ) ) {
-              filtro |= "FilterRows".equals( m.getStepID() ) && arriba( c ).contains( m );
+              filtro |= ( "FilterRows".equals( m.getStepID() ) || "Calculator".equals( m.getStepID() )
+                && textoXml( m ).contains( "<calc_type>NVL</calc_type>" ) ) && arriba( c ).contains( m );
             }
             if ( !filtro ) {
               carga = c;
