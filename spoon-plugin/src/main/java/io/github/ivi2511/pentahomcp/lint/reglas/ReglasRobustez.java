@@ -56,8 +56,8 @@ public final class ReglasRobustez {
   static final Set<String> BUSQUEDAS = conjunto( "DBLookup", "StreamLookup", "DBJoin", "FuzzyMatch" );
   /** Steps que escriben algo: un terminal de una rama de rechazo que es uno de estos no es un callejón sin salida. */
   public static final Set<String> ESCRITORES = conjunto( "TextFileOutput", "ExcelOutput", "TypeExitExcelWriterStep",
-    "JsonOutput", "XMLOutput", "TableOutput", "InsertUpdate", "Update", "SynchronizeAfterMerge", "WriteToLog", "AccessOutput",
-    "SQLFileOutput", "PropertyOutput", "CubeOutput", "MongoDbOutput", "TextFileOutputLegacy" );
+    "JsonOutput", "XMLOutput", "TableOutput", "InsertUpdate", "Update", "SynchronizeAfterMerge", "WriteToLog",
+    "AccessOutput", "SQLFileOutput", "PropertyOutput", "CubeOutput", "MongoDbOutput", "TextFileOutputLegacy" );
   /** Quitan o juntan filas por diseño: deduplicar o agregar ya es una decisión, no una pérdida. */
   static final Set<String> DEDUPLICAN = conjunto( "UniqueRows", "UniqueRowsByHashSet", "GroupBy", "MemoryGroupBy" );
   static final Set<String> AGRUPAN = conjunto( "GroupBy", "MemoryGroupBy" );
