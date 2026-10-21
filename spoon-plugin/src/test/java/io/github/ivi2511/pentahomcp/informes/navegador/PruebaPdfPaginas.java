@@ -21,19 +21,22 @@ import javax.imageio.ImageIO;
 import io.github.ivi2511.pentahomcp.EntornoKettle;
 import io.github.ivi2511.pentahomcp.informes.Progreso;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
+import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
 import io.github.ivi2511.pentahomcp.informes.modelo.Informe;
 import io.github.ivi2511.pentahomcp.informes.modelo.Parrafo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
+import io.github.ivi2511.pentahomcp.informes.modelo.Tramo;
 import io.github.ivi2511.pentahomcp.informes.render.RenderHtml;
 import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
  * PDF sin paginas en blanco: un diagrama o una imagen mas alta que la pagina dejaba el titulo solo en una
  * pagina, un marco vacio en la siguiente y el dibujo cortado en dos (el linaje de una practica real).
- * Imprime un informe con un Mermaid de 45 pasos en vertical y un lienzo de 300 x 2400
- * px, en A4 y en Letter, y lee el texto de cada pagina con iText (el de PDI, plugins\pdi-core-plugins\lib):
+ * Imprime un informe con un Mermaid de 45 pasos en vertical, un lienzo de 300 x 2400 px y un Gantt de 40
+ * filas, en A4 y en Letter, y lee el texto de cada pagina con iText (el de PDI, plugins\pdi-core-plugins\lib):
  * ninguna pagina queda vacia ni con solo un titulo, y el diagrama entero (primer y ultimo paso) esta en la
  * pagina de su titulo. Se saltea sin Edge ni Chrome.
  *
@@ -44,6 +47,7 @@ public class PruebaPdfPaginas {
   private static final int PASOS = 45;
   private static final String TITULO_DIAGRAMA = "Linaje hacia «Salida alta»";
   private static final String TITULO_IMAGEN = "Lienzo de Spoon alto";
+  private static final String TITULO_GANTT = "Línea de tiempo alta";
 
   private File exe;
   private File salida;
@@ -79,14 +83,19 @@ public class PruebaPdfPaginas {
     StringBuilder todo = new StringBuilder();
     int conDiagrama = -1;
     int conImagen = -1;
+    int conGantt = -1;
     for ( int i = 0; i < paginas.size(); i++ ) {
       String p = sinPie( paginas.get( i ) );
       todo.append( "\n--- p" ).append( i + 1 ).append( ": " ).append( p.replace( '\n', '|' ) );
       cierto( !p.trim().isEmpty(), pagina + ": la pagina " + ( i + 1 ) + " esta en blanco" + todo );
-      String sinTitulos = p.replace( TITULO_DIAGRAMA, "" ).replace( TITULO_IMAGEN, "" ).trim();
+      String sinTitulos = p.replace( TITULO_DIAGRAMA, "" ).replace( TITULO_IMAGEN, "" ).replace( TITULO_GANTT, "" )
+        .trim();
       cierto( !sinTitulos.isEmpty(), pagina + ": la pagina " + ( i + 1 ) + " tiene solo un titulo" + todo );
       if ( p.contains( TITULO_DIAGRAMA ) ) {
         conDiagrama = i;
+      }
+      if ( p.contains( TITULO_GANTT ) ) {
+        conGantt = i;
       }
       if ( p.contains( TITULO_IMAGEN ) ) {
         conImagen = i;
@@ -99,9 +108,14 @@ public class PruebaPdfPaginas {
     cierto( conImagen >= 0, pagina + ": esta el titulo de la imagen" + todo );
     contiene( paginas.get( conImagen ), "Nota del lienzo", pagina + ": la nota de la imagen va en la misma pagina"
       + todo );
+    cierto( conGantt >= 0, pagina + ": esta el titulo del Gantt" + todo );
+    String pg = paginas.get( conGantt );
+    contiene( pg, "Fila g0", pagina + ": la primera fila del Gantt en la pagina del titulo" + todo );
+    contiene( pg, "Fila g" + ( GraficosSvg.MAX_FILAS_GANTT - 1 ), pagina + ": y la ultima (entero, achicado)"
+      + todo );
     // portada e indice; cada seccion larga abre pagina con su titulo y resumen, y la figura de pagina entera
     // va en la siguiente (entera, achicada); conexiones. Sin el tope: titulo solo, marco vacio y dibujo partido
-    cierto( paginas.size() <= 6, pagina + ": " + paginas.size() + " paginas" + todo );
+    cierto( paginas.size() <= 8, pagina + ": " + paginas.size() + " paginas" + todo );
   }
 
   /** El texto sin el pie de pagina de @page («Pentaho Live · IDC Studios», «Página 3 de 5»). */
@@ -147,6 +161,23 @@ public class PruebaPdfPaginas {
     im.nota = "Nota del lienzo.";
     flujo.con( im );
     inf.secciones.add( flujo );
+
+    // un Gantt de 40 filas (el tope de GraficosSvg): ~960 px de alto, mas que la pagina
+    Seccion met = new Seccion( SeccionId.METRICAS, "Métricas de ejecución" );
+    met.resumen = "Un Gantt de 40 steps, más alto que la página.";
+    Grafico g = new Grafico();
+    g.id = "metrics-gantt";
+    g.clase = Grafico.GANTT;
+    g.titulo = TITULO_GANTT;
+    g.unidad = "ms";
+    g.nota = "Nota del Gantt.";
+    for ( int i = 0; i < GraficosSvg.MAX_FILAS_GANTT; i++ ) {
+      String cat = "Fila g" + i;
+      g.categorias.add( cat );
+      g.tramos.add( new Tramo( cat, Tramo.EXEC, i * 10L, i * 10L + 50 ) );
+    }
+    met.con( g );
+    inf.secciones.add( met );
 
     Seccion con = new Seccion( SeccionId.CONEXIONES, "Conexiones" );
     con.resumen = "Una sección corta al final.";
