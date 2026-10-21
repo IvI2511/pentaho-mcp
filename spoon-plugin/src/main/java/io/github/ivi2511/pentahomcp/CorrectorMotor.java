@@ -242,6 +242,8 @@ final class CorrectorMotor {
     boolean cortada;
     /** No termino ni con killAll. */
     boolean colgada;
+    /** La salida capturada (si termino bien y se capturo), con o sin comparacion: CorrectorCrearPack la escribe. */
+    CorrectorTabla tabla;
   }
 
   /**
@@ -381,6 +383,10 @@ final class CorrectorMotor {
         run.estado = ResultadoCaso.DEMASIADAS_FILAS;
         run.detalle = "the output has more than " + maxFilas + " rows (max_rows): only those were read";
         return;
+      }
+      fin.tabla = real;
+      if ( caso.esperado == null ) {
+        return; // creando el pack (CorrectorCrearPack): solo se captura, la salida esperada es esta
       }
       CorrectorTabla esperada = CorrectorTabla.esperada( new File( cx.dirPack, caso.esperado ), pack );
       rc.comparacion = CorrectorComparar.comparar( esperada, real, pack, rc.avisos );

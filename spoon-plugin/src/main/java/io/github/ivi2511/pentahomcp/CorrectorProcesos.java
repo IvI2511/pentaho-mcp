@@ -627,16 +627,7 @@ final class CorrectorProcesos implements Closeable {
     w.vencido = null;
     w.sinArranque = false;
     File dw = new File( new File( dirSandbox, WORKERS ), w.id );
-    CorrectorSandbox.borrar( dw );
-    File kettleHome = new File( dw, "kettle-home" );
-    File home = new File( dw, "home" );
-    File metastore = new File( dw, "metastore" );
-    File tmp = new File( dw, "tmp" );
-    for ( File d : Arrays.asList( new File( kettleHome, ".kettle" ), home, metastore, tmp ) ) {
-      if ( !d.mkdirs() && !d.isDirectory() ) {
-        throw new IOException( "cannot create " + d );
-      }
-    }
+    CorrectorSandbox.borrar( dw ); // lanzarHija crea kettle-home, home, metastore y tmp vacios
     Trabajo tr = new Trabajo();
     tr.pack = dirPack.getAbsolutePath();
     tr.dirSalida = dirSalida.getAbsolutePath();
@@ -653,15 +644,40 @@ final class CorrectorProcesos implements Closeable {
     File trabajo = new File( dirCola, "trabajo-" + w.id + ".json" );
     CorrectorJson.guardar( tr, trabajo );
 
+    File log = new File( dirLogs, "worker-" + w.ranura + ".log" );
+    w.proceso = lanzarHija( comandoBase, dw, CorrectorMain.class.getName(), Collections.singletonList(
+      trabajo.getAbsolutePath() ), log, w.id );
+    w.lanzado = System.currentTimeMillis();
+    lanzados.add( w.id );
+  }
+
+  /**
+   * Lanza una JVM hija del corrector (§7): {@code comandoBase} + {@code java.io.tmpdir}, {@code KETTLE_HOME},
+   * metastore y {@code user.home} propios en {@code dirHija} (que ya tiene que tener {@code kettle-home/.kettle},
+   * {@code home}, {@code metastore} y {@code tmp}; es tambien su directorio de trabajo), sin las KETTLE_*,
+   * PENTAHO_METASTORE*, JAVA_TOOL_OPTIONS, _JAVA_OPTIONS ni JDK_JAVA_OPTIONS del entorno, con stdout y stderr al final
+   * de {@code log} y sin stdin. La usan los workers y CorrectorCrearPack (C6).
+   */
+  static Process lanzarHija( List<String> comandoBase, File dirHija, String clase, List<String> args, File log,
+                             String id ) throws IOException {
+    File kettleHome = new File( dirHija, "kettle-home" );
+    File home = new File( dirHija, "home" );
+    File metastore = new File( dirHija, "metastore" );
+    File tmp = new File( dirHija, "tmp" );
+    for ( File d : Arrays.asList( new File( kettleHome, ".kettle" ), home, metastore, tmp ) ) {
+      if ( !d.isDirectory() && !d.mkdirs() && !d.isDirectory() ) {
+        throw new IOException( "cannot create " + d );
+      }
+    }
     List<String> cmd = new ArrayList<String>( comandoBase );
     cmd.add( "-Djava.io.tmpdir=" + tmp.getAbsolutePath() );
     cmd.add( "-DKETTLE_HOME=" + kettleHome.getAbsolutePath() );
     cmd.add( "-DPENTAHO_METASTORE_FOLDER=" + metastore.getAbsolutePath() );
     cmd.add( "-Duser.home=" + home.getAbsolutePath() );
-    cmd.add( CorrectorMain.class.getName() );
-    cmd.add( trabajo.getAbsolutePath() );
+    cmd.add( clase );
+    cmd.addAll( args );
     ProcessBuilder pb = new ProcessBuilder( cmd );
-    pb.directory( dw );
+    pb.directory( dirHija );
     Map<String, String> env = pb.environment();
     for ( Iterator<String> it = env.keySet().iterator(); it.hasNext(); ) {
       String k = it.next().toUpperCase( Locale.ROOT );
@@ -672,19 +688,21 @@ final class CorrectorProcesos implements Closeable {
     }
     env.put( "KETTLE_HOME", kettleHome.getAbsolutePath() );
     env.put( "PENTAHO_METASTORE_FOLDER", metastore.getAbsolutePath() );
-    File log = new File( dirLogs, "worker-" + w.ranura + ".log" );
+    File dirLog = log.getAbsoluteFile().getParentFile();
+    if ( dirLog != null && !dirLog.isDirectory() && !dirLog.mkdirs() && !dirLog.isDirectory() ) {
+      throw new IOException( "cannot create " + dirLog );
+    }
     escribirLinea( log, "=== " + new SimpleDateFormat( "yyyy-MM-dd HH:mm:ss", Locale.ROOT ).format( new Date() ) + " "
-      + w.id + ": " + String.join( " ", cmd ) );
+      + id + ": " + String.join( " ", cmd ) );
     pb.redirectErrorStream( true );
     pb.redirectOutput( ProcessBuilder.Redirect.appendTo( log ) );
-    w.proceso = pb.start();
+    Process p = pb.start();
     try {
-      w.proceso.getOutputStream().close(); // la entrega no lee nada del padre
+      p.getOutputStream().close(); // la entrega no lee nada del padre
     } catch ( IOException ignored ) {
       // ya cerrado
     }
-    w.lanzado = System.currentTimeMillis();
-    lanzados.add( w.id );
+    return p;
   }
 
   /** Cancelado: las entregas a medias no dejan su parcial (queda solo lo ya corregido). */
