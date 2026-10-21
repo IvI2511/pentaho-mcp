@@ -40,10 +40,17 @@ siempre funciona.
 
 **Informes.** Spoon suma una perspectiva nueva, **Informes**, que documenta sola la transformación o el
 job abierto: portada, diagrama de flujo, linaje de campos, diccionario de datos, modelo de las tablas
-destino, perfil de datos, métricas de ejecución con gráficos, validación, conexiones y parámetros. Exporta
-a HTML, PDF, Markdown (para Obsidian o GitHub) y PowerPoint, con tu nombre, institución, logo y colores.
-Claude puede armarte el mismo informe y sumarle una narrativa corta escrita a partir de los números
-reales.
+destino, perfil de datos, métricas de ejecución con gráficos, validación, calidad técnica, conexiones y
+parámetros. Exporta a HTML, PDF, Markdown (para Obsidian o GitHub) y PowerPoint, con tu nombre,
+institución, logo y colores. Claude puede armarte el mismo informe y sumarle una narrativa corta escrita a
+partir de los números reales.
+
+**Calidad.** Claude también puede revisar un ETL buscando lo que Kettle deja pasar sin error: Group by o
+Merge join sin ordenar, el símbolo decimal vacío que en una computadora en español convierte `2.50` en
+`250`, rutas fijas, contraseñas guardadas en el archivo, una rama de error que termina en Success. Te da un
+puntaje de calidad técnica de 0 a 100 que muestra de dónde sale cada punto que falta, y aplica los arreglos
+seguros con un solo Ctrl+Z (antes de los que cambian lo que hace el ETL, te pregunta). La misma revisión
+es una sección del informe.
 
 ¿No tenés Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
@@ -58,6 +65,7 @@ Kitchen.
 | *"Hacé un job que corra estas dos transformaciones en orden y que pare si falla la primera."* | arma el job con sus entradas y los hops de éxito / error |
 | *"El lienzo es un lío, ordenalo."* | acomoda los steps de izquierda a derecha, sin líneas cruzadas |
 | *"¿Por qué este `.ktr` falla en Pan?"* | lo lee, encuentra el problema con la lista de errores verificados y lo corrige |
+| *"Revisá las buenas prácticas de esta transformación antes de que la entregue y arreglá lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
 | *"Haceme un informe de esta transformación para el TP, en PDF y PowerPoint, con una conclusión corta."* | arma el informe (linaje, diccionario de datos, métricas…), escribe la conclusión con los datos reales y exporta los dos archivos |
 
 ## Cómo funciona
@@ -83,7 +91,7 @@ flowchart LR
 ```
 
 - El **plugin de Spoon** es un plugin de ciclo de vida de Kettle. Cuando abre Spoon, levanta un servidor
-  MCP en `127.0.0.1:8765` con unas 60 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
+  MCP en `127.0.0.1:8765` con 61 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
   con deshacer. El mismo jar agrega la perspectiva **Informes** al selector de perspectivas de Spoon.
 - El **plugin de Claude Code `pentaho-live`** conecta a Claude con ese servidor y suma la skill
   `pentaho-etl`, para que Claude use los ids de step y el XML exactos en vez de adivinarlos.
@@ -166,11 +174,12 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Jobs | Agregar, configurar y conectar entradas; hops de éxito / error / incondicionales |
 | Campos | Listar los campos que salen de cada step, antes de configurar el siguiente |
 | Controles | Validar; preview de filas reales de cualquier step |
+| Calidad | Revisar buenas prácticas más allá de la validación, con un puntaje de 0 a 100 (y, si lo pedís, leyendo las fuentes para probar un problema); aplicar los arreglos propuestos; silenciar una regla donde es a propósito |
 | Ejecución | Ejecutar una transformación o un job, seguir su estado y su log, detenerlo |
 | Bases de datos | Listar tipos de conexión; agregar, probar y borrar conexiones; ver tablas y columnas; correr consultas SQL (solo lectura salvo que pidas escribir) |
 | Parámetros | Listar, definir y borrar parámetros |
 | Lienzo | Agregar notas, seleccionar steps, ordenar el lienzo, sacar una imagen del lienzo |
-| Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, JSON) con linaje, diccionario de datos, métricas y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
+| Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, JSON) con linaje, diccionario de datos, métricas, calidad técnica y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
 
 </details>
 
@@ -188,6 +197,9 @@ Todo corre en tu computadora. No hay servidores, cuentas, analíticas ni telemet
   de datos, valores reales de tus datos (se pueden ocultar en los ajustes del informe). El perfil y la
   opción «Medir» ejecutan una copia de la transformación solo cuando lo pedís, y esa copia escribe sus
   salidas como una ejecución normal.
+- La revisión de calidad (`lint_etl`) no ejecuta la transformación. Su modo profundo lee hasta 5000 filas
+  de tus fuentes solo cuando lo pedís, con previews limitadas a steps de solo lectura, y sus hallazgos
+  pueden citar valores que leyó.
 - Lo que devuelven las herramientas (steps, nombres de campos, logs, filas de preview) pasa a ser parte
   de tu conversación con Claude, como cualquier otra cosa que compartas.
 

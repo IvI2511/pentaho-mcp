@@ -104,7 +104,8 @@ foreach ($d in @("catalogo\steps", "catalogo\job-entries", "manual")) {
   New-Item -ItemType Directory -Force (Join-Path $catJar $d) | Out-Null
 }
 foreach ($f in @("catalogo\INDICE.md", "catalogo\steps-comunes.md", "manual\01-formato-ktr.md",
-                 "manual\02-formato-kjb.md", "manual\03-errores-comunes.md", "manual\04-informes.md")) {
+                 "manual\02-formato-kjb.md", "manual\03-errores-comunes.md", "manual\04-informes.md",
+                 "manual\06-calidad.md")) {
   $from = Join-Path $skill $f
   if (-not (Test-Path $from)) { throw "Falta $from (catalogo de la skill pentaho-etl)" }
   Copy-Item -Force $from (Join-Path $catJar $f)

@@ -75,6 +75,7 @@ Pass `sections` only to leave things out or to add `profile`.
 | `lineage`, `dictionary` | transformation | computes the fields of every step; database steps may connect |
 | `target_model` | transformation with Table output or Insert/Update | none; with `query_database=true` it connects to read primary and foreign keys (read-only) |
 | `validation` | both | runs Spoon's check; database steps may connect |
+| `quality` | both | the `lint_etl` score and findings (`06-calidad.md` §9); computes fields like `lineage`. With `quality_deep: true` it also reads up to 5000 rows of the sources through read-only previews (never writes) |
 | `metrics` | both | `last_run` (default) reads the last run made in Spoon; nothing if it never ran |
 | `profile` | transformation | **runs a copy** up to `profile_step`, reading `profile_rows` rows (default 5000) |
 | `narrative` | both | only if you pass `narrative.conclusions` |
@@ -129,6 +130,7 @@ No headings, tables, links, images, code blocks or HTML (it is escaped and would
 | Rows, durations, slowest step | `metrics` → indicators (duration, rows read and written, errors, slowest step), the per-step table and the chart series |
 | Keys and target columns | `target_model` → `data` (tables, columns, primary and foreign keys) |
 | Errors and warnings | `validation` → indicators and table |
+| Good practices, the technical quality score | `quality` → `data` (the `lint_etl` result: `score`, `grade`, `penalties`, `findings`); call it technical quality, not the mark of the work |
 
 `get_report_data` cuts long tables to `max_rows` (default 50); `rows_total` gives the full length.
 
@@ -138,7 +140,7 @@ No headings, tables, links, images, code blocks or HTML (it is escaped and would
 |---|---|
 | `... has no file yet: pass 'output_dir'` | The document was never saved: `save` it, or pass `output_dir` |
 | A `pdf: ...` warning about Edge or Chrome | No browser for the PDF: the file is a printable HTML. Offer `html` or ask the user to print it to PDF |
-| `The report did not finish in N s` | Ask for fewer sections (lineage, dictionary and validation are the slow ones when steps use databases) |
+| `The report did not finish in N s` | Ask for fewer sections (lineage, dictionary, validation and quality are the slow ones when steps use databases) |
 | A section `partial` with a reason such as "needs the database" | Expected for Table input steps without a reachable connection; mention it |
 | `The Reports perspective is not available` (`show_report`) | It is turned off (`PENTAHO_LIVE_REPORTS=off`) or the plugin is installed elsewhere: use `build_report` |
 | `The 'profile' section needs 'profile_step'` | Ask which step to profile, and confirm it may run |

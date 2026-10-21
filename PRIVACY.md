@@ -1,6 +1,6 @@
 # Privacy policy — Pentaho Live (unofficial)
 
-_Last updated: 2026-10-20_
+_Last updated: 2026-10-21_
 
 Pentaho Live is made of a Claude Code plugin (a skill and an MCP connection) and a plugin that runs
 inside Pentaho Data Integration (Spoon) on your own computer. This policy covers both.
@@ -34,6 +34,11 @@ receives any of your data.
   `"mostrar_valores": false` to leave them out). It never contains passwords. To print the PDF and draw
   the diagrams, the plugin runs the Edge or Chrome already installed on your computer in headless mode,
   with a temporary profile, on local files only.
+- **Quality check.** `lint_etl` and the reports' technical quality section read the transformation or job
+  (and, like listing a step's fields, may connect to its databases to learn the field types); they never
+  run it. Only when you ask for the deep mode do they read up to 5000 rows of the sources, through previews
+  limited to steps that only read, and then the findings can quote values they read (a key, a number).
+  Silencing a rule stores a note inside the `.ktr` / `.kjb`, written when you save it.
 - **Nothing is stored** by the plugins beyond what Spoon itself keeps (your open documents, recent files)
   and your report settings (author, institution, colors and logo), saved in
   `<KETTLE_HOME>\.kettle\pentaho-live\` when you click "Save as default".

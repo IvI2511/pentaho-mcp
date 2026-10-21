@@ -2,6 +2,8 @@
 
 Every case in this file was triggered on purpose by breaking one of the examples and running it with Pan/Kitchen 9.4 + Java 21. The messages are **verbatim** (long paths are cut with `…`). The broken variants were left in the session scratchpad; to reproduce one, apply the indicated change to the corresponding example.
 
+With the `pentaho` MCP, `lint_etl` catches many of these before anything runs, including every silent error of section D: the rule id is next to each heading (D1 · `duplicate_step_name`), and `06-calidad.md` explains the linter.
+
 About language: step messages almost always come out **in English** even when the JVM is in Spanish; what changes is the "frame" (`Unexpected error` → `Error desconocido`, `Error initializing step` → `Error inicializando paso`, `Transformation detected one or more steps with errors.` → `Transformación detectada …`). For 100 % English logs: `PENTAHO_DI_JAVA_OPTIONS=-Xms1024m -Xmx2048m -Duser.language=en -Duser.country=US` (this is what `ejemplos/correr.ps1 -Ingles` does).
 
 ---
@@ -65,7 +67,7 @@ Exit 1. If the path ended up empty (`/file:` with nothing after it): `ERROR: No 
 
 ## C. Format errors that Pan detects
 
-### C1. Misspelled step type (`<type>AddConstants</type>` instead of `Constant`)
+### C1. Misspelled step type (`<type>AddConstants</type>` instead of `Constant`) · `missing_plugin`
 
 ```
 Agregar constantes.0 - ERROR (…) : Can't run transformation due to plugin missing
@@ -75,7 +77,7 @@ Unable to prepare and initialize this transformation
 ```
 Exit 3. **Fix:** use the exact plugin ID (case-sensitive) → `../catalogo/`. In jobs the equivalent (`<type>EXITO</type>`) gives `Success - ERROR (…) : Can't run job due to plugin missing` (exit 1).
 
-### C2. Hop to a nonexistent step (`<to>Escribir CSV2</to>`)
+### C2. Hop to a nonexistent step (`<to>Escribir CSV2</to>`) · `broken_hop`
 
 ```
 java.lang.NullPointerException: Cannot invoke "org.pentaho.di.trans.step.StepMeta.isMapping()" because "nextStep" is null
@@ -162,7 +164,7 @@ Unable to prepare and initialize this transformation
 ```
 Exit 3.
 
-### C13. Nonexistent input file (CSV input)
+### C13. Nonexistent input file (CSV input) · `missing_input_file`
 
 ```
 Leer clientes.0 - An error occurred while creating field mapping
@@ -171,14 +173,14 @@ Leer clientes.0 - Could not read from "file:///C:/…/datos/clientes_NO_EXISTE.c
 ```
 Exit 1. (The OS message in parentheses is Spanish-locale Windows for "The system cannot find the file specified".)
 
-### C14. Nonexistent variable in a path (`${CARPETA_DATOS}/clientes.csv`)
+### C14. Nonexistent variable in a path (`${CARPETA_DATOS}/clientes.csv`) · `undeclared_variable`
 
 ```
 Could not read from "file:///C:/pdi/data-integration/${CARPETA_DATOS}/clientes.csv" because it is not a file.
 ```
 Exit 1. The variable stays literal and the path is resolved against the PDI folder. **Fix:** declare it as a parameter with a default, pass it with `/param:`, or define it in `kettle.properties`.
 
-### C15. Relative path without a variable (`datos/clientes.csv`)
+### C15. Relative path without a variable (`datos/clientes.csv`) · `relative_path`
 
 ```
 Could not read from "file:///C:/pdi/data-integration/datos/clientes.csv" because it is not a file.
@@ -240,7 +242,7 @@ We detected rows with varying number of fields, this is not allowed in a transfo
 ```
 **Fix:** all hops entering the same step (except the info streams of lookups/joins) must carry the same fields in the same order. To debug, run with `/safemode`.
 
-### C23. Text file output with no declared fields + a source with huge lengths (SQLite)
+### C23. Text file output with no declared fields + a source with huge lengths (SQLite) · `text_output_without_fields`
 
 ```
 Escribir consulta.0 - ERROR (…) : UnexpectedError:
@@ -248,14 +250,14 @@ Escribir consulta.0 - ERROR (…) : java.lang.OutOfMemoryError: Requested array 
 ```
 Exit 1. The output pads each String to its metadata length; the SQLite driver reports TEXT with a length of ~2³¹. **Fix:** declare the output fields with `<length>-1</length>`.
 
-### C24. Job without a valid START
+### C24. Job without a valid START · `start_not_named_start`, `job_without_start`
 
 ```
 10_job_secuencia - ERROR (…) : A serious error occurred during job execution:
 10_job_secuencia - Couldn't find starting point in this job.
 Kitchen - ERROR (…) : Finished with errors
 ```
-Exit 1. It happens if the entry is not literally named `START`, or if it lacks `<draw>Y</draw>` (even when it has `<start>Y</start>`). **Fix:** `<name>START</name><type>SPECIAL</type><start>Y</start><draw>Y</draw>`.
+Exit 1. Kitchen looks the start up **by name**: an entry called `START` (copy 0) that is drawn. The name ignores case (`Start` works, as in several PDI samples), but a start entry renamed to anything else (`Inicio`) is not found even with `<start>Y</start>`; nor is one without `<draw>Y</draw>`. **Fix:** `<name>START</name><type>SPECIAL</type><start>Y</start><draw>Y</draw>`.
 
 ### C25. Job that calls a nonexistent ktr
 
@@ -274,52 +276,61 @@ You see the step error (e.g. C7) and then `03_ventas_por_producto - ERROR (…) 
 
 These are the dangerous ones: Pan says it finished fine.
 
-### D1. Duplicate step names → a step disappears (or Pan hangs)
+### D1. Duplicate step names → a step disappears (or Pan hangs) · `duplicate_step_name`
 
 Two cases tested:
 
 - Example 02 with the Dummy `Descartados` renamed to `Escribir filtrados` (the same name as the Text file output): **exit 0**, but only one of the two steps exists; the hops of both were resolved to the Text file output, which wrote 8 rows (the accepted **and** the discarded ones) instead of 4. The Dummy does not even appear in the log.
 - Example 01 with `Agregar constantes` renamed to `Generar filas`: the hop became `Generar filas → Generar filas` (from a step to itself) and Pan stayed at `Dispatching started for transformation [...]` forever, with no error.
 
-**Validate that names are unique before running.**
+Kettle looks steps up by name **ignoring case** (`TransMeta.findStep`), so `Leer ventas` and `leer ventas` collide too; a trailing space does make two names different. Once the file is loaded the duplicate is gone, so it can only be seen in the `.ktr` itself (the linter reads the saved file). **Validate that names are unique before running.**
 
-### D2. Circular hop → infinite loop
+### D2. Circular hop → infinite loop · `cycle`
 
-A backwards hop (`Escribir CSV → Agregar constantes`) makes the rows circulate endlessly: `Escribir CSV.0 - linenr 300000` and climbing. There is no cycle detection. **Validate that the graph is acyclic.**
+A backwards hop (`Escribir CSV → Agregar constantes`) makes the rows circulate endlessly: `Escribir CSV.0 - linenr 300000` and climbing. There is no cycle detection, and Spoon's Verify does not help: `checkSteps` and the field calculation (`get_step_fields`) crash with `StackOverflowError`. **Validate that the graph is acyclic.**
 
-### D3. Empty `<decimal/>` with a Spanish locale → numbers ×100
+### D3. Empty `<decimal/>` with a Spanish locale → numbers ×100 · `empty_decimal_symbol`
 
-CSV with `2.50`, Number field with empty `<format/>` and `<decimal/>`: with the JVM in es_ES the `.` is taken as the thousands separator and the value is read as **250**. Example 03 gave `importe_total` 2000.00 instead of 20.00. With the JVM in English it comes out right, so the same `.ktr` changes its result depending on the machine. **Always set `<decimal>.</decimal>` and `<group/>` (or whatever applies) explicitly.**
+CSV with `2.50`, Number field with empty `<format/>` and `<decimal/>`: with the JVM in es_ES the `.` is taken as the thousands separator and the value is read as **250**. Example 03 gave `importe_total` 2000.00 instead of 20.00. With the JVM in English it comes out right, so the same `.ktr` changes its result depending on the machine. With the format `#.##` instead, es_ES fails (see C17's message). **Always set `<decimal>.</decimal>` and `<group/>` (or whatever applies) explicitly.** `lint_etl deep=true` reads the column and says whether the data really has decimals.
 
-### D4. Calculator: Integer × Number rounds
+### D4. Calculator: Integer × Number rounds · `calculator_integer_first`
 
-`MULTIPLY` with `field_a=cantidad` (Integer) and `field_b=precio_unitario` (Number): the result was computed as an integer, rounding the price (2.50→3, 1.80→2, 1.20→1, 4.75→5). Café: 24.00 instead of 20.00. **Fix:** put the decimal field in `field_a` (or convert it beforehand with Select values `meta`).
+`MULTIPLY` with `field_a=cantidad` (Integer) and `field_b=precio_unitario` (Number): the result was computed as an integer, rounding the price (2.50→3, 1.80→2, 1.20→1, 4.75→5). Café: 24.00 instead of 20.00. Calculator picks the operation by the type of `field_a`, so `DIVIDE` with two Integers is an integer division even when the result type is Number (101 / 3 = 33, verified with a preview). **Fix:** put the decimal field in `field_a` (or convert it beforehand with Select values `meta`).
 
-### D5. Group by without sorting first
+### D5. Group by without sorting first · `unsorted_input`
 
-Group by groups **consecutive** rows with the same key. Without a prior Sort rows, example 03 gave 10 "groups" (one per row) instead of 4. **Fix:** Sort rows by the same keys before Group by (or use Memory group by, `MemoryGroupBy`, which does not need sorted input).
+Group by groups **consecutive** rows with the same key. Without a prior Sort rows, example 03 gave 10 "groups" (one per row) instead of 4. **Fix:** Sort rows by the same keys before Group by (or use Memory group by, `MemoryGroupBy`, which does not need sorted input). The linter checks the same for Unique rows, Row denormaliser and Analytic query, which also work on consecutive rows.
 
-### D6. Merge join with unsorted inputs
+### D6. Merge join with unsorted inputs · `unsorted_input`
 
-Without the Sort rows steps, the LEFT OUTER of example 05 lost matches (customer 1 ended up with one sale instead of two; customers 4 and 8 showed up with no sales). **Fix:** Sort rows ascending by the key on **both** inputs.
+Without the Sort rows steps, the LEFT OUTER of example 05 lost matches (customer 1 ended up with one sale instead of two; customers 4 and 8 showed up with no sales). **Fix:** Sort rows ascending by the key on **both** inputs, with the keys in the same order as the join's (Merge join compares rows key by key; Merge rows and Sorted merge too).
 
-### D7. Disabled hop / step without hops
+If the step before the join runs in **several copies** (e.g. a Sort rows with 2 copies), Kettle refuses:
 
-With `<enabled>N</enabled>` on the only hop into `Escribir CSV`, that step **does not run** (it does not even appear in the log) and nothing is written. A step with no hop at all in a transformation that does have hops does not run either.
+```
+The source step to read from [Ordenar clientes] can't be executed in multiple (2) copies.  Insert a Dummy step to resolve this situation.
+```
+Do **not** just follow the advice: with a Dummy in between the error goes away, but the copies interleave the rows and they reach the join unsorted again, now with no error. Keep the Sort rows right before the join at 1 copy.
 
-### D8. Text file output with no declared fields → padding
+### D7. Disabled hop / step without hops · `disabled_hop`, `orphan_step`
+
+With `<enabled>N</enabled>` on the only hop into `Escribir CSV`, that step **does not run** (it does not even appear in the log) and nothing is written. A step with no hop at all in a transformation that does have hops does not run either. In jobs: `orphan_entry`, `unreachable_entry`.
+
+### D8. Text file output with no declared fields → padding · `text_output_without_fields`
 
 With an empty `<fields>` all fields are written, but Strings come out padded with spaces up to their metadata length (`Ana Pérez                                         ;Madrid                        ;`). See C23 for the extreme case.
 
-### D9. Variables in Generate rows / Add constants / Filter rows values
+### D9. Variables in Generate rows / Add constants / Filter rows values · `variable_in_constant`
 
 `${ARCHIVO_SALIDA}` as the value of an Add constants field comes out literally in the CSV. **Fix:** Get variables (`GetVariable`).
 
-### D10. Error branch that ends in SUCCESS
+### D10. Error branch that ends in SUCCESS · `failure_branch_ends_in_success`
 
 If the red hop (`evaluation=N`) of a failed TRANS leads to `SUCCESS`, Kitchen returns exit 0. **Fix:** end error branches in `ABORT`.
 
-### D11. `${Internal.Job.Filename.Directory}` inside a ktr run with Pan
+This is about entries that **fail** (TRANS, JOB, SQL…). The red branch of a **condition** (File exists, Simple evaluation, Table exists…) is its "else": File exists → red → Success gives exit 0, and that is correct. With an entry in between it depends on the hop after it (verified with Kitchen): red → Write to log → green → Success still ends with exit 1 (Write to log passes the `false` along), but red → Write to log → unconditional → Success gives exit 0.
+
+### D11. `${Internal.Job.Filename.Directory}` inside a ktr run with Pan · `job_variable_in_transformation`
 
 Its value is the literal text `Parent Job File Directory`. **Fix:** use `${Internal.Entry.Current.Directory}`.
 
@@ -338,4 +349,5 @@ Its value is the literal text `Parent Job File Directory`. **Fix:** use `${Inter
 9. Sort before Group by / Merge join.
 10. Paths with `${Internal.Entry.Current.Directory}`; parameters declared with a default.
 11. Job: `START` entry (`SPECIAL`, `start=Y`, `draw=Y`), unconditional hop from START, error branches to `ABORT`.
-12. Run with Pan/Kitchen, check the exit code **and** the counts `Finished processing (I=…, O=…, R=…, W=…, U=…, E=…)` (E>0 = errors in that step; W of the output = rows written).
+12. Live, with the MCP: `validate`, then `lint_etl` (it checks most of this list on the open document: `06-calidad.md`).
+13. Run with Pan/Kitchen, check the exit code **and** the counts `Finished processing (I=…, O=…, R=…, W=…, U=…, E=…)` (E>0 = errors in that step; W of the output = rows written).

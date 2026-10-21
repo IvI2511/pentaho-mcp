@@ -1,6 +1,6 @@
 ---
 name: pentaho-etl
-description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, or find out why a .ktr/.kjb fails. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
+description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
 ---
 
 # Pentaho Data Integration 9.4 — ETLs
@@ -38,7 +38,8 @@ starts Spoon and returns right away: ask the user first (it opens a window), wai
      keeps its default) and `after=<previous step>` so it is placed and connected automatically.
    - `get_step_fields` of the previous step **before** configuring the next one: that way you use the
      real column names, not the ones you assume.
-3. `validate`, then `preview_step` on the last step to see real rows.
+3. `validate`, then `preview_step` on the last step to see real rows, then `lint_etl` for what Kettle
+   lets through (see "Quality" below).
 4. `canvas_screenshot` returns a PNG of the canvas: use it to check the drawing (overlapping steps,
    crossing hops). `arrange_canvas` if there are branches or lookups.
 5. `save` with a `.ktr`/`.kjb` path. `run mode=visible` if the user wants to watch it run;
@@ -57,7 +58,7 @@ and hops, a table of what each step does, output fields, connections (never pass
 and notes. `language` = `en` | `es` | `pt`; with `path` it saves a `.md`, without it returns the text.
 Use it when the user wants to hand in or document the ETL (assignment, Obsidian note, README).
 For a **full report** (flow, field lineage, data dictionary, run metrics with charts, target model,
-validation) as HTML, PDF, Markdown with images or PowerPoint: `build_report`; `get_report_data` first if
+validation, technical quality) as HTML, PDF, Markdown with images or PowerPoint: `build_report`; `get_report_data` first if
 you are going to add a narrative; `show_report` only if the user asks to see it in Spoon's Reports
 perspective. How, and how to write the narrative: `manual/04-informes.md`.
 
@@ -70,6 +71,36 @@ loaded, read the local files below instead: same content.
 starting from the recommended template in `manual/01-formato-ktr.md` §1.2 and check it with Pan or
 Kitchen (see below). The user opens it in Spoon when you are done.
 
+## Quality: `lint_etl`
+
+`validate` says whether the ETL runs; `lint_etl` says whether it is **well built**: what Kettle lets
+through with exit 0 (Group by / Merge join without sorting, the empty decimal symbol, Calculator
+Integer × Number, outputs without fields, a red branch that ends in Success), what only works on this
+computer (absolute paths, passwords in the file) and style (default names, no description). It runs
+nothing and opens no dialogs.
+
+- **When**: after building or changing an ETL (after `validate` and `preview_step`, before `save`), when
+  the user asks for a review or best practices, before an assignment is handed in, and when a result is
+  wrong with exit 0. Tell the user the score, the errors one by one and the rest grouped; not the JSON.
+- **The score** (0-100, grades A/B/C/D): 25 per error, 8 per warning, 2 per info, capped per rule; infos
+  take at most 10 in total; **any error caps it at 74**. `penalties` says where each point went. Call it
+  technical quality, never the mark of an assignment.
+- **Deep mode** (`deep=true`): reads up to 5000 rows of the sources, only through read-only steps, to
+  prove or rule out `unsorted_input` and `empty_decimal_symbol` (error with the proof, e.g. "gives 4 rows
+  instead of 10", or info when the data is fine). It reads real data: say so, and ask first with big or
+  production databases.
+- **Fixing**: `apply_lint_fixes` with `keys: ["all_auto"]` applies the safe fixes (proposed names, START,
+  Calculator operands). Fixes with `confirm: true` (Sort rows, paths, decimal symbol, copy mode, Abort…):
+  **ask the person first**, then pass their keys. `needs_value` fixes take `values[key]` (a name, `.` or
+  `,`, a `${VARIABLE}` for a password, never the password itself). One Ctrl+Z in a transformation; `save`
+  afterwards.
+- **Silencing**: `suppress_lint` (`rule`, `step`/`entry`, `reason`) when a finding is deliberate; it
+  travels inside the file. Ask before silencing an error.
+- **In reports**: the `quality` section of `build_report` (on by default) and `quality_deep: true`.
+
+Rules, result format, fixes and troubleshooting: `manual/06-calidad.md`; the machine-readable catalog is
+the resource `pentaho://lint/rules`.
+
 ## Where everything is
 
 | I need… | Read |
@@ -78,6 +109,7 @@ Kitchen (see below). The user opens it in Spoon when you are done.
 | Jobs: START, TRANS, hops with a condition | `manual/02-formato-kjb.md` |
 | A Pan/Kitchen error, or an odd result with exit 0 | `manual/03-errores-comunes.md` |
 | Reports (`build_report`, formats, sections) and writing the narrative | `manual/04-informes.md` |
+| Quality: `lint_etl`, the score, the deep mode, `apply_lint_fixes`, `suppress_lint`, every rule | `manual/06-calidad.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

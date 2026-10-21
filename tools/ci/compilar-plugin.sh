@@ -50,7 +50,7 @@ printf '%s' "$VERSION" > "$CLASES/io/github/ivi2511/pentahomcp/pentaho-mcp-versi
 # --- catálogo y guías de la skill pentaho-etl dentro del jar, para los recursos MCP pentaho://...
 SKILL="$RAIZ/claude/skills/pentaho-etl"
 for f in catalogo/INDICE.md catalogo/steps-comunes.md manual/01-formato-ktr.md manual/02-formato-kjb.md \
-         manual/03-errores-comunes.md; do
+         manual/03-errores-comunes.md manual/04-informes.md manual/06-calidad.md; do
   [ -f "$SKILL/$f" ] || { echo "Falta $SKILL/$f (catálogo de la skill pentaho-etl)"; exit 1; }
   mkdir -p "$CLASES/pentaho-etl/$(dirname "$f")" && cp "$SKILL/$f" "$CLASES/pentaho-etl/$f"
 done

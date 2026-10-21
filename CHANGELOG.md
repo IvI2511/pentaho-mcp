@@ -7,6 +7,54 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **ETL linter**, `lint_etl`: checks a transformation or job for what Kettle lets through, beyond `validate`.
+  28 rules (two more are off by default): Group by, Merge join, Unique rows and the other steps that need
+  sorted input, the empty decimal symbol, Calculator Integer × Number, variables in Add constants or Generate
+  rows, Text file output without fields, absolute and relative paths, passwords stored in the file, a job's
+  failure branch that ends in Success, a START entry with another name, default step names, no description…
+  Each finding says how to fix it and whether `apply_lint_fixes` can. The result has a 0-100 technical
+  quality score (grades A-D) and the points each rule takes away; any error caps it at 74. It opens no
+  dialogs and does not run the transformation; `include_kettle_checks` adds Spoon's own Verify, which never
+  changes the score.
+- Deep mode, `lint_etl` with `deep=true`: reads up to 5000 rows of the sources to confirm or rule out the
+  unsorted input and decimal symbol findings. An unsorted input is proven by running the step with and
+  without a Sort rows before it ("gives 4 rows instead of 10"), and becomes an error; sorted data or integer
+  values, with the whole input read, lower the finding to info. It runs only through steps known to be read-only, never creates a
+  missing SQLite, H2 or HSQLDB file, and `deep_timeout_s` (default 60) caps it.
+- `apply_lint_fixes`: applies the fixes `lint_etl` proposes, by key. `all_auto` takes the safe ones
+  (proposed names for default step and entry names, START renamed, Calculator operands swapped); the rest
+  (a Sort rows or an `ORDER BY`, copy mode, paths, the decimal symbol, output fields, the failure hop to an
+  Abort, a `${VARIABLE}` for a password) only by key, after asking the person. In a transformation the whole
+  call is one Ctrl+Z; in a job, one per change. `dry_run` returns the new score without changing anything.
+- `suppress_lint`: silences a rule on a step, a job entry or the whole document, with a reason. It is stored
+  inside the `.ktr` / `.kjb`, and silenced findings no longer lower the score (61 tools).
+- MCP resource `pentaho://lint/rules`: the rule catalog (severity, category, what, why and how to fix in
+  English, Spanish and Portuguese) and the score formula.
+- Reports: **Technical quality** section (`quality`, right after validation, on by default) with the score,
+  one notice per error, the findings with the proposed fixes, where the missing points come from and what
+  could not be checked. `build_report`, `get_report_data` and `show_report` take `quality_deep`, and the
+  Reports panel has a "Deep check (reads data)" box under the section.
+- Skill: a Quality section in `SKILL.md` and the guide `manual/06-calidad.md` (when to run the linter, the
+  score, the deep mode, fixing and silencing). MCP clients without the skill read it as the resource
+  `pentaho://guide/quality`.
+- `tools/lint-corpus/`: regression harness that runs the linter over PDI's samples, the skill examples and 27
+  copies of the examples broken on purpose; it fails if a known error is missed or the counts change.
+
+### Changed
+
+- `validate` runs its own structural checks through the linter. Its messages now name the step, and the
+  report's validation section shows them in the report's language. A step that distributes rows among
+  outputs of the same type (deliberate load balancing) is no longer reported, hidden job entries
+  (`draw=N`, common in old jobs) are no longer flagged as having no hops, and a disabled hop in a job says
+  that the job never reaches the entry that way.
+- Skill: `manual/03-errores-comunes.md` gives the linter rule next to each error it catches, and corrects
+  three entries. C24: Kitchen finds the START entry by name ignoring case (`Start` works). D10: the red
+  branch of a condition such as File exists is its "else", and what an entry in between does matters. D6:
+  Kettle's advice to "Insert a Dummy step" for an input in several copies hides the unsorted rows instead of
+  fixing them.
+
 ## [0.5.0] - 2026-10-21
 
 ### Added

@@ -36,9 +36,15 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
 
 ## 0.6.0 · Calidad y clases
 
-- **Linter de ETL** — buenas prácticas más allá de `validate`: rutas fijas, contraseñas a la vista,
-  Group by / Merge join sin ordenar, salidas sin manejo de errores, steps con nombre por defecto, la
-  trampa del decimal con locale español, conversión perezosa… Con puntaje y cómo arreglar cada cosa.
+- **Linter de ETL** — **hecho** (21-oct-2026, rama `feat/calidad`, sin publicar). Buenas prácticas más
+  allá de `validate`: rutas fijas, contraseñas a la vista, Group by / Merge join sin ordenar, steps con
+  nombre por defecto, la trampa del decimal con locale español… Con puntaje y cómo arreglar cada cosa.
+  Quedó así: `lint_etl` (28 reglas encendidas, puntaje 0-100 y modo profundo que lee las fuentes con
+  previews de solo lectura), `apply_lint_fixes` y `suppress_lint` (61 herramientas), el recurso
+  `pentaho://lint/rules` y la sección «Calidad técnica» de los Informes. Salidas sin manejo de errores
+  quedó como regla apagada (para el corrector y el modo clase) y la conversión perezosa se podó (sin daño
+  demostrado en 9.4). Falta: clic en un hallazgo de la vista previa para seleccionar el step y un botón
+  «Revisar calidad». Diseño: `docs/linter-diseno.md`; integración: `docs/linter-integracion.md`.
 - **Corrector de ejercicios** — el docente deja la salida esperada (y opcionalmente reglas); el plugin
   corre la transformación del alumno, compara filas y arma la nota con lo que falló.
 - **Modo clase** — Claude construye despacio y deja una nota en el lienzo junto a cada step

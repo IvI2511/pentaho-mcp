@@ -2,9 +2,9 @@
 
 Qué falta para que el motor del linter (rama `feat/linter`) llegue a Spoon, con los cambios exactos en los
 archivos compartidos. El diseño es `docs/linter-diseno.md`; este documento no lo repite.
-Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP3, WP4, WP5 y WP6 integrados** en
+Fecha: 20-oct-2026. Estado: **motor estático hecho y probado sin Spoon**. **WP3 a WP7 integrados** en
 `feat/calidad` (sobre `dev` 0.5.0, que ya trae Informes): lo que cambió respecto de este plan está en §2.5, §2.6,
-§2.7 y §2.8.
+§2.7, §2.8 y §2.9.
 
 ## 1. Qué hay en la rama
 
@@ -315,6 +315,29 @@ acá mismo, con cambios chicos en sus archivos:
   (`TiempoAgotado`, cancelación, textos). Además `PruebaServicio`, `PruebaModelo`, `PruebaMcpInformes` y
   `PruebaPanelSwt` cuentan la sección nueva y el check.
 
+### 2.9 WP7 en `feat/calidad` (21-oct-2026): documentación
+
+- **Skill**: sección «Quality: `lint_etl`» en `SKILL.md` (cuándo correrlo, el puntaje, el modo profundo, arreglar y
+  silenciar, la sección de los informes) y la fila en «Where everything is»; guía nueva `manual/06-calidad.md` (qué
+  herramienta, cuándo, cómo leer el resultado con una salida real de m09, el puntaje, la tabla de las 31 reglas con su
+  arreglo y su código D/C, modo profundo, `apply_lint_fixes`, `suppress_lint`, la sección de informes y problemas
+  frecuentes). `04-informes.md` suma `quality` a la tabla de secciones y a «dónde están los datos».
+- **`03-errores-comunes.md`**: el id de regla al lado de D1-D11 y de C1, C2, C13, C14, C15, C23 y C24, con las
+  correcciones del §12 del diseño: C24 (START sin importar mayúsculas: es el nombre, no `<start>Y</start>`), D10 (las
+  condiciones y la entrada del medio, lo de la revisión con Kitchen), D6 (el «Insert a Dummy step» de Kettle, con el
+  mensaje literal de la sonda de m16) y, de paso, D1 (mayúsculas), D2 (`StackOverflowError`) y D4 (división entera).
+  Un renglón nuevo en el checklist §E.
+- **Recurso** `pentaho://guide/quality` (la guía 06, como `pentaho://guide/reports`): una entrada en
+  `McpResources.DOCS` y el archivo en la lista de `build.ps1` (y en `tools/ci/compilar-plugin.sh`, que además no
+  copiaba `04-informes.md`). `PruebaLint.pruebaGuiaCalidad` controla que la guía esté en `resources/list` y que nombre
+  las 3 herramientas y **todos** los ids de `Catalogo`, y que cada D1-D11 de `03-errores-comunes.md` lleve un id que
+  existe.
+- **README** (los tres y `claude/README.md`): párrafo «Calidad», fila en la tabla de herramientas y en «qué le podés
+  pedir», 61 herramientas, y una línea de privacidad (el modo profundo lee datos y los hallazgos pueden citarlos;
+  también en `PRIVACY.md`). `INSTALL.md`: `"tools":61` en el ping. `CHANGELOG.md`: `[Unreleased]` con Added y
+  Changed. `docs/roadmap.md`: el linter, hecho. **Sin subir versiones** (`VERSION` y `plugin.json` siguen en 0.5.0:
+  eso es del release).
+
 ## 3. Lo que falta escribir
 
 | WP | Qué | Dónde | Necesita |
@@ -322,7 +345,7 @@ acá mismo, con cambios chicos en sus archivos:
 | ~~WP3~~ | **Hecho** (§2.7): modo profundo (`deep=true`), sondas de orden, diferencial y decimal, lista blanca y presupuesto. | `LintSondas.java`, `lint/Sondas.java`, `RunMotor.filas` | — |
 | ~~WP5~~ | **Hecho** (§2.6): `apply_lint_fixes`, `suppress_lint` y las propuestas de nombre. | `LintArreglos.java`, `LintPropuestas.java` | — |
 | ~~WP6~~ | **Hecho** (§2.8): sección «Calidad técnica» (`quality`, `quality_deep`). Queda abierto el `LocationListener` (clic en un hallazgo) y el botón «Revisar calidad». | `SecCalidad.java` y los cambios chicos de Informes | — |
-| WP7 | Skill: sección «Calidad» en `SKILL.md` y los ids de regla al lado de D1-D11 en `03-errores-comunes.md` (con las correcciones de §12 del diseño); `CHANGELOG.md`; conteo de herramientas en los README | `claude/` (sube `version` del `plugin.json`) | — |
+| ~~WP7~~ | **Hecho** (§2.9): sección «Quality» en `SKILL.md`, guía `manual/06-calidad.md`, ids de regla en `03-errores-comunes.md` (con las correcciones de §12 del diseño), `CHANGELOG.md`, README e `INSTALL.md`. La versión del `plugin.json` la sube el release. | `claude/`, README, `CHANGELOG.md` | — |
 
 ## 4. Decisiones de esta rama
 

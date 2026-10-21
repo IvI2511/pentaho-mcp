@@ -110,7 +110,12 @@ final class McpResources {
     new Doc( "pentaho://guide/reports", "reports", "Reports (build_report, get_report_data, show_report)",
       "Which report tool to use, the usual flow, sections, formats and languages, and how to write the "
         + "optional narrative from get_report_data so that every statement rests on the real numbers.",
-      "manual/04-informes.md" )
+      "manual/04-informes.md" ),
+    new Doc( "pentaho://guide/quality", "quality", "Technical quality (lint_etl, apply_lint_fixes, suppress_lint)",
+      "When to run lint_etl and how to read its findings and its 0-100 score, the rules and the Pan/Kitchen error "
+        + "each one prevents, the deep mode that reads the sources, applying fixes, silencing a rule, and the "
+        + "quality section of the reports. The machine-readable rule catalog is pentaho://lint/rules.",
+      "manual/06-calidad.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

@@ -39,9 +39,16 @@ and runs the transformation. Every change goes through Spoon's own undo, so **Ct
 
 **Reports.** Spoon gets a new **Reports** perspective that documents the open transformation or job by
 itself: cover, flow diagram, field lineage, data dictionary, target table model, data profile, run
-metrics with charts, validation, connections and parameters. It exports HTML, PDF, Markdown (for
-Obsidian or GitHub) and PowerPoint, with your name, institution, logo and colors. Claude can build the
-same report for you and add a short narrative written from the real numbers.
+metrics with charts, validation, technical quality, connections and parameters. It exports HTML, PDF,
+Markdown (for Obsidian or GitHub) and PowerPoint, with your name, institution, logo and colors. Claude can
+build the same report for you and add a short narrative written from the real numbers.
+
+**Quality.** Claude can also review an ETL for what Kettle lets through without an error: Group by or
+Merge join without sorting, the empty decimal symbol that turns `2.50` into `250` on a computer set to
+Spanish, hardcoded paths, passwords stored in the file, a failure branch that ends in Success. You get a
+0-100 technical quality score that shows where every lost point comes from, and the safe fixes are applied
+as one Ctrl+Z (Claude asks first about the ones that change what the ETL does). The same check is a section
+of the report.
 
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
@@ -56,6 +63,7 @@ Kitchen.
 | *"Make a job that runs these two transformations in order and stops if the first one fails."* | builds the job with its entries and success / failure hops |
 | *"The canvas is a mess, tidy it up."* | lays out the steps left to right, with no crossed lines |
 | *"Why does this `.ktr` fail in Pan?"* | reads it, finds the problem with the verified error list and fixes it |
+| *"Check this transformation for bad practices before I hand it in, and fix what's safe."* | runs the quality check, explains each finding, applies the safe fixes in one Ctrl+Z and asks before the rest |
 | *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
 
 ## How it works
@@ -81,7 +89,7 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with about 60 tools, and applies every edit on Spoon's UI thread with undo support.
+  `127.0.0.1:8765` with 61 tools, and applies every edit on Spoon's UI thread with undo support.
   The same jar adds the **Reports** perspective to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.
@@ -164,11 +172,12 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Jobs | Add, configure and connect job entries; set success / failure / unconditional hops |
 | Fields | List the fields each step outputs, before configuring the next one |
 | Checks | Validate, preview real rows from any step |
+| Quality | Check good practices beyond validation with a 0-100 score (optionally reading the sources to prove a problem), apply the proposed fixes, silence a rule where it is deliberate |
 | Running | Run a transformation or job, follow its status and logs, stop it |
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
 | Canvas | Add notes, select steps, tidy the layout, take a screenshot of the canvas |
-| Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, JSON) with lineage, data dictionary, metrics and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
+| Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, JSON) with lineage, data dictionary, metrics, technical quality and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
 
 </details>
 
@@ -184,6 +193,9 @@ Everything runs on your computer. There are no servers, accounts, analytics or t
 - Reports never include passwords. They can include host names, file paths and, in the data profile, real
   values from your data (you can hide them in the report settings). The profile and the "Measure" option
   run a copy of the transformation only when you ask, and that copy writes its outputs like a normal run.
+- The quality check (`lint_etl`) does not run the transformation. Its deep mode reads up to 5000 rows of
+  your sources only when you ask, through previews limited to read-only steps, and its findings can quote
+  values it read.
 - What the tools return (steps, field names, logs, preview rows) becomes part of your conversation with
   Claude, like anything else you share.
 

@@ -40,10 +40,17 @@ reais de preview e executa a transformação. Toda alteração passa pelo desfaz
 
 **Relatórios.** O Spoon ganha uma nova perspectiva, **Relatórios**, que documenta sozinha a
 transformação ou o job aberto: capa, diagrama de fluxo, linhagem de campos, dicionário de dados, modelo
-das tabelas de destino, perfil de dados, métricas de execução com gráficos, validação, conexões e
-parâmetros. Exporta para HTML, PDF, Markdown (para Obsidian ou GitHub) e PowerPoint, com seu nome,
-instituição, logo e cores. O Claude pode montar o mesmo relatório e acrescentar uma narrativa curta
+das tabelas de destino, perfil de dados, métricas de execução com gráficos, validação, qualidade técnica,
+conexões e parâmetros. Exporta para HTML, PDF, Markdown (para Obsidian ou GitHub) e PowerPoint, com seu
+nome, instituição, logo e cores. O Claude pode montar o mesmo relatório e acrescentar uma narrativa curta
 escrita a partir dos números reais.
+
+**Qualidade.** O Claude também pode revisar um ETL procurando o que o Kettle deixa passar sem erro: Group
+by ou Merge join sem ordenar, o símbolo decimal vazio que, num computador configurado em espanhol,
+transforma `2.50` em `250`, caminhos fixos, senhas gravadas no arquivo, um ramo de erro que termina em
+Success. Você recebe uma pontuação de qualidade técnica de 0 a 100 que mostra de onde sai cada ponto
+perdido, e as correções seguras são aplicadas com um único Ctrl+Z (antes das que mudam o que o ETL faz, o
+Claude pergunta). A mesma revisão é uma seção do relatório.
 
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
@@ -58,6 +65,7 @@ Kitchen.
 | *"Crie um job que rode estas duas transformações em sequência e pare se a primeira falhar."* | monta o job com as entradas e os hops de sucesso / falha |
 | *"O canvas está uma bagunça, organize."* | alinha os steps da esquerda para a direita, sem linhas cruzadas |
 | *"Por que este `.ktr` falha no Pan?"* | lê o arquivo, encontra o problema na lista de erros verificados e corrige |
+| *"Revise as boas práticas desta transformação antes de eu entregar e corrija o que for seguro."* | roda a revisão de qualidade, explica cada achado, aplica as correções seguras com um Ctrl+Z e pergunta antes do resto |
 | *"Faça um relatório desta transformação para o trabalho, em PDF e PowerPoint, com uma conclusão curta."* | monta o relatório (linhagem, dicionário de dados, métricas…), escreve a conclusão com os dados reais e exporta os dois arquivos |
 
 ## Como funciona
@@ -83,7 +91,7 @@ flowchart LR
 ```
 
 - O **plugin do Spoon** é um plugin de ciclo de vida do Kettle. Quando o Spoon abre, ele sobe um servidor
-  MCP em `127.0.0.1:8765` com cerca de 60 ferramentas e aplica cada alteração na thread de interface do
+  MCP em `127.0.0.1:8765` com 61 ferramentas e aplica cada alteração na thread de interface do
   Spoon, com desfazer. O mesmo jar acrescenta a perspectiva **Relatórios** ao seletor de perspectivas do
   Spoon.
 - O **plugin do Claude Code `pentaho-live`** conecta o Claude a esse servidor e inclui a skill
@@ -167,11 +175,12 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Jobs | Adicionar, configurar e conectar entradas; hops de sucesso / falha / incondicionais |
 | Campos | Listar os campos que saem de cada step, antes de configurar o próximo |
 | Verificações | Validar; preview de linhas reais de qualquer step |
+| Qualidade | Revisar boas práticas além da validação, com uma pontuação de 0 a 100 (e, se você pedir, lendo as fontes para provar um problema); aplicar as correções propostas; silenciar uma regra onde ela é proposital |
 | Execução | Executar uma transformação ou um job, acompanhar o status e o log, parar |
 | Bancos de dados | Listar tipos de conexão; criar, testar e excluir conexões; ver tabelas e colunas; rodar consultas SQL (somente leitura, a menos que você peça escrita) |
 | Parâmetros | Listar, definir e excluir parâmetros |
 | Canvas | Adicionar notas, selecionar steps, organizar o layout, tirar uma imagem do canvas |
-| Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, JSON) com linhagem, dicionário de dados, métricas e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
+| Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, JSON) com linhagem, dicionário de dados, métricas, qualidade técnica e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
 
 </details>
 
@@ -189,6 +198,9 @@ Tudo roda no seu computador. Não há servidores, contas, analytics nem telemetr
   dados, valores reais dos seus dados (dá para ocultá-los nas configurações do relatório). O perfil e a
   opção «Medir» rodam uma cópia da transformação só quando você pede, e essa cópia grava suas saídas como
   uma execução normal.
+- A revisão de qualidade (`lint_etl`) não executa a transformação. O modo profundo lê até 5000 linhas das
+  suas fontes só quando você pede, com previews limitadas a steps somente leitura, e os achados podem citar
+  valores lidos.
 - O que as ferramentas devolvem (steps, nomes de campos, logs, linhas de preview) passa a fazer parte da
   sua conversa com o Claude, como qualquer outra coisa que você compartilhe.
 

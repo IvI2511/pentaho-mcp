@@ -9,6 +9,8 @@ import static io.github.ivi2511.pentahomcp.Verificador.noContiene;
 import static io.github.ivi2511.pentahomcp.Verificador.noNulo;
 
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -26,6 +28,7 @@ import io.github.ivi2511.pentahomcp.lint.Catalogo;
 import io.github.ivi2511.pentahomcp.lint.LintJson;
 import io.github.ivi2511.pentahomcp.lint.LintMotor;
 import io.github.ivi2511.pentahomcp.lint.Opciones;
+import io.github.ivi2511.pentahomcp.lint.Regla;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
 
 /**
@@ -75,6 +78,44 @@ public class PruebaLint {
     }
     // la misma instancia lo cachea: la segunda lectura es identica
     igual( texto, r.leer( McpResources.LINT_REGLAS ).path( "contents" ).path( 0 ).path( "text" ).asText(), "cache" );
+  }
+
+  // ---------------------------------------------------------------- las guias de la skill (WP7)
+
+  /**
+   * La guia 06-calidad.md tambien es un recurso (pentaho://guide/quality, para clientes sin la skill) y nombra las
+   * tres herramientas y todos los ids del catalogo: si se suma una regla, la guia tiene que decirla. Y cada D1-D11
+   * de 03-errores-comunes.md lleva al lado ("· `id`") una regla que existe.
+   */
+  public void pruebaGuiaCalidad() throws Exception {
+    McpResources r = new McpResources();
+    contiene( r.listar( null ).toString(), "pentaho://guide/quality", "resources/list trae la guia de calidad" );
+    String guia = r.leer( "pentaho://guide/quality" ).path( "contents" ).path( 0 ).path( "text" ).asText();
+    for ( String nombre : new String[] { "lint_etl", "apply_lint_fixes", "suppress_lint", "pentaho://lint/rules",
+      "quality_deep", "all_auto" } ) {
+      contiene( guia, nombre, "la guia nombra " + nombre );
+    }
+    for ( Regla regla : Catalogo.todas() ) {
+      contiene( guia, "`" + regla.id() + "`", "la guia nombra la regla " + regla.id() );
+    }
+
+    String errores = r.leer( "pentaho://guide/common-errors" ).path( "contents" ).path( 0 ).path( "text" ).asText();
+    Matcher titulo = Pattern.compile( "(?m)^### (D\\d+)\\. .*$" ).matcher( errores );
+    int silenciosos = 0;
+    while ( titulo.find() ) {
+      silenciosos++;
+      String linea = titulo.group();
+      int punto = linea.lastIndexOf( " · " );
+      cierto( punto > 0, titulo.group( 1 ) + " lleva el id de la regla: " + linea );
+      Matcher id = Pattern.compile( "`([a-z_]+)`" ).matcher( linea.substring( punto ) );
+      int ids = 0;
+      while ( id.find() ) {
+        ids++;
+        noNulo( Catalogo.buscar( id.group( 1 ) ), titulo.group( 1 ) + ": la regla " + id.group( 1 ) + " existe" );
+      }
+      cierto( ids > 0, titulo.group( 1 ) + " nombra al menos una regla: " + linea );
+    }
+    igual( 11, silenciosos, "D1-D11 en 03-errores-comunes.md" );
   }
 
   // ---------------------------------------------------------------- validate con el motor

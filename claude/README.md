@@ -14,9 +14,20 @@ Hitachi Vantara. Pentaho is a trademark of Hitachi Vantara.
   entries with their default XML, an annotated guide to the ~45 most used steps, nine runnable examples
   and the errors Pan/Kitchen give (including the silent ones). It works on its own: without Spoon,
   Claude writes the file and checks it with Pan.
-- **MCP connection `pentaho`**: 58 tools (create/open/save, add/configure/connect steps and job
-  entries, list output fields, validate, preview rows, run, database connections, parameters, and
-  reports: HTML, PDF, Markdown and PowerPoint with lineage, data dictionary and run metrics).
+- **MCP connection `pentaho`**: 61 tools (create/open/save, add/configure/connect steps and job
+  entries, list output fields, validate, preview rows, run, database connections, parameters, a
+  quality check, and reports: HTML, PDF, Markdown and PowerPoint with lineage, data dictionary, run
+  metrics and technical quality).
+
+## Quality
+
+`lint_etl` reviews the open transformation or job for what Kettle lets through: Group by or Merge join
+without sorting, the empty decimal symbol trap, Calculator Integer × Number, hardcoded paths, passwords
+in the file, a failure branch that ends in Success, default step names… It gives a 0-100 technical
+quality score that shows where every lost point comes from. `apply_lint_fixes` applies the fixes it
+proposes as one Ctrl+Z (Claude asks you first about the ones that change what the ETL does), and
+`suppress_lint` silences a rule where it is on purpose. On request, a deep mode reads the sources to
+prove whether an unsorted input or a decimal symbol really changes the result.
 
 ## Requirement: the Spoon-side plugin
 
@@ -37,6 +48,9 @@ claude.ai chat only the skill is useful.
 - The Spoon-side plugin listens on the loopback interface only and rejects browser requests from other
   origins. It edits the documents you have open, writes files only where you ask Claude to save, and
   runs transformations only when asked. Database passwords are never returned to Claude.
+- The quality check does not run the transformation. Its deep mode, only when asked, reads up to 5000
+  rows of the sources through previews limited to read-only steps, and its findings can quote values it
+  read.
 - The skill may ask Claude to run Pan or Kitchen (PDI's command-line runners) on your computer to
   verify a file. Claude Code asks for permission before running commands, as usual.
 - Source code of everything, including the Java plugin, is in the
@@ -47,6 +61,7 @@ claude.ai chat only the skill is useful.
 - *"Build a transformation that reads ventas.csv, adds the city from clientes.csv, sums the amount per
   city and writes a CSV."*
 - *"Why does this .ktr fail in Pan?"*
+- *"Check this transformation for bad practices and fix what's safe."*
 - *"Add a Filter rows after the CSV input that keeps rows with saldo > 1000 and preview the result."*
 
 ## Privacy
