@@ -402,7 +402,8 @@ final class EstresSandbox {
         return e;
       }
       if ( "CsvInput".equals( e.tipo ) || "TextFileInput".equals( e.tipo ) ) {
-        if ( "TextFileInput".equals( e.tipo ) && "Fixed".equalsIgnoreCase( texto( x, "file_type" ) ) ) {
+        if ( "TextFileInput".equals( e.tipo ) && ( "Fixed".equalsIgnoreCase( texto( x, "file_type" ) )
+          || ( file != null && "Fixed".equalsIgnoreCase( texto( file, "type" ) ) ) ) ) {
           e.noEvaluada = "fixed-width files are not supported yet";
           return e;
         }

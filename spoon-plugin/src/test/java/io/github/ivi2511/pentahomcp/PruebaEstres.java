@@ -171,6 +171,20 @@ public class PruebaEstres {
     sinRestos();
   }
 
+  public void pruebaTextFileInputTipado() throws Exception {
+    ObjectNode o = probar( "typed_text_input.ktr", "bad_numbers", "header_only" );
+    cierto( o.path( "ran" ).asBoolean(), "corrió: " + o );
+    JsonNode in = o.path( "static" ).path( "inputs" ).get( 0 );
+    igual( 8, in.path( "base_rows" ).asInt(), "leyó la base de un Text file input: " + in );
+    JsonNode malos = variante( o, "bad_numbers" );
+    igual( 6, malos.path( "inputs" ).path( "Read text" ).path( "injected" ).path( "bad_numbers" ).asInt(),
+      "números malos en los dos campos numéricos declarados" );
+    igual( "fail", check( malos, "no_abort" ).path( "status" ).asText(), "un número malo aborta: " + malos );
+    contiene( check( malos, "no_abort" ).toString(), "Read text", "nombra el Text file input" );
+    igual( "pass", check( variante( o, "header_only" ), "no_abort" ).path( "status" ).asText(), "solo cabecera" );
+    sinRestos();
+  }
+
   /** db/dw.sqlite junto a la copia de los .ktr, con la tabla vacía (sin clave primaria: duplicar es posible). */
   private File baseSqlite() throws Exception {
     File db = new File( dir, "db/dw.sqlite" );
