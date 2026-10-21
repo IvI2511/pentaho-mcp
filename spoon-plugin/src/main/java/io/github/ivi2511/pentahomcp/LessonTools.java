@@ -77,7 +77,19 @@ final class LessonTools {
       a -> {
         Entorno ent = LeccionMotor.spoon();
         TransMeta tm = Docs.ui( () -> Docs.trans( a ) );
-        return LeccionMotor.inicioJson( LeccionMotor.empezar( ent, a, tm ) );
+        Leccion l = LeccionMotor.empezar( ent, a, tm );
+        String sinPestana;
+        try {
+          sinPestana = Docs.ui( () -> LeccionPanel.abrir( l ) );
+        } catch ( Throwable t ) {
+          sinPestana = TransOps.mensaje( t );
+        }
+        ObjectNode o = LeccionMotor.inicioJson( l );
+        if ( sinPestana != null ) {
+          ArrayNode w = o.has( "warnings" ) ? (ArrayNode) o.get( "warnings" ) : o.putArray( "warnings" );
+          w.add( "The Lesson tab could not be opened (" + sinPestana + "): use lesson_next to advance." );
+        }
+        return o;
       } ) );
 
     s.add( Tools.tool( "lesson_next",

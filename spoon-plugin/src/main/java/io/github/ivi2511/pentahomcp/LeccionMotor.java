@@ -649,7 +649,8 @@ final class LeccionMotor {
     }
     synchronized ( l ) {
       l.posicion++;
-      l.motivo = null;
+      l.motivo = l.pausaPedida ? l.motivoPausa : null;
+      l.motivoPausa = null;
       if ( l.posicion >= l.pasos.size() ) {
         l.estado = Estado.DONE;
       } else {
@@ -850,6 +851,56 @@ final class LeccionMotor {
     }
   }
 
+  /**
+   * Se cerro la pestana «Leccion» (el usuario oculto el panel de resultados): en guided/auto la leccion queda en
+   * pausa con motivo panel_hidden (en guided no hay boton; en auto seguiria sin que nadie la vea). §6
+   */
+  static void panelOculto( Leccion l ) {
+    synchronized ( l ) {
+      if ( l.ritmo == Ritmo.MANUAL ) {
+        return;
+      }
+      if ( l.estado == Estado.WAITING ) {
+        l.estado = Estado.PAUSED;
+        l.motivo = "panel_hidden";
+        l.cambio();
+      } else if ( l.estado == Estado.PLAYING && !l.pausaPedida ) {
+        l.pausaPedida = true;
+        l.motivoPausa = "panel_hidden";
+        l.cambio();
+      }
+    }
+  }
+
+  /** La pestana volvio: reanuda solo la pausa que puso {@link #panelOculto} (no una pedida por alguien). */
+  static void panelVisible( Leccion l ) {
+    synchronized ( l ) {
+      if ( l.estado == Estado.PAUSED && "panel_hidden".equals( l.motivo ) ) {
+        l.estado = Estado.WAITING;
+        l.motivo = null;
+        l.proximo = System.currentTimeMillis() + l.delayMs;
+        l.cambio();
+      } else if ( l.estado == Estado.PLAYING && "panel_hidden".equals( l.motivoPausa ) ) {
+        l.pausaPedida = false;
+        l.motivoPausa = null;
+        l.cambio();
+      }
+    }
+  }
+
+  /** La ultima leccion de un documento (por identidad), o null. */
+  static Leccion deDocumento( TransMeta tm ) {
+    synchronized ( LECCIONES ) {
+      Leccion r = null;
+      for ( Leccion l : LECCIONES.values() ) {
+        if ( l.tm == tm ) {
+          r = l;
+        }
+      }
+      return r;
+    }
+  }
+
   // ---------------------------------------------------------------- lesson_status / lesson_control
 
   /** Espera hasta wait_s a que cambie algo (o a que la posicion difiera de 'since'). */
@@ -921,6 +972,7 @@ final class LeccionMotor {
               l.proximo = System.currentTimeMillis() + l.delayMs;
             } else if ( l.estado == Estado.PLAYING ) {
               l.pausaPedida = false;
+              l.motivoPausa = null;
             } else {
               avisos.add( "Nothing to resume: the lesson is " + l.estado.json + "." );
             }

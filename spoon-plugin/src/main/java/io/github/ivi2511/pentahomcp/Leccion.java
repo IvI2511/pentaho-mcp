@@ -135,6 +135,8 @@ final class Leccion {
   long cambios;
   boolean pedido;
   boolean pausaPedida;
+  /** Motivo de la pausa pedida mientras corre un paso (panel_hidden), o null. */
+  String motivoPausa;
   /** Hay un hilo pentaho-live-leccion esperando clics o el temporizador. */
   boolean hiloVivo;
   long proximo;
