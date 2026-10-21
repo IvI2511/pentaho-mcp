@@ -86,6 +86,8 @@ public final class ModeloMuestra {
     inf.secciones.add( metricas() );
     inf.secciones.add( validacion() );
     inf.secciones.add( calidad() );
+    inf.secciones.add( Seccion.omitida( SeccionId.LECCION, "Guía de la lección",
+      "Este documento no tiene una lección" ) );
     inf.secciones.add( conexiones() );
     inf.secciones.add( narrativa() );
     return inf;

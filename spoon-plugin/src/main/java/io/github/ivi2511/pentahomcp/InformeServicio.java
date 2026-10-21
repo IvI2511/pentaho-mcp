@@ -137,7 +137,7 @@ public final class InformeServicio {
   private static final List<Recolector> RECOLECTORES = Collections.unmodifiableList( Arrays.<Recolector>asList(
     new SecPortada(), new SecResumen(), new SecFlujo( false ), new SecFlujo( true ), new SecLinaje(),
     new SecDiccionario(), new SecDestino(), new SecPerfil(), new SecMetricas(), new SecValidacion(), new SecCalidad(),
-    new SecConexiones(), new SecNarrativa() ) );
+    new SecLeccion(), new SecConexiones(), new SecNarrativa() ) );
 
   /** Secciones marcadas por defecto (diseno §2.3); metrics ademas pide una corrida. */
   private static final Set<String> POR_DEFECTO = Collections.unmodifiableSet( new LinkedHashSet<String>( Arrays.asList(
@@ -304,14 +304,15 @@ public final class InformeServicio {
         && !c.copia.getDatabases().isEmpty();
       return conBase ? Disponibilidad.COSTO_BASE : Disponibilidad.COSTO_CAMPOS;
     }
-    // cover, summary, connections, narrative, target_model (sin consultar la base), metrics (ultima corrida)
+    // cover, summary, connections, narrative, target_model (sin consultar la base), metrics (ultima corrida), lesson
     return Disponibilidad.COSTO_NADA;
   }
 
   /** Secciones que no consultan campos ni la base ni ejecutan: corren aunque se agote el plazo. */
   static boolean barata( String id ) {
     return SeccionId.PORTADA.equals( id ) || SeccionId.RESUMEN.equals( id ) || SeccionId.FLUJO.equals( id )
-      || SeccionId.FLUJO_JOB.equals( id ) || SeccionId.CONEXIONES.equals( id ) || SeccionId.NARRATIVA.equals( id );
+      || SeccionId.FLUJO_JOB.equals( id ) || SeccionId.CONEXIONES.equals( id ) || SeccionId.NARRATIVA.equals( id )
+      || SeccionId.LECCION.equals( id );
   }
 
   private static String noAplica( Recolector r, Captura c, String idioma ) {

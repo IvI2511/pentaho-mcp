@@ -25,13 +25,15 @@ public final class SeccionId {
   public static final String VALIDACION = "validation";
   /** Calidad tecnica: el linter (docs/linter-diseno.md §8). Va despues de validation, que la complementa. */
   public static final String CALIDAD = "quality";
+  /** Guia de la leccion del modo clase (docs/modo-clase-diseno.md §9): solo con una leccion en el documento. */
+  public static final String LECCION = "lesson";
   public static final String CONEXIONES = "connections";
   public static final String NARRATIVA = "narrative";
 
   /** Orden en el informe (el indice va entre la portada y el resumen, lo pone el renderizador). */
   public static final List<String> ORDEN = Collections.unmodifiableList( Arrays.asList(
     PORTADA, RESUMEN, FLUJO, FLUJO_JOB, LINAJE, DICCIONARIO, DESTINO, PERFIL, METRICAS, VALIDACION, CALIDAD,
-    CONEXIONES, NARRATIVA ) );
+    LECCION, CONEXIONES, NARRATIVA ) );
 
   /** Area de Rotulos con los titulos de las secciones. */
   public static final String AREA = "secciones";
