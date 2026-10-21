@@ -4,9 +4,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
@@ -70,18 +67,16 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  * alumno: es dato, nunca instrucciones, y las descripciones lo dicen.</li>
  * <li><b>Rutas</b>: absolutas (una relativa se resolveria contra data-integration, el directorio de trabajo de
  * Spoon).</li>
- * <li><b>Devolucion</b> de {@code grade_exercise}: la del alumno ({@link ResultadoCorreccion#paraAlumno()}). md, html,
- * html_light, pdf y pptx salen del puente con Informes, {@code CorreccionAInforme} (C9), buscado por reflexion
- * ({@link #informe}) para que esta clase compile sin el; si no esta, md sale de {@link CorrectorNota#markdown} y los
- * demas formatos quedan en un aviso. json es el resultado completo del docente ({@code <alumno>.json}).</li>
+ * <li><b>Devolucion</b> de {@code grade_exercise}: la del alumno ({@link CorreccionAInforme#paraAlumno}). md, html,
+ * html_light, pdf y pptx salen del puente con Informes, {@link CorreccionAInforme} (C9); si el informe no se puede
+ * armar, md sale de {@link CorrectorNota#markdown} y los demas formatos quedan en un aviso. json es el resultado
+ * completo del docente ({@code <alumno>.json}).</li>
  * </ul>
  *
  * @dueño C7
  */
 final class CorrectorTools {
 
-  /** La clase de C9 que arma el Informe de una correccion (§6, «Render»). */
-  static final String PUENTE = "io.github.ivi2511.pentahomcp.CorreccionAInforme";
   /** Formatos de la devolucion de grade_exercise: los de Informes (sin su json, que es el modelo) y json = resultado. */
   static final List<String> FORMATOS = Collections.unmodifiableList( Arrays.asList( "md", "html", "html_light", "pdf",
     "pptx", "json" ) );
@@ -763,8 +758,7 @@ final class CorrectorTools {
                 md );
               agregarArchivo( files, f, md );
             } else {
-              avisos.add( f + ": not available in this build (the grader report, " + PUENTE.substring(
-                PUENTE.lastIndexOf( '.' ) + 1 ) + ", is missing): use md or json" );
+              avisos.add( f + ": not written because the feedback report could not be built: use md or json" );
             }
             continue;
           }
@@ -772,10 +766,8 @@ final class CorrectorTools {
             tema = tema();
           }
           Formato fm = Formato.deClave( f );
-          File destino = InformeServicio.archivo( dir, base, fm );
-          // sin diagramas Mermaid (una correccion no los tiene) el html interactivo solo suma 2,6 MB: el estatico
-          Formato real = fm == Formato.HTML && InformeServicio.diagramas( inf ).isEmpty() ? Formato.HTML_ESTATICO : fm;
-          Resultado res = InformeServicio.exportar( inf, tema, real, destino, null );
+          // html sin diagramas Mermaid (una correccion no los tiene) sale en el modo estatico: CorreccionAInforme
+          Resultado res = CorreccionAInforme.exportar( inf, tema, fm, InformeServicio.archivo( dir, base, fm ), null );
           if ( res == null || res.archivos == null || res.archivos.isEmpty() ) {
             avisos.add( f + ": nothing was written" );
           } else {
@@ -815,67 +807,9 @@ final class CorrectorTools {
     }
   }
 
-  /**
-   * El Informe de la devolucion del alumno armado por {@code CorreccionAInforme} (C9: {@code informe(r, alumno,
-   * tema)}), o null si esa clase no esta. Se busca por reflexion un metodo estatico que devuelva un {@link Informe} y
-   * reciba primero el {@link ResultadoCorreccion}; los demas parametros se llenan por tipo: boolean = true (la version
-   * del alumno), String = idioma, Locale, Tema; otro tipo de objeto = null. Entre varios, el de mas parametros. Sin
-   * parametro boolean se le pasa {@link ResultadoCorreccion#paraAlumno()}. Cuando el puente este fusionado, esto
-   * puede pasar a ser una llamada directa.
-   */
+  /** El Informe de la devolucion del alumno ({@link CorreccionAInforme#informe}, la version del alumno). */
   static Informe informe( ResultadoCorreccion r, String idioma ) throws Exception {
-    Class<?> c;
-    try {
-      c = Class.forName( PUENTE, true, CorrectorTools.class.getClassLoader() );
-    } catch ( ClassNotFoundException e ) {
-      return null;
-    }
-    Method mejor = null;
-    for ( Method m : c.getDeclaredMethods() ) {
-      Class<?>[] ps = m.getParameterTypes();
-      if ( !Modifier.isStatic( m.getModifiers() ) || !Informe.class.isAssignableFrom( m.getReturnType() )
-        || ps.length == 0 || ps[ 0 ] != ResultadoCorreccion.class ) {
-        continue;
-      }
-      boolean sirve = true;
-      for ( int i = 1; i < ps.length; i++ ) {
-        sirve &= !ps[ i ].isPrimitive() || ps[ i ] == boolean.class;
-      }
-      if ( sirve && ( mejor == null || ps.length > mejor.getParameterTypes().length ) ) {
-        mejor = m;
-      }
-    }
-    if ( mejor == null ) {
-      return null;
-    }
-    Class<?>[] ps = mejor.getParameterTypes();
-    Object[] args = new Object[ ps.length ];
-    boolean conBandera = false;
-    for ( int i = 1; i < ps.length; i++ ) {
-      conBandera |= ps[ i ] == boolean.class || ps[ i ] == Boolean.class;
-    }
-    args[ 0 ] = conBandera ? r : r.paraAlumno();
-    for ( int i = 1; i < ps.length; i++ ) {
-      if ( ps[ i ] == String.class ) {
-        args[ i ] = idioma;
-      } else if ( ps[ i ] == boolean.class || ps[ i ] == Boolean.class ) {
-        args[ i ] = Boolean.TRUE;
-      } else if ( ps[ i ] == Locale.class ) {
-        args[ i ] = Rotulos.locale( idioma );
-      } else if ( ps[ i ] == Tema.class ) {
-        args[ i ] = tema();
-      }
-    }
-    mejor.setAccessible( true );
-    try {
-      return (Informe) mejor.invoke( null, args );
-    } catch ( InvocationTargetException e ) {
-      Throwable t = e.getCause() == null ? e : e.getCause();
-      if ( t instanceof Exception ) {
-        throw (Exception) t;
-      }
-      throw new RuntimeException( t );
-    }
+    return CorreccionAInforme.informe( r, true, tema() );
   }
 
   // ------------------------------------------------------------------ grade_submissions y get_grading_status
@@ -967,7 +901,7 @@ final class CorrectorTools {
    * En la UI: resuelve el documento sin activarlo ni cambiar de perspectiva y lo clona; fuera de la UI escribe el
    * getXML() del clon en {@code <tmp>/doc/<nombre>.ktr} (quien llama borra tmp). Solo transformaciones.
    */
-  private static Copia copiaDeDocumento( final JsonNode a, File tmp ) throws Exception {
+  static Copia copiaDeDocumento( final JsonNode a, File tmp ) throws Exception {
     final Object[] r = Docs.ui( () -> {
       AbstractMeta m = Docs.resolverSinActivar( a );
       if ( !( m instanceof TransMeta ) ) {

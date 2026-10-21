@@ -368,13 +368,8 @@ public class PruebaMcpCorrector {
     archivo( md, 200, "devolucion md" );
     String texto = EntornoKettle.leer( md );
     contiene( texto, "bruno_agregado_mal", "la devolucion nombra al alumno" );
-    if ( !puente() ) {
-      igual( CorrectorNota.markdown( completo, true ), texto, "md = la devolucion del alumno de CorrectorNota" );
-      contiene( o.path( "report" ).path( "warnings" ).toString(), "html: not available", "sin el puente, aviso" );
-    } else {
-      noNulo( files.get( "html" ), "con CorreccionAInforme hay html: " + o.path( "report" ) );
-      archivo( new File( files.get( "html" ) ), 500, "html" );
-    }
+    noNulo( files.get( "html" ), "con CorreccionAInforme hay html: " + o.path( "report" ) );
+    archivo( new File( files.get( "html" ) ), 500, "html" );
     // la devolucion del alumno no muestra los ejemplos del caso oculto
     ResultadoCorreccion alumno = completo.paraAlumno();
     nulo( alumno.caso( "oculto" ).comparacion.ejemplos, "sin ejemplos del oculto en la del alumno" );
@@ -538,16 +533,6 @@ public class PruebaMcpCorrector {
   }
 
   // ------------------------------------------------------------------ ayudas
-
-  /** Si CorreccionAInforme (C9) esta en el classpath. */
-  private static boolean puente() {
-    try {
-      Class.forName( CorrectorTools.PUENTE );
-      return true;
-    } catch ( ClassNotFoundException e ) {
-      return false;
-    }
-  }
 
   /** Espera (hasta 2 min) a que haya 2 GB libres antes de lanzar JVMs. */
   private static void memoria() throws InterruptedException {

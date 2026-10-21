@@ -35,6 +35,7 @@ import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion.Aviso;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
+import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
  * Un lote de correccion: la carpeta de entregas de un curso contra un pack (docs/corrector-diseno.md §8
@@ -50,7 +51,8 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * que solo difieren en mayusculas): la segunda pasa a {@code ana_2} con aviso ({@value #AVISO_IDENTIDAD_REPETIDA});
  * nunca se pisa un resultado. Una carpeta sin .ktr o un zip rechazado quedan {@code load_failed} sin lanzar nada.</li>
  * <li><b>Correccion</b>: {@link CorrectorProcesos} con {@link Opciones#workers} workers; cada resultado final pasa por
- * aca (avisos de identidad, devolucion {@code <alumno>.md} para el alumno, sin lo de los casos ocultos).</li>
+ * aca (avisos de identidad, devolucion {@code <alumno>.md} y {@code <alumno>.html} para el alumno, sin lo de los casos
+ * ocultos). {@link #recorregir} vuelve a corregir una entrega con mas steps permitidos (el panel, C8).</li>
  * <li><b>Trabajo</b>: {@link #iniciar} devuelve enseguida con un {@code job_id}; {@link #estado} da el progreso
  * ({@code running}, {@code finished}, {@code cancelled}), los resultados y el resumen; {@link #esperar} espera;
  * {@link #cancelar} mata los workers y deja lo ya corregido. Al terminar escribe la planilla
@@ -224,6 +226,11 @@ final class CorrectorLote {
     public String resultado;
     @JsonProperty( "feedback_path" )
     public String devolucion;
+    /** El ajuste del docente (con signo), si hay; lo edita el panel del corrector (C8). */
+    @JsonProperty( "adjustment" )
+    public Double ajuste;
+    @JsonProperty( "comment" )
+    public String comentario;
   }
 
   private final String id;
@@ -248,6 +255,8 @@ final class CorrectorLote {
   private String error;
   private Map<String, CorrectorPlanilla.Ajuste> ajustes;
   private Double segundos;
+  /** El tema de las devoluciones HTML (se lee una vez, en el hilo del supervisor). */
+  private Tema tema;
 
   private CorrectorLote( String id, Opciones op, CorrectorPack cp, String carpeta ) {
     this.id = id;
@@ -512,17 +521,93 @@ final class CorrectorLote {
     }
   }
 
-  /** Escribe {@code <alumno>.md} (la devolucion del alumno, sin lo de los casos ocultos); su nombre o null. */
+  /**
+   * Escribe {@code <alumno>.md} y {@code <alumno>.html} (la devolucion del alumno, sin lo de los casos ocultos; el
+   * HTML liviano de {@link CorreccionAInforme#devolucionHtml}, con los avisos traducidos); el nombre del .md o null.
+   */
   private String devolucion( Entrega e, ResultadoCorreccion r ) {
     if ( !op.devoluciones ) {
       return null;
     }
+    String nombre = null;
     try {
       File f = new File( salida, CorrectorMain.carpeta( e.alumno ) + ".md" );
       CorrectorPlanilla.escribirAtomico( CorrectorNota.markdown( r, true ).getBytes( StandardCharsets.UTF_8 ), f );
-      return f.getName();
+      nombre = f.getName();
     } catch ( Throwable t ) {
-      return null;
+      // sin .md
+    }
+    try {
+      if ( tema == null ) {
+        tema = CorreccionAInforme.tema(); // una vez por lote: informes.json no cambia en medio
+      }
+      CorreccionAInforme.devolucionHtml( r, new File( salida, CorrectorMain.carpeta( e.alumno ) + ".html" ), tema );
+    } catch ( Throwable t ) {
+      // sin .html: queda el .md
+    }
+    return nombre;
+  }
+
+  /**
+   * «Volver a corregir con...» (§9): corrige otra vez una entrega del lote ya terminado, con steps condicionales
+   * ademas de los del pack y, solo desde la UI, el modo confianza (los dos quedan en el resultado:
+   * {@code extra_allowed_steps}, {@code trust_mode}). Reemplaza su resultado, su devolucion y su fila, y reescribe la
+   * planilla. Lanza una JVM hija y espera: nunca en el hilo de UI.
+   *
+   * @throws IllegalStateException si el lote todavia corre
+   * @throws IllegalArgumentException si no hay una entrega con esa identidad
+   */
+  ResultadoCorreccion recorregir( String alumno, List<String> extra, boolean confianza ) throws Exception {
+    if ( !terminado() ) {
+      throw new IllegalStateException( "the grading job is still running" );
+    }
+    Entrega e = null;
+    synchronized ( this ) {
+      for ( Entrega x : entregas ) {
+        if ( x.alumno.equals( alumno ) ) {
+          e = x;
+        }
+      }
+    }
+    if ( e == null ) {
+      throw new IllegalArgumentException( "no submission with the identity " + alumno );
+    }
+    File tmp = Files.createTempDirectory( "pentaho-live-recorregir" ).toFile();
+    try ( CorrectorPack cp2 = CorrectorPack.cargar( op.pack, null ) ) {
+      File archivo = e.archivo;
+      if ( archivo == null || !archivo.isFile() ) {
+        // un .zip se descomprimio en _sandbox, que ya se borro: se vuelve a abrir el original
+        File origen = new File( op.carpeta.getAbsoluteFile(), e.nombre );
+        if ( !origen.exists() ) {
+          throw new IOException( "the submission is no longer in the folder: " + origen );
+        }
+        archivo = CorrectorTools.entrega( origen, cp2.pack(), tmp ).archivo;
+      }
+      Pedido pd = new Pedido( e.alumno, archivo, new File( salida, CorrectorMain.carpeta( e.alumno ) + ".json" ) );
+      pd.nombreVisible = e.visible;
+      CorrectorProcesos.Opciones po = opcionesProcesos();
+      po.workers = 1;
+      for ( String s : extra == null ? Collections.<String>emptyList() : extra ) {
+        if ( s != null && !s.trim().isEmpty() && !po.permitidosExtra.contains( s.trim() ) ) {
+          po.permitidosExtra.add( s.trim() );
+        }
+      }
+      po.modoConfianza = confianza;
+      List<ResultadoCorreccion> rs = CorrectorProcesos.corregir( cp2.raiz(), cp2.pack(), Collections.singletonList(
+        pd ), salida, po );
+      ResultadoCorreccion r = rs.isEmpty() ? null : rs.get( 0 );
+      if ( r == null ) {
+        throw new IOException( "the grading did not finish (see " + new File( salida, CorrectorProcesos.LOGS ) + ")" );
+      }
+      terminar( e, r );
+      escribirPlanillas();
+      return r;
+    } finally {
+      try {
+        CorrectorSandbox.borrar( tmp );
+      } catch ( Throwable ignorada ) {
+        // queda en el temporal del sistema
+      }
     }
   }
 
@@ -654,6 +739,8 @@ final class CorrectorLote {
       r.alumno = e.alumno;
       r.archivo = e.visible;
       r.estado = e.fila.estado();
+      r.ajuste = e.fila.ajuste;
+      r.comentario = e.fila.comentario;
       if ( e.fila.resultado != null ) {
         s.hechas++;
         r.motivo = e.fila.resultado.motivo;
