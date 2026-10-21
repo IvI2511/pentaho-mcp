@@ -1,0 +1,299 @@
+package io.github.ivi2511.pentahomcp;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import org.pentaho.di.core.gui.Point;
+import org.pentaho.di.core.plugins.PluginInterface;
+import org.pentaho.di.trans.TransHopMeta;
+import org.pentaho.di.trans.TransMeta;
+import org.pentaho.di.trans.step.StepErrorMeta;
+import org.pentaho.di.trans.step.StepMeta;
+import org.pentaho.metastore.api.IMetaStore;
+
+import io.github.ivi2511.pentahomcp.robustez.Cambio;
+import io.github.ivi2511.pentahomcp.robustez.Propuesta;
+
+/**
+ * harden_etl, paso 2 (hilo de UI sobre el documento vivo; o un hilo de trabajo sobre una copia en dry_run y en las
+ * pruebas): resuelve TODOS los nombres antes de tocar nada (una propuesta que ya no encaja va a skipped entera) y
+ * aplica en un orden fijo, todo en un {@link UndoGrupo} = un Ctrl+Z: (1) steps nuevos, (2) hops que se quitan,
+ * (3) hops nuevos, (4) reconfiguraciones, (5) manejo de errores, (6) parámetros (fuera del undo de Spoon).
+ */
+final class RobustecerAplicar {
+
+  private RobustecerAplicar() {
+  }
+
+  /** Lo que hizo aplicar(). */
+  static final class Hecho {
+    final ArrayNode aplicados = Tools.arr();
+    /** {key, motivo}. */
+    final List<String[]> saltados = new ArrayList<String[]>();
+    final Set<String> notas = new LinkedHashSet<String>();
+    int cambios;
+    int pasosDeshacer;
+  }
+
+  static Hecho aplicar( TransMeta tm, List<Propuesta> elegidas, UndoGrupo undo, IMetaStore ms ) {
+    Hecho h = new Hecho();
+    // 1) resolver: cada propuesta contra el documento tal como está, sin tocarlo
+    List<Propuesta> ok = new ArrayList<Propuesta>();
+    Map<String, String> hopsQuitados = new HashMap<String, String>();
+    for ( Propuesta x : elegidas ) {
+      String motivo = resolver( tm, x, hopsQuitados );
+      if ( motivo != null ) {
+        h.saltados.add( new String[] { x.key, motivo } );
+        continue;
+      }
+      for ( Cambio c : x.cambios ) {
+        if ( Cambio.REMOVE_HOP.equals( c.op ) ) {
+          hopsQuitados.put( c.firma(), x.key );
+        }
+      }
+      ok.add( x );
+    }
+    // los cambios de todas, sin repetir (las colas compartidas se crean una vez)
+    Map<String, Cambio> todos = new LinkedHashMap<String, Cambio>();
+    for ( Propuesta x : ok ) {
+      for ( Cambio c : x.cambios ) {
+        if ( !todos.containsKey( c.firma() ) ) {
+          todos.put( c.firma(), c );
+        }
+      }
+    }
+    if ( todos.isEmpty() ) {
+      return h;
+    }
+    try {
+      ejecutar( tm, new ArrayList<Cambio>( todos.values() ), undo, ms, h );
+      for ( Propuesta x : ok ) {
+        ObjectNode o = h.aplicados.addObject();
+        o.put( "key", x.key ).put( "recipe", x.receta ).put( "step", x.step );
+      }
+    } catch ( Exception e ) {
+      h.saltados.add( new String[] { "*", "failed: " + RunMotor.primeraLinea( e ) + " (the changes made so far are "
+        + "one Ctrl+Z)" } );
+    }
+    h.pasosDeshacer = Math.min( 1, undo.acciones() );
+    return h;
+  }
+
+  /** null si la propuesta se puede aplicar tal cual; si no, el motivo. */
+  private static String resolver( TransMeta tm, Propuesta x, Map<String, String> hopsQuitados ) {
+    Set<String> nuevos = new HashSet<String>();
+    for ( Cambio c : x.cambios ) {
+      if ( Cambio.ADD_STEP.equals( c.op ) ) {
+        nuevos.add( c.get( "name" ).toLowerCase( Locale.ROOT ) );
+        if ( tm.findStep( c.get( "name" ) ) != null ) {
+          return "no longer applies: there is already a step '" + c.get( "name" ) + "' (call harden_etl again)";
+        }
+      }
+    }
+    for ( Cambio c : x.cambios ) {
+      for ( String k : new String[] { "step", "from", "to", "target" } ) {
+        String n = c.get( k );
+        if ( n != null && !nuevos.contains( n.toLowerCase( Locale.ROOT ) ) && tm.findStep( n ) == null ) {
+          return "no longer applies: there is no step '" + n + "'";
+        }
+      }
+      if ( Cambio.REMOVE_HOP.equals( c.op ) ) {
+        if ( hop( tm, c.get( "from" ), c.get( "to" ) ) == null ) {
+          return "no longer applies: there is no hop '" + c.get( "from" ) + "' -> '" + c.get( "to" ) + "'";
+        }
+        String otra = hopsQuitados.get( c.firma() );
+        if ( otra != null ) {
+          return "conflicts with " + otra + " (both move the hop '" + c.get( "from" ) + "' -> '" + c.get( "to" )
+            + "'): call harden_etl again after this one";
+        }
+      }
+      if ( Cambio.ADD_HOP.equals( c.op ) && !nuevos.contains( c.get( "from" ).toLowerCase( Locale.ROOT ) )
+        && !nuevos.contains( c.get( "to" ).toLowerCase( Locale.ROOT ) )
+        && hop( tm, c.get( "from" ), c.get( "to" ) ) != null ) {
+        return "no longer applies: there is already a hop '" + c.get( "from" ) + "' -> '" + c.get( "to" ) + "'";
+      }
+      if ( Cambio.ADD_PARAMETER.equals( c.op ) && LintArreglos.tieneParametro( tm, c.get( "name" ) ) ) {
+        return "no longer applies: the parameter " + c.get( "name" ) + " already exists";
+      }
+    }
+    return null;
+  }
+
+  private static TransHopMeta hop( TransMeta tm, String de, String a ) {
+    StepMeta f = tm.findStep( de );
+    StepMeta t = tm.findStep( a );
+    return f == null || t == null ? null : tm.findTransHop( f, t, true );
+  }
+
+  /** Clon del step con su propio StepErrorMeta (StepMeta.clone lo comparte): para el undo. */
+  static StepMeta instantanea( StepMeta s ) {
+    StepMeta c = (StepMeta) s.clone();
+    c.setStepErrorMeta( s.getStepErrorMeta() == null ? null : s.getStepErrorMeta().clone() );
+    return c;
+  }
+
+  /**
+   * El «antes» de un step al que se le pone manejo de errores. StepMeta.replaceMeta (lo que hace Ctrl+Z en Spoon) solo
+   * copia el StepErrorMeta si el de antes no es null: con null, deshacer dejaría el manejo de errores habilitado hacia
+   * un step que ya no está (y la transformación fallaría al correr). Por eso, si no tenía, el «antes» lleva uno
+   * deshabilitado y sin destino: tras Ctrl+Z el step corre como antes (el .ktr guarda un &lt;error&gt; apagado).
+   */
+  static StepMeta instantaneaSinErrores( TransMeta tm, StepMeta s ) {
+    StepMeta c = instantanea( s );
+    if ( c.getStepErrorMeta() == null ) {
+      StepErrorMeta apagado = new StepErrorMeta( tm, c );
+      apagado.setEnabled( false );
+      c.setStepErrorMeta( apagado );
+    }
+    return c;
+  }
+
+  private static void ejecutar( TransMeta tm, List<Cambio> cambios, UndoGrupo undo, IMetaStore ms, Hecho h )
+    throws Exception {
+    // (1) steps nuevos (construidos todos antes de agregar ninguno: si uno no carga, no se toca nada)
+    List<StepMeta> nuevos = new ArrayList<StepMeta>();
+    for ( Cambio c : cambios ) {
+      if ( Cambio.ADD_STEP.equals( c.op ) ) {
+        PluginInterface pl = TransOps.plugin( c.get( "type" ) );
+        String cuerpo = Xml.mezclar( TransOps.plantilla( pl ), c.xml == null ? "" : c.xml, Xml.TAGS_ENVOLTORIO_STEP );
+        StepMeta s = TransOps.construir( tm, TransOps.id( pl ), c.get( "name" ), null, 1,
+          !"false".equals( c.get( "distribute" ) ), cuerpo, new Point( c.x, c.y ), ms );
+        for ( Map.Entry<String, String> e : c.atributos.entrySet() ) {
+          s.setAttribute( RobustecerAnalisis.GRUPO, e.getKey(), e.getValue() );
+        }
+        nuevos.add( s );
+      }
+    }
+    if ( !nuevos.isEmpty() ) {
+      Object[] objs = new Object[ nuevos.size() ];
+      int[] idx = new int[ nuevos.size() ];
+      for ( int i = 0; i < nuevos.size(); i++ ) {
+        tm.addStep( nuevos.get( i ) );
+      }
+      for ( int i = 0; i < nuevos.size(); i++ ) {
+        objs[ i ] = nuevos.get( i );
+        idx[ i ] = tm.indexOfStep( nuevos.get( i ) );
+      }
+      undo.nuevo( objs, idx );
+      h.cambios += nuevos.size();
+    }
+    // (2) hops que se quitan (por índice, de atrás para adelante)
+    final List<TransHopMeta> viejos = new ArrayList<TransHopMeta>();
+    for ( Cambio c : cambios ) {
+      if ( Cambio.REMOVE_HOP.equals( c.op ) ) {
+        TransHopMeta x = hop( tm, c.get( "from" ), c.get( "to" ) );
+        if ( x != null && !viejos.contains( x ) ) {
+          viejos.add( x );
+        }
+      }
+    }
+    if ( !viejos.isEmpty() ) {
+      final TransMeta t = tm;
+      Collections.sort( viejos, new Comparator<TransHopMeta>() {
+        @Override
+        public int compare( TransHopMeta a, TransHopMeta b ) {
+          return t.indexOfTransHop( a ) - t.indexOfTransHop( b );
+        }
+      } );
+      Object[] clones = new Object[ viejos.size() ];
+      int[] idx = new int[ viejos.size() ];
+      for ( int i = 0; i < viejos.size(); i++ ) {
+        clones[ i ] = viejos.get( i ).clone();
+        idx[ i ] = tm.indexOfTransHop( viejos.get( i ) );
+      }
+      for ( int i = viejos.size() - 1; i >= 0; i-- ) {
+        tm.removeTransHop( idx[ i ] );
+      }
+      undo.borrado( clones, idx );
+      h.cambios += viejos.size();
+    }
+    // (3) hops nuevos
+    List<TransHopMeta> hops = new ArrayList<TransHopMeta>();
+    for ( Cambio c : cambios ) {
+      if ( Cambio.ADD_HOP.equals( c.op ) ) {
+        TransHopMeta x = new TransHopMeta( tm.findStep( c.get( "from" ) ), tm.findStep( c.get( "to" ) ), true );
+        x.setErrorHop( "true".equals( c.get( "error" ) ) );
+        tm.addTransHop( x );
+        hops.add( x );
+      }
+    }
+    if ( !hops.isEmpty() ) {
+      Object[] objs = new Object[ hops.size() ];
+      int[] idx = new int[ hops.size() ];
+      for ( int i = 0; i < hops.size(); i++ ) {
+        objs[ i ] = hops.get( i );
+        idx[ i ] = tm.indexOfTransHop( hops.get( i ) );
+      }
+      undo.nuevo( objs, idx );
+      h.cambios += hops.size();
+    }
+    // (4) reconfiguraciones de steps existentes (mezcla sobre su configuración actual)
+    for ( Cambio c : cambios ) {
+      if ( Cambio.RECONFIGURE.equals( c.op ) ) {
+        StepMeta s = tm.findStep( c.get( "step" ) );
+        StepMeta antes = instantanea( s );
+        String aviso = TransOps.reconfigurar( tm, s, c.xml, ms );
+        if ( aviso != null ) {
+          h.notas.add( aviso );
+        }
+        undo.cambio( new Object[] { antes }, new Object[] { instantanea( s ) }, new int[] { tm.indexOfStep( s ) } );
+        h.cambios++;
+      }
+    }
+    // (5) manejo de errores
+    for ( Cambio c : cambios ) {
+      if ( Cambio.SET_ERROR_HANDLING.equals( c.op ) ) {
+        StepMeta s = tm.findStep( c.get( "step" ) );
+        StepMeta destino = tm.findStep( c.get( "target" ) );
+        StepMeta antes = instantaneaSinErrores( tm, s );
+        StepErrorMeta sem = s.getStepErrorMeta();
+        if ( sem == null ) {
+          sem = new StepErrorMeta( tm, s, destino );
+        } else {
+          sem = sem.clone();
+        }
+        sem.setSourceStep( s );
+        sem.setTargetStep( destino );
+        sem.setEnabled( true );
+        if ( c.get( "description_field" ) != null && vacio( sem.getErrorDescriptionsValuename() ) ) {
+          sem.setErrorDescriptionsValuename( c.get( "description_field" ) );
+        }
+        if ( c.get( "fields_field" ) != null && vacio( sem.getErrorFieldsValuename() ) ) {
+          sem.setErrorFieldsValuename( c.get( "fields_field" ) );
+        }
+        s.setStepErrorMeta( sem );
+        s.setChanged();
+        undo.cambio( new Object[] { antes }, new Object[] { instantanea( s ) }, new int[] { tm.indexOfStep( s ) } );
+        h.cambios++;
+      }
+    }
+    TransOps.resolverReferencias( tm );
+    // (6) parámetros: fuera del undo de Spoon (como add_parameter del linter)
+    for ( Cambio c : cambios ) {
+      if ( Cambio.ADD_PARAMETER.equals( c.op ) ) {
+        tm.addParameterDefinition( c.get( "name" ), c.get( "default" ), c.get( "description" ) );
+        h.notas.add( "The parameter " + c.get( "name" ) + " is not undone with Ctrl+Z (Spoon does not undo "
+          + "parameters): remove it in the transformation settings if needed." );
+        h.cambios++;
+      }
+    }
+    tm.clearCaches();
+    tm.setChanged();
+  }
+
+  private static boolean vacio( String s ) {
+    return s == null || s.trim().isEmpty();
+  }
+}
