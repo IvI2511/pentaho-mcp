@@ -478,7 +478,7 @@ public final class Variantes {
     throws IOException {
     byte[] b = leerTodo( f, 64L * 1024 * 1024 );
     String s = new String( b, fmt.charset() );
-    if ( s.startsWith( "﻿" ) ) {
+    if ( s.startsWith( "\uFEFF" ) ) {
       s = s.substring( 1 );
     }
     List<String[]> filas = new ArrayList<String[]>();

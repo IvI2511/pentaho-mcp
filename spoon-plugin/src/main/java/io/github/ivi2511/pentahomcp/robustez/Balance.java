@@ -239,7 +239,7 @@ public final class Balance {
       if ( n.agrega() ) {
         long todas = Math.max( p.recibidas, p.leidas );
         if ( todas != sale ) {
-          inf.agrupa.add( n.nombre + ": " + todas + " → " + sale );
+          inf.agrupa.add( n.nombre + ": " + todas + " -> " + sale );
         }
         continue;
       }
@@ -402,6 +402,6 @@ public final class Balance {
 
   static String recortar( String s ) {
     String x = s.replaceAll( "\\s+", " " ).trim();
-    return x.length() > 400 ? x.substring( 0, 400 ) + "…" : x;
+    return x.length() > 400 ? x.substring( 0, 400 ) + "..." : x;
   }
 }

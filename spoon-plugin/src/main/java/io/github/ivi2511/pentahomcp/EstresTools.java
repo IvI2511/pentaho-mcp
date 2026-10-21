@@ -500,7 +500,7 @@ final class EstresTools {
           r.sinMotivo++;
         } else if ( r.muestras.size() < 3 && !r.muestras.contains( m.trim() ) ) {
           String t = m.trim();
-          r.muestras.add( t.length() > 160 ? t.substring( 0, 160 ) + "…" : t );
+          r.muestras.add( t.length() > 160 ? t.substring( 0, 160 ) + "..." : t );
         }
       }
       if ( r.sinColumnaMotivo ) {
