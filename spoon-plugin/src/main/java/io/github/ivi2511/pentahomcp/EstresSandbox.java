@@ -144,6 +144,20 @@ final class EstresSandbox {
   static Analisis analizar( TransMeta tm, int filas, Set<String> soloEntradas, List<String> obligatorios )
     throws Exception {
     Analisis a = new Analisis();
+    if ( tm.getFilename() != null && !tm.getFilename().trim().isEmpty() ) {
+      // las rutas relativas al .ktr se resuelven contra la carpeta del ORIGINAL (la copia vive en el sandbox)
+      File ktr = new File( tm.environmentSubstitute( tm.getFilename() ) ).getAbsoluteFile();
+      String carpeta = ktr.getParent();
+      if ( carpeta != null ) {
+        for ( String v : new String[] { "Internal.Entry.Current.Directory",
+          "Internal.Transformation.Filename.Directory" } ) {
+          String x = tm.getVariable( v );
+          if ( x == null || x.trim().isEmpty() || x.contains( "${" ) || !new File( x ).isDirectory() ) {
+            tm.setVariable( v, carpeta );
+          }
+        }
+      }
+    }
     for ( String p : tm.listParameters() ) {
       if ( tm.getVariable( p ) == null || tm.getVariable( p ).isEmpty() ) {
         String d = tm.getParameterDefault( p );
@@ -157,6 +171,20 @@ final class EstresSandbox {
     Map<String, Element> pasos = new LinkedHashMap<String, Element>();
     for ( Element s : hijos( doc.getDocumentElement(), "step" ) ) {
       pasos.put( texto( s, "name" ), s );
+    }
+    // tipos que un Select values de más abajo da a los campos que la entrada lee como texto
+    Map<String, String> conversiones = new LinkedHashMap<String, String>();
+    for ( Element s : pasos.values() ) {
+      Element campos = "SelectValues".equals( texto( s, "type" ) ) ? hijo( s, "fields" ) : null;
+      if ( campos != null ) {
+        for ( Element m : hijos( campos, "meta" ) ) {
+          String n = texto( m, "name" );
+          String t = texto( m, "type" );
+          if ( n != null && t != null && !t.trim().isEmpty() && !"None".equalsIgnoreCase( t.trim() ) ) {
+            conversiones.put( n.trim().toLowerCase( Locale.ROOT ), t.trim() );
+          }
+        }
+      }
     }
 
     // --- ramas de rechazo: aguas abajo de un hop de error o de la rama falsa de un filtro
@@ -268,12 +296,16 @@ final class EstresSandbox {
       boolean salidaArchivo = SALIDAS_ARCHIVO.contains( id );
       n.escritorRechazo = n.enRechazo && salidaArchivo;
       n.carga = !n.enRechazo && ( salidaArchivo || CARGAS_BD.contains( id ) );
+      n.archivo = salidaArchivo;
       n.declaracion = declaracion( s );
       a.nodos.add( n );
 
       // --- entradas
       if ( x != null && ENTRADAS.contains( id ) ) {
         Entrada e = entrada( tm, s, x, filas, obligatorios );
+        if ( e.noEvaluada == null ) {
+          Variantes.completarTipos( e.base, conversiones );
+        }
         n.entradaArchivo = e.noEvaluada == null && ( soloEntradas == null || soloEntradas.contains( s.getName() ) );
         if ( soloEntradas != null && !soloEntradas.contains( s.getName() ) && e.noEvaluada == null ) {
           e.noEvaluada = "not in 'inputs'";

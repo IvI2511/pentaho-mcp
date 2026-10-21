@@ -68,6 +68,8 @@ public final class Variantes {
     public String tipo = "String";
     public String formato;
     public int largo = -1;
+    /** El tipo no está declarado: se dedujo de los datos (las roturas de ese tipo no se exigen como rechazo). */
+    public boolean inferido;
 
     public Campo() {
     }
@@ -111,6 +113,8 @@ public final class Variantes {
     public String cruda;
     /** null = fila base; si no, el tipo de rotura. */
     public String tipo;
+    /** Rota en una columna de tipo deducido: se inyecta pero no se exige que se rechace. */
+    public boolean dudosa;
 
     Fila( String[] v, String tipo ) {
       this.valores = v;
@@ -139,7 +143,7 @@ public final class Variantes {
     public int debenRechazarse() {
       int n = 0;
       for ( Fila f : filas ) {
-        if ( f.tipo != null && DEBEN_RECHAZARSE.contains( f.tipo ) ) {
+        if ( f.tipo != null && !f.dudosa && DEBEN_RECHAZARSE.contains( f.tipo ) ) {
           n++;
         }
       }
@@ -268,7 +272,7 @@ public final class Variantes {
             for ( String malo : new String[] { "31/02/2021", "2021-13-45", "no es fecha" } ) {
               String[] f = plantilla( base );
               f[ i ] = malo;
-              agregar( v, f, tipo );
+              agregar( v, f, tipo ).dudosa = base.campos.get( i ).inferido;
             }
           }
         }
@@ -280,7 +284,7 @@ public final class Variantes {
             for ( String malo : new String[] { "mil", "12abc", "--5" } ) {
               String[] f = plantilla( base );
               f[ i ] = malo;
-              agregar( v, f, tipo );
+              agregar( v, f, tipo ).dudosa = base.campos.get( i ).inferido;
             }
           }
         }
@@ -395,9 +399,48 @@ public final class Variantes {
     return base.campos.isEmpty() ? -1 : 0;
   }
 
-  private static void agregar( Variante v, String[] f, String tipo ) {
-    v.filas.add( new Fila( f, tipo ) );
+  private static Fila agregar( Variante v, String[] f, String tipo ) {
+    Fila fila = new Fila( f, tipo );
+    v.filas.add( fila );
     cuenta( v, tipo );
+    return fila;
+  }
+
+  /**
+   * Los campos declarados como texto cuyo tipo real se conoce (lo convierte un step de más abajo:
+   * {@code conversiones} campo → tipo) o se deduce de las filas base (todos enteros, números o fechas): así las
+   * roturas de números y fechas caen donde importan aunque la entrada lea todo como String.
+   */
+  public static void completarTipos( Tabla t, Map<String, String> conversiones ) {
+    for ( int i = 0; i < t.campos.size(); i++ ) {
+      Campo c = t.campos.get( i );
+      if ( !"String".equals( c.tipo ) ) {
+        continue;
+      }
+      String conv = conversiones == null ? null : conversiones.get( c.nombre.toLowerCase( Locale.ROOT ) );
+      if ( conv != null ) {
+        c.tipo = conv; // lo que dice un step de más abajo manda (también si dice String)
+        continue;
+      }
+      boolean alguno = false;
+      boolean enteros = true;
+      boolean numeros = true;
+      boolean fechas = true;
+      for ( String[] f : t.filas ) {
+        String x = i < f.length && f[ i ] != null ? f[ i ].trim() : "";
+        if ( x.isEmpty() ) {
+          continue;
+        }
+        alguno = true;
+        enteros &= x.matches( "-?\\d{1,18}" );
+        numeros &= x.matches( "-?\\d+([.,]\\d+)?" );
+        fechas &= x.matches( "\\d{4}-\\d{1,2}-\\d{1,2}([ T].*)?|\\d{1,2}/\\d{1,2}/\\d{2,4}" );
+      }
+      if ( alguno && ( enteros || numeros || fechas ) ) {
+        c.tipo = enteros ? "Integer" : numeros ? "Number" : "Date";
+        c.inferido = true;
+      }
+    }
   }
 
   private static void cuenta( Variante v, String tipo ) {

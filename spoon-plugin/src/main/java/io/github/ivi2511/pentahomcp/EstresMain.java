@@ -182,17 +182,46 @@ public final class EstresMain {
     }
   }
 
-  /** La primera línea con ERROR del log, sin la fecha. */
+  /**
+   * Los primeros mensajes de ERROR distintos del log (sin fecha ni prefijo de versión) y, tras una excepción, su
+   * primera línea de detalle (las siguientes no llevan prefijo de log), unidos con " | ".
+   */
   static String primerError( String log ) {
-    for ( String l : log.split( "\r?\n" ) ) {
-      int i = l.indexOf( "ERROR" );
-      if ( i >= 0 || l.contains( "Exception" ) ) {
-        String x = l.trim();
-        int g = x.indexOf( " - " );
-        return g > 0 && g < 40 ? x.substring( g + 3 ) : x;
+    List<String> l = new ArrayList<String>();
+    boolean tras = false;
+    for ( String x : log.split( "\r?\n" ) ) {
+      // "2026/10/22 00:03:01 - Convert types.0 - ERROR (version …) : mensaje" o una línea de detalle sin ERROR
+      String resto = x.replaceFirst( "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2} - ", "" );
+      boolean conFecha = !resto.equals( x );
+      String paso = "";
+      if ( conFecha ) {
+        int g = resto.indexOf( " - " );
+        if ( g >= 0 ) {
+          paso = resto.substring( 0, g ).trim();
+          resto = resto.substring( g + 3 );
+        }
+      }
+      String t = resto.trim();
+      if ( t.startsWith( "ERROR" ) ) {
+        int dos = t.indexOf( ") : " );
+        String m = dos >= 0 ? t.substring( dos + 4 ).trim() : t.substring( 5 ).trim();
+        tras = m.isEmpty() || m.endsWith( ":" ) || m.endsWith( "Exception" );
+        agregar( l, m.isEmpty() ? null : ( paso.isEmpty() ? "" : paso + ": " ) + m );
+      } else if ( tras && !t.isEmpty() && !t.startsWith( "at " ) && !t.startsWith( "..." ) ) {
+        agregar( l, t );
+        tras = false;
+      }
+      if ( l.size() >= 5 ) {
+        break;
       }
     }
-    return null;
+    return l.isEmpty() ? null : String.join( " | ", l );
+  }
+
+  private static void agregar( List<String> l, String t ) {
+    if ( t != null && !l.contains( t ) ) {
+      l.add( t );
+    }
   }
 
   /** Filas y huellas (claves y filas, ordenadas) de una tabla de una conexión de archivo del sandbox. */

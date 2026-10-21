@@ -136,6 +136,28 @@ public class PruebaEstresVariantes {
     falso( v.inyectadas.containsKey( "truncated_lines" ), "sin líneas cortadas fuera de texto" );
   }
 
+  public void pruebaTiposDeTexto() {
+    Variantes.Tabla t = new Variantes.Tabla();
+    for ( String n : new String[] { "id", "fecha", "importe", "cliente", "codigo" } ) {
+      t.campos.add( new Variantes.Campo( n, "String", null ) );
+    }
+    t.filas.add( new String[] { "1", "2024-05-01", "12.5", "Ana", "007" } );
+    t.filas.add( new String[] { "2", "2024-05-02", "8", "Luis", "008" } );
+    java.util.Map<String, String> conv = new java.util.HashMap<String, String>();
+    conv.put( "codigo", "String" );
+    conv.put( "importe", "BigNumber" );
+    Variantes.completarTipos( t, conv );
+    igual( "Integer", t.campos.get( 0 ).tipo, "entero deducido" );
+    cierto( t.campos.get( 0 ).inferido, "marcado como deducido" );
+    igual( "Date", t.campos.get( 1 ).tipo, "fecha deducida" );
+    igual( "BigNumber", t.campos.get( 2 ).tipo, "el tipo del Select values de más abajo manda" );
+    falso( t.campos.get( 2 ).inferido, "y no es deducido" );
+    igual( "String", t.campos.get( 3 ).tipo, "texto" );
+    Variantes.Variante v = Variantes.generar( "bad_numbers", t, null, true, ";" );
+    igual( 6, v.inyectadas.get( "bad_numbers" ), "números malos en id e importe" );
+    igual( 3, v.debenRechazarse(), "solo se exigen los del tipo conocido (importe), no los del deducido (id)" );
+  }
+
   public void pruebaExpandir() {
     igual( Arrays.asList( "combined", "empty_file", "header_only" ), Variantes.expandir( null, false ),
       "por defecto, sin BD de archivo" );

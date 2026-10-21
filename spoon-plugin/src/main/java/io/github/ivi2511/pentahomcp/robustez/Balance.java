@@ -56,6 +56,8 @@ public final class Balance {
     public boolean entradaArchivo;
     /** Escribe filas buenas en una BD o un archivo (fuera de las ramas de rechazo). */
     public boolean carga;
+    /** La carga es un archivo (Text file output, Excel…), no una BD. */
+    public boolean archivo;
     /** Escribe un archivo en una rama de rechazo. */
     public boolean escritorRechazo;
     /** Aguas abajo de un hop de error o de la rama falsa de un filtro. */
@@ -130,8 +132,15 @@ public final class Balance {
       return null;
     }
 
+    /** La corrida abortó: el resumen lo dice en vez de cuadrar filas. */
+    public boolean abortada;
+
     /** «31 read = 17 loaded + 12 rejected + 2 dropped (declared) + 0 lost». */
     public String resumen() {
+      if ( abortada ) {
+        return "aborted after " + leidas + " rows read (" + cargadas + " loaded, " + rechazadas + " rejected before "
+          + "the stop)";
+      }
       long dd = 0;
       for ( long x : descartesDeclarados.values() ) {
         dd += x;
@@ -183,6 +192,7 @@ public final class Balance {
 
     // --- no_abort
     boolean abortada = !c.terminada || c.errores > 0 || c.vencida;
+    inf.abortada = abortada;
     if ( abortada ) {
       Comprobacion k = new Comprobacion( "no_abort", EstresResultado.FALLA,
         c.vencida ? "the run did not finish in time (timeout)" : "the transformation aborted with " + c.errores
@@ -217,7 +227,8 @@ public final class Balance {
         }
       }
       if ( n.carga && !n.enRechazo ) {
-        inf.cargadas += p.salida + p.actualizadas;
+        // un archivo escribe toda fila que recibe (getLinesOutput cuenta también la cabecera); una BD, las que entraron
+        inf.cargadas += n.archivo ? Math.max( p.recibidas, p.leidas ) : p.salida + p.actualizadas;
       }
       if ( n.escritorRechazo ) {
         inf.rechazadas += p.recibidas > 0 ? p.recibidas : p.leidas;
@@ -253,7 +264,7 @@ public final class Balance {
         }
         continue;
       }
-      if ( entra > sale ) {
+      if ( entra > sale && !abortada ) {
         if ( n.declaracion != null ) {
           inf.descartesDeclarados.put( n.nombre, entra - sale );
           inf.declaraciones.put( n.nombre, n.declaracion );
