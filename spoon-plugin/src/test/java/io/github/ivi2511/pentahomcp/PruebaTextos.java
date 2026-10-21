@@ -10,10 +10,18 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 
@@ -61,6 +69,82 @@ public class PruebaTextos {
     Rotulos e = Rotulos.de( "ejecucion", "es" );
     igual( "Nulos por campo (%)", e.s( "chart.nulls.title" ), "un % suelto queda igual" );
     igual( "El campo con más nulos es «x» (12 %).", e.f( "summary.profile.nulls", "x", "12" ), "y %% sigue andando" );
+  }
+
+  /**
+   * Las llamadas del codigo: cada {@code s( "clave" )} o {@code t( "clave" )} con la clave escrita lee un texto
+   * sin patron, porque s() no formatea y un {@code %s}, {@code %,d} o {@code %%} se veria tal cual (como el
+   * «%n%n» de la confirmacion). Los patrones se leen con f(); una clave que en algun lado se lee con f() queda
+   * fuera (puede haber la misma clave en dos areas).
+   */
+  public void pruebaLlamadasConSNoTienenPatron() throws Exception {
+    String recursos = System.getProperty( "pruebas.recursos" );
+    cierto( recursos != null, "test.ps1 pasa -Dpruebas.recursos" );
+    File fuentes = new File( new File( recursos ).getParentFile().getParentFile(), "main" + File.separator + "java" );
+    cierto( fuentes.isDirectory(), "fuentes en " + fuentes );
+    Map<String, List<String>> textos = new HashMap<>(); // clave -> "archivo: texto" de todos los idiomas
+    for ( String archivo : archivos() ) {
+      Properties p = cargar( archivo );
+      for ( String clave : p.stringPropertyNames() ) {
+        List<String> l = textos.get( clave );
+        if ( l == null ) {
+          l = new ArrayList<>();
+          textos.put( clave, l );
+        }
+        l.add( archivo + ": " + p.getProperty( clave ) );
+      }
+    }
+    Pattern llamadaS = Pattern.compile( "(?<![\\w$])[st]\\(\\s*\"([A-Za-z0-9_.\\-]+)\"\\s*\\)" );
+    Pattern llamadaF = Pattern.compile( "(?<![\\w$])f\\(\\s*\"([A-Za-z0-9_.\\-]+)\"" );
+    // un especificador de String.format (sin el flag espacio: «% de nulos» no es un patron)
+    Pattern patron = Pattern.compile( "%(\\d+\\$)?[-#+0,(]*\\d*(\\.\\d+)?[sdfxXcbeg%]" );
+    Map<String, String> conS = new TreeMap<>(); // clave -> archivo .java
+    Set<String> conF = new HashSet<>();
+    List<File> javas = new ArrayList<>();
+    juntar( fuentes, javas );
+    cierto( javas.size() > 50, "archivos .java: " + javas.size() );
+    for ( File j : javas ) {
+      String src = new String( Files.readAllBytes( j.toPath() ), StandardCharsets.UTF_8 );
+      Matcher m = llamadaS.matcher( src );
+      while ( m.find() ) {
+        conS.put( m.group( 1 ), j.getName() );
+      }
+      m = llamadaF.matcher( src );
+      while ( m.find() ) {
+        conF.add( m.group( 1 ) );
+      }
+    }
+    int revisadas = 0;
+    List<String> mal = new ArrayList<>();
+    for ( Map.Entry<String, String> e : conS.entrySet() ) {
+      List<String> l = textos.get( e.getKey() );
+      if ( l == null || conF.contains( e.getKey() ) ) {
+        continue;
+      }
+      revisadas++;
+      for ( String x : l ) {
+        String texto = x.substring( x.indexOf( ": " ) + 2 );
+        if ( patron.matcher( texto ).find() ) {
+          mal.add( e.getValue() + " lee con s() " + x );
+        }
+      }
+    }
+    cierto( revisadas > 200, "claves leidas con s() revisadas: " + revisadas );
+    cierto( mal.isEmpty(), "textos con patron leidos con s() (usar f()): " + mal );
+  }
+
+  private static void juntar( File dir, List<File> out ) {
+    File[] hijos = dir.listFiles();
+    if ( hijos == null ) {
+      return;
+    }
+    for ( File h : hijos ) {
+      if ( h.isDirectory() ) {
+        juntar( h, out );
+      } else if ( h.getName().endsWith( ".java" ) ) {
+        out.add( h );
+      }
+    }
   }
 
   // ---------------------------------------------------------------- utilidades

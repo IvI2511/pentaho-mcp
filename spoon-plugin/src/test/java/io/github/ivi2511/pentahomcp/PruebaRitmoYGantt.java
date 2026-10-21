@@ -75,6 +75,57 @@ public class PruebaRitmoYGantt {
     contiene( g.nota, "«Step 40»", "todos" );
   }
 
+  /**
+   * Job con 3 entradas y una sub-transformacion de 44 steps (47 filas): quedan las 40 mas lentas en su orden,
+   * la ultima entrada (la mas lenta, la carga) sigue y la nota nombra las que no entraron.
+   */
+  public void pruebaGanttJobSeVanLasMasRapidas() throws Exception {
+    Constructor<CorridaMedida> k = CorridaMedida.class.getDeclaredConstructor();
+    k.setAccessible( true );
+    CorridaMedida m = k.newInstance();
+    m.esJob = true;
+    m.fuente = CorridaMedida.ULTIMA;
+    m.estado = "finished";
+    m.nombre = "job";
+    m.inicio = 1_000_000L;
+    m.fin = m.inicio + 5000;
+    String[] nombres = { "Preparar", "Transformar", "Cargar todo" };
+    long[] dur = { 1, 1500, 3000 };
+    long t = m.inicio;
+    for ( int i = 0; i < 3; i++ ) {
+      CorridaMedida.EntradaMedida e = new CorridaMedida.EntradaMedida();
+      e.nombre = nombres[ i ];
+      e.nr = 0;
+      e.job = "job";
+      e.ini = t;
+      e.fin = t + dur[ i ];
+      e.ok = Boolean.TRUE;
+      if ( i == 1 ) {
+        e.hija = new CorridaMedida.TransHija();
+        for ( int j = 0; j < 44; j++ ) {
+          PasoMedido p = new PasoMedido();
+          p.step = "Paso " + j;
+          p.ms = j < 6 ? 1 : 100 + j; // los 6 primeros, rapidisimos (como «Preparar»)
+          p.execIni = t + j;
+          p.execFin = p.execIni + p.ms;
+          p.estado = "STATUS_FINISHED";
+          e.hija.pasos.add( p );
+        }
+      }
+      m.entradas.add( e );
+      t = e.fin;
+    }
+    Seccion s = SecMetricas.seccionJob( m, "Métricas", es );
+    Grafico g = grafico( s, Grafico.GANTT );
+    igual( CorridaMedida.MAX_FILAS_GANTT, g.categorias.size(), "40 filas" );
+    igual( "Cargar todo", g.categorias.get( g.categorias.size() - 1 ), "la carga final, la mas lenta, esta" );
+    igual( "Transformar", g.categorias.get( 0 ), "orden de la corrida (Preparar, 1 ms, queda fuera)" );
+    falso( g.categorias.contains( "↳ Paso 0" ), "fuera un step rapido" );
+    noNulo( g.nota, "nota" );
+    contiene( g.nota, "No entran en el gráfico las 7 filas más rápidas", "la nota explica" );
+    contiene( g.nota, "«Preparar»", "y las nombra" );
+  }
+
   /** El SVG del Gantt (para quien le pase mas filas): quedan las mas largas, el eje cubre toda la corrida. */
   public void pruebaGanttSvgTope() {
     Grafico g = new Grafico();
@@ -125,7 +176,7 @@ public class PruebaRitmoYGantt {
     Grafico g = grafico( s, Grafico.LINEA );
     noNulo( g, "grafico de ritmo" );
     igual( "metrics-throughput", g.id, "id" );
-    igual( "Ritmo de cada step durante la ejecución (filas por segundo)", g.titulo, "titulo claro" );
+    igual( "Ritmo de cada step durante la ejecución", g.titulo, "titulo claro" );
     igual( "filas/s", g.unidad, "unidad" );
     contiene( g.nota, "cuántas filas por segundo", "explicacion debajo" );
     cierto( g.series.size() >= 1 && g.series.size() <= SecMetricas.MAX_SERIES, "1 a 5 series" );
@@ -136,7 +187,7 @@ public class PruebaRitmoYGantt {
     }
     Rotulos en = Rotulos.de( SecMetricas.AREA, "en" );
     Grafico ge = grafico( SecMetricas.seccionTrans( m, "Metrics", en ), Grafico.LINEA );
-    igual( "Pace of each step during the run (rows per second)", ge.titulo, "en" );
+    igual( "Pace of each step during the run", ge.titulo, "en" );
     igual( "rows/s", ge.unidad, "unidad en" );
   }
 

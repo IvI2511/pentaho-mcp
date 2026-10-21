@@ -491,45 +491,60 @@ final class SecMetricas implements Recolector {
     gantt.clase = Grafico.GANTT;
     gantt.titulo = r.s( "chart.gantt.job.title" );
     gantt.unidad = "ms";
-    Set<String> usadas = new HashSet<String>();
-    int filas = 0;
-    int sinLugar = 0;
-    boolean anidados = false;
+    // primero todas las filas (entradas y, anidados, los steps de cada sub-transformacion); si pasan del tope
+    // quedan las mas lentas en su orden y la nota nombra las que no entraron. Antes se cortaba por orden y
+    // se perdian las ultimas, que suelen ser la carga final y las mas lentas.
+    List<FilaJob> todas = new ArrayList<FilaJob>();
     for ( EntradaMedida e : m.entradas ) {
       if ( esStart( e ) ) {
         continue;
       }
-      if ( filas >= CorridaMedida.MAX_FILAS_GANTT ) {
-        sinLugar++;
-        continue;
-      }
-      String cat = unica( sangria( e.nivel ) + e.nombre, usadas );
-      gantt.categorias.add( cat );
-      filas++;
       long ini = e.ini < 0 ? 0 : e.ini - m.inicio;
       long fi = e.fin < 0 ? m.fin - m.inicio : e.fin - m.inicio;
-      gantt.tramos.add( new Tramo( cat, Tramo.EXEC, ini, Math.max( ini, fi ) ) );
+      todas.add( new FilaJob( e.nombre, e.nivel, false, -1, -1, ini, Math.max( ini, fi ) ) );
       if ( e.hija != null ) {
         for ( PasoMedido p : e.hija.pasos ) {
           if ( p.execIni <= 0 ) {
             continue;
           }
-          if ( filas >= CorridaMedida.MAX_FILAS_GANTT ) {
-            sinLugar++;
-            continue;
-          }
-          String sc = unica( sangria( e.nivel + 1 ) + p.step, usadas );
-          gantt.categorias.add( sc );
-          anidados = true;
-          filas++;
-          if ( p.initIni > 0 ) {
-            gantt.tramos.add( new Tramo( sc, Tramo.INIT, p.initIni - m.inicio, p.initFin - m.inicio ) );
-          }
-          gantt.tramos.add( new Tramo( sc, Tramo.EXEC, p.execIni - m.inicio, p.execFin - m.inicio ) );
+          todas.add( new FilaJob( p.step, e.nivel + 1, true, p.initIni > 0 ? p.initIni - m.inicio : -1,
+            p.initFin - m.inicio, p.execIni - m.inicio, p.execFin - m.inicio ) );
         }
       }
     }
-    gantt.nota = sinLugar > 0 ? r.f( "chart.gantt.job.more", sinLugar ) : r.s( "chart.gantt.job.note" );
+    List<String> fuera = new ArrayList<String>();
+    if ( todas.size() > CorridaMedida.MAX_FILAS_GANTT ) {
+      List<FilaJob> porDuracion = new ArrayList<FilaJob>( todas );
+      Collections.sort( porDuracion, new Comparator<FilaJob>() {
+        @Override
+        public int compare( FilaJob a, FilaJob b ) {
+          return Long.compare( b.fin - b.ini, a.fin - a.ini );
+        }
+      } );
+      Set<FilaJob> lentas = new HashSet<FilaJob>( porDuracion.subList( 0, CorridaMedida.MAX_FILAS_GANTT ) );
+      List<FilaJob> quedan = new ArrayList<FilaJob>();
+      for ( FilaJob f : todas ) {
+        if ( lentas.contains( f ) ) {
+          quedan.add( f );
+        } else {
+          fuera.add( f.nombre );
+        }
+      }
+      todas = quedan;
+    }
+    Set<String> usadas = new HashSet<String>();
+    boolean anidados = false;
+    for ( FilaJob f : todas ) {
+      String cat = unica( sangria( f.nivel ) + f.nombre, usadas );
+      gantt.categorias.add( cat );
+      anidados |= f.paso;
+      if ( f.initIni >= 0 ) {
+        gantt.tramos.add( new Tramo( cat, Tramo.INIT, f.initIni, f.initFin ) );
+      }
+      gantt.tramos.add( new Tramo( cat, Tramo.EXEC, f.ini, f.fin ) );
+    }
+    gantt.nota = fuera.isEmpty() ? r.s( "chart.gantt.job.note" )
+      : r.f( "chart.gantt.job.fastest_out", fuera.size(), lista( fuera, 8, r ) );
     // las entradas del job corren una tras otra: la leyenda de siempre ("los steps corren en paralelo")
     // solo vale para los steps anidados de las sub-transformaciones
     gantt.leyenda = r.s( anidados ? "chart.gantt.job.legend_nested" : "chart.gantt.job.legend" );
@@ -597,6 +612,27 @@ final class SecMetricas implements Recolector {
       sb.append( "  " );
     }
     return sb.append( "↳ " ).toString();
+  }
+
+  /** Una fila del Gantt del job: una entrada o, anidado, un step de su sub-transformacion (ms desde el inicio). */
+  private static final class FilaJob {
+    final String nombre;
+    final int nivel;
+    final boolean paso;
+    final long initIni;
+    final long initFin;
+    final long ini;
+    final long fin;
+
+    FilaJob( String nombre, int nivel, boolean paso, long initIni, long initFin, long ini, long fin ) {
+      this.nombre = nombre;
+      this.nivel = nivel;
+      this.paso = paso;
+      this.initIni = initIni;
+      this.initFin = initFin;
+      this.ini = ini;
+      this.fin = fin;
+    }
   }
 
   /** Categoria unica del Gantt (dos entradas con el mismo nombre irian a la misma fila). */
