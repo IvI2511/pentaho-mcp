@@ -148,6 +148,8 @@ public class PruebaLintRobustez {
     noNulo( con.robustez, "con robustness hay sub-puntaje" );
     igual( sin.score, con.score, "el puntaje general no cambia con robustness" );
     igual( sin.penalties.size(), con.penalties.size(), "ni sus penalidades" );
+    // en un job la familia no corre: sin bloque robustness
+    nulo( lint( EntornoKettle.job( "10" ), "{\"robustness\":true}" ).robustez, "un job no tiene sub-puntaje" );
     // el esquema de lint_etl ofrece el argumento
     contiene( LintTools.opciones( McpHttpServer.JSON.readTree( "{\"robustness\":true}" ) ).robustez ? "si" : "no",
       "si", "lint_etl lee robustness" );
@@ -202,8 +204,8 @@ public class PruebaLintRobustez {
     return new TransMeta( f.getAbsolutePath() );
   }
 
-  private static Resultado lint( TransMeta tm, String json ) throws Exception {
-    final TransMeta copia = (TransMeta) ReportTools.clonar( tm );
+  private static Resultado lint( org.pentaho.di.base.AbstractMeta tm, String json ) throws Exception {
+    final org.pentaho.di.base.AbstractMeta copia = ReportTools.clonar( tm );
     final Opciones op = LintTools.opciones( McpHttpServer.JSON.readTree( json ) );
     final LintEntorno env = new LintEntorno( copia );
     op.entorno = env;
