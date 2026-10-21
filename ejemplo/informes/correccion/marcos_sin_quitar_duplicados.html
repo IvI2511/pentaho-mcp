@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Pentaho Live">
+<title>Grano de Oro · Ventas por tienda y categoría</title>
+<style>
+html { background: #FFFFFF; }
+body { margin: 0; padding: 0; background: #FFFFFF; color: #1F2933; font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 14px; line-height: 1.5; -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+.hoja { position: relative; z-index: 1; max-width: 920px; margin: 0 auto; padding: 28px 40px 24px; }
+a { color: #3F74D8; text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { font-weight: 600; line-height: 1.25; }
+p { margin: 0 0 10px; }
+ul { margin: 0 0 10px; padding-left: 22px; }
+li { margin: 2px 0; }
+code, pre { font-family: Consolas, "Courier New", monospace; }
+.portada { margin: 0 0 22px; }
+.portada .banda { background: #243B53; color: #FFFFFF; padding: 26px 30px 22px; }
+.portada .banda:after { content: ""; display: block; clear: both; }
+.portada .logo { float: right; margin: 0 0 8px 20px; background: #FFFFFF; padding: 6px; }
+.portada .logo img { display: block; max-width: 180px; max-height: 64px; width: auto; height: auto; }
+.portada .tipo { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #A3ADB7; margin: 0 0 6px; }
+.portada h1 { margin: 0 0 6px; font-size: 28px; color: #FFFFFF; }
+.portada .subtitulo { font-size: 15px; color: #D8DCE0; margin: 0; }
+.portada .generado { font-size: 12px; color: #A3ADB7; margin: 12px 0 0; }
+.portada .cuerpo { border: 1px solid #D9DEE5; border-top: 0; padding: 14px 30px 8px; }
+.portada .cuerpo ul.datos { list-style: none; padding: 0; margin: 0 0 8px; }
+.portada .cuerpo ul.datos li { padding: 4px 0; border-bottom: 1px solid #F4F5F6; }
+.portada .cuerpo ul.datos li:last-child { border-bottom: 0; }
+.portada .cuerpo .resumen-portada { margin: 0 0 8px; color: #6B7785; }
+.indice { margin: 0 0 22px; padding: 14px 20px 10px; background: #F4F5F6; border-left: 3px solid #243B53; }
+.indice h2 { margin: 0 0 6px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #6B7785; border: 0; padding: 0; }
+.indice ol { margin: 0; padding-left: 22px; }
+.indice li { margin: 3px 0; }
+.indice li.omitida { color: #6B7785; }
+.indice .motivo { font-size: 12px; color: #6B7785; }
+.seccion { margin: 30px 0 0; }
+.seccion h2 { margin: 0 0 10px; padding: 0 0 6px; font-size: 21px; color: #243B53; border-bottom: 2px solid #243B53; }
+.seccion h3 { margin: 18px 0 8px; font-size: 15px; color: #1F2933; }
+.estado { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 8px; font-size: 11px;
+  font-weight: 600; letter-spacing: .5px; text-transform: uppercase; border: 1px solid; }
+.estado-parcial { color: #8A5A00; border-color: #D69E2E; background: #FFF8E6; }
+.estado-error { color: #9B1C1C; border-color: #C53030; background: #FDEDED; }
+.motivo-seccion { margin: 0 0 10px; font-size: 13px; color: #6B7785; }
+.resumen { margin: 0 0 14px; padding: 8px 12px; color: #1F2933; background: #E9EBEE; border-left: 3px solid #3F74D8; }
+.bloque { margin: 0 0 16px; }
+.nota { margin: 4px 0 0; font-size: 12px; color: #6B7785; }
+.rotulo-ia { margin: 4px 0 0; font-size: 11px; font-style: italic; color: #6B7785; }
+.rotulo-ia span { display: inline-block; margin-right: 6px; padding: 0 5px; font-style: normal; font-weight: 600;
+  color: #3F74D8; border: 1px solid #3F74D8; }
+.ia { border-left: 2px solid #B2C7EF; padding-left: 10px; }
+.tabla { overflow-x: auto; }
+table.datos { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.datos th { background: #EDEFF1; color: #243B53; text-align: left; font-weight: 600; padding: 6px 10px;
+  border-bottom: 2px solid #243B53; vertical-align: bottom; }
+table.datos td { padding: 5px 10px; border-bottom: 1px solid #D9DEE5; vertical-align: top; }
+table.datos tr.par td { background: #FAFBFC; }
+table.datos .r { text-align: right; }
+table.datos .c { text-align: center; }
+table.datos td.largo { word-wrap: break-word; overflow-wrap: break-word; }
+.pie-tabla { margin: 4px 0 0; font-size: 12px; color: #6B7785; }
+.titulo-bloque { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #1F2933; }
+.tarjetas { margin: 0 -6px; font-size: 0; }
+.tarjeta { display: inline-block; vertical-align: top; min-width: 144px; max-width: 280px; margin: 0 6px 12px; padding: 10px 12px 9px;
+  border: 1px solid #D9DEE5; border-top: 3px solid #243B53; background: #FFFFFF; font-size: 14px; }
+.tarjeta .etiqueta { font-size: 11px; color: #6B7785; text-transform: uppercase; letter-spacing: .5px; }
+.tarjeta .valor { font-size: 22px; font-weight: 600; color: #1F2933; line-height: 1.25; margin: 2px 0 0;
+  word-wrap: break-word; }
+.tarjeta .detalle { font-size: 12px; color: #6B7785; word-wrap: break-word; }
+.tarjeta.ok { border-top-color: #1C9A80; }
+.tarjeta.warn { border-top-color: #D69E2E; }
+.tarjeta.error { border-top-color: #C53030; }
+.aviso { margin: 0 0 12px; padding: 8px 12px; border-left: 4px solid; font-size: 13px; }
+.aviso strong.nivel { margin-right: 6px; }
+.aviso-info { border-color: #3F74D8; background: #ECF1FB; }
+.aviso-warn { border-color: #D69E2E; background: #FFF8E6; }
+.aviso-error { border-color: #C53030; background: #FDEDED; }
+.figura { margin: 0 0 16px; }
+.figura img { max-width: 100%; height: auto; border: 1px solid #D9DEE5; }
+.figura .lienzo { margin: 0 0 10px; }
+.figura .svg { text-align: center; overflow: hidden; }
+.figura .svg svg { max-width: 100%; overflow: hidden; }
+.figura .leyenda { margin: 4px 0 0; font-size: 12px; color: #6B7785; }
+pre.mermaid { margin: 0; padding: 10px; background: #FFFFFF; border: 1px solid #D9DEE5; text-align: center;
+  white-space: pre-wrap; font-size: 12px; color: #6B7785; }
+pre.mermaid[data-processed] { color: #1F2933; }
+.mermaid-fallo { display: none; }
+.pendiente { margin: 0 0 8px; padding: 18px 12px; text-align: center; font-size: 13px; color: #6B7785;
+  background: #F4F5F6; border: 1px dashed #D9DEE5; }
+.alternativa { margin: 8px 0 0; }
+.pie { margin: 32px 0 0; padding: 8px 0 0; border-top: 1px solid #D9DEE5; font-size: 7.5pt; color: #6B7785; }
+.pie svg { width: 14px; height: 8px; vertical-align: -1px; margin-right: 5px; }
+.marca { position: fixed; right: 6mm; bottom: 6mm; width: 151px; height: 86px; z-index: 0; pointer-events: none; opacity: 0.08; }
+.marca svg { width: 151px; height: 86px; }
+@supports (display: grid) {
+  .figura .svg svg { height: auto; }
+}
+@media print {
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hoja { max-width: none; padding: 0; }
+  a { color: #1F2933; }
+  tr, .tarjeta, .aviso, .figura, .pendiente { page-break-inside: avoid; break-inside: avoid; }
+  h2, h3, .titulo-bloque { page-break-after: avoid; break-after: avoid; }
+  .tabla { overflow: visible; }
+}
+</style>
+</head>
+<body>
+<div class="marca" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37.00 21.00" role="img" aria-label="IDC Studios" width="148" height="84"><title>IDC Studios</title><g transform="translate(0.00 0.00)"><rect x="0.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="20.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#1c9a80"/><rect x="30.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="10.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/></g></svg></div>
+<div class="hoja">
+<div class="portada" id="sec-cover">
+<div class="banda">
+<p class="tipo">Transformación &middot; marcos_sin_quitar_duplicados.ktr</p>
+<h1>Grano de Oro · Ventas por tienda y categoría</h1>
+<p class="subtitulo">Devolución para marcos_sin_quitar_duplicados</p>
+<p class="generado">Generado el 21 de octubre de 2026, 08:20</p>
+</div>
+<div class="cuerpo">
+<ul class="datos"><li>Alumno: marcos_sin_quitar_duplicados</li><li>Archivo: marcos_sin_quitar_duplicados.ktr</li><li>Ejercicio: grano-de-oro-ventas-tienda-categoria</li><li>Nota: 5,3 / 10 (corregida)</li><li>Corregida el: 2026-10-21 08:20</li></ul>
+</div>
+</div>
+<div class="indice">
+<h2>Contenido</h2>
+<ol>
+<li><a href="#sec-grade">Nota</a></li>
+<li><a href="#sec-criteria">Criterios</a></li>
+<li><a href="#sec-hints">Pistas</a></li>
+<li><a href="#sec-case_visible">Caso «visible»</a></li>
+<li><a href="#sec-case_oculto">Caso «oculto» (oculto)</a></li>
+</ol>
+</div>
+<section class="seccion" id="sec-grade">
+<h2>Nota</h2>
+<div class="resumen"><p>No aprueba: Valores correctos; Quita los duplicados con Unique rows.</p>
+</div>
+<div class="bloque" id="b-grade-cards">
+<div class="tarjetas"><div class="tarjeta ok"><div class="etiqueta">Nota</div><div class="valor">5,3 / 10</div><div class="detalle">53%</div></div><div class="tarjeta ok"><div class="etiqueta">Estado</div><div class="valor">corregida</div></div><div class="tarjeta warn"><div class="etiqueta">Criterios aprobados</div><div class="valor">6 de 8</div></div><div class="tarjeta error"><div class="etiqueta">Casos sin diferencias</div><div class="valor">0 de 2</div></div></div>
+</div>
+</section>
+<section class="seccion corta" id="sec-criteria">
+<h2>Criterios</h2>
+<div class="bloque" id="b-criteria-table">
+<div class="tabla"><table class="datos"><thead><tr><th>Criterio</th><th class="r">Puntos</th><th>Detalle</th></tr></thead><tbody>
+<tr><td>✔ Corre sin errores</td><td class="r">1 / 1</td><td>visible 100%, oculto 100%</td></tr>
+<tr class="par"><td>✔ Columnas correctas</td><td class="r">1 / 1</td><td>visible 100%, oculto 100%</td></tr>
+<tr><td>✔ Cantidad de filas</td><td class="r">1 / 1</td><td>visible 100%, oculto 100%</td></tr>
+<tr class="par"><td>✘ Valores correctos</td><td class="r">0,3 / 4</td><td>visible 10%, oculto 5%</td></tr>
+<tr><td>✔ Agrupa con un Group by (o Memory group by)</td><td class="r">1 / 1</td><td>Encontrado: «Ventas por tienda y categoría»</td></tr>
+<tr class="par"><td>✘ Quita los duplicados con Unique rows</td><td class="r">0 / 1</td><td>Ningún step de tipo Unique, UniqueRowsByHashSet</td></tr>
+<tr><td>✔ Sin JavaScript ni Java</td><td class="r">0,5 / 0,5</td><td>No usa ninguno</td></tr>
+<tr class="par"><td>✔ Rutas relativas a la transformación</td><td class="r">0,5 / 0,5</td><td>Sin hallazgos</td></tr>
+</tbody></table></div>
+<p class="pie-tabla">Total: 5,3 de 10 puntos</p>
+</div>
+</section>
+<section class="seccion corta" id="sec-hints">
+<h2>Pistas</h2>
+<div class="bloque" id="b-hints-list">
+<ul><li>Revisá cómo calculás «unidades»: no coincide en algunas filas.</li><li>Revisá cómo calculás «importe»: no coincide en algunas filas.</li></ul>
+</div>
+</section>
+<section class="seccion" id="sec-case_visible">
+<h2>Caso «visible»</h2>
+<div class="resumen"><p>Filas: 20 esperadas, 20 tuyas, 2 iguales, 18 distintas, 0 faltan, 0 sobran, 0 claves repetidas</p>
+</div>
+<div class="bloque" id="b-case_visible-cards">
+<div class="tarjetas"><div class="tarjeta ok"><div class="etiqueta">Corrida</div><div class="valor">terminó</div><div class="detalle">1,87 s</div></div><div class="tarjeta ok"><div class="etiqueta">Columnas</div><div class="valor">4 de 4</div></div><div class="tarjeta ok"><div class="etiqueta">Filas</div><div class="valor">20</div><div class="detalle">esperadas: 20</div></div><div class="tarjeta warn"><div class="etiqueta">Valores</div><div class="valor">10%</div><div class="detalle">2 de 20 filas iguales</div></div></div>
+</div>
+<div class="bloque" id="b-case_visible-details">
+<ul><li>Step de salida: Escribir KPI</li><li>Salida tomada de file salida/kpi_tienda_categoria.csv</li><li>Rutas redirigidas: output &#39;Escribir KPI&#39;: ${Internal.Entry.Current.Directory}/kpi_tienda_categoria -&gt; salida/kpi_tienda_categoria.csv</li></ul>
+</div>
+<div class="bloque" id="b-case_visible-different">
+<h3>Valores distintos</h3>
+<div class="tabla"><table class="datos"><thead><tr><th>Clave</th><th>Columna</th><th>Esperado</th><th>Tuyo</th></tr></thead><tbody>
+<tr><td>Chamberí | Bebidas</td><td>unidades</td><td>91</td><td>94</td></tr>
+<tr class="par"><td>Chamberí | Bebidas</td><td>importe</td><td>248.70</td><td>258.90</td></tr>
+<tr><td>Chamberí | Bollería</td><td>unidades</td><td>166</td><td>169</td></tr>
+<tr class="par"><td>Chamberí | Bollería</td><td>importe</td><td>388.40</td><td>392.60</td></tr>
+<tr><td>Chamberí | Café</td><td>unidades</td><td>359</td><td>364</td></tr>
+</tbody></table></div>
+</div>
+<div class="bloque" id="b-case_visible-by-column">
+<h3>Diferencias por columna</h3>
+<div class="tabla"><table class="datos"><thead><tr><th>Columna</th><th class="r">Celdas distintas</th></tr></thead><tbody>
+<tr><td>unidades</td><td class="r">18</td></tr>
+<tr class="par"><td>importe</td><td class="r">18</td></tr>
+</tbody></table></div>
+</div>
+<div class="bloque" id="b-case_visible-metrics">
+<h3>Filas por step</h3>
+<div class="tabla"><table class="datos"><thead><tr><th>Step</th><th class="r">Leídas</th><th class="r">Escritas</th><th class="r">Errores</th></tr></thead><tbody>
+<tr><td>Leer ventas (CSV)</td><td class="r">0</td><td class="r">3000</td><td class="r">0</td></tr>
+<tr class="par"><td>Estandarizar textos</td><td class="r">3000</td><td class="r">3000</td><td class="r">0</td></tr>
+<tr><td>Normalizar precio</td><td class="r">3000</td><td class="r">3000</td><td class="r">0</td></tr>
+<tr class="par"><td>Convertir precio a número</td><td class="r">3000</td><td class="r">3000</td><td class="r">0</td></tr>
+<tr><td>Buscar tienda</td><td class="r">3004</td><td class="r">3000</td><td class="r">0</td></tr>
+<tr class="par"><td>Leer tiendas (JSON)</td><td class="r">0</td><td class="r">4</td><td class="r">0</td></tr>
+<tr><td>Buscar categoría</td><td class="r">3028</td><td class="r">3000</td><td class="r">0</td></tr>
+<tr class="par"><td>Leer productos (Excel)</td><td class="r">0</td><td class="r">28</td><td class="r">0</td></tr>
+<tr><td>Estandarizar productos</td><td class="r">28</td><td class="r">28</td><td class="r">0</td></tr>
+<tr class="par"><td>¿Línea válida?</td><td class="r">3000</td><td class="r">2945</td><td class="r">0</td></tr>
+<tr><td>Calcular importe</td><td class="r">2945</td><td class="r">2945</td><td class="r">0</td></tr>
+<tr class="par"><td>Ordenar por tienda y categoría</td><td class="r">2945</td><td class="r">2945</td><td class="r">0</td></tr>
+<tr><td>Ventas por tienda y categoría</td><td class="r">2945</td><td class="r">20</td><td class="r">0</td></tr>
+<tr class="par"><td>Redondear importe</td><td class="r">20</td><td class="r">20</td><td class="r">0</td></tr>
+<tr><td>Escribir KPI</td><td class="r">20</td><td class="r">20</td><td class="r">0</td></tr>
+</tbody></table></div>
+</div>
+</section>
+<section class="seccion corta" id="sec-case_oculto">
+<h2>Caso «oculto» (oculto)</h2>
+<div class="resumen"><p>Filas: 20 esperadas, 20 tuyas, 1 iguales, 19 distintas, 0 faltan, 0 sobran, 0 claves repetidas</p>
+</div>
+<div class="bloque" id="b-case_oculto-cards">
+<div class="tarjetas"><div class="tarjeta ok"><div class="etiqueta">Corrida</div><div class="valor">terminó</div><div class="detalle">0,69 s</div></div><div class="tarjeta ok"><div class="etiqueta">Columnas</div><div class="valor">4 de 4</div></div><div class="tarjeta ok"><div class="etiqueta">Filas</div><div class="valor">20</div><div class="detalle">esperadas: 20</div></div><div class="tarjeta warn"><div class="etiqueta">Valores</div><div class="valor">5%</div><div class="detalle">1 de 20 filas iguales</div></div></div>
+</div>
+<div class="bloque" id="b-case_oculto-hidden">
+<div class="aviso aviso-info"><strong class="nivel">Nota.</strong>Caso oculto: solo se muestran los conteos.</div>
+</div>
+<div class="bloque" id="b-case_oculto-by-column">
+<h3>Diferencias por columna</h3>
+<div class="tabla"><table class="datos"><thead><tr><th>Columna</th><th class="r">Celdas distintas</th></tr></thead><tbody>
+<tr><td>unidades</td><td class="r">19</td></tr>
+<tr class="par"><td>importe</td><td class="r">19</td></tr>
+</tbody></table></div>
+</div>
+</section>
+<div class="pie"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37.00 21.00" role="img" aria-label="IDC Studios" width="148" height="84"><title>IDC Studios</title><g transform="translate(0.00 0.00)"><rect x="0.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="20.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#1c9a80"/><rect x="30.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="10.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/></g></svg>Generado con Pentaho Live · IDC Studios</div>
+</div>
+</body>
+</html>

@@ -465,6 +465,27 @@ public class PruebaPanelCorrector {
     cierto( ui( () -> buscar( "corregir" ).isEnabled() ), "se puede corregir otra vez" );
   }
 
+  /** Un lote que arranca grade_submissions (otro hilo, sin el panel): al volver a la perspectiva, se ve ese. */
+  public void pruebaIb_LoteDeMcp() throws Exception {
+    File entregas = new File( dir, "lote-mcp" );
+    new File( entregas, "vacia" ).mkdirs(); // load_failed sin lanzar ningun worker
+    CorrectorLote.Opciones op = new CorrectorLote.Opciones();
+    op.pack = new File( copia, "packs/" + VENTAS );
+    op.carpeta = entregas;
+    op.salida = new File( dir, "lote-mcp-notas" );
+    op.procesos = servicio.procesos();
+    final CorrectorLote l = CorrectorLote.iniciar( op );
+    cierto( l.esperar( 30000 ), "termina sin workers" );
+    falso( panel().lote() == l, "todavia muestra el suyo" );
+    ui( () -> {
+      perspectiva.setActive( true );
+      return null;
+    } );
+    esperar( "muestra el lote de grade_submissions", () -> panel().lote() == l, 5000 );
+    String[] f = fila( ui( () -> panel().filasVisibles() ), "vacia" );
+    igual( "no se pudo abrir", f[ 2 ], "la entrega vacia" );
+  }
+
   /** El asistente de 4 pasos de punta a punta: analizar, ver la salida esperada, quitar una regla y guardar. */
   public void pruebaJ_Asistente() throws Exception {
     memoria();
@@ -666,6 +687,17 @@ public class PruebaPanelCorrector {
       } else {
         System.setProperty( Interruptor.PROPIEDAD_CORRECTOR, antes );
       }
+    }
+  }
+
+  /** La guia 07-corrector.md es un recurso MCP (pentaho://guide/grading) y nombra las 5 tools y la perspectiva. */
+  public void pruebaN_GuiaCorrector() throws Exception {
+    McpResources r = new McpResources();
+    contiene( r.listar( null ).toString(), "pentaho://guide/grading", "resources/list trae la guia del corrector" );
+    String guia = r.leer( "pentaho://guide/grading" ).path( "contents" ).path( 0 ).path( "text" ).asText();
+    for ( String n : new String[] { "create_exercise_pack", "validate_exercise_pack", "grade_exercise",
+      "grade_submissions", "get_grading_status", "Grader", "PENTAHO_LIVE_GRADER", "allow_steps", "trust mode" } ) {
+      contiene( guia, n, "la guia nombra " + n );
     }
   }
 

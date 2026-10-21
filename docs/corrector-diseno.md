@@ -352,6 +352,12 @@ y el modo confianza solo se activa en la UI.
 
 ## 9. En Spoon
 
+**Estado (C8, 21-oct-2026).** Hecho con el **plan B**: Informes 0.5.0 sigue sin pestañas, así que el corrector
+es la perspectiva `pentaho-live-grader` (`GraderSpoonPlugin` + `GraderPerspective`, sin `classLoaderGroup`,
+`PENTAHO_LIVE_GRADER=off` la apaga), con `PanelCorrector` y `AsistentePack` en la raíz del paquete. «Ajustar
+nota» es un campo del detalle y no una celda editable; «Volver a corregir con…» es `CorrectorLote.recorregir`.
+Quedan pendientes el menú por overlay XUL y la pestaña «Corrección» en `TransGraph.extraViewTabFolder`.
+
 **Dónde.** Una pestaña **Corrector** en la perspectiva de Informes. Hoy **no hay dónde**: su panel
 0.5.0 es un `GridLayout` con un `SashForm` (§5.1 de su diseño), sin pestañas. Hace falta que el dueño de
 su WP1 envuelva `PanelInformes` en un `CTabFolder` y exponga una interfaz `PestanaPerspectiva`: es un

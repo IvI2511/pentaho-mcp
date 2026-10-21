@@ -1,0 +1,5 @@
+﻿"alumno";"archivo";"estado";"nota";"Corre sin errores";"Columnas correctas";"Cantidad de filas";"Valores correctos";"Agrupa con un Group by (o Memory group by)";"Quita los duplicados con Unique rows";"Sin JavaScript ni Java";"Rutas relativas a la transformación";"segundos";"devolucion";"nota_motor";"ajuste";"comentario"
+"lucia_rutas_absolutas";"lucia_rutas_absolutas.ktr";"corregida";9,5;1;1;1;4;1;1;0,5;0;3,44;"lucia_rutas_absolutas.md";9,5;;
+"marcos_sin_quitar_duplicados";"marcos_sin_quitar_duplicados.ktr";"corregida";5,3;1;1;1;0,3;1;0;0,5;0,5;3,77;"marcos_sin_quitar_duplicados.md";5,3;;
+"nerea_decimal_vacio";"nerea_decimal_vacio.ktr";"corregida";6;1;1;1;0;1;1;0,5;0,5;1,73;"nerea_decimal_vacio.md";6;;
+"oscar_group_by_sin_ordenar";"oscar_group_by_sin_ordenar.ktr";"corregida";5;1;1;0;0;1;1;0,5;0,5;1,81;"oscar_group_by_sin_ordenar.md";5;;

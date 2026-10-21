@@ -50,6 +50,14 @@ Spanish, hardcoded paths, passwords stored in the file, a failure branch that en
 as one Ctrl+Z (Claude asks first about the ones that change what the ETL does). The same check is a section
 of the report.
 
+**Grading.** For teachers: build an exercise pack from your solution (a visible case and a hidden one with
+other data, the expected output, rules and a rubric) and grade a whole folder of submissions. Each one runs in
+a separate JVM, never inside Spoon, and its output is compared row by row with the expected one: you get a
+grade with the failed checks, a hint for each typical mistake (unsorted Group by, empty decimal symbol,
+duplicates left in, hardcoded paths), feedback for every student without the hidden case's values, and a
+gradebook for Excel. Spoon gets a **Grader** perspective with the same, plus a wizard that builds the pack
+from the open transformation.
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 
@@ -65,6 +73,7 @@ Kitchen.
 | *"Why does this `.ktr` fail in Pan?"* | reads it, finds the problem with the verified error list and fixes it |
 | *"Check this transformation for bad practices before I hand it in, and fix what's safe."* | runs the quality check, explains each finding, applies the safe fixes in one Ctrl+Z and asks before the rest |
 | *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
+| *"Make a grading pack from this solution with a hidden case, then grade the submissions in `C:\TP3\entregas`."* | runs the solution to get the expected output, grades every submission in separate JVMs and tells you the grades, who failed what and why; the gradebook and each student's feedback are in the results folder |
 
 ## How it works
 
@@ -89,8 +98,8 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with 61 tools, and applies every edit on Spoon's UI thread with undo support.
-  The same jar adds the **Reports** perspective to Spoon's perspective switcher.
+  `127.0.0.1:8765` with 66 tools, and applies every edit on Spoon's UI thread with undo support.
+  The same jar adds the **Reports** and **Grader** perspectives to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.
 
@@ -157,7 +166,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 
 | Piece | What it is | Where |
 |---|---|---|
-| **Spoon plugin** | Kettle `@LifecyclePlugin` that starts the MCP server when Spoon opens, and the Reports perspective (`@SpoonPlugin`) in the same jar (Java 8 bytecode, built against PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
+| **Spoon plugin** | Kettle `@LifecyclePlugin` that starts the MCP server when Spoon opens, and the Reports and Grader perspectives (`@SpoonPlugin`) in the same jar (Java 8 bytecode, built against PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
 | **Skill `pentaho-etl`** | `.ktr` / `.kjb` format, catalog of 216 steps and 77 job entries generated from a real install, an annotated guide to the most used steps, runnable examples and the errors Pan and Kitchen actually give | [`claude/skills/pentaho-etl/`](claude/skills/pentaho-etl/) |
 | **MCP connection `pentaho`** | Points Claude Code at the Spoon plugin (address configurable with `mcp_url`) | [`claude/.mcp.json`](claude/.mcp.json) |
 | **Installers** | Find or download PDI, install the Spoon plugin, configure Claude Code and Codex | [`instalar.ps1`](instalar.ps1), [`instalar.sh`](instalar.sh) |
@@ -177,6 +186,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
 | Canvas | Add notes, select steps, tidy the layout, take a screenshot of the canvas |
+| Grading | Build an exercise pack from a solution (cases, hidden cases, expected output, rules, rubric, a copy for students), validate it, grade one submission or a whole folder in separate JVMs, follow the job, get the gradebook and each student's feedback |
 | Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, JSON) with lineage, data dictionary, metrics, technical quality and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
 
 </details>
@@ -196,6 +206,10 @@ Everything runs on your computer. There are no servers, accounts, analytics or t
 - The quality check (`lint_etl`) does not run the transformation. Its deep mode reads up to 5000 rows of
   your sources only when you ask, through previews limited to read-only steps, and its findings can quote
   values it read.
+- The grader runs the solution and the students' submissions only when you ask, each one in a separate
+  Java process with its own empty Kettle settings, on copies of the data; it never modifies a submission and
+  writes results only to the folder you choose. Trust mode (letting dangerous steps run) exists only in
+  Spoon's Grader perspective, never over MCP.
 - What the tools return (steps, field names, logs, preview rows) becomes part of your conversation with
   Claude, like anything else you share.
 
@@ -223,6 +237,10 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - The bundled PDI 9.4 CE has no OSGi container (karaf), so the big-data and streaming steps that depend on
   it are missing. The 216 steps in the catalog are there.
 - Open Spoon before starting the agent; if the agent started first, restart it so it sees the tools.
+- Grader: running a submission is running code someone else wrote. The separate process and the step
+  policy (code, network and file-deletion steps are blocked) reduce the risk, but it is **not a real
+  sandbox**: for submissions from strangers, use a virtual machine. It grades transformations (`.ktr`);
+  jobs are not graded yet.
 - Reports: the PDF and the diagram images use **Microsoft Edge or Google Chrome** (Windows ships Edge).
   Without either, the PDF falls back to the browser's print dialog and PowerPoint shows the lineage and
   table diagrams as tables. The preview inside Spoon uses the old Internet Explorer engine that PDI

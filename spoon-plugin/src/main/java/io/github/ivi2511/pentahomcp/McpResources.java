@@ -115,7 +115,13 @@ final class McpResources {
       "When to run lint_etl and how to read its findings and its 0-100 score, the rules and the Pan/Kitchen error "
         + "each one prevents, the deep mode that reads the sources, applying fixes, silencing a rule, and the "
         + "quality section of the reports. The machine-readable rule catalog is pentaho://lint/rules.",
-      "manual/06-calidad.md" )
+      "manual/06-calidad.md" ),
+    new Doc( "pentaho://guide/grading", "grading", "Exercise grader (create_exercise_pack, grade_exercise, "
+      + "grade_submissions)",
+      "How the exercise grader works: the pack (cases, hidden cases, expected output, rules, rubric, policy), creating "
+        + "and validating one from a solution, grading one submission or a whole folder in separate JVMs, reading a "
+        + "result (statuses, checks, hints, the two readers), the gradebook, the Grader perspective in Spoon and the "
+        + "security policy.", "manual/07-corrector.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

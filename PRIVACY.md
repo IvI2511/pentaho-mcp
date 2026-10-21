@@ -41,6 +41,15 @@ receives any of your data.
   limited to steps that only read, and then the findings can quote values they read (a key, a number);
   in a report, `"mostrar_valores": false` leaves those values out. The deep mode writes no log tables.
   Silencing a rule stores a note inside the `.ktr` / `.kjb`, written when you save it.
+- **Exercise grader.** `create_exercise_pack`, `grade_exercise`, `grade_submissions` and the Grader
+  perspective run transformations (the teacher's solution, the students' submissions) only when you ask,
+  each one in a separate Java process with its own empty Kettle settings, on copies of the data inside a
+  temporary folder; they never modify a submission. They write the pack, the results, the students'
+  feedback and the gradebook (student names, grades and your comments) only to the folders you choose.
+  Grades and names stay on your computer. Running a submission is running code someone else wrote: the
+  step policy blocks code, network and file-deletion steps unless you enable trust mode in Spoon, but it is
+  not a sandbox. What the tools return to Claude (names, values, logs of a submission) becomes part of your
+  conversation, like any other content.
 - **Nothing is stored** by the plugins beyond what Spoon itself keeps (your open documents, recent files)
   and your report settings (author, institution, colors and logo), saved in
   `<KETTLE_HOME>\.kettle\pentaho-live\` when you click "Save as default".

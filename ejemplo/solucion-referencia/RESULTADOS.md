@@ -7,6 +7,12 @@ también queda comprobado que los precios no dependen del idioma.
 
 Los datos son los de `../datos/` tal y como los escribe `generar_datos.py` (semilla 20260901).
 
+`06_kpi_desde_ficheros.ktr` no forma parte del job: es la tabla «ventas por tienda y categoría» calculada en
+una sola transformación desde los tres ficheros, que es lo que corrige el pack de
+[`../pack-correccion/`](../pack-correccion/). La comprobó el propio corrector: sus 20 filas coinciden con
+`kpi_ventas_tienda_categoria` de `../datos/resultado_esperado.json` (y las del caso oculto, con las del
+generador para su semilla), y contra el pack saca 10 con `es_ES` y con `en_US`.
+
 ## Cómo se comprobó
 
 ```powershell

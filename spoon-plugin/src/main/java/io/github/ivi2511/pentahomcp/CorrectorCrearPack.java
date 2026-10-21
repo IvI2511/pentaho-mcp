@@ -1124,6 +1124,8 @@ public final class CorrectorCrearPack {
         if ( !f.isAbsolute() ) {
           f = new File( dirOriginal, v );
         }
+        // sin «..» ni «.»: ${Internal.Entry.Current.Directory}/../datos/x y datos/x son el mismo archivo
+        f = f.getAbsoluteFile().toPath().normalize().toFile();
         String k = f.getAbsolutePath().toLowerCase( Locale.ROOT );
         if ( f.isDirectory() || !vistas.add( k ) ) {
           continue; // una carpeta (Get file names, comodines): no es un archivo del pack

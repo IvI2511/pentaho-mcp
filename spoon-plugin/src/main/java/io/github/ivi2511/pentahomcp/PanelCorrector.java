@@ -463,10 +463,16 @@ final class PanelCorrector {
 
   // ---------------------------------------------------------------- ciclo
 
-  /** La perspectiva se activo: refresca la tabla si hay un lote. (UI) */
+  /**
+   * La perspectiva se activo: si hay un lote mas nuevo en este Spoon (por ejemplo uno de grade_submissions) y el que se
+   * ve ya termino, pasa a ese; si no, refresca la tabla. (UI)
+   */
   void alActivar() {
     try {
-      if ( lote != null ) {
+      CorrectorLote ultimo = ultimoLote();
+      if ( ultimo != null && ultimo != lote && !ocupado && ( lote == null || lote.terminado() ) ) {
+        seguir( ultimo );
+      } else if ( lote != null ) {
         refrescar();
       }
       habilitar();

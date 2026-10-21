@@ -7,7 +7,8 @@
 > injects known amounts of errors, so the expected result is exact. `solucion-referencia/` is a
 > working solution written as `.ktr`/`.kjb` files and verified with Kitchen; the live demo has Claude
 > build the same ETL on the Spoon canvas through the MCP server, and the Reports tab documents it.
-> Everything in this folder is in Spanish.
+> `pack-correccion/` turns it into a graded exercise for the Pentaho Live grader, with four sample
+> submissions. Everything in this folder is in Spanish.
 
 Esta carpeta es un ejercicio de ETL de los que se ponen en una asignatura de Big Data o Ingeniería
 de Datos, preparado para enseñar Pentaho Live con algo realista: tres fuentes en tres formatos,
@@ -38,11 +39,16 @@ ejemplo/
 │   ├── 03_dim_fecha.ktr         genera los 30 días de septiembre → dim_fecha
 │   ├── 04_hechos_ventas.ktr     CSV → limpieza, duplicados, claves, validación → hechos y rechazos
 │   ├── 05_kpi_ventas.ktr        modelo estrella → KPI (tabla y CSV)
+│   ├── 06_kpi_desde_ficheros.ktr  el KPI por tienda y categoría en una sola transformación (la del corrector)
 │   └── RESULTADOS.md            los números comprobados de una ejecución con Kitchen
+├── pack-correccion/             el ejercicio para el corrector de Pentaho Live (ver abajo)
+├── pack-correccion-alumnos.zip  su copia para alumnos, sin la solución ni el caso oculto
+├── entregas-ejemplo/            cuatro entregas con errores típicos, para probar el corrector
 ├── construido-en-vivo/          la misma ETL, construida por el MCP dentro de Spoon (ver abajo)
 ├── informes/                    los informes que generó la pestaña Informes (PDF, PowerPoint, HTML, Markdown)
 ├── capturas/                    el GIF de la construcción, el lienzo de cada transformación y páginas del informe
-├── herramientas/                los scripts que repiten la construcción en vivo y los informes
+├── herramientas/                los scripts que repiten la construcción en vivo y los informes, y el que
+│                                genera los datos del caso oculto del corrector
 └── salida/                      lo que genera la ETL (no se versiona)
 ```
 
@@ -140,6 +146,27 @@ Spoon abierto. Sirve de plan B en clase y es lo que se grabó para el GIF.
 
 Para presentarlo en directo, con los mensajes listos para Claude y qué enseñar en cada momento, está el
 [guion de la demo](guion-demo.md).
+
+## Corregir entregas con el corrector
+
+[`pack-correccion/`](pack-correccion/) convierte la práctica en un ejercicio que corrige el corrector de
+Pentaho Live: el alumno entrega una transformación que calcula las ventas por tienda y categoría desde los tres
+ficheros, y el corrector la ejecuta con estos datos y con un caso oculto, la compara con la tabla de
+`datos/resultado_esperado.json` y pone la nota con una rúbrica. Las cuatro entregas de
+[`entregas-ejemplo/`](entregas-ejemplo/) tienen los errores más habituales de esta práctica y sacan notas
+distintas, cada una con su pista:
+
+| Entrega | Error | Nota |
+|---|---|---:|
+| `lucia_rutas_absolutas` | rutas de su ordenador (`C:\Users\lucia\Escritorio\…`) | 9,5 |
+| `marcos_sin_quitar_duplicados` | no quita las 60 líneas repetidas | 5,3 |
+| `nerea_decimal_vacio` | lee el precio sin símbolo decimal: con `es_ES`, `2.50` vale 250 | 6,0 |
+| `oscar_group_by_sin_ordenar` | Group by sin Sort rows delante | 5,0 |
+
+Cómo lo usa un docente (en Spoon, en la perspectiva Corrector, o pidiéndoselo a Claude) y cómo se crea un pack
+así: [`pack-correccion/README.md`](pack-correccion/README.md). Lo que escribió el corrector con esas entregas
+(planilla, informe del curso y la devolución de cada alumno) está en
+[`informes/correccion/`](informes/correccion/).
 
 ## El informe que genera Pentaho Live
 

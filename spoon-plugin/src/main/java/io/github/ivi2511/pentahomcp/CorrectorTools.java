@@ -203,8 +203,9 @@ final class CorrectorTools {
     s.add( Tools.tool( "grade_submissions",
       "Grades a whole folder of submissions against an exercise pack, in the background with a pool of JVM workers "
         + "(never in Spoon): one submission per .ktr, .kjb, .zip or subfolder (Moodle folder names are cleaned; an "
-        + "optional alumnos.csv 'file;student;email' sets the names). Writes <student>.json and <student>.md (the "
-        + "feedback) for each one and, at the end, the gradebook (notas.csv for Excel and/or notas.xlsx), keeping "
+        + "optional alumnos.csv 'file;student;email' sets the names). Writes <student>.json and the feedback "
+        + "(<student>.md and <student>.html) for each one and, at the end, the gradebook (notas.csv for Excel and/or "
+        + "notas.xlsx), keeping "
         + "the teacher's adjustments and comments of a previous gradebook in the same folder. Waits up to wait_s and "
         + "returns job_id, state (running, finished, cancelled), done/total, the results so far (student, status, "
         + "grade) and the summary (mean, median, passed, blocked, timeouts); while it is running, call "

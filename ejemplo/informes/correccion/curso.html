@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Pentaho Live">
+<title>Grano de Oro · Ventas por tienda y categoría</title>
+<style>
+html { background: #FFFFFF; }
+body { margin: 0; padding: 0; background: #FFFFFF; color: #1F2933; font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 14px; line-height: 1.5; -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+.hoja { position: relative; z-index: 1; max-width: 920px; margin: 0 auto; padding: 28px 40px 24px; }
+a { color: #3F74D8; text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { font-weight: 600; line-height: 1.25; }
+p { margin: 0 0 10px; }
+ul { margin: 0 0 10px; padding-left: 22px; }
+li { margin: 2px 0; }
+code, pre { font-family: Consolas, "Courier New", monospace; }
+.portada { margin: 0 0 22px; }
+.portada .banda { background: #243B53; color: #FFFFFF; padding: 26px 30px 22px; }
+.portada .banda:after { content: ""; display: block; clear: both; }
+.portada .logo { float: right; margin: 0 0 8px 20px; background: #FFFFFF; padding: 6px; }
+.portada .logo img { display: block; max-width: 180px; max-height: 64px; width: auto; height: auto; }
+.portada .tipo { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #A3ADB7; margin: 0 0 6px; }
+.portada h1 { margin: 0 0 6px; font-size: 28px; color: #FFFFFF; }
+.portada .subtitulo { font-size: 15px; color: #D8DCE0; margin: 0; }
+.portada .generado { font-size: 12px; color: #A3ADB7; margin: 12px 0 0; }
+.portada .cuerpo { border: 1px solid #D9DEE5; border-top: 0; padding: 14px 30px 8px; }
+.portada .cuerpo ul.datos { list-style: none; padding: 0; margin: 0 0 8px; }
+.portada .cuerpo ul.datos li { padding: 4px 0; border-bottom: 1px solid #F4F5F6; }
+.portada .cuerpo ul.datos li:last-child { border-bottom: 0; }
+.portada .cuerpo .resumen-portada { margin: 0 0 8px; color: #6B7785; }
+.indice { margin: 0 0 22px; padding: 14px 20px 10px; background: #F4F5F6; border-left: 3px solid #243B53; }
+.indice h2 { margin: 0 0 6px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #6B7785; border: 0; padding: 0; }
+.indice ol { margin: 0; padding-left: 22px; }
+.indice li { margin: 3px 0; }
+.indice li.omitida { color: #6B7785; }
+.indice .motivo { font-size: 12px; color: #6B7785; }
+.seccion { margin: 30px 0 0; }
+.seccion h2 { margin: 0 0 10px; padding: 0 0 6px; font-size: 21px; color: #243B53; border-bottom: 2px solid #243B53; }
+.seccion h3 { margin: 18px 0 8px; font-size: 15px; color: #1F2933; }
+.estado { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 8px; font-size: 11px;
+  font-weight: 600; letter-spacing: .5px; text-transform: uppercase; border: 1px solid; }
+.estado-parcial { color: #8A5A00; border-color: #D69E2E; background: #FFF8E6; }
+.estado-error { color: #9B1C1C; border-color: #C53030; background: #FDEDED; }
+.motivo-seccion { margin: 0 0 10px; font-size: 13px; color: #6B7785; }
+.resumen { margin: 0 0 14px; padding: 8px 12px; color: #1F2933; background: #E9EBEE; border-left: 3px solid #3F74D8; }
+.bloque { margin: 0 0 16px; }
+.nota { margin: 4px 0 0; font-size: 12px; color: #6B7785; }
+.rotulo-ia { margin: 4px 0 0; font-size: 11px; font-style: italic; color: #6B7785; }
+.rotulo-ia span { display: inline-block; margin-right: 6px; padding: 0 5px; font-style: normal; font-weight: 600;
+  color: #3F74D8; border: 1px solid #3F74D8; }
+.ia { border-left: 2px solid #B2C7EF; padding-left: 10px; }
+.tabla { overflow-x: auto; }
+table.datos { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.datos th { background: #EDEFF1; color: #243B53; text-align: left; font-weight: 600; padding: 6px 10px;
+  border-bottom: 2px solid #243B53; vertical-align: bottom; }
+table.datos td { padding: 5px 10px; border-bottom: 1px solid #D9DEE5; vertical-align: top; }
+table.datos tr.par td { background: #FAFBFC; }
+table.datos .r { text-align: right; }
+table.datos .c { text-align: center; }
+table.datos td.largo { word-wrap: break-word; overflow-wrap: break-word; }
+.pie-tabla { margin: 4px 0 0; font-size: 12px; color: #6B7785; }
+.titulo-bloque { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #1F2933; }
+.tarjetas { margin: 0 -6px; font-size: 0; }
+.tarjeta { display: inline-block; vertical-align: top; min-width: 144px; max-width: 280px; margin: 0 6px 12px; padding: 10px 12px 9px;
+  border: 1px solid #D9DEE5; border-top: 3px solid #243B53; background: #FFFFFF; font-size: 14px; }
+.tarjeta .etiqueta { font-size: 11px; color: #6B7785; text-transform: uppercase; letter-spacing: .5px; }
+.tarjeta .valor { font-size: 22px; font-weight: 600; color: #1F2933; line-height: 1.25; margin: 2px 0 0;
+  word-wrap: break-word; }
+.tarjeta .detalle { font-size: 12px; color: #6B7785; word-wrap: break-word; }
+.tarjeta.ok { border-top-color: #1C9A80; }
+.tarjeta.warn { border-top-color: #D69E2E; }
+.tarjeta.error { border-top-color: #C53030; }
+.aviso { margin: 0 0 12px; padding: 8px 12px; border-left: 4px solid; font-size: 13px; }
+.aviso strong.nivel { margin-right: 6px; }
+.aviso-info { border-color: #3F74D8; background: #ECF1FB; }
+.aviso-warn { border-color: #D69E2E; background: #FFF8E6; }
+.aviso-error { border-color: #C53030; background: #FDEDED; }
+.figura { margin: 0 0 16px; }
+.figura img { max-width: 100%; height: auto; border: 1px solid #D9DEE5; }
+.figura .lienzo { margin: 0 0 10px; }
+.figura .svg { text-align: center; overflow: hidden; }
+.figura .svg svg { max-width: 100%; overflow: hidden; }
+.figura .leyenda { margin: 4px 0 0; font-size: 12px; color: #6B7785; }
+pre.mermaid { margin: 0; padding: 10px; background: #FFFFFF; border: 1px solid #D9DEE5; text-align: center;
+  white-space: pre-wrap; font-size: 12px; color: #6B7785; }
+pre.mermaid[data-processed] { color: #1F2933; }
+.mermaid-fallo { display: none; }
+.pendiente { margin: 0 0 8px; padding: 18px 12px; text-align: center; font-size: 13px; color: #6B7785;
+  background: #F4F5F6; border: 1px dashed #D9DEE5; }
+.alternativa { margin: 8px 0 0; }
+.pie { margin: 32px 0 0; padding: 8px 0 0; border-top: 1px solid #D9DEE5; font-size: 7.5pt; color: #6B7785; }
+.pie svg { width: 14px; height: 8px; vertical-align: -1px; margin-right: 5px; }
+.marca { position: fixed; right: 6mm; bottom: 6mm; width: 151px; height: 86px; z-index: 0; pointer-events: none; opacity: 0.08; }
+.marca svg { width: 151px; height: 86px; }
+@supports (display: grid) {
+  .figura .svg svg { height: auto; }
+}
+@media print {
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hoja { max-width: none; padding: 0; }
+  a { color: #1F2933; }
+  tr, .tarjeta, .aviso, .figura, .pendiente { page-break-inside: avoid; break-inside: avoid; }
+  h2, h3, .titulo-bloque { page-break-after: avoid; break-after: avoid; }
+  .tabla { overflow: visible; }
+}
+</style>
+</head>
+<body>
+<div class="marca" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37.00 21.00" role="img" aria-label="IDC Studios" width="148" height="84"><title>IDC Studios</title><g transform="translate(0.00 0.00)"><rect x="0.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="20.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#1c9a80"/><rect x="30.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="10.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/></g></svg></div>
+<div class="hoja">
+<div class="portada" id="sec-cover">
+<div class="banda">
+<p class="tipo">grano-de-oro-ventas-tienda-categoria</p>
+<h1>Grano de Oro · Ventas por tienda y categoría</h1>
+<p class="subtitulo">Resultados del curso</p>
+<p class="generado">Generado el 21 de octubre de 2026, 08:20</p>
+</div>
+<div class="cuerpo">
+<ul class="datos"><li>Ejercicio: grano-de-oro-ventas-tienda-categoria</li><li>Entregas: 4</li></ul>
+</div>
+</div>
+<div class="indice">
+<h2>Contenido</h2>
+<ol>
+<li><a href="#sec-course_summary">Resumen del curso</a></li>
+<li><a href="#sec-grade_distribution">Distribución de notas</a></li>
+<li><a href="#sec-checks">Criterios más fallados</a></li>
+<li><a href="#sec-submissions">Entregas</a></li>
+</ol>
+</div>
+<section class="seccion" id="sec-course_summary">
+<h2>Resumen del curso</h2>
+<div class="resumen"><p>Con nota: 4 · media 6,5 · aprobadas: 4.</p>
+</div>
+<div class="bloque" id="b-course-cards">
+<div class="tarjetas"><div class="tarjeta"><div class="etiqueta">Entregas</div><div class="valor">4</div><div class="detalle">4 con resultado</div></div><div class="tarjeta ok"><div class="etiqueta">Media</div><div class="valor">6,5</div></div><div class="tarjeta ok"><div class="etiqueta">Mediana</div><div class="valor">5,7</div></div><div class="tarjeta ok"><div class="etiqueta">Aprobadas (nota ≥ 5)</div><div class="valor">4 de 4</div></div><div class="tarjeta ok"><div class="etiqueta">Bloqueadas</div><div class="valor">0</div></div><div class="tarjeta ok"><div class="etiqueta">Cortadas por tiempo</div><div class="valor">0</div></div><div class="tarjeta ok"><div class="etiqueta">No se pudieron abrir o se interrumpieron</div><div class="valor">0</div></div></div>
+</div>
+</section>
+<section class="seccion" id="sec-grade_distribution">
+<h2>Distribución de notas</h2>
+<div class="bloque" id="b-grade-distribution">
+<h3>Entregas por nota</h3>
+<div class="figura grafico"><div class="svg" role="img" aria-label="Entregas por nota"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 760 341" role="img" aria-label="Entregas por nota" width="760" height="341"><title>Entregas por nota</title><rect x="0" y="0" width="760" height="341" fill="#FFFFFF"/><line x1="10" y1="17" x2="26" y2="17" stroke="#3F74D8" stroke-width="2.5"/><circle cx="18" cy="17" r="2.5" fill="#3F74D8" stroke="#3F74D8" stroke-width="1"/><text x="32" y="20.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">Entregas</text><text x="10" y="40.5" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">entregas</text><line x1="31.32" y1="310.5" x2="750" y2="310.5" stroke="#8794A3" stroke-width="1" shape-rendering="crispEdges"/><text x="25.32" y="314.18" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">0,0</text><line x1="31.32" y1="246" x2="750" y2="246" stroke="#D9DEE5" stroke-width="1" shape-rendering="crispEdges"/><text x="25.32" y="249.68" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">0,5</text><line x1="31.32" y1="181.5" x2="750" y2="181.5" stroke="#D9DEE5" stroke-width="1" shape-rendering="crispEdges"/><text x="25.32" y="185.18" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">1,0</text><line x1="31.32" y1="117" x2="750" y2="117" stroke="#D9DEE5" stroke-width="1" shape-rendering="crispEdges"/><text x="25.32" y="120.68" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">1,5</text><line x1="31.32" y1="52.5" x2="750" y2="52.5" stroke="#D9DEE5" stroke-width="1" shape-rendering="crispEdges"/><text x="25.32" y="56.18" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">2,0</text><text x="67.26" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">0–1</text><text x="139.13" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">1–2</text><text x="210.99" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">2–3</text><text x="282.86" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">3–4</text><text x="354.73" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">4–5</text><text x="426.6" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">5–6</text><text x="498.46" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">6–7</text><text x="570.33" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">7–8</text><text x="642.2" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">8–9</text><text x="714.07" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="10.5" fill="#6B7785">9–10</text><polyline points="67.26,310.5 139.13,310.5 210.99,310.5 282.86,310.5 354.73,310.5 426.6,52.5 498.46,181.5 570.33,310.5 642.2,310.5 714.07,181.5" fill="none" stroke="#3F74D8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="67.26" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 0–1: 0 entregas</title></circle><circle cx="139.13" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 1–2: 0 entregas</title></circle><circle cx="210.99" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 2–3: 0 entregas</title></circle><circle cx="282.86" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 3–4: 0 entregas</title></circle><circle cx="354.73" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 4–5: 0 entregas</title></circle><circle cx="426.6" cy="52.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 5–6: 2 entregas</title></circle><circle cx="498.46" cy="181.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 6–7: 1 entregas</title></circle><circle cx="570.33" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 7–8: 0 entregas</title></circle><circle cx="642.2" cy="310.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 8–9: 0 entregas</title></circle><circle cx="714.07" cy="181.5" r="2.5" fill="#3F74D8" stroke="#FFFFFF" stroke-width="1"><title>Entregas · 9–10: 1 entregas</title></circle></svg></div></div>
+</div>
+</section>
+<section class="seccion" id="sec-checks">
+<h2>Criterios más fallados</h2>
+<div class="bloque" id="b-failed-checks">
+<h3>Entregas que no aprueban cada criterio</h3>
+<div class="figura grafico"><div class="svg" role="img" aria-label="Entregas que no aprueban cada criterio"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 760 216" role="img" aria-label="Entregas que no aprueban cada criterio" width="760" height="216"><title>Entregas que no aprueban cada criterio</title><rect x="0" y="0" width="760" height="216" fill="#FFFFFF"/><rect x="10" y="12" width="10" height="10" fill="#3F74D8" rx="2" ry="2"/><text x="24" y="20.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">No lo aprueban</text><text x="267.71" y="45.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Valores correctos</text><rect x="275.71" y="34" width="459.87" height="14" fill="#3F74D8" rx="2" ry="2"><title>Valores correctos: 3</title></rect><text x="739.58" y="44.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">3</text><text x="267.71" y="67.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Cantidad de filas</text><rect x="275.71" y="56" width="153.29" height="14" fill="#3F74D8" rx="2" ry="2"><title>Cantidad de filas: 1</title></rect><text x="433" y="66.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">1</text><text x="267.71" y="89.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Quita los duplicados con Unique rows</text><rect x="275.71" y="78" width="153.29" height="14" fill="#3F74D8" rx="2" ry="2"><title>Quita los duplicados con Unique rows: 1</title></rect><text x="433" y="88.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">1</text><text x="267.71" y="111.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Rutas relativas a la transformación</text><rect x="275.71" y="100" width="153.29" height="14" fill="#3F74D8" rx="2" ry="2"><title>Rutas relativas a la transformación: 1</title></rect><text x="433" y="110.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">1</text><text x="267.71" y="133.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Corre sin errores</text><text x="279.71" y="132.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">0</text><text x="267.71" y="155.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Columnas correctas</text><text x="279.71" y="154.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">0</text><text x="267.71" y="177.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Agrupa con un Group by (o Memory group by)</text><text x="279.71" y="176.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">0</text><text x="267.71" y="199.2" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#1F2933">Sin JavaScript ni Java</text><text x="279.71" y="198.85" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#1F2933">0</text><line x1="275.71" y1="28" x2="275.71" y2="208" stroke="#8794A3" stroke-width="1" shape-rendering="crispEdges"/></svg></div></div>
+</div>
+<div class="bloque" id="b-checks-table">
+<div class="tabla"><table class="datos"><thead><tr><th>Criterio</th><th class="r">Puntos</th><th class="r">Lo aprueban</th><th class="r">Puntos promedio</th></tr></thead><tbody>
+<tr><td>Corre sin errores</td><td class="r">1</td><td class="r">4 de 4</td><td class="r">1</td></tr>
+<tr class="par"><td>Columnas correctas</td><td class="r">1</td><td class="r">4 de 4</td><td class="r">1</td></tr>
+<tr><td>Cantidad de filas</td><td class="r">1</td><td class="r">3 de 4</td><td class="r">0,75</td></tr>
+<tr class="par"><td>Valores correctos</td><td class="r">4</td><td class="r">1 de 4</td><td class="r">1,07</td></tr>
+<tr><td>Agrupa con un Group by (o Memory group by)</td><td class="r">1</td><td class="r">4 de 4</td><td class="r">1</td></tr>
+<tr class="par"><td>Quita los duplicados con Unique rows</td><td class="r">1</td><td class="r">3 de 4</td><td class="r">0,75</td></tr>
+<tr><td>Sin JavaScript ni Java</td><td class="r">0,5</td><td class="r">4 de 4</td><td class="r">0,5</td></tr>
+<tr class="par"><td>Rutas relativas a la transformación</td><td class="r">0,5</td><td class="r">3 de 4</td><td class="r">0,38</td></tr>
+</tbody></table></div>
+</div>
+</section>
+<section class="seccion corta" id="sec-submissions">
+<h2>Entregas</h2>
+<div class="bloque" id="b-submissions-table">
+<div class="tabla"><table class="datos"><thead><tr><th>Alumno</th><th>Archivo</th><th>Estado</th><th class="r">Nota</th><th class="r">Criterios aprobados</th></tr></thead><tbody>
+<tr><td>lucia_rutas_absolutas</td><td>lucia_rutas_absolutas.ktr</td><td>corregida</td><td class="r">9,5</td><td class="r">7 de 8</td></tr>
+<tr class="par"><td>marcos_sin_quitar_duplicados</td><td class="largo">marcos_<wbr>sin_<wbr>quitar_<wbr>duplicados.<wbr>ktr</td><td>corregida</td><td class="r">5,3</td><td class="r">6 de 8</td></tr>
+<tr><td>nerea_decimal_vacio</td><td>nerea_decimal_vacio.ktr</td><td>corregida</td><td class="r">6,0</td><td class="r">7 de 8</td></tr>
+<tr class="par"><td>oscar_group_by_sin_ordenar</td><td>oscar_group_by_sin_ordenar.ktr</td><td>corregida</td><td class="r">5,0</td><td class="r">6 de 8</td></tr>
+</tbody></table></div>
+</div>
+</section>
+<div class="pie"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37.00 21.00" role="img" aria-label="IDC Studios" width="148" height="84"><title>IDC Studios</title><g transform="translate(0.00 0.00)"><rect x="0.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="20.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="0.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="10.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#1c9a80"/><rect x="30.00" y="8.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="0.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/><rect x="10.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="20.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#d6deea"/><rect x="30.00" y="16.00" width="7.00" height="5.00" rx="1.50" fill="#3f74d8"/></g></svg>Generado con Pentaho Live · IDC Studios</div>
+</div>
+</body>
+</html>
