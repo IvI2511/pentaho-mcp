@@ -72,7 +72,7 @@ código 0,5, ≤ 8 steps 0,5; escala 10; **sin compuertas**):
 | elena_sin_ordenar | Group by sin Sort rows (D5) | graded | **5,5** | 10 filas contra 4; claves repetidas Café ×4, Té ×3, Medialuna ×2; pista del Sort rows |
 | fede_bucle | Hop circular (D2) | timeout | **2,0** | Solo los puntos de reglas (ver compuertas, §5) |
 | gabi_renombra (extra) | `importe_medio` → `promedio` | graded | 9,7 | «La columna importe_medio no está, pero promedio tiene los mismos valores: ¿la renombraste?» |
-| hugo_decimal (extra) | `<decimal/>` vacío (D3) | graded | 6,0 | «Algunos importes salen multiplicados por 100: declarale el símbolo decimal» |
+| hugo_decimal (extra) | `<decimal/>` vacío (D3) | graded | 6,0 | «Algunos importes salen multiplicados por 100: declara el símbolo decimal» |
 
 **No probado [NP]:** jobs `.kjb`; pack en `.zip` o `.json` único; nada en Spoon (UI, classpath de la
 hija desde Spoon); las tools MCP; `.xlsx`; comparación sin clave (todas las pruebas usaron clave),

@@ -255,6 +255,9 @@ final class PanelCorrector {
   private AsistentePack asistente;
   private Recorreccion dialogo;
 
+  /** Los paneles abiertos en este Spoon, para avisarles de un lote de grade_submissions ({@link #loteNuevo}). */
+  private static final List<PanelCorrector> VIVOS = new java.util.concurrent.CopyOnWriteArrayList<PanelCorrector>();
+
   /** Arma el panel dentro de {@code padre}. (UI) */
   PanelCorrector( Composite padre, Servicio servicio, String idiomaUi ) {
     if ( servicio == null ) {
@@ -455,6 +458,7 @@ final class PanelCorrector {
     listo( t.s( "ui.listo" ) );
     habilitar();
     raiz.addDisposeListener( e -> alCerrar() );
+    VIVOS.add( this );
     CorrectorLote previo = ultimoLote();
     if ( previo != null ) {
       seguir( previo ); // la perspectiva se recreo con un lote de este Spoon en curso o terminado
@@ -478,6 +482,26 @@ final class PanelCorrector {
       habilitar();
     } catch ( Throwable x ) {
       fallo( x );
+    }
+  }
+
+  /**
+   * grade_submissions arranco un lote: cada panel abierto lo adopta como al activar la perspectiva (si el lote que
+   * muestra ya termino y no esta ocupado), sin esperar a que el usuario cambie de perspectiva. (cualquier hilo)
+   */
+  static void loteNuevo() {
+    for ( final PanelCorrector p : VIVOS ) {
+      try {
+        if ( !p.display.isDisposed() ) {
+          p.display.asyncExec( () -> {
+            if ( !p.raiz.isDisposed() ) {
+              p.alActivar();
+            }
+          } );
+        }
+      } catch ( Throwable ignored ) {
+        // un panel que se cierra justo ahora
+      }
     }
   }
 
@@ -1470,6 +1494,7 @@ final class PanelCorrector {
   // ---------------------------------------------------------------- ayudas
 
   private void alCerrar() {
+    VIVOS.remove( this );
     genDetalle++;
     if ( asistente != null ) {
       asistente.cerrar();

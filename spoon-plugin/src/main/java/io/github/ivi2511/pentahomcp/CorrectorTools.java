@@ -851,6 +851,7 @@ final class CorrectorTools {
     } catch ( IllegalArgumentException | IllegalStateException e ) {
       throw new ToolError( e.getMessage() );
     }
+    PanelCorrector.loteNuevo(); // la perspectiva Corrector, si esta abierta, lo muestra enseguida
     l.esperar( espera * 1000L );
     return CorrectorJson.mapper().valueToTree( l.estado() );
   }
