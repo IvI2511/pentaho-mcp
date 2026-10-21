@@ -587,9 +587,10 @@ final class PptxDiapos {
           b = bs.get( k );
         }
       }
-      // presentacion: el detalle de consulta y lo que pasa de MAX_DIAPOS_SECCION va al anexo (o queda fuera)
+      // presentacion: el detalle de consulta y lo que pasa de MAX_DIAPOS_SECCION va al anexo (o queda fuera);
+      // los diagramas propios no: son lo que se presenta (un linaje con 4 destinos ocupa mas de 4 diapositivas)
       if ( !enAnexo && ( detalle( b ) || ( diaposSeccion > MAX_DIAPOS_SECCION && !( b instanceof Parrafo )
-        && !( b instanceof Aviso ) ) ) ) {
+        && !( b instanceof Aviso ) && !( b instanceof Diagrama && Figuras.propio( (Diagrama) b ) ) ) ) ) {
         apartar( titulo, b );
         continue;
       }
@@ -1343,8 +1344,18 @@ final class PptxDiapos {
     if ( ds == null ) {
       return false;
     }
-    subtituloPendiente = null;
+    // los PNG antes de tocar las diapositivas: si Batik falla, sigue el Mermaid o la tabla (nunca a medias)
+    List<byte[]> pngs = new ArrayList<>();
     for ( Dibujo x : ds ) {
+      try {
+        pngs.add( x.png( 2 ) );
+      } catch ( Exception | LinkageError e ) {
+        return false;
+      }
+    }
+    subtituloPendiente = null;
+    for ( int k = 0; k < ds.size(); k++ ) {
+      Dibujo x = ds.get( k );
       cancelar( progreso );
       if ( !vacia() ) {
         continuar();
@@ -1360,13 +1371,7 @@ final class PptxDiapos {
         w = w * h / x.altoFinal();
       }
       Rectangle2D ancla = new Rectangle2D.Double( X0 + ( ANCHO_UTIL - w ) / 2, y, w, h );
-      byte[] png;
-      try {
-        png = x.png( 2 );
-      } catch ( Exception e ) {
-        throw new IllegalStateException( "PNG del diagrama: " + e.getMessage(), e );
-      }
-      XSLFPictureShape ps = diapo.createPicture( ppt.addPicture( png, PictureType.PNG ) );
+      XSLFPictureShape ps = diapo.createPicture( ppt.addPicture( pngs.get( k ), PictureType.PNG ) );
       try {
         ps.setSvgImage( ppt.addPicture( x.svg.getBytes( StandardCharsets.UTF_8 ), PictureType.SVG ) );
       } catch ( Throwable t ) {
