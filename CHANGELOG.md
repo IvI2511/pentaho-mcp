@@ -33,7 +33,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The Mermaid code is still in the Markdown export. The target table model (ER) still uses Mermaid.
 - PowerPoint: the data-dictionary annex and the reference tables are left out by default (they stay in
   the HTML, PDF and Word); a long table takes at most two slides (a 26-step class exercise went from
-  47 slides to 16).
+  47 slides to 14).
 - The "rows written per interval" chart is now **Pace of each step during the run**, with an
   explanation, and only appears when the run is long enough to say something.
 - Run timeline (Gantt): when there are too many rows, the fastest ones are left out (and named), never
