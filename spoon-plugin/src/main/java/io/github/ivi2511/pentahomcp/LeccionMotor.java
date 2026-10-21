@@ -454,7 +454,12 @@ final class LeccionMotor {
     hopsExtra( l, l.hopsCero, u, hechos );
     TransOps.resolverReferencias( tm );
     previos.registrar( u, tm );
-    // registro y titulo
+    // registro y titulo. El de una leccion anterior sin notas en el lienzo (validar lo garantiza) se reemplaza: si
+    // no, la numeracion de pasos de lesson_notes add contaria tambien los de aquella.
+    if ( LeccionNotas.tieneLeccion( tm ) ) {
+      tm.getAttributesMap().remove( LeccionNotas.GRUPO );
+      l.avisos.add( "The registry of an earlier lesson (none of its notes is on the canvas) was replaced." );
+    }
     LeccionNotas.asegurarGrupo( tm, l.idioma );
     tm.setAttribute( LeccionNotas.GRUPO, "id", l.id );
     tm.setAttribute( LeccionNotas.GRUPO, "title", l.titulo );

@@ -349,6 +349,18 @@ final class Leccion {
    */
   List<String> validar( TransMeta t, IMetaStore ms ) {
     List<String> problemas = new ArrayList<String>();
+    // otra leccion en el lienzo
+    if ( !LeccionNotas.reconocer( t ).isEmpty() ) {
+      problemas.add( "'" + t.getName() + "' already has lesson notes on the canvas: remove them first "
+        + "(lesson_notes action=remove) or work on a copy" );
+    }
+    try {
+      if ( !LeccionNotas.ocultas( t ).isEmpty() ) {
+        problemas.add( "'" + t.getName() + "' has hidden lesson notes: lesson_notes show, then remove, first" );
+      }
+    } catch ( ToolError e ) {
+      problemas.add( e.getMessage() );
+    }
     Map<String, Integer> pasoDe = new HashMap<String, Integer>(); // clave -> n del paso que crea el step
     Map<String, Paso> nombres = new HashMap<String, Paso>();
     for ( Paso p : pasos ) {
@@ -394,18 +406,6 @@ final class Leccion {
       } else {
         pasos.get( k - 1 ).hopsExtra.add( h );
       }
-    }
-    // otra leccion en el lienzo
-    if ( !LeccionNotas.reconocer( t ).isEmpty() ) {
-      problemas.add( "'" + t.getName() + "' already has lesson notes on the canvas: remove them first "
-        + "(lesson_notes action=remove purge=true) or work on a copy" );
-    }
-    try {
-      if ( !LeccionNotas.ocultas( t ).isEmpty() ) {
-        problemas.add( "'" + t.getName() + "' has hidden lesson notes: lesson_notes show + remove (purge=true) first" );
-      }
-    } catch ( ToolError e ) {
-      problemas.add( e.getMessage() );
     }
     // vista previa
     boolean hayVista = false;

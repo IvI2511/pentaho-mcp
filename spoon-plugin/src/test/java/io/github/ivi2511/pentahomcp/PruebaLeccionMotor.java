@@ -358,6 +358,31 @@ public class PruebaLeccionMotor {
     LeccionMotor.olvidarTodas();
   }
 
+  public void pruebaSegundaLeccionReemplazaElRegistro() throws Exception {
+    LeccionMotor.SinSpoon ent = entorno( 0 );
+    TransMeta tm = nueva( "leccion_dos" );
+    ObjectNode g = guionL1( "manual" );
+    for ( JsonNode p : g.path( "steps" ) ) {
+      ( (ObjectNode) p ).remove( "preview_rows" );
+    }
+    Leccion l = LeccionMotor.empezar( ent, g, tm );
+    siguiente( ent, l );
+    siguiente( ent, l );
+    lanza( ToolError.class, () -> LeccionMotor.empezar( ent, guionL1( "manual" ), tm ), "sigue activa" );
+    LeccionMotor.controlar( ent, l, "stop", null );
+    contiene( lanza( ToolError.class, () -> LeccionMotor.empezar( ent, guionL1( "manual" ), tm ),
+      "con notas de leccion" ).getMessage(), "already has lesson notes", "pide quitarlas" );
+    LessonTools.ejecutar( null, tm, "remove", Tools.obj().put( "action", "remove" ) );
+    ObjectNode g2 = Tools.obj().put( "title", "Otra" ).put( "pace", "manual" );
+    g2.putArray( "steps" ).addObject().put( "step", "Leer clientes" ).put( "what", "again" );
+    Leccion l2 = LeccionMotor.empezar( ent, g2, tm );
+    igual( "1", tm.getAttribute( LeccionNotas.GRUPO, "notes" ), "registro nuevo: solo el titulo" );
+    contiene( LeccionMotor.inicioJson( l2 ).path( "warnings" ).toString(), "earlier lesson", "lo avisa" );
+    siguiente( ent, l2 );
+    igual( 1, LeccionNotas.numeroDePaso( LeccionNotas.registro( tm ), "Leer clientes" ), "numeracion desde 1" );
+    LeccionMotor.olvidarTodas();
+  }
+
   public void pruebaDocumentoCerradoAlAvanzar() throws Exception {
     LeccionMotor.SinSpoon ent = entorno( 0 );
     TransMeta tm = nueva( "leccion_cerrada" );
