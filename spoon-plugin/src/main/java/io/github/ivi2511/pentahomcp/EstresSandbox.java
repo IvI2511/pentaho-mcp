@@ -126,6 +126,12 @@ final class EstresSandbox {
     final Set<String> camposMotivo = new LinkedHashSet<String>();
     final List<String> notas = new ArrayList<String>();
     /**
+     * Variables que usa la transformación con el valor que tienen en el padre (kettle.properties, Spoon), sin las
+     * Internal.* ni las que parecen secretos: la hija tiene un KETTLE_HOME vacío. Los parámetros van aparte.
+     */
+    final Map<String, String> variables = new LinkedHashMap<String, String>();
+    final Map<String, String> parametros = new LinkedHashMap<String, String>();
+    /**
      * Otros steps que leen archivos (Get data from XML, Fixed file input, Load file content…): step → sus rutas ya
      * resueltas. En la copia se leen del original (solo lectura) con la ruta absoluta.
      */
@@ -175,6 +181,20 @@ final class EstresSandbox {
       }
     }
     a.xml = tm.getXML();
+    Set<String> declarados = new HashSet<String>( Arrays.asList( tm.listParameters() ) );
+    java.util.regex.Matcher mv = java.util.regex.Pattern.compile( "\\$\\{([^}]+)\\}|%%([^%]+)%%" ).matcher( a.xml );
+    while ( mv.find() ) {
+      String n = mv.group( 1 ) != null ? mv.group( 1 ) : mv.group( 2 );
+      String up = n.toUpperCase( Locale.ROOT );
+      if ( n.startsWith( "Internal." ) || up.contains( "PASS" ) || up.contains( "SECRET" ) || up.contains( "TOKEN" )
+        || up.contains( "KEY" ) ) {
+        continue;
+      }
+      String v = tm.getVariable( n );
+      if ( v != null ) {
+        ( declarados.contains( n ) ? a.parametros : a.variables ).put( n, v );
+      }
+    }
     Document doc = parse( a.xml );
     Map<String, Element> pasos = new LinkedHashMap<String, Element>();
     for ( Element s : hijos( doc.getDocumentElement(), "step" ) ) {

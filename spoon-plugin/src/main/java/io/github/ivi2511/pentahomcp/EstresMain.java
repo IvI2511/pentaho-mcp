@@ -104,7 +104,15 @@ public final class EstresMain {
         Map.Entry<String, JsonNode> e = it.next();
         tm.setParameterValue( e.getKey(), e.getValue().asText() );
       }
+      for ( Iterator<Map.Entry<String, JsonNode>> it = v.path( "variables" ).fields(); it.hasNext(); ) {
+        Map.Entry<String, JsonNode> e = it.next();
+        tm.setVariable( e.getKey(), e.getValue().asText() );
+      }
       t = new Trans( tm );
+      for ( Iterator<Map.Entry<String, JsonNode>> it = v.path( "variables" ).fields(); it.hasNext(); ) {
+        Map.Entry<String, JsonNode> e = it.next();
+        t.setVariable( e.getKey(), e.getValue().asText() );
+      }
       t.setLogLevel( LogLevel.BASIC );
       t.activateParameters();
       t.prepareExecution( null );
