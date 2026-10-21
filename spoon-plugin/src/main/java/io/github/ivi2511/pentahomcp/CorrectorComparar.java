@@ -185,21 +185,7 @@ final class CorrectorComparar {
     }
     int presentes = comunes;
     if ( !op.ignorarOrdenColumnas && comunes > 0 ) {
-      int[] seq = new int[ comunes ];
-      int[] cual = new int[ comunes ];
-      for ( int i = 0, k = 0; i < ne; i++ ) {
-        if ( mapa[ i ] >= 0 ) {
-          cual[ k ] = i;
-          seq[ k++ ] = mapa[ i ];
-        }
-      }
-      boolean[] enOrden = subsecuenciaCreciente( seq );
-      List<String> fuera = new ArrayList<>();
-      for ( int k = 0; k < comunes; k++ ) {
-        if ( !enOrden[ k ] ) {
-          fuera.add( esp.columnas.get( cual[ k ] ) );
-        }
-      }
+      List<String> fuera = fueraDeOrden( esp.columnas, real.columnas );
       presentes = comunes - fuera.size();
       if ( !fuera.isEmpty() ) {
         cc.ordenDistinto = true;
@@ -1303,6 +1289,45 @@ final class CorrectorComparar {
       sb.append( s );
     }
     return sb.toString();
+  }
+
+  /**
+   * Las esperadas que estan en las reales pero fuera de orden: las que no entran en la subsecuencia comun mas larga
+   * (cada esperada toma la primera real libre con el mismo nombre, sin mayusculas). CorrectorNota la usa para
+   * mantener la penalizacion por orden con {@code extra_columns=penalize}.
+   */
+  static List<String> fueraDeOrden( List<String> esperadas, List<String> reales ) {
+    List<String> fuera = new ArrayList<>();
+    if ( esperadas == null || reales == null ) {
+      return fuera;
+    }
+    int ne = esperadas.size();
+    int nr = reales.size();
+    boolean[] usada = new boolean[ nr ];
+    int[] seq = new int[ ne ];
+    int[] cual = new int[ ne ];
+    int comunes = 0;
+    for ( int i = 0; i < ne; i++ ) {
+      String e = esperadas.get( i ) == null ? "" : esperadas.get( i ).trim();
+      for ( int j = 0; j < nr; j++ ) {
+        if ( !usada[ j ] && reales.get( j ) != null && reales.get( j ).equalsIgnoreCase( e ) ) {
+          usada[ j ] = true;
+          cual[ comunes ] = i;
+          seq[ comunes++ ] = j;
+          break;
+        }
+      }
+    }
+    if ( comunes == 0 ) {
+      return fuera;
+    }
+    boolean[] enOrden = subsecuenciaCreciente( Arrays.copyOf( seq, comunes ) );
+    for ( int k = 0; k < comunes; k++ ) {
+      if ( !enOrden[ k ] ) {
+        fuera.add( esperadas.get( cual[ k ] ) );
+      }
+    }
+    return fuera;
   }
 
   /** Marca los elementos de la subsecuencia estrictamente creciente mas larga (valores distintos). */

@@ -12,9 +12,11 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -103,19 +105,26 @@ final class CorrectorSandbox {
   /** Hijos directos del step que nunca son rutas. */
   static final Set<String> HOJAS_PROPIAS = conjunto( "name", "description", "type", "copies", "distribute",
     "custom_distribution", "cluster_schema" );
-  /** Atributos que conserva una conexion SQLite al apuntarla a la base del pack (sin pool, extras ni cluster). */
+  /**
+   * Atributos que conserva una conexion SQLite al apuntarla a la base del pack (sin pool, extras, cluster ni SQL al
+   * conectar: Kettle sustituye variables en ese SQL antes de correrlo, y la copia de analisis tampoco lo lleva).
+   */
   static final Set<String> ATRIBUTOS_SQLITE = conjunto( "FORCE_IDENTIFIERS_TO_LOWERCASE",
     "FORCE_IDENTIFIERS_TO_UPPERCASE", "PRESERVE_RESERVED_WORD_CASE", "QUOTE_ALL_FIELDS", "SUPPORTS_BOOLEAN_DATA_TYPE",
-    "SUPPORTS_TIMESTAMP_DATA_TYPE", "PORT_NUMBER", "SQL_CONNECT" );
+    "SUPPORTS_TIMESTAMP_DATA_TYPE", "PORT_NUMBER" );
 
   /** Orden en que se elige el motivo cuando el sandbox encuentra varios problemas. */
   static final List<String> PRIORIDAD = Collections.unmodifiableList( Arrays.asList(
     ResultadoCaso.REESCRITURA_FALLIDA, ResultadoCaso.SALIDA_INESPERADA, ResultadoCaso.CONEXION_AJENA,
-    ResultadoCaso.ENTRADA_INESPERADA ) );
+    ResultadoCaso.ENTRADA_INESPERADA, ResultadoCaso.SQL_PROHIBIDO ) );
 
   private static final Pattern ESQUEMA = Pattern.compile( "^([A-Za-z][A-Za-z0-9+.-]+):" );
   private static final Pattern PORCIENTO = Pattern.compile( "%([0-9A-Fa-f]{2})" );
   private static final Pattern NO_VALE_EN_NOMBRE = Pattern.compile( "[\\\\/:*?\"<>|\\x00-\\x1f]" );
+  /** La extension que Kettle agrega al nombre de una salida: sin separadores ni puntos. */
+  private static final Pattern EXTENSION_SEGURA = Pattern.compile( "[A-Za-z0-9_-]{1,16}" );
+  /** Un separador en lo que Kettle agrega al nombre de una salida (fecha con formato, id de particion). */
+  private static final Pattern SEPARADOR = Pattern.compile( "[\\\\/]" );
 
   private CorrectorSandbox() {
   }
@@ -270,6 +279,8 @@ final class CorrectorSandbox {
       }
     }
     Variables vars = variables( p, doc, declarados, tmpJvm );
+    sqlSustituido( doc, vars, p, problemas );
+    particiones( doc, p );
 
     // steps: salidas, rutas desde un campo y entradas
     Set<Element> hechos = new HashSet<Element>();
@@ -409,7 +420,8 @@ final class CorrectorSandbox {
     if ( original.isEmpty() ) {
       return; // JSON output sin archivo (outputvalue), o un step que igual falla al iniciar
     }
-    String ext = Nodos.txt( file, "extention" );
+    String ext = extensionSegura( file, nombre, vars, p );
+    fechaSegura( file, nombre, p );
     String base = limpio( nombreBase( vars.environmentSubstitute( original ) ) );
     if ( base.isEmpty() || base.contains( "${" ) || base.contains( "%%" ) ) {
       base = limpio( nombre );
@@ -437,6 +449,117 @@ final class CorrectorSandbox {
     }
   }
 
+  /**
+   * El {@code file/extention} de una salida redirigida, con las variables ya sustituidas y fijo en la copia. Kettle
+   * lo agrega al nombre al correr ({@code buildFilename}): con un separador («csv/../../x») escribiria fuera de
+   * salida/. Si no es solo letras, numeros, _ o -, la salida queda sin extension.
+   */
+  private static String extensionSegura( Element file, String nombre, VariableSpace vars, Preparacion p ) {
+    Element x = Nodos.hijo( file, "extention" );
+    if ( x == null ) {
+      return "";
+    }
+    String crudo = x.getTextContent().trim();
+    String ext = sustituir( vars, crudo ).trim();
+    if ( !ext.isEmpty() && !EXTENSION_SEGURA.matcher( ext ).matches() ) {
+      p.redirecciones.add( "output " + q( nombre ) + ": extension " + crudo + " -> (none)" );
+      ext = "";
+    }
+    if ( !ext.equals( x.getTextContent() ) ) {
+      x.setTextContent( ext );
+    }
+    return ext;
+  }
+
+  /**
+   * El {@code file/date_time_format} de una salida: Kettle agrega al nombre la fecha con ese formato y el texto entre
+   * comillas sale tal cual («'/../../x'»). Si la fecha formateada tiene un separador, la copia queda sin formato
+   * (Kettle usa entonces add_date/add_time, que solo agregan digitos).
+   */
+  private static void fechaSegura( Element file, String nombre, Preparacion p ) {
+    Element f = Nodos.hijo( file, "date_time_format" );
+    String formato = f == null ? "" : f.getTextContent();
+    if ( formato.trim().isEmpty() ) {
+      return;
+    }
+    String hoy;
+    try {
+      hoy = new SimpleDateFormat( formato ).format( new Date() );
+    } catch ( IllegalArgumentException ex ) {
+      hoy = formato; // Kettle tampoco lo puede aplicar: se mira el texto
+    }
+    if ( SEPARADOR.matcher( hoy ).find() ) {
+      f.setTextContent( "" );
+      p.redirecciones.add( "output " + q( nombre ) + ": date_time_format " + formato.trim() + " -> (none)" );
+    }
+  }
+
+  /**
+   * Los ids de particion: Kettle los agrega al nombre de una salida con «partition number in filename». Un id con
+   * separador pasa a su version {@link #limpio}.
+   */
+  private static void particiones( Element doc, Preparacion p ) {
+    for ( Element ps : Nodos.hijos( Nodos.hijo( Nodos.hijo( doc, "info" ), "partitionschemas" ),
+      "partitionschema" ) ) {
+      for ( Element par : Nodos.hijos( ps, "partition" ) ) {
+        Element id = Nodos.hijo( par, "id" );
+        String v = id == null ? "" : id.getTextContent();
+        if ( SEPARADOR.matcher( v ).find() ) {
+          String nuevo = limpio( v );
+          id.setTextContent( nuevo.isEmpty() ? "P" : nuevo );
+          p.redirecciones.add( "partition " + q( Nodos.txt( ps, "name" ) ) + ": " + v.trim() + " -> "
+            + id.getTextContent() );
+        }
+      }
+    }
+  }
+
+  /**
+   * El SQL prohibido (CorrectorPolitica.sqlProhibido) que solo aparece al sustituir variables: Kettle las sustituye
+   * en el SQL de Table input y Execute SQL antes de correrlo, y un «ATT» en el default de un parametro mas
+   * «${X}ACH DATABASE» en el SQL no esta en ninguna hoja. Solo si la entrega usa la base del pack.
+   */
+  private static void sqlSustituido( Element doc, VariableSpace vars, Preparacion p, List<String[]> problemas ) {
+    if ( p.baseDatos == null ) {
+      return;
+    }
+    Set<Element> yaVistos = new HashSet<Element>();
+    for ( Element[] hp : Nodos.hojas( doc ) ) {
+      String t = hp[ 0 ].getTextContent();
+      String sust = sustituir( vars, t );
+      if ( sust.equals( t ) || CorrectorPolitica.sqlProhibido( t ) != null ) {
+        continue; // sin variables, o ya lo bloqueo la politica
+      }
+      String prohibido = CorrectorPolitica.sqlProhibido( sust );
+      if ( prohibido == null ) {
+        continue;
+      }
+      Element dueno = CorrectorPolitica.hijoDeRaiz( doc, hp[ 0 ] );
+      if ( dueno != null && !yaVistos.add( dueno ) ) {
+        continue;
+      }
+      String step = dueno != null && "step".equals( dueno.getTagName() ) ? Nodos.crudo( dueno, "name" ) : null;
+      String donde = step != null ? "step " + q( step )
+        : dueno != null && "connection".equals( dueno.getTagName() ) ? "connection " + q( Nodos.txt( dueno, "name" ) )
+        : "<" + hp[ 0 ].getTagName() + ">";
+      problemas.add( new String[] { ResultadoCaso.SQL_PROHIBIDO, donde + ": " + prohibido
+        + " after substituting variables is not allowed (it would create or read files outside the sandbox)", step } );
+    }
+  }
+
+  /** El texto con las variables sustituidas (${...}, %%...%%, $[hex]) hasta que no cambie, como mucho 5 veces. */
+  private static String sustituir( VariableSpace vars, String texto ) {
+    String t = texto == null ? "" : texto;
+    for ( int i = 0; i < 5; i++ ) {
+      String s = vars.environmentSubstitute( t );
+      if ( s == null || s.equals( t ) ) {
+        break;
+      }
+      t = s;
+    }
+    return t;
+  }
+
   /** Conexiones usadas, ajenas y sin usar (§3); la SQLite usada pasa a la copia de la plantilla. */
   private static void conexiones( Element doc, Entrega e, Preparacion p, List<String[]> problemas ) {
     Set<String> usadas = new HashSet<String>();
@@ -462,6 +585,9 @@ final class CorrectorSandbox {
         for ( Element a : Nodos.hijos( attrs, "attribute" ) ) {
           if ( !ATRIBUTOS_SQLITE.contains( Nodos.txt( a, "code" ).toLowerCase( Locale.ROOT ) ) ) {
             attrs.removeChild( a );
+            if ( "SQL_CONNECT".equalsIgnoreCase( Nodos.txt( a, "code" ) ) && !Nodos.txt( a, "attribute" ).isEmpty() ) {
+              p.redirecciones.add( "connection " + q( nombre ) + " (SQLITE): connect SQL -> (none)" );
+            }
           }
         }
         p.redirecciones.add( "connection " + q( nombre ) + " (SQLITE): " + antes + " -> " + DB + "/"

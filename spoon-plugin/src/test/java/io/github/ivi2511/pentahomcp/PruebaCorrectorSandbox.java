@@ -452,6 +452,86 @@ public class PruebaCorrectorSandbox {
     }
   }
 
+  /**
+   * Lo que Kettle agrega al nombre de una salida (extension, fecha con formato, id de particion) no saca la salida de
+   * salida/; el SQL prohibido armado con variables bloquea, y el SQL al conectar no pasa a la copia.
+   */
+  public void pruebaNombreArmadoYSqlConVariables() throws Exception {
+    File r = CorrectorRecursos.copia();
+    Pack ventas = pack( r, CorrectorRecursos.VENTAS );
+    File dirPack = new File( new File( r, "packs" ), CorrectorRecursos.VENTAS );
+    String paula = texto( new File( new File( new File( r, "entregas" ), CorrectorRecursos.VENTAS ),
+      "paula_correcta.ktr" ) );
+    String ext = "<extention>csv</extention>";
+    String fecha = "<SpecifyFormat>N</SpecifyFormat>";
+    cierto( paula.contains( ext ) && paula.contains( fecha ) && paula.contains( "<date_time_format/>" ),
+      "paula tiene extension y formato de fecha" );
+
+    // extension con separadores y fecha con texto entre comillas: Kettle los agrega al nombre
+    Entrega e = CorrectorPolitica.cargar( escribirKtr( r, "e.ktr", paula.replace( ext,
+      "<extention>csv/../../../../fuera</extention>" ).replace( fecha, "<SpecifyFormat>Y</SpecifyFormat>" )
+      .replace( "<date_time_format/>", "<date_time_format>'/../../../../fuera2'</date_time_format>" ) ) );
+    falso( CorrectorPolitica.revisar( e, ventas, false, null ).bloquea(), "e: la politica no bloquea" );
+    Preparacion pe = CorrectorSandbox.preparar( ventas, dirPack, ventas.caso( "visible" ), e, new File( lote(
+      "nombres" ), "e/visible" ), null );
+    nulo( pe.motivo, "e: no bloquea (" + pe.detalle + ")" );
+    igual( "", pe.salidas.get( 0 ).extension, "e: sin extension" );
+    String xe = texto( pe.ktr );
+    noContiene( xe, "fuera", "e: la copia no agrega nada fuera de salida/" );
+    String notas = String.join( "\n", pe.redirecciones );
+    contiene( notas, "extension csv/../../../../fuera -> (none)", "e: nota de la extension" );
+    contiene( notas, "date_time_format '/../../../../fuera2' -> (none)", "e: nota del formato" );
+    TransMeta tme = new TransMeta( pe.ktr.getAbsolutePath() );
+    org.pentaho.di.trans.steps.textfileoutput.TextFileOutputMeta to =
+      (org.pentaho.di.trans.steps.textfileoutput.TextFileOutputMeta) tme.getSteps().stream().filter(
+        s -> s.getStepMetaInterface() instanceof org.pentaho.di.trans.steps.textfileoutput.TextFileOutputMeta )
+        .findFirst().get().getStepMetaInterface();
+    String nombre = to.buildFilename( tme, 0, "P1", 0, false );
+    falso( nombre.contains( ".." ), "e: buildFilename sin .. (" + nombre + ")" );
+    cierto( nombre.replace( '\\', '/' ).startsWith( DIR + "/salida/" ) || nombre.replace( '\\', '/' ).contains(
+      "/salida/" ), "e: buildFilename en salida/ (" + nombre + ")" );
+
+    // extension por variable: la copia lleva el valor ya sustituido
+    Entrega v = CorrectorPolitica.cargar( escribirKtr( r, "v.ktr", paula.replace( ext, "<extention>${EXT}</extention>" )
+      .replaceFirst( "<parameters>", "<parameters><parameter><name>EXT</name><default_value>txt</default_value>"
+        + "<description/></parameter>" ) ) );
+    Preparacion pv = CorrectorSandbox.preparar( ventas, dirPack, ventas.caso( "visible" ), v, new File( lote(
+      "nombres" ), "v/visible" ), null );
+    nulo( pv.motivo, "v: no bloquea (" + pv.detalle + ")" );
+    igual( "txt", pv.salidas.get( 0 ).extension, "v: la extension sustituida" );
+    contiene( texto( pv.ktr ), "<extention>txt</extention>", "v: fija en la copia" );
+
+    // SQL prohibido armado con un parametro (y el SQL al conectar no pasa a la copia)
+    Pack tabla = pack( r, CorrectorRecursos.TABLA );
+    File dirTabla = new File( new File( r, "packs" ), CorrectorRecursos.TABLA );
+    File dirEntregas = new File( new File( r, "entregas" ), CorrectorRecursos.TABLA );
+    String lara = texto( new File( dirEntregas, "lara_attach.ktr" ) );
+    cierto( lara.contains( "<sql>ATTACH DATABASE" ) && lara.contains( "<replace_variables>N</replace_variables>" ),
+      "lara tiene el ATTACH" );
+    Entrega s = CorrectorPolitica.cargar( escribirKtr( r, "s.ktr", lara.replace( "<sql>ATTACH DATABASE",
+      "<sql>${A}ACH DATABASE" ).replace( "<replace_variables>N</replace_variables>",
+        "<replace_variables>Y</replace_variables>" ).replaceFirst( "<parameters>",
+          "<parameters><parameter><name>A</name><default_value>ATT</default_value><description/></parameter>" ) ) );
+    Revision rs = CorrectorPolitica.revisar( s, tabla, false, null );
+    falso( ResultadoCaso.SQL_PROHIBIDO.equals( rs.motivo ), "s: ninguna hoja tiene el ATTACH entero" );
+    Preparacion ps = CorrectorSandbox.preparar( tabla, dirTabla, tabla.caso( "visible" ), s, new File( lote(
+      "nombres" ), "s/visible" ), null );
+    igual( ResultadoCaso.SQL_PROHIBIDO, ps.motivo, "s: el sandbox ve el ATTACH sustituido" );
+    igual( "Preparar base", ps.step, "s: el step" );
+    contiene( ps.detalle, "after substituting variables", "s: por que" );
+
+    String ines = texto( new File( dirEntregas, "ines_tabla_ok.ktr" ) );
+    Entrega c = CorrectorPolitica.cargar( escribirKtr( r, "c2.ktr", ines.replaceFirst( "<attributes>",
+      "<attributes><attribute><code>SQL_CONNECT</code><attribute>PRAGMA foreign_keys = ON</attribute></attribute>" ) ) );
+    contiene( c.tm.getXML(), "SQL_CONNECT", "c2: Kettle carga el SQL al conectar" );
+    Preparacion pc = CorrectorSandbox.preparar( tabla, dirTabla, tabla.caso( "visible" ), c, new File( lote(
+      "nombres" ), "c2/visible" ), null );
+    nulo( pc.motivo, "c2: no bloquea (" + pc.detalle + ")" );
+    noContiene( texto( pc.ktr ), "SQL_CONNECT", "c2: la copia no lleva el SQL al conectar" );
+    contiene( String.join( "\n", pc.redirecciones ), "connection 'dw' (SQLITE): connect SQL -> (none)",
+      "c2: nota" );
+  }
+
   private static File escribirKtr( File dir, String nombre, String xml ) throws IOException {
     File f = new File( dir, nombre );
     Files.write( f.toPath(), xml.getBytes( StandardCharsets.UTF_8 ) );

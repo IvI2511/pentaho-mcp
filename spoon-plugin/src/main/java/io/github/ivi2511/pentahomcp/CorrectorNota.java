@@ -710,7 +710,10 @@ final class CorrectorNota {
       return 0;
     }
 
-    /** extra_columns = penalize: presentes / (esperadas + sobrantes que no son un renombre). */
+    /**
+     * extra_columns = penalize: presentes / (esperadas + sobrantes que no son un renombre). Presentes son las que
+     * estan y, sin ignore_column_order, en orden: como en CorrectorComparar, penalizar las de mas no apaga el orden.
+     */
     double puntajeColumnasRestando( Comparacion cmp ) {
       Comparacion.Columnas col = cmp.columnas;
       int esperadas = col.esperadas == null ? 0 : col.esperadas.size();
@@ -731,7 +734,9 @@ final class CorrectorNota {
       if ( esperadas <= 0 ) {
         return acotar( cmp.puntajeColumnas );
       }
-      return acotar( (double) ( esperadas - faltan ) / ( esperadas + sobran ) );
+      int fuera = pack.comparar.ignorarOrdenColumnas ? 0 : CorrectorComparar.fueraDeOrden( col.esperadas,
+        col.reales ).size();
+      return acotar( (double) ( esperadas - faltan - fuera ) / ( esperadas + sobran ) );
     }
 
     String etiqueta( ItemRubrica i ) {

@@ -514,6 +514,33 @@ public class PruebaCorrectorNota {
     criterio( r, "columns", 1.43, false ); // penalize: 5 / (6 + 1); el renombre no resta dos veces
     igual( Arrays.asList( "rename", "extra_column" ), ids( CorrectorNota.pistas( p, r, null ) ),
       "renombre y la que sobra de verdad" );
+
+    // penalize no apaga el orden: unidades e importe cambiadas, sin columnas de mas
+    p.comparar.ignorarOrdenColumnas = false;
+    ResultadoCorreccion o = armado( p, "finished", "finished" );
+    for ( ResultadoCaso c : o.casos ) {
+      Comparacion.Columnas col = c.comparacion.columnas;
+      col.esperadas.clear();
+      col.esperadas.addAll( Arrays.asList( "tienda", "categoria", "unidades", "importe" ) );
+      col.reales.clear();
+      col.reales.addAll( Arrays.asList( "tienda", "categoria", "importe", "unidades" ) );
+      col.faltan.clear();
+      col.sobran.clear();
+      col.renombres.clear();
+      col.ordenDistinto = true;
+      c.comparacion.puntajeColumnas = 3.0 / 4;
+    }
+    p.comparar.columnasDeMas = OpcionesComparar.EXTRA_AVISAR;
+    CorrectorNota.puntuar( p, o, null );
+    criterio( o, "columns", 1.5, false ); // warn: 3 / 4
+    p.comparar.columnasDeMas = OpcionesComparar.EXTRA_RESTAR;
+    CorrectorNota.puntuar( p, o, null );
+    criterio( o, "columns", 1.5, false ); // penalize: (4 - 0 - 1 fuera de orden) / (4 + 0)
+    cierto( ids( CorrectorNota.pistas( p, o, null ) ).contains( "column_order" ), "la pista del orden sigue" );
+    igual( 1, CorrectorComparar.fueraDeOrden( Arrays.asList( "tienda", "categoria", "unidades", "importe" ),
+      Arrays.asList( "tienda", "categoria", "importe", "unidades" ) ).size(), "fueraDeOrden: una cambiada" );
+    igual( 0, CorrectorComparar.fueraDeOrden( Arrays.asList( "a", "b" ), Arrays.asList( "A", "x", "B" ) ).size(),
+      "fueraDeOrden: en orden, sin mayusculas" );
   }
 
   public void pruebaRedondeo() throws Exception {

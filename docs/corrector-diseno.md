@@ -175,6 +175,11 @@ Todo pasa en la hija, también el análisis estático (calcular campos puede toc
    - **Salidas a archivo**: `file/name` de Text file output [P] y de Excel output, Excel writer, JSON y
      XML output [B] → `${…}/salida/<nombre base>`; si dos chocan, sufijo `_<step>`. **`fileNameInField=Y`
      bloquea** (`unexpected_output`): escribiría donde diga un campo, hasta `output_dir/<alumno>.json`.
+     Lo que Kettle agrega al nombre al correr (`buildFilename`) tampoco puede sacar la salida de `salida/`:
+     la `extention` queda fija y ya sustituida, y sin extensión si no es solo letras, números, `_` o `-`;
+     un `date_time_format` cuya fecha formateada tenga `/` o `\` se vacía (Kettle usa entonces
+     add_date/add_time), y un id de partición con separador pasa a su versión limpia. Cada cambio deja una
+     nota en `redirections`.
    - **Conexiones** [P]: con captura `query`, toda conexión SQLite pasa a `db/<plantilla>`. Una de otro
      tipo bloquea el caso **solo si un step la nombra**; las que no usa nadie se sacan con una nota (P15).
    - **Entradas inesperadas** [NP, **obligatorio**]: toda lectura no redirigida que, con variables
@@ -324,6 +329,11 @@ el que tiene todos sus hops deshabilitados.
   y `output_too_big`. `-Djava.io.tmpdir` = `tmp/` del worker: los temporales de Sort rows se cuentan.
 - **SQLite del pack**: `ATTACH DATABASE` y `VACUUM INTO` crean archivos en cualquier ruta; con
   ExecSQL/ExecSQLRow/TableInput habilitados se rechaza el SQL que los use (o `load_extension`) [NP].
+  El sandbox lo mira también con las variables sustituidas (`${A}ACH` con `A=ATT` en un parámetro →
+  `forbidden_sql`), y la copia que corre no lleva el SQL al conectar (`SQL_CONNECT`), igual que la de
+  análisis. Lo que no se puede mirar antes: el SQL que Execute row SQL y Dynamic SQL row arman con los
+  datos de la fila (solo aviso `dynamic_sql`); el sqlite-jdbc 3.27 de PDI 9.4 no tiene `limit_attached`
+  para cortarlo en el motor.
 - **Casos ocultos** contra la salida dibujada (un Data grid con las 4 filas pasa el visible y no el
   oculto); `must_use` exige el step conectado; `salida/` se borra apenas se captura.
 - **Zip slip y bombas**: cada entrada del zip (pack o entrega) queda dentro de la carpeta destino, con
