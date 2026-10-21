@@ -233,8 +233,15 @@ public final class Balance {
       if ( n.escritorRechazo ) {
         inf.rechazadas += p.recibidas > 0 ? p.recibidas : p.leidas;
       }
-      if ( n.previos.isEmpty() && n.infos.isEmpty() ) {
-        continue; // una entrada: no recibe filas de otros steps
+      if ( abortada || ( n.previos.isEmpty() && n.infos.isEmpty() ) ) {
+        continue; // abortada: cuentas parciales; una entrada: no recibe filas de otros steps
+      }
+      if ( n.agrega() ) {
+        long todas = Math.max( p.recibidas, p.leidas );
+        if ( todas != sale ) {
+          inf.agrupa.add( n.nombre + ": " + todas + " → " + sale );
+        }
+        continue;
       }
       // filas info: las que puso la fuente info, si solo manda a este step
       long info = 0;
@@ -256,12 +263,6 @@ public final class Balance {
       long entra = recibidas - info;
       if ( entra < 0 ) {
         inf.noEvaluados.add( n.nombre + ": could not separate its main and info rows" );
-        continue;
-      }
-      if ( n.agrega() ) {
-        if ( entra != sale ) {
-          inf.agrupa.add( n.nombre + ": " + entra + " → " + sale );
-        }
         continue;
       }
       if ( entra > sale && !abortada ) {
