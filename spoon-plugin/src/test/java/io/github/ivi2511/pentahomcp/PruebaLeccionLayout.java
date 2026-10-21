@@ -436,7 +436,13 @@ public class PruebaLeccionLayout {
     }
     e.nota( Tipo.PASO, "B1", 1, "Primero" );
     e.nota( Tipo.PASO, "B2", 2, "Segundo" );
-    Plan p = LeccionLayout.calcular( e, m );
+    Plan p;
+    LeccionLayout.acercarNotas = false; // solo las bandas (la regla de acercar va en pruebaAcercarNotaLejana)
+    try {
+      p = LeccionLayout.calcular( e, m );
+    } finally {
+      LeccionLayout.acercarNotas = true;
+    }
     Ubicada b2 = nota( p, Tipo.PASO, "B2" );
     igual( Banda.ABAJO, b2.banda, "B2 abajo" );
     int esperado = p.yBandaAbajo - ( p.posicion( "B2" ).y + 32 );
@@ -446,6 +452,54 @@ public class PruebaLeccionLayout {
     cierto( nota( p, Tipo.PASO, "B1" ).distancia <= 300, "B1 cerca" );
   }
 
+  /**
+   * Regla de densidad de WP8: dos flujos sueltos. El de arriba (R -> X -> Y -> B1, B2) deja a B1 y B2 solos en su
+   * columna; el de abajo (S reparte a T1..T6) hace alto el lienzo. La nota de B2 va a la banda de abajo, bajo todo
+   * el flujo (lejos); con la regla se apila bajo el nombre de B2, donde no corta nada (su ojo, debajo).
+   */
+  public void pruebaAcercarNotaLejana() {
+    Entrada e = nueva( 32 );
+    e.step( "R", null );
+    e.step( "X", null );
+    e.step( "Y", null );
+    e.step( "B1", null );
+    e.step( "B2", null );
+    e.hop( "R", "X" );
+    e.hop( "X", "Y" );
+    e.hop( "Y", "B1" );
+    e.hop( "Y", "B2" );
+    e.step( "S", null );
+    for ( int i = 1; i <= 6; i++ ) {
+      e.step( "T" + i, null );
+      e.hop( "S", "T" + i );
+    }
+    e.nota( Tipo.PASO, "B1", 1, "Primero" );
+    e.nota( Tipo.PASO, "B2", 2, "Segundo" );
+    e.nota( Tipo.OJO, "B2", 2, "Cuidado" );
+    Plan sin;
+    LeccionLayout.acercarNotas = false;
+    try {
+      sin = LeccionLayout.calcular( e, m );
+    } finally {
+      LeccionLayout.acercarNotas = true;
+    }
+    Ubicada b2s = nota( sin, Tipo.PASO, "B2" );
+    String donde = "B2 en " + sin.posicion( "B2" ).x + "," + sin.posicion( "B2" ).y + ", T6 en " + sin.posicion( "T6" ).x
+      + "," + sin.posicion( "T6" ).y + ", nota " + b2s.banda + " y=" + b2s.y;
+    igual( Banda.ABAJO, b2s.banda, "B2 abajo: " + donde );
+    cierto( b2s.distancia > 300, "sin la regla, B2 lejos: " + b2s.distancia + " (" + donde + ")" );
+    Plan p = LeccionLayout.calcular( e, m );
+    Ubicada b2 = nota( p, Tipo.PASO, "B2" );
+    Ubicada ojo = nota( p, Tipo.OJO, "B2" );
+    cierto( b2.distancia <= 300, "con la regla, B2 cerca: " + b2.distancia );
+    cierto( b2.y > p.posicion( "B2" ).y + 32, "bajo el icono de B2" );
+    cierto( ojo.y >= b2.y + b2.alto + 2 * LeccionLayout.MARGEN + LeccionLayout.SEP, "el ojo, debajo de la del paso" );
+    cierto( ojo.distancia <= 300, "el ojo tambien cerca: " + ojo.distancia );
+    igual( Banda.ABAJO, b2.banda, "sigue siendo de abajo (lado del step)" );
+    falso( String.join( "\n", p.avisos ).contains( "more than 300 px" ), "sin aviso de notas lejos: " + p.avisos );
+    igual( b2s.x, b2.x, "la x no cambia" );
+    sinChoques( e, p );
+  }
   public void pruebaMasDeDocePasos() {
     for ( int n : new int[] { 12, 13 } ) {
       Entrada e = nueva( 32 );

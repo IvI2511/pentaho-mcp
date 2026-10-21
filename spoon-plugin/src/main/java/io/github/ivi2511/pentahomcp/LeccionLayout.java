@@ -717,6 +717,10 @@ final class LeccionLayout {
       }
     }
 
+    if ( acercarNotas ) {
+      acercar( plan, e, m );
+    }
+
     // distancias y avisos de legibilidad
     int lejos = 0;
     for ( Ubicada u : plan.notas ) {
@@ -747,6 +751,122 @@ final class LeccionLayout {
         + " into stages, with one note per stage (\"Steps 1-5: read and clean the data\")." );
     }
     return plan;
+  }
+
+  /** Regla de acercar (WP8): activa por defecto; las pruebas la apagan para comparar. */
+  static volatile boolean acercarNotas = true;
+
+  /**
+   * Regla de densidad de WP8 (tools/pruebas-clase, 179 .ktr: notas a mas de 300 px de 14 a 4, 0 choques): las bandas
+   * son de todo el flujo, asi que en un lienzo alto las notas de un step pueden quedar lejos. Si las notas completas
+   * de un step quedan a mas de {@link #DISTANCIA_LEGIBLE} px de su icono, se apilan junto a su step en su columna
+   * (banda de abajo: bajo su nombre; de arriba: {@link #AIRE_FLUJO} px sobre el icono), solo si ahi no cortan iconos,
+   * nombres, hops, notas previas ni otras notas (+{@link #AIRE} px); si cortan, se quedan en la banda (y el aviso de
+   * notas lejanas sigue). Devuelve cuantas notas movio.
+   */
+  static int acercar( Plan p, Entrada e, Medidor m ) {
+    final int icono = p.icono;
+    final int n = p.steps.size();
+    List<int[]> rects = new ArrayList<int[]>();
+    List<int[]> segs = new ArrayList<int[]>();
+    int[] altoNombre = new int[ n ];
+    for ( int i = 0; i < n; i++ ) {
+      Point pos = p.posiciones[ i ];
+      rects.add( new int[] { pos.x, pos.y, icono, icono } );
+      Point ext = m.nombre( p.steps.get( i ) );
+      altoNombre[ i ] = ext.y;
+      rects.add( new int[] { pos.x + icono / 2 - ext.x / 2, pos.y + icono + SEP_NOMBRE, ext.x, ext.y } );
+    }
+    for ( String[] h : e.hops ) {
+      Point a = p.posicion( h[ 0 ] );
+      Point b = p.posicion( h[ 1 ] );
+      if ( a != null && b != null && a != b ) {
+        segs.add( new int[] { a.x + icono / 2, a.y + icono / 2, b.x + icono / 2, b.y + icono / 2 } );
+      }
+    }
+    for ( int i = 0; i < e.previas.size(); i++ ) {
+      Previa pv = e.previas.get( i );
+      rects.add( new int[] { p.previas[ i ].x, p.previas[ i ].y, pv.ancho + 2 * MARGEN, pv.alto + 2 * MARGEN } );
+    }
+    Map<String, List<Ubicada>> porStep = new java.util.LinkedHashMap<String, List<Ubicada>>();
+    for ( Ubicada u : p.notas ) {
+      if ( u.pedida.step == null || !u.enLienzo() || ( u.banda != Banda.ARRIBA && u.banda != Banda.ABAJO ) ) {
+        continue;
+      }
+      String k = u.pedida.step.trim().toLowerCase( Locale.ROOT );
+      List<Ubicada> l = porStep.get( k );
+      if ( l == null ) {
+        porStep.put( k, l = new ArrayList<Ubicada>() );
+      }
+      if ( u.pedida.tipo == Tipo.PASO ) {
+        l.add( 0, u ); // la del paso pegada al step
+      } else {
+        l.add( u );
+      }
+    }
+    int movidas = 0;
+    for ( List<Ubicada> l : porStep.values() ) {
+      String step = l.get( 0 ).pedida.step;
+      int si = -1;
+      for ( int i = 0; i < n; i++ ) {
+        if ( p.steps.get( i ).trim().equalsIgnoreCase( step.trim() ) ) {
+          si = i;
+        }
+      }
+      if ( si < 0 ) {
+        continue;
+      }
+      Point pos = p.posiciones[ si ];
+      int[] ic = new int[] { pos.x, pos.y, icono, icono };
+      int peor = 0;
+      for ( Ubicada u : l ) {
+        peor = Math.max( peor, distancia( u.rect(), ic ) );
+      }
+      if ( peor <= DISTANCIA_LEGIBLE ) {
+        continue;
+      }
+      boolean abajo = l.get( 0 ).banda == Banda.ABAJO;
+      int[][] cand = new int[ l.size() ][];
+      int yy = abajo ? pos.y + icono + SEP_NOMBRE + altoNombre[ si ] + AIRE_NOMBRE : pos.y - AIRE_FLUJO;
+      for ( int k = 0; k < l.size(); k++ ) {
+        Ubicada u = l.get( k );
+        int h = u.alto + 2 * MARGEN;
+        if ( abajo ) {
+          cand[ k ] = new int[] { u.x, yy, u.ancho + 2 * MARGEN, h };
+          yy += h + SEP;
+        } else {
+          yy -= h;
+          cand[ k ] = new int[] { u.x, yy, u.ancho + 2 * MARGEN, h };
+          yy -= SEP;
+        }
+      }
+      boolean libre = true;
+      for ( int k = 0; k < cand.length && libre; k++ ) {
+        if ( cand[ k ][ 1 ] < 0 ) {
+          libre = false;
+          break;
+        }
+        int[] r = inflar( cand[ k ], AIRE );
+        for ( int[] o : rects ) {
+          libre &= !cortan( r, o );
+        }
+        for ( int[] s : segs ) {
+          libre &= !segmentoCorta( s, r );
+        }
+        for ( Ubicada o : p.notas ) {
+          if ( o.enLienzo() && !l.contains( o ) ) {
+            libre &= !cortan( r, o.rect() );
+          }
+        }
+      }
+      if ( libre ) {
+        for ( int k = 0; k < cand.length; k++ ) {
+          l.get( k ).y = cand[ k ][ 1 ];
+          movidas++;
+        }
+      }
+    }
+    return movidas;
   }
 
   /**
