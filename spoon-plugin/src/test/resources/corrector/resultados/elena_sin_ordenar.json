@@ -1,0 +1,312 @@
+{
+  "format": "pentaho-live-grade-result/1",
+  "pack": "ventas-por-producto",
+  "pack_title": "Ejercicio 3 - Ventas por producto",
+  "student": "elena_sin_ordenar",
+  "file": "elena_sin_ordenar.ktr",
+  "language": "es",
+  "status": "graded",
+  "grade": 5.5,
+  "scale": 10.0,
+  "capture": "file",
+  "trust_mode": false,
+  "extra_allowed_steps": [],
+  "checks": [
+    {
+      "check": "runs",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%, oculto 100%"
+    },
+    {
+      "check": "columns",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "detail": "visible 100%, oculto 100%"
+    },
+    {
+      "check": "row_count",
+      "points": 1.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "values",
+      "points": 4.0,
+      "earned": 0.5,
+      "passed": false,
+      "detail": "visible 25%, oculto 0%"
+    },
+    {
+      "check": "rule:usa_group_by",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "Usa un Group by (o Memory group by): Found: [Totales por producto]"
+    },
+    {
+      "check": "rule:sin_codigo",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "No usa JavaScript ni Java: OK"
+    },
+    {
+      "check": "rule:max_pasos",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "Como mucho 8 steps: 4 steps (max 8)"
+    }
+  ],
+  "blocked_steps": [],
+  "rules": {
+    "usa_group_by": {
+      "label": "Usa un Group by (o Memory group by)",
+      "passed": true,
+      "evaluated": true,
+      "detail": "Found: [Totales por producto]"
+    },
+    "sin_codigo": {
+      "label": "No usa JavaScript ni Java",
+      "passed": true,
+      "evaluated": true,
+      "detail": "OK"
+    },
+    "max_pasos": {
+      "label": "Como mucho 8 steps",
+      "passed": true,
+      "evaluated": true,
+      "detail": "4 steps (max 8)"
+    }
+  },
+  "lint": {},
+  "cases": [
+    {
+      "id": "visible",
+      "hidden": false,
+      "weight": 1.0,
+      "redirections": [
+        "output 'Escribir totales': ${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto -> salida/03_ventas_por_producto"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "finished",
+        "seconds": 0.295,
+        "errors": 0,
+        "output_step": "Escribir totales",
+        "output_step_type": "TextFileOutput",
+        "captured_from": "file salida/03_ventas_por_producto.csv",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Escribir totales",
+            "read": 10,
+            "written": 10,
+            "output": 11,
+            "errors": 0
+          }
+        ]
+      },
+      "comparison": {
+        "mode": "key",
+        "key_columns": [
+          "producto"
+        ],
+        "columns": {
+          "expected": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "actual": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "missing": [],
+          "extra": [],
+          "renamed_suggestions": [],
+          "order_differs": false
+        },
+        "rows": {
+          "expected": 4,
+          "actual": 10,
+          "matched": 1,
+          "different": 0,
+          "missing": 0,
+          "extra": 0,
+          "duplicate_keys": 3
+        },
+        "examples": {
+          "different": [],
+          "missing": [],
+          "extra": [],
+          "duplicate_keys": [
+            {
+              "key": "Café",
+              "count": 4
+            },
+            {
+              "key": "Medialuna",
+              "count": 2
+            },
+            {
+              "key": "Té",
+              "count": 3
+            }
+          ]
+        },
+        "differences_by_column": {},
+        "columns_score": 1.0,
+        "row_count_ok": false,
+        "values_score": 0.25
+      }
+    },
+    {
+      "id": "oculto",
+      "hidden": true,
+      "weight": 1.0,
+      "redirections": [
+        "output 'Escribir totales': ${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto -> salida/03_ventas_por_producto"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "finished",
+        "seconds": 0.136,
+        "errors": 0,
+        "output_step": "Escribir totales",
+        "output_step_type": "TextFileOutput",
+        "captured_from": "file salida/03_ventas_por_producto.csv",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 12,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 12,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Escribir totales",
+            "read": 12,
+            "written": 12,
+            "output": 13,
+            "errors": 0
+          }
+        ]
+      },
+      "comparison": {
+        "mode": "key",
+        "key_columns": [
+          "producto"
+        ],
+        "columns": {
+          "expected": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "actual": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "missing": [],
+          "extra": [],
+          "renamed_suggestions": [],
+          "order_differs": false
+        },
+        "rows": {
+          "expected": 4,
+          "actual": 12,
+          "matched": 0,
+          "different": 0,
+          "missing": 0,
+          "extra": 0,
+          "duplicate_keys": 4
+        },
+        "examples": {
+          "different": [],
+          "missing": [],
+          "extra": [],
+          "duplicate_keys": [
+            {
+              "key": "Café",
+              "count": 4
+            },
+            {
+              "key": "Jugo",
+              "count": 3
+            },
+            {
+              "key": "Medialuna",
+              "count": 2
+            },
+            {
+              "key": "Tostado",
+              "count": 3
+            }
+          ]
+        },
+        "differences_by_column": {},
+        "columns_score": 1.0,
+        "row_count_ok": false,
+        "values_score": 0.0
+      }
+    }
+  ],
+  "hints": [],
+  "warnings": [],
+  "timing": {
+    "kettle_init_s": 5.751
+  }
+}

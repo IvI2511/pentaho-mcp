@@ -1,0 +1,201 @@
+{
+  "about": "Expected outcome of every fixture submission under docs/corrector-diseno.md (with the rubric gate of each pack.json). 'proven' = the prototype gave exactly this status and grade; 'prototype' = what the prototype gave when the design changes it. Hint ids are informal (table of §6). See README.md.",
+  "packs": [
+    {
+      "id": "ventas-por-producto",
+      "pack": "packs/ventas-por-producto",
+      "submissions": "entregas/ventas-por-producto",
+      "solution_grade": 10.0,
+      "expected": {
+        "ana_orden_distinto.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "P6", "proven": true, "tags": ["correct", "absolute_paths"],
+          "note": "Correcta, Sort descendente y rutas de su PC (C:\\Users\\ana\\...) en la entrada y la salida: se redirigen y se anotan."
+        },
+        "bruno_agregado_mal.ktr": {
+          "status": "graded", "grade": 6.5, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "§1", "proven": true, "tags": ["wrong_values"],
+          "note": "importe_medio con MAX en vez de AVERAGE: values visible 25 %, oculto 0 %."
+        },
+        "carla_falta_columna.ktr": {
+          "status": "graded", "grade": 9.7, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "§1", "proven": true, "tags": ["missing_column"], "hints": ["missing_column"],
+          "note": "Sin ultima_venta en el Text file output: columns 5/6; las columnas que faltan no restan en values."
+        },
+        "diego_javascript.ktr": {
+          "status": "blocked", "reason": "step_not_allowed", "grade": 0.5,
+          "source": "P7", "proven": false, "prototype": { "status": "blocked", "grade": 1.5 },
+          "tags": ["forbidden_step"], "hints": ["blocked_step"],
+          "note": "Modified JavaScript (condicional) sin allow_steps: no se ejecuta. Con la compuerta requires runs, usa_group_by no suma: solo max_pasos."
+        },
+        "elena_sin_ordenar.ktr": {
+          "status": "graded", "grade": 5.5, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "§1", "proven": true, "tags": ["wrong_rows", "duplicate_keys"], "hints": ["D5"],
+          "note": "Group by sin Sort rows: 10 y 12 filas contra 4, claves repetidas (Café x4, Té x3, Medialuna x2)."
+        },
+        "fede_bucle.ktr": {
+          "status": "blocked", "reason": "cycle", "grade": 1.0,
+          "source": "P8", "proven": false, "prototype": { "status": "timeout", "grade": 2.0 },
+          "tags": ["cycle"], "hints": ["D2"],
+          "note": "Hop circular (D2): con hasLoop no se ejecuta. Compuerta: solo sin_codigo y max_pasos."
+        },
+        "gabi_renombra.ktr": {
+          "status": "graded", "grade": 9.7, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "§1", "proven": true, "tags": ["renamed_column"], "hints": ["rename"],
+          "note": "importe_medio -> promedio: sugerencia de renombre."
+        },
+        "hugo_decimal.ktr": {
+          "status": "graded", "grade": 6.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "P9", "proven": true, "tags": ["wrong_format", "locale"], "hints": ["D3"],
+          "note": "<decimal/> vacio al leer el CSV: con es_ES los importes salen x100 (con en_US daria 10,0)."
+        },
+        "t1_paso_ventas_csv.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "P14", "proven": false, "prototype": { "status": "graded", "grade": 2.0 },
+          "tags": ["absolute_paths", "rewrite_exceptions"],
+          "note": "ana con el CSV input llamado ventas.csv: la reescritura de entradas no toca <name> ni los hops."
+        },
+        "t2_conexion_suelta.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "warnings": ["unused_connection_removed"],
+          "source": "P15", "proven": false, "prototype": { "status": "graded", "grade": 2.0 },
+          "tags": ["absolute_paths", "unused_connection"],
+          "note": "ana + una conexion MySQL que ningun step usa: se saca con una nota, no bloquea."
+        },
+        "t3_decimal_coma.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "P16", "proven": false, "prototype": { "status": "graded", "grade": 6.0 },
+          "tags": ["absolute_paths", "wrong_format", "comma_decimal", "locale"], "hints": ["comma_decimal"],
+          "note": "<decimal/> vacio en la salida: con es_ES escribe 20,00; se lee con el formato que declaro (strict_format false: aviso sin descuento)."
+        },
+        "t4_encoding_vacio.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "P17", "proven": true, "tags": ["absolute_paths", "encoding"],
+          "note": "<encoding/> vacio en la salida: con el file.encoding del pack (UTF-8) da 10; con el charset nativo, 8,5."
+        },
+        "t5_xxe.ktr": {
+          "status": "load_failed", "grade": 0.0,
+          "source": "P19", "proven": false, "tags": ["xxe"],
+          "note": "DOCTYPE con entidad externa (file:///C:/Windows/win.ini): nuestro parser y new TransMeta lo rechazan; no se evalua nada."
+        },
+        "t6_infinito.ktr": {
+          "status": "graded", "grade": 1.0, "cases": { "visible": "output_too_big", "oculto": "output_too_big" },
+          "source": "P18", "proven": false, "tags": ["runaway_output"],
+          "note": "Generate rows never ending -> Text file output: max_output_mb (5 en este pack) lo corta. Sin Group by."
+        },
+        "t7_paso_suelto.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "P20", "proven": false, "tags": ["absolute_paths", "loose_step"],
+          "note": "ana + un Generate rows sin hops: corre (la politica mira todos los steps) y no cambia la salida."
+        },
+        "paula_correcta.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "C0", "proven": true, "tags": ["correct"],
+          "note": "La solucion tal cual."
+        },
+        "quique_dibuja_salida.ktr": {
+          "status": "graded", "grade": 7.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "C0 (§7)", "proven": true, "tags": ["drawn_output", "hidden_case"],
+          "note": "Data grid con las 4 filas del caso visible: visible 100 %, oculto 0 %; sin Group by."
+        },
+        "rodri_filtra_de_mas.ktr": {
+          "status": "graded", "grade": 7.5, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "C0", "proven": true, "tags": ["wrong_rows", "missing_rows"],
+          "note": "Filter rows precio_unitario > 2: faltan Medialuna y Té (visible) y Medialuna (oculto); row_count 0, values 50 % y 75 %."
+        },
+        "sofi_fecha_dmy.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "C0 (date_formats)", "proven": false, "prototype": { "status": "graded", "grade": 6.0 },
+          "tags": ["wrong_format", "date_format"],
+          "note": "ultima_venta escrita con dd/MM/yyyy: date_formats del pack la acepta (con strict_format true restaria)."
+        },
+        "tomas_sin_salida.ktr": {
+          "status": "graded", "grade": 1.0, "cases": { "visible": "no_output_step", "oculto": "no_output_step" },
+          "source": "C0", "proven": false, "prototype": { "status": "graded", "grade": 2.0 },
+          "tags": ["missing_output"],
+          "note": "Termina en un Dummy: no hay Text file output de donde capturar. Compuerta: usa_group_by no suma."
+        },
+        "ulises_salida_en_campo.ktr": {
+          "status": "blocked", "reason": "unexpected_output", "grade": 1.0,
+          "source": "C0 (§3)", "proven": false, "tags": ["writes_outside"], "never_run": true,
+          "note": "Text file output con fileNameInField=Y (destino = C:/Users/Public/robado.csv): no se puede redirigir. NO correrla sin el sandbox."
+        },
+        "vero_pisa_esperado.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "C0 (§3)", "proven": true, "tags": ["writes_outside", "redirected_output"],
+          "note": "La salida apunta a ../../../esperado/visible: se redirige a salida/visible.csv y el esperado del pack no cambia."
+        },
+        "walter_copia_companero.ktr": {
+          "status": "blocked", "reason": "unexpected_input", "grade": 1.0,
+          "source": "C0 (§3)", "proven": false, "prototype": { "status": "graded", "grade": 7.0 },
+          "tags": ["reads_other_student"], "hints": ["read_outside_pack"],
+          "note": "Lee ../../paula_correcta/visible/salida/03_ventas_por_producto.csv del _sandbox del mismo lote. En el prototipo, corregida despues de paula, copiaba su salida y sacaba 7,0."
+        },
+        "xime_lee_url.ktr": {
+          "status": "blocked", "reason": "unexpected_input", "grade": 1.0,
+          "source": "C0 (§3)", "proven": false, "tags": ["reads_outside", "vfs_url"], "hints": ["read_outside_pack"], "never_run": true,
+          "note": "Text file input de http://192.0.2.10/... (TEST-NET-1): esquema VFS que no es file:. No correrla: intentaria una conexion."
+        },
+        "yago_entrada_en_campo.ktr": {
+          "status": "blocked", "reason": "unexpected_input", "grade": 1.0,
+          "source": "C0 (§3)", "proven": false, "tags": ["reads_outside", "filename_from_field", "rewrite_exceptions"], "hints": ["read_outside_pack"],
+          "note": "CSV input con filename_field: el nombre sale de un Data grid (../../../esperado/oculto.csv); el valor del grid no se reescribe."
+        },
+        "nico_ejecuta_proceso.ktr": {
+          "status": "blocked", "reason": "dangerous_step", "grade": 1.0,
+          "source": "C0 (§7)", "proven": false, "tags": ["forbidden_step", "dangerous_step"], "hints": ["blocked_step"], "never_run": true,
+          "note": "La solucion + Data grid (whoami) -> Execute a process, suelto. Peligroso: nunca corre sin modo confianza. 7 steps."
+        },
+        "oscar_step_desconocido.ktr": {
+          "status": "blocked", "reason": "unknown_step", "grade": 1.0,
+          "source": "C0 (§7)", "proven": false, "tags": ["forbidden_step", "unknown_step"], "hints": ["blocked_step"],
+          "note": "La solucion + un step de tipo PasoQueNoExiste: TransMeta lo carga como MissingTrans (isMissing)."
+        },
+        "pia_nombre_repetido.ktr": {
+          "status": "blocked", "reason": "duplicate_step_name", "grade": 1.0,
+          "source": "C0 (D1)", "proven": false, "tags": ["duplicate_name"], "hints": ["D1"],
+          "note": "El Sort rows se llama «totales por producto» y el Group by «Totales por producto»: Kettle los funde (findStep sin mayusculas) y queda un hop de un step a si mismo. Solo se ve en el XML crudo; sin el chequeo, cuelga hasta el timeout."
+        },
+        "mati_rutas_mac.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished", "oculto": "finished" },
+          "source": "C0", "proven": true, "tags": ["correct", "absolute_paths"],
+          "note": "Rutas de macOS (/Users/mati/...) y la salida como URL file:///Users/mati/...: se redirigen."
+        }
+      }
+    },
+    {
+      "id": "ventas-a-tabla",
+      "pack": "packs/ventas-a-tabla",
+      "submissions": "entregas/ventas-a-tabla",
+      "solution_grade": 10.0,
+      "expected": {
+        "ines_tabla_ok.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished" },
+          "source": "P5", "proven": true, "tags": ["correct", "absolute_paths"],
+          "note": "Conexion SQLite a D:\\facu\\dw.sqlite: pasa a db/dw.sqlite (copia de la plantilla). Es la ivan_tabla_ok del prototipo."
+        },
+        "juan_tabla_max.ktr": {
+          "status": "graded", "grade": 5.5, "cases": { "visible": "finished" },
+          "source": "P5", "proven": true, "tags": ["wrong_values"],
+          "note": "importe_medio con MAX: values 25 %."
+        },
+        "kevin_otra_base.ktr": {
+          "status": "blocked", "reason": "foreign_connection", "grade": 0.0,
+          "source": "C0 (§3)", "proven": false, "prototype": { "status": "graded", "grade": 0.0 },
+          "tags": ["foreign_connection"],
+          "note": "El Table output usa una conexion MySQL: no es la base del pack y un step la nombra."
+        },
+        "lara_attach.ktr": {
+          "status": "blocked", "reason": "forbidden_sql", "grade": 0.0,
+          "source": "C0 (§7)", "proven": false, "tags": ["writes_outside", "forbidden_sql"], "never_run": true,
+          "note": "Execute SQL (permitido por el pack) con ATTACH DATABASE 'C:/Users/Public/copia.sqlite': crearia un archivo fuera del sandbox. NO correrla sin el chequeo."
+        },
+        "mora_borra_antes.ktr": {
+          "status": "graded", "grade": 10.0, "cases": { "visible": "finished" },
+          "source": "C0", "proven": true, "tags": ["correct", "allowed_conditional"],
+          "note": "Execute SQL legitimo (DELETE FROM totales) suelto: allow_steps lo habilita y corre sin trabar la base."
+        }
+      }
+    }
+  ]
+}
