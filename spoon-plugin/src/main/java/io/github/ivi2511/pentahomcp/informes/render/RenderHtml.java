@@ -928,7 +928,7 @@ public final class RenderHtml implements Renderizador {
           sb.append( " title=\"" ).append( Html.esc( d.alt ) ).append( '"' );
         }
         sb.append( '>' ).append( Html.esc( d.mermaid.trim() ) ).append( "</pre>\n" );
-        hayMermaid = true;
+        Escritor.this.hayMermaid = true; // el campo (la variable local de arriba lo tapa): lleva el bundle
         if ( alt != null ) {
           sb.append( "<div class=\"alternativa mermaid-fallo\" id=\"" ).append( alt ).append( "\">" );
           tabla( d.alternativa );

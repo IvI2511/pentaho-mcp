@@ -115,8 +115,15 @@ public class PruebaDiagramaPropio {
     Tema tema = ModeloMuestra.tema();
     String html = new RenderHtml( RenderHtml.Modo.ESTATICO, null, true ).html( conGrafos( false ), tema );
     double hoja = RenderHtml.altoHojaPx( tema );
+    // solo las figuras de los diagramas propios (los graficos usan la misma estructura y el CSS los ajusta)
+    StringBuilder propios = new StringBuilder();
+    String[] trozos = html.split( "<div class=\"diagrama propio\">", -1 );
+    for ( int i = 1; i < trozos.length; i++ ) {
+      int fin = trozos[ i ].indexOf( "<div class=\"bloque" );
+      propios.append( fin < 0 ? trozos[ i ] : trozos[ i ].substring( 0, fin ) );
+    }
     Matcher m = Pattern.compile( "<div class=\"svg\" role=\"img\"[^>]*><svg[^>]* width=\"([0-9.]+)\" height=\"([0-9.]+)\"" )
-      .matcher( html );
+      .matcher( propios );
     int n = 0;
     while ( m.find() ) {
       n++;
@@ -177,7 +184,9 @@ public class PruebaDiagramaPropio {
             if ( r.getWidth() >= 600 || r.getHeight() >= 300 ) {
               grandes++;
             }
-          } else if ( sh instanceof XSLFTextShape && ( (XSLFTextShape) sh ).getText().contains( "Anexo step" ) ) {
+          } else if ( sh instanceof XSLFTextShape && ( (XSLFTextShape) sh ).getText().trim().startsWith(
+            "Anexo step" ) ) {
+            // el subtitulo de una tabla del anexo (la nota «Detalle de consulta en el informe...» los nombra)
             anexo = true;
           }
         }
