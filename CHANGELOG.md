@@ -18,7 +18,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root, `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`.
+- Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root, `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`. `preparar_instalador.ps1 -SinCompilar` reuses the plugin already built in `spoon-plugin/dist/`.
 - TODO (integrator)
 
 ### Fixed
