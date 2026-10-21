@@ -173,6 +173,10 @@ public final class Ctx {
       camposCaidos = new SinCampos( "fields", t( "ne.fields_timeout", "detail", primeraLinea( e ) ) );
       memo.put( s, camposCaidos );
       throw camposCaidos;
+    } catch ( BaseFaltante e ) { // no se calculan: Kettle crearía vacía la base de archivo que falta
+      SinCampos x = new SinCampos( "fields", t( "ne.fields_db_missing", "connection", e.conexion, "file", e.archivo ) );
+      memo.put( s, x );
+      throw x;
     } catch ( Throwable e ) { // incluye StackOverflowError: getPrevStepFields con un ciclo
       SinCampos x = new SinCampos( "fields", t( "ne.fields", "detail", primeraLinea( e ) ) );
       memo.put( s, x );

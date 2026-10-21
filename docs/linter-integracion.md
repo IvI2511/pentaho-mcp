@@ -338,6 +338,57 @@ acá mismo, con cambios chicos en sus archivos:
   Changed. `docs/roadmap.md`: el linter, hecho. **Sin subir versiones** (`VERSION` y `plugin.json` siguen en 0.5.0:
   eso es del release).
 
+### 2.10 Prueba en vivo en Spoon (21-oct-2026)
+
+Con el Spoon de pruebas (su propio `KETTLE_HOME`, puerto 8766) y el plugin de esta rama, todo por el MCP:
+
+- `tools/list` da **61** herramientas; `resources/list` trae `pentaho://lint/rules` y `pentaho://guide/quality`; las
+  instrucciones del servidor nombran `lint_etl` y `apply_lint_fixes`.
+- **`ejemplo/construido-en-vivo/`**: las seis dan **100/A**, estático y profundo (el profundo no tiene nada que
+  revisar). `validate` limpio en las cinco transformaciones. El job da un error de Kettle, «filename cannot be null»
+  en «Crear carpeta salida»: ya estaba en `dev` (el `check()` de *Create a folder* lee una propiedad `filename` que esa
+  entrada no tiene) y el informe del job de 0.5.0 lo muestra igual.
+- **Copia rota a propósito** (CSV con ruta absoluta y símbolo decimal vacío, Table input SQLite con contraseña en claro,
+  Stream lookup → Group by sin ordenar, Text file output con ruta absoluta, nombres por defecto, sin descripción; un job
+  con la rama roja a Success): **37/D** estático y **3/D** profundo («con un Sort rows delante, Group by da 3 filas en
+  lugar de 6»; «en esta máquina (es-ES) 3.50 se lee como 350.0»); el job, 71/C.
+- **`apply_lint_fixes`**: `all_auto` (5 nombres) 37 → 58 (sin guardar, la contraseña se juzga en memoria, donde Spoon la
+  tiene `Encrypted`: aviso); con las rutas, el Sort rows, «.», `${TIENDAS_DB_PASSWORD}` y la descripción, **100/A**,
+  y sigue en 100 después de guardar. La transformación corre y da los totales correctos. **Un Ctrl+Z** (mandado a la
+  ventana de Spoon) deshizo los cinco renombres, incluido el `<from>` del Stream lookup, y Ctrl+Y los rehízo. El job:
+  71 → 73 → 92 (queda «Success 2» sin hops, como avisa la nota) → 100 al borrarlo; corre bien.
+- **`suppress_lint`** en un step, en el documento, `*` en un step y en una entrada de job; rechaza `kettle_check`,
+  reglas y steps que no existen y `entry` en una transformación. Las supresiones siguen ahí al guardar y reabrir, y
+  `remove` también; Ctrl+Z deshace la de un step.
+- **Informes**: `build_report` (PDF y Markdown, es/pt/en, con `quality_deep`) de la copia rota y de `04_hechos_ventas`
+  (100/A, sin rutas personales); `show_report` solo con `quality` muestra 3/100 Banda D con el modo profundo.
+
+Arreglado a raíz de la prueba (con su prueba automática):
+
+- `lint_etl` estático (y `apply_lint_fixes`, que vuelve a correr las reglas) **creaba vacía** una base SQLite que
+  faltaba si su carpeta existía: un Table input se conecta para dar sus campos. `LintEntorno` ahora mira
+  `SecDestino.baseFaltantePara` antes de calcular campos, como `ContextoKettle`, y lanza `lint.BaseFaltante`; `Ctx` lo
+  traduce como `ne.fields_db_missing` (`PruebaLint.pruebaLintBaseQueFalta`).
+- PDF: la tabla de hallazgos se salía de la página cuando una celda tenía una palabra larga (la propuesta
+  `«${Internal.Entry.Current.Directory}/../malo/datos/…»`): Chromium achicaba todo el informe (hasta ×1,33) y recortaba
+  el resto de «Cómo se arregla». En las celdas con una tira de más de 30 caracteres sin espacios, `Html.escCortable`
+  pone `<wbr>` después de `/ \ . _ -` (y cada 20 caracteres si no hay ninguno), y la clase `largo` suma
+  `overflow-wrap: break-word`. Vale para todas las tablas: el informe de `04_hechos_ventas` también salía achicado por
+  la ruta de su conexión (`PruebaHtml.pruebaPalabrasLargas`).
+- pt: «Senha em texto puro **em a** conexão» → «**na** conexão» (los `word.*` en pt llevan la preposición contraída).
+- Panel: «Vista previa lista (1 secciones)» → «(1 sección)».
+- `deep.nothing` decía «no hay hallazgos de unsorted_input ni de empty_decimal_symbol», y el párrafo sale tal cual en
+  el informe: ahora nombra las reglas con palabras («entrada sin ordenar», «símbolo decimal vacío»).
+
+Queda abierto (no se tocó):
+
+- Con una ruta absoluta en el documento, el informe la muestra entera (`C:/Users/<usuario>/…`) en «Calidad técnica» y
+  ya antes en «Diagrama de flujo» («Lee: …»): es el hallazgo, pero si el informe se entrega convendría acortar la
+  carpeta personal.
+- El error de Kettle del job de ejemplo (arriba) hace que `validate` del job no salga limpio.
+- El PDF de `04_hechos_ventas` todavía sale apenas achicado (cuerpo en 9,4 pt en vez de 9,7): otro bloque es un poco
+  más ancho que la página; no se buscó cuál.
+
 ## 3. Lo que falta escribir
 
 | WP | Qué | Dónde | Necesita |

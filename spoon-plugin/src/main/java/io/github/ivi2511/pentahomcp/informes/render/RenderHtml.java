@@ -736,8 +736,9 @@ public final class RenderHtml implements Renderizador {
           sb.append( n++ % 2 == 1 ? "<tr class=\"par\">" : "<tr>" );
           for ( int i = 0; i < columnas; i++ ) {
             String c = f == null || i >= f.size() ? null : f.get( i );
-            sb.append( "<td" ).append( alineacion( t, i ) ).append( '>' ).append( Html.escLineas( c ) ).append(
-              "</td>" );
+            boolean largo = Html.palabraLarga( c, Html.PALABRA_LARGA );
+            sb.append( "<td" ).append( atributosCelda( t, i, largo ) ).append( '>' )
+              .append( largo ? Html.escCortable( c ) : Html.escLineas( c ) ).append( "</td>" );
           }
           sb.append( "</tr>\n" );
         }
@@ -746,6 +747,20 @@ public final class RenderHtml implements Renderizador {
       if ( t.pie != null && !t.pie.trim().isEmpty() ) {
         sb.append( "<p class=\"pie-tabla\">" ).append( Html.escLineas( t.pie.trim() ) ).append( "</p>\n" );
       }
+    }
+
+    /**
+     * La alineacion y, si la celda tiene una palabra muy larga (una ruta, una propuesta con ${...}), la clase
+     * "largo". Esas celdas se escriben con {@link Html#escCortable}: sin puntos de corte, el ancho minimo de la
+     * columna es el de toda la palabra y la tabla se sale de la pagina del PDF (Chromium la achica y recorta lo que
+     * sobra).
+     */
+    String atributosCelda( Tabla t, int i, boolean largo ) {
+      String a = alineacion( t, i );
+      if ( !largo ) {
+        return a;
+      }
+      return a.isEmpty() ? " class=\"largo\"" : a.replace( "class=\"", "class=\"largo " );
     }
 
     String alineacion( Tabla t, int i ) {

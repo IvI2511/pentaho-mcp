@@ -64,6 +64,9 @@ table.datos td { padding: 5px 10px; border-bottom: 1px solid {{borde}}; vertical
 table.datos tr.par td { background: #FAFBFC; }
 table.datos .r { text-align: right; }
 table.datos .c { text-align: center; }
+/* celdas con una ruta o un ${...}: Html.escCortable les pone puntos de corte (wbr) en / . _ - (si no, la tabla se
+   sale de la pagina del PDF); break-word por si un tramo igual no entra (no cambia el ancho minimo de la columna) */
+table.datos td.largo { word-wrap: break-word; overflow-wrap: break-word; }
 .pie-tabla { margin: 4px 0 0; font-size: 12px; color: {{tenue}}; }
 .titulo-bloque { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: {{texto}}; }
 

@@ -14,11 +14,13 @@ import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
+import io.github.ivi2511.pentahomcp.lint.BaseFaltante;
 import io.github.ivi2511.pentahomcp.lint.Entorno;
 import io.github.ivi2511.pentahomcp.lint.TiempoAgotado;
 
 /**
- * Lo que el motor del linter (lint/) le pide al plugin: campos con timeout en el pool de RunMotor, las salidas
+ * Lo que el motor del linter (lint/) le pide al plugin: campos con timeout en el pool de RunMotor (nunca contra una
+ * base de archivo que no existe, que Kettle crearía vacía: {@link #baseFaltante}), las salidas
  * normales de TransOps y la lista blanca de solo lectura del modo profundo (docs/linter-diseno.md §3.3, §5). Vive
  * en el paquete base porque esas clases son package-private. Una instancia por análisis, sobre la copia.
  */
@@ -91,6 +93,10 @@ final class LintEntorno implements Entorno {
     if ( ms <= 0 ) {
       throw new TiempoAgotado( "no time left" );
     }
+    String[] falta = baseFaltante( s, entrada );
+    if ( falta != null ) {
+      throw new BaseFaltante( falta[ 0 ], falta[ 1 ] );
+    }
     try {
       return RunMotor.enSegundoPlano( () -> entrada ? tm.getPrevStepFields( s ) : tm.getStepFields( s ), ms, null,
         "Computing the fields of '" + s.getName() + "'" );
@@ -100,6 +106,20 @@ final class LintEntorno implements Entorno {
       throw e;
     } catch ( Exception e ) {
       throw new KettleStepException( RunMotor.primeraLinea( e ), e );
+    }
+  }
+
+  /**
+   * {conexión, archivo} si calcular los campos se conectaría a una base de archivo que no existe (SQLite, H2,
+   * HSQLDB): un Table input se conecta para dar sus campos y Kettle crearía el archivo vacío. Como
+   * ContextoKettle.baseFaltante (docs/informes-diseno.md §2.4.4): para la salida también mira el propio step. null si
+   * no (o si el chequeo falla: entonces se calcula como siempre).
+   */
+  String[] baseFaltante( StepMeta s, boolean entrada ) {
+    try {
+      return SecDestino.baseFaltantePara( tm, s, !entrada );
+    } catch ( RuntimeException e ) {
+      return null;
     }
   }
 

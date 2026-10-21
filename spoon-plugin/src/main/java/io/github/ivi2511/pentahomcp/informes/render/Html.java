@@ -98,6 +98,78 @@ public final class Html {
     return esc( s ).replace( "\n", "<br>" );
   }
 
+  /** Desde cuantos caracteres sin espacios una palabra de una celda es "larga" (una ruta, un ${...}). */
+  public static final int PALABRA_LARGA = 30;
+
+  /** Tramo maximo sin punto de corte dentro de una palabra larga (ver {@link #escCortable}). */
+  static final int TRAMO_CORTABLE = 20;
+
+  /** Despues de estos se puede cortar una palabra larga. */
+  private static final String SEPARADORES = "/\\._-";
+
+  /** Si s tiene una tira de mas de n caracteres sin espacios en blanco. */
+  public static boolean palabraLarga( String s, int n ) {
+    if ( s == null ) {
+      return false;
+    }
+    int corrida = 0;
+    for ( int i = 0; i < s.length(); i++ ) {
+      corrida = Character.isWhitespace( s.charAt( i ) ) ? 0 : corrida + 1;
+      if ( corrida > n ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Como {@link #escLineas}, y dentro de cada palabra de mas de {@link #PALABRA_LARGA} caracteres agrega &lt;wbr&gt;
+   * despues de / \ . _ - y, si un tramo sigue sin donde cortarse, cada {@link #TRAMO_CORTABLE} caracteres. Asi una
+   * ruta o un ${Internal.Entry.Current.Directory}/... se corta por ahi y el ancho minimo de su columna es el de un
+   * tramo, no el de toda la ruta: sin eso la tabla se salia de la pagina del PDF y Chromium recortaba la ultima
+   * columna. El &lt;wbr&gt; no agrega caracteres: copiar la ruta la copia entera.
+   */
+  public static String escCortable( String s ) {
+    if ( s == null ) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder( s.length() + 32 );
+    int i = 0;
+    while ( i < s.length() ) {
+      int j = i;
+      while ( j < s.length() && !Character.isWhitespace( s.charAt( j ) ) ) {
+        j++;
+      }
+      if ( j == i ) {
+        sb.append( escLineas( s.substring( i, i + 1 ) ) );
+        i++;
+        continue;
+      }
+      String palabra = s.substring( i, j );
+      if ( palabra.length() <= PALABRA_LARGA ) {
+        sb.append( esc( palabra ) );
+      } else {
+        int tramo = 0;
+        for ( int k = 0; k < palabra.length(); k++ ) {
+          char c = palabra.charAt( k );
+          sb.append( esc( String.valueOf( c ) ) );
+          tramo++;
+          if ( k == palabra.length() - 1 || Character.isHighSurrogate( c ) ) {
+            continue;
+          }
+          // despues de una tira de separadores ("../" corta una vez), o cada TRAMO_CORTABLE si no hay ninguno
+          boolean separador = SEPARADORES.indexOf( c ) >= 0 && SEPARADORES.indexOf( palabra.charAt( k + 1 ) ) < 0;
+          if ( separador || tramo >= TRAMO_CORTABLE ) {
+            sb.append( "<wbr>" );
+            tramo = 0;
+          }
+        }
+      }
+      i = j;
+    }
+    return sb.toString();
+  }
+
   /** Texto para una cadena CSS entre comillas dobles (content: "..."): escapa \ y " y saca saltos. */
   public static String cadenaCss( String s ) {
     if ( s == null ) {

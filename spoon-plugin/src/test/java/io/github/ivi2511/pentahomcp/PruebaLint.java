@@ -5,16 +5,20 @@ import static io.github.ivi2511.pentahomcp.Verificador.contiene;
 import static io.github.ivi2511.pentahomcp.Verificador.distinto;
 import static io.github.ivi2511.pentahomcp.Verificador.falso;
 import static io.github.ivi2511.pentahomcp.Verificador.igual;
+import static io.github.ivi2511.pentahomcp.Verificador.lanza;
 import static io.github.ivi2511.pentahomcp.Verificador.noContiene;
 import static io.github.ivi2511.pentahomcp.Verificador.noNulo;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.pentaho.di.core.database.DatabaseMeta;
 import org.pentaho.di.job.JobHopMeta;
 import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.job.entries.special.JobEntrySpecial;
@@ -23,7 +27,10 @@ import org.pentaho.di.trans.TransHopMeta;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.steps.dummytrans.DummyTransMeta;
+import org.pentaho.di.trans.steps.textfileoutput.TextFileField;
+import org.pentaho.di.trans.steps.textfileoutput.TextFileOutputMeta;
 
+import io.github.ivi2511.pentahomcp.lint.BaseFaltante;
 import io.github.ivi2511.pentahomcp.lint.Catalogo;
 import io.github.ivi2511.pentahomcp.lint.LintJson;
 import io.github.ivi2511.pentahomcp.lint.LintMotor;
@@ -199,6 +206,46 @@ public class PruebaLint {
     }
     // el ejemplo no tiene steps sin hops ni hops deshabilitados
     noContiene( o.path( "findings" ).toString(), "orphan_step", "sin huerfanos" );
+  }
+
+  /**
+   * lint_etl estatico con un Table input contra una base SQLite que no existe, en una carpeta que si existe: no se
+   * conecta (SQLite crearia el archivo vacio) y la regla que necesitaba esos campos lo dice, con el motivo.
+   */
+  public void pruebaLintBaseQueFalta() throws Exception {
+    File dir = Files.createTempDirectory( "lint-base-falta" ).toFile();
+    File base = new File( dir, "nueva.sqlite" );
+    try {
+      TransMeta tm = EntornoKettle.trans( "07" );
+      final TransMeta copia = (TransMeta) ReportTools.clonar( tm );
+      DatabaseMeta dm = copia.findDatabase( "sqlite_demo" );
+      noNulo( dm, "la conexion de 07" );
+      dm.setDBName( base.getAbsolutePath() );
+      final Opciones op = LintTools.opciones( McpHttpServer.JSON.readTree( "{\"language\":\"es\"}" ) );
+      final LintEntorno env = new LintEntorno( copia );
+      op.entorno = env;
+      final StepMeta consulta = copia.findStep( "Consultar SQLite" );
+      noNulo( consulta, "el Table input de 07" );
+      BaseFaltante bf = lanza( BaseFaltante.class, () -> env.salida( consulta ), "los campos del Table input" );
+      igual( "sqlite_demo", bf.conexion, "conexion del motivo" );
+      final StepMeta escribir = copia.findStep( "Escribir consulta" );
+      lanza( BaseFaltante.class, () -> env.entrada( escribir ), "lo que llega despues del Table input tampoco" );
+      // sin campos declarados, text_output_without_fields pide los campos que llegan al Text file output
+      ( (TextFileOutputMeta) escribir.getStepMetaInterface() ).setOutputFields( new TextFileField[ 0 ] );
+      Resultado r = RunMotor.enSegundoPlano( () -> LintMotor.analizar( copia, op ), LintTools.MS_LINT, env::cancelar,
+        "The lint" );
+      ObjectNode o = LintJson.resultado( r );
+      falso( base.exists(), "no se creo la base vacia: " + base );
+      // text_output_without_fields queda en aviso con los campos desconocidos y el motivo, traducido
+      contiene( o.path( "findings" ).toString(), "apunta a un archivo de base que no existe",
+        "el motivo en la evidencia: " + o.path( "findings" ) );
+      for ( JsonNode n : o.path( "not_evaluated" ) ) {
+        distinto( "error", n.path( "code" ).asText(), "ninguna regla revento: " + n );
+      }
+    } finally {
+      base.delete();
+      dir.delete();
+    }
   }
 
   private static JobEntryCopy entradaSuelta( JobMeta jm, String nombre, int x ) {

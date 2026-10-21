@@ -16,8 +16,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   failure branch that ends in Success, a START entry with another name, default step names, no description…
   Each finding says how to fix it and whether `apply_lint_fixes` can. The result has a 0-100 technical
   quality score (grades A-D) and the points each rule takes away; any error caps it at 74. It opens no
-  dialogs and does not run the transformation; `include_kettle_checks` adds Spoon's own Verify, which never
-  changes the score.
+  dialogs, does not run the transformation and never connects to a SQLite, H2 or HSQLDB file that does not
+  exist (Kettle would create it empty); `include_kettle_checks` adds Spoon's own Verify, which never changes
+  the score.
 - Deep mode, `lint_etl` with `deep=true`: reads up to 5000 rows of the sources to confirm or rule out the
   unsorted input and decimal symbol findings. An unsorted input is proven by running the step with and
   without a Sort rows before it ("gives 4 rows instead of 10"), and becomes an error; sorted data or integer
@@ -54,6 +55,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   branch of a condition such as File exists is its "else", and what an entry in between does matters. D6:
   Kettle's advice to "Insert a Dummy step" for an input in several copies hides the unsorted rows instead of
   fixing them.
+
+### Fixed
+
+- Reports: a table cell with a very long word (a path, a `${…}` value) no longer pushes the table past the
+  edge of the PDF page, where the last column was cut off.
+- Reports panel: "Preview ready (1 section)" in the singular.
 
 ## [0.5.0] - 2026-10-21
 

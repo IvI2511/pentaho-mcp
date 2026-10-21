@@ -288,6 +288,37 @@ public class PruebaHtml {
     contiene( t, "O step mais lento foi “Ler”.", "md: lo que agrega" );
   }
 
+  /**
+   * Una celda con una palabra muy larga (la propuesta «${Internal.Entry.Current.Directory}/…» de Calidad tecnica)
+   * lleva la clase "largo" y puntos de corte (wbr) en / . _ -: sin eso la tabla se salia de la pagina del PDF y
+   * Chromium recortaba la ultima columna.
+   */
+  public void pruebaPalabrasLargas() throws Exception {
+    cierto( Html.palabraLarga( "Usar ${Internal.Entry.Current.Directory} y una ruta", Html.PALABRA_LARGA ),
+      "${Internal.Entry.Current.Directory} es larga" );
+    falso( Html.palabraLarga( "Poner un Sort rows por producto antes.", Html.PALABRA_LARGA ), "texto normal" );
+    falso( Html.palabraLarga( null, Html.PALABRA_LARGA ), "null" );
+    igual( "Propuesta: «${Internal.<wbr>Entry.<wbr>Current.<wbr>Directory}/../<wbr>datos/<wbr>a&amp;b.<wbr>csv»."
+      + "<br>x", Html.escCortable( "Propuesta: «${Internal.Entry.Current.Directory}/../datos/a&b.csv».\nx" ),
+      "corta en . y /, escapa, las palabras cortas quedan igual" );
+    igual( "aaaaaaaaaaaaaaaaaaaa<wbr>aaaaaaaaaaaaaaaaaaaa<wbr>a", Html.escCortable( repetir( 'a', 41 ) ),
+      "sin donde cortar: cada 20" );
+    String html = new RenderHtml( RenderHtml.Modo.ESTATICO, null, true ).html( ModeloMuestra.crear(),
+      ModeloMuestra.tema() );
+    contiene( html, "<td class=\"largo\">Usar ${Internal.<wbr>Entry.<wbr>Current.<wbr>Directory}",
+      "la celda de la propuesta" );
+    contiene( html, "<td>Poner un Sort rows por producto antes.", "las demas celdas sin clase" );
+    contiene( html, "table.datos td.largo { word-wrap: break-word; overflow-wrap: break-word; }", "el CSS" );
+  }
+
+  private static String repetir( char c, int n ) {
+    StringBuilder sb = new StringBuilder();
+    for ( int i = 0; i < n; i++ ) {
+      sb.append( c );
+    }
+    return sb.toString();
+  }
+
   public void pruebaUtilidades() {
     List<Html.Trozo> t = Html.trozos( "a **b** *c* d*e 2 * 3 **x" );
     igual( "TEXTO:a |NEGRITA:b|TEXTO: |CURSIVA:c|TEXTO: d*e 2 * 3 **x", texto( t ), "trozos" );

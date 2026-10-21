@@ -1030,7 +1030,8 @@ public class PanelInformes {
         }
       }
       int n = inf.secciones == null ? 0 : inf.secciones.size();
-      return liviano ? r.s( "status_light_done" ) : r.f( "status_preview_done", n );
+      return liviano ? r.s( "status_light_done" ) : n == 1 ? r.s( "status_preview_done_1" )
+        : r.f( "status_preview_done", n );
     } );
   }
 

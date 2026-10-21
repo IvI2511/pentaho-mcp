@@ -34,8 +34,9 @@ two never disagree on them.
   a database) but its answer is long. To look at one part, pass `steps` or `min_severity: "warning"`.
 
 The static check **runs nothing and opens no dialogs**: it reads the document (a detached copy) and computes
-fields like `get_step_fields` (database steps may connect to get them). `include_kettle_checks=true` also lists
-what Spoon's Verify says, under `kettle_checks`; it may connect to the database and never changes the score.
+fields like `get_step_fields` (database steps may connect to get them, but never to a SQLite, H2 or HSQLDB file
+that does not exist: Kettle would create it empty, so those fields stay unknown). `include_kettle_checks=true` also
+lists what Spoon's Verify says, under `kettle_checks`; it may connect to the database and never changes the score.
 
 ```json
 { "document": "T1", "language": "es" }
