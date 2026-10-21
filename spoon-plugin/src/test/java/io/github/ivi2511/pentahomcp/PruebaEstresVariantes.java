@@ -56,7 +56,10 @@ public class PruebaEstresVariantes {
     igual( 5, v.inyectadas.get( "missing_fields" ), "missing_fields" );
     igual( 3, v.inyectadas.get( "bad_dates" ), "bad_dates" );
     igual( 6, v.inyectadas.get( "bad_numbers" ), "bad_numbers" );
-    igual( 5 + 3 + 6 + 1, v.debenRechazarse(), "filas que deben rechazarse" );
+    // sin lista de obligatorios solo se exige el rechazo de la fila vacía (un campo vacío puede ser válido)
+    igual( 1 + 3 + 6 + 1, v.debenRechazarse(), "filas que deben rechazarse" );
+    igual( 1 + 4 + 3 + 6 + 1, Variantes.generar( "combined", base(), Arrays.asList( "id", "fecha", "cliente",
+      "importe" ), true, ";" ).debenRechazarse(), "con la lista de obligatorios, también las de un campo vacío" );
     igual( 3 + v.inyectadas.values().stream().mapToInt( Integer::intValue ).sum(), v.datos(), "líneas de datos" );
     JsonNode m = v.manifiesto( OM );
     cierto( m.size() == v.datos() - 3, "el manifiesto anota solo las rotas: " + m.size() );

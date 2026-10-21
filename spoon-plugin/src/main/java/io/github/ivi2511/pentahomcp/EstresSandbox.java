@@ -31,6 +31,7 @@ import org.pentaho.di.trans.step.StepMeta;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 import io.github.ivi2511.pentahomcp.lint.Supresiones;
 import io.github.ivi2511.pentahomcp.robustez.Balance;
@@ -131,6 +132,8 @@ final class EstresSandbox {
      */
     final Map<String, String> variables = new LinkedHashMap<String, String>();
     final Map<String, String> parametros = new LinkedHashMap<String, String>();
+    /** Campos que algún Filter rows exige con IS NOT NULL: los obligatorios si la persona no los da. */
+    final List<String> obligatorios = new ArrayList<String>();
     /**
      * Otros steps que leen archivos (Get data from XML, Fixed file input, Load file content…): step → sus rutas ya
      * resueltas. En la copia se leen del original (solo lectura) con la ruta absoluta.
@@ -228,6 +231,14 @@ final class EstresSandbox {
       }
       Element x = pasos.get( s.getName() );
       if ( x != null && "FilterRows".equals( s.getStepID() ) ) {
+        for ( Element c : todos( x, "condition" ) ) {
+          String fn = texto( c, "function" );
+          String izq = texto( c, "leftvalue" );
+          if ( fn != null && "IS NOT NULL".equalsIgnoreCase( fn.trim() ) && izq != null && !izq.trim().isEmpty()
+            && !"Y".equalsIgnoreCase( texto( c, "negated" ) ) && !a.obligatorios.contains( izq.trim() ) ) {
+            a.obligatorios.add( izq.trim() );
+          }
+        }
         String f = texto( x, "send_false_to" );
         if ( f != null && !f.isEmpty() && tm.findStep( f ) != null ) {
           semillas.add( tm.findStep( f ) );
@@ -699,6 +710,16 @@ final class EstresSandbox {
       if ( n instanceof Element && tag.equals( n.getNodeName() ) ) {
         l.add( (Element) n );
       }
+    }
+    return l;
+  }
+
+  /** Todos los descendientes con ese tag. */
+  static List<Element> todos( Element e, String tag ) {
+    List<Element> l = new ArrayList<Element>();
+    NodeList nl = e.getElementsByTagName( tag );
+    for ( int i = 0; i < nl.getLength(); i++ ) {
+      l.add( (Element) nl.item( i ) );
     }
     return l;
   }

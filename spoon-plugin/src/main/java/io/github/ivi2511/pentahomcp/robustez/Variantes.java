@@ -258,7 +258,8 @@ public final class Variantes {
           if ( obligatorios == null || contiene( obligatorios, c.nombre ) ) {
             String[] f = plantilla( base );
             f[ i ] = "";
-            agregar( v, f, tipo );
+            // sin lista de obligatorios no se sabe si ese campo puede faltar: se inyecta, pero no se exige el rechazo
+            agregar( v, f, tipo ).dudosa = obligatorios == null;
           }
         }
         String[] vacia = new String[ n ];

@@ -198,12 +198,22 @@ final class EstresTools {
     o.putArray( "notes" ).add( "Not a security sandbox: the transformation's own JavaScript/Java code runs in the "
       + "child JVM." );
 
+    // --- obligatorios: los que da la persona o los que algún Filter rows exige con IS NOT NULL
+    List<String> obligatorios = p.obligatorios != null ? p.obligatorios : a.obligatorios.isEmpty() ? null
+      : a.obligatorios;
+    if ( obligatorios != null ) {
+      ArrayNode ob = est.putArray( "required_fields" );
+      for ( String x : obligatorios ) {
+        ob.add( x );
+      }
+    }
+
     // --- variantes generadas (en memoria)
     Map<String, Map<String, Variantes.Variante>> gen = new LinkedHashMap<String, Map<String, Variantes.Variante>>();
     for ( String id : ids ) {
       Map<String, Variantes.Variante> m = new LinkedHashMap<String, Variantes.Variante>();
       for ( EstresSandbox.Entrada e : sucias ) {
-        m.put( e.paso, Variantes.generar( id, e.base, p.obligatorios, "text".equals( e.formato ),
+        m.put( e.paso, Variantes.generar( id, e.base, obligatorios, "text".equals( e.formato ),
           e.texto == null ? null : e.texto.separador ) );
       }
       gen.put( id, m );

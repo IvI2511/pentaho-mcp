@@ -145,8 +145,13 @@ public final class Balance {
       for ( long x : descartesDeclarados.values() ) {
         dd += x;
       }
-      return leidas + " read = " + cargadas + " loaded + " + rechazadas + " rejected + " + dd
-        + " dropped (declared) + " + perdidasTotal() + " lost";
+      if ( leidas == cargadas + rechazadas + dd + perdidasTotal() ) {
+        return leidas + " read = " + cargadas + " loaded + " + rechazadas + " rejected + " + dd
+          + " dropped (declared) + " + perdidasTotal() + " lost";
+      }
+      return leidas + " read; " + cargadas + " reached the loads, " + rechazadas + " rejected, " + dd
+        + " dropped (declared), " + perdidasTotal() + " lost (rows fan out to several loads or are merged: see "
+        + "aggregates)";
     }
 
     public ObjectNode json( ObjectMapper om ) {
@@ -228,7 +233,8 @@ public final class Balance {
       }
       if ( n.carga && !n.enRechazo ) {
         // un archivo escribe toda fila que recibe (getLinesOutput cuenta también la cabecera); una BD, las que entraron
-        inf.cargadas += n.archivo ? Math.max( p.recibidas, p.leidas ) : p.salida + p.actualizadas;
+        inf.cargadas += n.archivo ? Math.max( p.recibidas, p.leidas ) : Math.max( 0, Math.max( p.recibidas, p.leidas )
+          - p.puestasError );
       }
       if ( n.escritorRechazo ) {
         inf.rechazadas += p.recibidas > 0 ? p.recibidas : p.leidas;
