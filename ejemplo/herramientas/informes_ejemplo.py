@@ -49,7 +49,7 @@ conclus04 = (
     "- La validación de Spoon no encuentra errores ni advertencias.\n"
     "- El paso más lento es la escritura en SQLite («Cargar hechos_ventas»), lo esperable en una carga de este tamaño.")
 r = json.loads(mcp("build_report", document=docs["04_hechos_ventas.ktr"],
-                   formats=["html", "html_light", "pdf", "md", "pptx"], output_dir=DEST, language="es",
+                   formats=["html", "html_light", "pdf", "md", "pptx", "docx"], output_dir=DEST, language="es",
                    title="Carga de hechos de ventas · Grano de Oro", profile_step="Convertir precio a número",
                    narrative={"summary": resumen04, "conclusions": conclus04}))
 print("informe 04:", [(s["id"], s["status"]) for s in r["sections"]], r.get("warnings"))
@@ -58,8 +58,13 @@ resumenJob = (
     "carpeta de salida y las tablas, carga las tres dimensiones (tiendas, productos y fechas), después los hechos y por "
     "último los KPI. Si algún paso falla, registra el error y aborta la carga. En la última ejecución todas las "
     "entradas terminaron correctamente.")
-r = json.loads(mcp("build_report", document=docs["job_carga_dw.kjb"], formats=["html_light", "pdf", "md", "pptx"],
+r = json.loads(mcp("build_report", document=docs["job_carga_dw.kjb"], formats=["html_light", "pdf", "md", "pptx", "docx"],
                    output_dir=DEST, language="es", title="Job de carga del modelo estrella · Grano de Oro",
                    narrative={"summary": resumenJob}))
 print("informe job:", [(s["id"], s["status"]) for s in r["sections"]], r.get("warnings"))
+r = json.loads(mcp("build_report", document=docs["job_carga_dw.kjb"], include_job_transformations=True,
+                   combine=True, formats=["pdf", "docx"], output_dir=DEST, language="es", file_name="carga_completa",
+                   title="Carga completa del modelo estrella · Grano de Oro"))
+print("combinado:", [f["path"] for f in r.get("files", [])], r.get("warnings"))
+print("capitulos:", sorted({s.get("chapter") for s in r["sections"] if s.get("chapter")}))
 mcp("activate_document", document=docs["04_hechos_ventas.ktr"])
