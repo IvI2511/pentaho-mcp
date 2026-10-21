@@ -171,6 +171,24 @@ public class PruebaEstres {
     sinRestos();
   }
 
+  public void pruebaCopiaReescribeRutas() throws Exception {
+    baseSqlite();
+    TransMeta tm = new TransMeta( new File( dir, "append_load_sqlite.ktr" ).getAbsolutePath() );
+    EstresSandbox.Analisis a = EstresSandbox.analizar( tm, 50, null, null );
+    cierto( a.corre(), "SQLite de archivo: corre (" + a.bdNoArchivo + a.bloqueos + ")" );
+    igual( 1, a.tablas.size(), "la tabla de la carga, para rerun" );
+    File sb = new File( sandbox, "copia" );
+    File variante = new File( sb, "entrada/x.csv" );
+    File ktr = EstresSandbox.escribirCopia( a, java.util.Collections.singletonMap( "Read sales", variante ), new File(
+      sb, "salida" ), new File( sb, "db" ), new File( sb, "copia.ktr" ) );
+    String xml = new String( Files.readAllBytes( ktr.toPath() ), java.nio.charset.StandardCharsets.UTF_8 );
+    contiene( xml, variante.getAbsolutePath().replace( '\\', '/' ), "la entrada lee la variante" );
+    contiene( xml, new File( sb, "db" ).getAbsolutePath().replace( '\\', '/' ), "la conexión apunta a la copia de la BD" );
+    cierto( new File( sb, "db/dw.db" ).isFile(), "la BD se copió al sandbox" );
+    cierto( !xml.contains( dir.getAbsolutePath().replace( '\\', '/' ) + "/db" ), "nada apunta a la BD original" );
+    EstresTools.borrar( sb );
+  }
+
   public void pruebaTextFileInputTipado() throws Exception {
     ObjectNode o = probar( "typed_text_input.ktr", "bad_numbers", "header_only" );
     cierto( o.path( "ran" ).asBoolean(), "corrió: " + o );

@@ -64,6 +64,9 @@ final class EstresSandbox {
     "AccessOutput", "PropertyOutput", "LDIFOutput", "SalesforceInsert", "SalesforceUpdate", "SalesforceUpsert",
     "SalesforceDelete", "MongoDbOutput", "KafkaProducerOutput", "JmsProducer", "MQTTProducer", "ShapeFileReader",
     "WriteToFile", "ProcessFiles", "ZipFile", "SetVariable" ) );
+  /** Lectores de archivos cuyo id no termina en «Input»: se leen del original con la ruta absoluta. */
+  static final Set<String> OTROS_LECTORES = new HashSet<String>( Arrays.asList( "GetXMLData", "XMLInputStream",
+    "GetFileNames", "getXMLData", "LoadFileInput" ) );
   /** Steps de SQL: solo sobre una conexión de archivo del sandbox. */
   static final Set<String> SQL = new HashSet<String>( Arrays.asList( "ExecSQL", "ExecSQLRow" ) );
 
@@ -122,6 +125,11 @@ final class EstresSandbox {
     /** Nombres de los campos de motivo de los hops de error (descriptions_valuename). */
     final Set<String> camposMotivo = new LinkedHashSet<String>();
     final List<String> notas = new ArrayList<String>();
+    /**
+     * Otros steps que leen archivos (Get data from XML, Fixed file input, Load file content…): step → sus rutas ya
+     * resueltas. En la copia se leen del original (solo lectura) con la ruta absoluta.
+     */
+    final Map<String, List<String>> lecturas = new LinkedHashMap<String, List<String>>();
     String xml;
 
     boolean corre() {
@@ -300,6 +308,23 @@ final class EstresSandbox {
       n.declaracion = declaracion( s );
       a.nodos.add( n );
 
+      // --- otros lectores de archivos: rutas absolutas al original (la copia vive en el sandbox)
+      if ( x != null && !ENTRADAS.contains( id ) && !SALIDAS_ARCHIVO.contains( id ) && ( id.endsWith( "Input" )
+        || OTROS_LECTORES.contains( id ) ) ) {
+        List<String> rutas = new ArrayList<String>();
+        Element file = hijo( x, "file" );
+        if ( file != null ) {
+          for ( Element n2 : hijos( file, "name" ) ) {
+            rutas.add( absoluta( tm, n2.getTextContent() ) );
+          }
+        }
+        if ( texto( x, "filename" ) != null ) {
+          rutas.add( absoluta( tm, texto( x, "filename" ) ) );
+        }
+        if ( !rutas.isEmpty() ) {
+          a.lecturas.put( s.getName(), rutas );
+        }
+      }
       // --- entradas
       if ( x != null && ENTRADAS.contains( id ) ) {
         Entrada e = entrada( tm, s, x, filas, obligatorios );
@@ -445,6 +470,18 @@ final class EstresSandbox {
     return e;
   }
 
+  /** La ruta resuelta y absoluta (con / ), o "" si está vacía. */
+  private static String absoluta( TransMeta tm, String ruta ) {
+    if ( ruta == null || ruta.trim().isEmpty() ) {
+      return "";
+    }
+    String r = tm.environmentSubstitute( ruta.trim() );
+    if ( r.contains( "://" ) ) {
+      return r; // VFS (zip:, http:…): tal cual
+    }
+    return new File( r ).getAbsolutePath().replace( '\\', '/' );
+  }
+
   /** Cada fila con tantos valores como campos. */
   private static void ajustarFilas( Variantes.Tabla t ) {
     int n = t.campos.size();
@@ -515,6 +552,20 @@ final class EstresSandbox {
             poner( file, "filemask", "" );
             poner( file, "exclude_filemask", "" );
           }
+        }
+      }
+      List<String> rutas = a.lecturas.get( nombre );
+      if ( rutas != null ) {
+        Element file = hijo( s, "file" );
+        int i = 0;
+        for ( Element n2 : file == null ? new ArrayList<Element>() : hijos( file, "name" ) ) {
+          if ( i < rutas.size() && !rutas.get( i ).isEmpty() ) {
+            n2.setTextContent( rutas.get( i ) );
+          }
+          i++;
+        }
+        if ( hijo( s, "filename" ) != null && i < rutas.size() && !rutas.get( i ).isEmpty() ) {
+          poner( s, "filename", rutas.get( i ) );
         }
       }
       if ( SALIDAS_ARCHIVO.contains( tipo ) ) {
