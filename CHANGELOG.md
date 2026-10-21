@@ -45,6 +45,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `pentaho://guide/quality`.
 - `tools/lint-corpus/`: regression harness that runs the linter over PDI's samples, the skill examples and 27
   copies of the examples broken on purpose; it fails if a known error is missed or the counts change.
+- **Robustness**: make a load tolerate dirty data, so that a bad row goes to a rejects file with its reason
+  (`motivo`) instead of stopping the load or vanishing. Four pieces that share one analysis of the graph:
+  - Linter family `robustness` (17 rules, off by default): loads and type conversions without an error hop,
+    rejects without a reason or that end in a Dummy, a Filter rows that drops rows without a false branch,
+    lookups that lose or do not check orphans, an inner join in the source SQL, no check of required
+    fields, lenient conversions, a split that can fail, no dedupe before loading a dimension, a Sequence
+    used as surrogate key (keys change on every run), Table output that duplicates rows on a re-run, a
+    fact not grouped to its key, a lookup that reads a table before its load finishes, a fixed input file.
+    `lint_etl` with `robustness: true` adds a separate robustness score and never changes the main one. A
+    step can declare a deliberate drop (duplicates, a filter) and is then not flagged. Each finding names
+    the recipe that fixes it.
+  - `harden_etl` ("Harden"): a plan of recipes with a text diff for each change, applied as **one Ctrl+Z**.
+    `auto` recipes (error hop to a rejects file on loads, conversions and file inputs that read a field
+    as a number or date, a reason for each rejected row, wait for the dimension loads before the lookups)
+    apply by default; `confirm` ones (required fields, input file as a
+    parameter, strict conversions, dedupe before a dimension, orphans to rejects) only with their key;
+    `manual` ones (safe split, stable surrogate keys, Insert/Update instead of Table output, aggregate to
+    the fact's grain) return the steps to follow. `dry_run` (the default) simulates the whole apply on a
+    copy and returns the robustness score before and after.
+  - `stress_test`: generates broken variants of the file inputs (missing fields, bad dates and numbers,
+    duplicates, truncated lines, too long text, out of range numbers, empty file, header only...), runs a
+    copy of the transformation on each one in a separate sandboxed JVM, and checks that it does not abort,
+    that every row read is loaded, rejected with a reason or dropped on purpose, and, on a SQLite or H2
+    database, that a re-run duplicates nothing and keeps the keys. It never connects to other databases
+    (`not_run`, and `export_variants` writes the broken files to try by hand) and never writes next to the
+    original files (63 tools).
+  - Skill: the guide `manual/09-robustez.md` (recipes R01-R14 with the exact XML, also served as
+    `pentaho://guide/robustness`) and the pattern `patrones/06_carga_tolerante` (a load with stable keys,
+    Insert/Update, orphans and database errors to rejects, proven clean, re-run and broken with Kitchen).
 
 ### Changed
 

@@ -13,6 +13,19 @@ la herramienta o la IA sola, rápido y bien. Cuatro piezas que comparten un mism
 Fecha: 21-oct-2026. Estado: **diseño**; no se tocó código del plugin. Rama `feat/robustez` (desde
 `feat/0.6.0` = linter + 0.5.1).
 
+**Estado al 22-oct-2026: implementado** en `feat/robustez` (sin publicar; entra en la 0.6.0). Hecho: la
+guía 09 (R01-R14) y el patrón 06; las 17 reglas `robustness` (§3); `harden_etl` con las recetas `auto` y
+`confirm` aplicables (R01 también en las entradas de archivo con campos tipados) y las `manual` como
+`how_to`; `stress_test` con la JVM hija, el sandbox, el balance y `rerun` sobre SQLite/H2. Suite completa
+verde. La prueba de punta a punta sobre copias de dos cargas de clase y del ejemplo Grano de Oro: las
+reglas encuentran lo que se arregló a mano, el plan propone lo mismo salvo lo que es `manual`, y
+`stress_test` pasa de abortar a no perder filas (lo que queda, en el informe de la prueba). **No hecho**
+(para la 0.6.1): el diálogo «Robustecer…» (§7); aplicar las recetas manuales (claves estables,
+Insert/Update, agregar al grano, partir sin fallar); deducir los obligatorios siguiendo los renombres de
+Select values; R03 con nombres de campo que no son identificadores Java (hoy queda `manual`); el
+`encoding` y `dead_end` de §5; la sección de robustez de los Informes; unir el grafo de las tres piezas y
+los lanzadores de JVM hija con el corrector.
+
 Marcas: **[P]** probado (en la evidencia, en los patrones o con Pan/Kitchen) · **[B]** leído del bytecode de
 PDI 9.4 o del código del plugin · **[S]** ya existe en el plugin · **[NP]** no probado: lo verifica el
 paquete de trabajo que lo usa antes de construir encima (§11).

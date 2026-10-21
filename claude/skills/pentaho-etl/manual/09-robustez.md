@@ -56,6 +56,17 @@ means *rejected with a reason, in a file that someone reads*.
    the broken files so the person runs them with the input parameter (as with a hand-made broken file).
 5. Fix what `stress_test` reports (§9), `lint_etl robustness=true` again (target ≥ 90), `save`.
 
+Learned on real class loads:
+- R03 finds the required fields by name from the keys of the loads and lookups. When the input fields
+  are renamed on the way (`CustID` → `cod_cliente` in a Select values), it finds none: pass
+  `required_fields: {"<input step>": ["field", …]}`. Field names that are not Java identifiers
+  (`Fecha de venta`) leave R03 as `manual`: rename them in the input first.
+- To run `stress_test` on a MySQL load, copy it with the connection pointing to a SQLite file. SQLite takes
+  one writer at a time: if several loads write in parallel, set *Make the transformation database
+  transactional* (`unique_connections`) on the copy, or every load stops with "database is locked".
+- A file input that reads a field as Number or Date stops the load on a badly written value; R01 gives it
+  an error hop (the row arrives with that field null and Kettle's message as the reason).
+
 Without the MCP, build it by hand with the recipes below and prove it with a broken file and Pan/Kitchen
 (§8). The pattern is the fastest start: copy `patrones/06_carga_tolerante/` and adapt it.
 

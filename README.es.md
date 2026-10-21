@@ -53,6 +53,14 @@ puntaje de calidad técnica de 0 a 100 que muestra de dónde sale cada punto que
 seguros con un solo Ctrl+Z (antes de los que cambian lo que hace el ETL, te pregunta). La misma revisión
 es una sección del informe.
 
+**Robustez.** Pídele a Claude que una carga tolere datos sucios: cada fila mala (un campo que falta, una
+fecha que no se puede leer, un texto demasiado largo para su columna, una venta de un cliente que no
+existe) va a un archivo de rechazos con el motivo, en vez de parar la carga o perderse. Claude encuentra
+lo que falta, te muestra el plan y lo aplica con un solo Ctrl+Z; después lo demuestra con una prueba de
+datos sucios: copias rotas de tus archivos de entrada corren contra una copia de la transformación en un
+entorno aislado, y la prueba comprueba que cada fila leída se cargó o se rechazó con su motivo, y que
+ejecutarla dos veces no duplica nada.
+
 ¿No tenés Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
 
@@ -176,6 +184,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Campos | Listar los campos que salen de cada step, antes de configurar el siguiente |
 | Controles | Validar; preview de filas reales de cualquier step |
 | Calidad | Revisar buenas prácticas más allá de la validación, con un puntaje de 0 a 100 (y, si lo pedís, leyendo las fuentes para probar un problema); aplicar los arreglos propuestos; silenciar una regla donde es a propósito |
+| Robustez | Encontrar lo que pararía una carga o perdería filas con datos sucios; robustecerla (rechazos con su motivo, campos obligatorios, duplicados, huérfanos) con un solo Ctrl+Z; demostrarlo con una prueba de datos sucios en un entorno aislado que solo usa copias y bases de datos de archivo |
 | Ejecución | Ejecutar una transformación o un job, seguir su estado y su log, detenerlo |
 | Bases de datos | Listar tipos de conexión; agregar, probar y borrar conexiones; ver tablas y columnas; correr consultas SQL (solo lectura salvo que pidas escribir) |
 | Parámetros | Listar, definir y borrar parámetros |
@@ -202,6 +211,10 @@ Todo corre en tu computadora. No hay servidores, cuentas, analíticas ni telemet
 - La revisión de calidad (`lint_etl`) no ejecuta la transformación. Su modo profundo lee hasta 5000 filas
   de tus fuentes solo cuando lo pedís, con previews limitadas a steps de solo lectura, y sus hallazgos
   pueden citar valores que leyó.
+- La prueba de datos sucios (`stress_test`) solo corre cuando la pides, sobre una copia de la
+  transformación en un proceso de Java aparte con su propia configuración de Kettle, y solo si todas las
+  bases de datos que usa son archivos SQLite o H2 (que antes copia). Nunca se conecta a otra base de datos
+  y solo escribe en una carpeta temporal.
 - Lo que devuelven las herramientas (steps, nombres de campos, logs, filas de preview) pasa a ser parte
   de tu conversación con Claude, como cualquier otra cosa que compartas.
 

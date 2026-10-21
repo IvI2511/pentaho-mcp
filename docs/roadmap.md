@@ -45,6 +45,16 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   quedó como regla apagada (para el corrector y el modo clase) y la conversión perezosa se podó (sin daño
   demostrado en 9.4). Falta: clic en un hallazgo de la vista previa para seleccionar el step y un botón
   «Revisar calidad». Diseño: `docs/linter-diseno.md`; integración: `docs/linter-integracion.md`.
+- **Robustez automática** — **hecha** (22-oct-2026, rama `feat/robustez`, sin publicar). Pedida por Iván
+  después de robustecer a mano dos transformaciones de clase: que una carga tolere datos sucios sin pararse
+  ni perder filas, y que lo haga la herramienta o la IA sola. Quedó así: la guía `manual/09-robustez.md`
+  (recetas R01-R14) y el patrón `06_carga_tolerante`; 17 reglas `robustness` del linter (apagadas por
+  defecto, con su propio puntaje: `lint_etl robustness=true`); `harden_etl` (plan con diff, un solo
+  Ctrl+Z) y `stress_test` (variantes sucias de las entradas en una JVM hija aislada, balance de filas,
+  re-ejecución sobre SQLite) — 63 herramientas. Falta: el diálogo «Robustecer…» en Spoon, las recetas
+  manuales con aplicación (claves estables, Insert/Update, agregar al grano, partir sin fallar), seguir
+  los renombres para deducir los obligatorios y la sección de robustez de los Informes. Diseño:
+  `docs/robustez-diseno.md`.
 - **Corrector de ejercicios** — el docente deja la salida esperada (y opcionalmente reglas); el plugin
   corre la transformación del alumno, compara filas y arma la nota con lo que falló.
 - **Modo clase** — Claude construye despacio y deja una nota en el lienzo junto a cada step

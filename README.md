@@ -51,6 +51,13 @@ Spanish, hardcoded paths, passwords stored in the file, a failure branch that en
 as one Ctrl+Z (Claude asks first about the ones that change what the ETL does). The same check is a section
 of the report.
 
+**Robustness.** Ask Claude to make a load tolerate dirty data: every bad row (a missing field, a date that
+does not parse, a text too long for its column, a sale whose customer does not exist) goes to a rejects
+file with the reason, instead of stopping the load or vanishing. Claude finds what is missing, shows you
+the plan and applies it as one Ctrl+Z, then proves it with a dirty-data test: broken copies of your input
+files run against a copy of the transformation in a sandbox, and the test checks that every row read was
+loaded or rejected with a reason, and that running it twice duplicates nothing.
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 
@@ -174,6 +181,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Fields | List the fields each step outputs, before configuring the next one |
 | Checks | Validate, preview real rows from any step |
 | Quality | Check good practices beyond validation with a 0-100 score (optionally reading the sources to prove a problem), apply the proposed fixes, silence a rule where it is deliberate |
+| Robustness | Find what would stop a load or lose rows on dirty data; harden it (rejects files with the reason, required fields, dedupe, orphans) as one Ctrl+Z; prove it with a dirty-data test in a sandbox that runs only on copies and file databases |
 | Running | Run a transformation or job, follow its status and logs, stop it |
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
@@ -197,6 +205,9 @@ Everything runs on your computer. There are no servers, accounts, analytics or t
 - The quality check (`lint_etl`) does not run the transformation. Its deep mode reads up to 5000 rows of
   your sources only when you ask, through previews limited to read-only steps, and its findings can quote
   values it read.
+- The dirty-data test (`stress_test`) runs only when you ask, on a copy of the transformation in a separate
+  Java process with its own Kettle settings, and only when every database it uses is a SQLite or H2 file
+  (which it copies first). It never connects to any other database and writes only in a temporary folder.
 - What the tools return (steps, field names, logs, preview rows) becomes part of your conversation with
   Claude, like anything else you share.
 
