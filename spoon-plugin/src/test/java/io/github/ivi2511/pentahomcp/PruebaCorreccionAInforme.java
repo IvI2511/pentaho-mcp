@@ -300,8 +300,7 @@ public class PruebaCorreccionAInforme {
           for ( int n; ( n = in.read( buf ) ) > 0; ) {
             o.write( buf, 0, n );
           }
-          b.append( new String( o.toByteArray(), "UTF-8" ).replaceAll( "<[^>]+>", "" ) ).append( '
-' );
+          b.append( new String( o.toByteArray(), "UTF-8" ).replaceAll( "<[^>]+>", "" ) ).append( ' ' );
         }
       }
     }
