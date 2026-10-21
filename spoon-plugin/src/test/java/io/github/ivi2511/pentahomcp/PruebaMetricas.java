@@ -221,7 +221,7 @@ public class PruebaMetricas {
     igual( s.bloques.size(), ModeloJson.leer( json, Seccion.class ).bloques.size(), "ida y vuelta JSON" );
   }
 
-  /** "Medir..." de la copia enorme de 03: hay snapshots, asi que sale la linea de filas por intervalo. */
+  /** "Medir..." de la copia enorme de 03: hay snapshots, asi que sale el ritmo de los steps (filas por segundo). */
   public void pruebaCopiaGrandeLinea() throws Exception {
     File dir = PruebaPerfil.grande( PruebaPerfil.FILAS_ENORME );
     Captura c = PruebaPerfil.capturaDe( new File( dir, "03_ventas_por_producto.ktr" ) );
@@ -230,7 +230,7 @@ public class PruebaMetricas {
     igual( (long) PruebaPerfil.FILAS_ENORME, s.datos.get( "rows_read" ).asLong(), "todas las filas" );
     Grafico linea = grafico( s, Grafico.LINEA );
     if ( linea == null ) {
-      Verificador.saltear( "la corrida duro " + s.datos.get( "duration_ms" ) + " ms: menos de 3 snapshots" );
+      Verificador.saltear( "la corrida duro " + s.datos.get( "duration_ms" ) + " ms: menos de 2 s o de 4 snapshots" );
     }
     cierto( linea.categorias.size() >= 3, "al menos 3 instantes: " + linea.categorias );
     cierto( linea.series.size() >= 1 && linea.series.size() <= SecMetricas.MAX_SERIES, "1 a 5 series" );

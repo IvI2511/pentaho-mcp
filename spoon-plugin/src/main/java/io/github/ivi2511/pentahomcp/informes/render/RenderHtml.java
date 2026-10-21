@@ -103,6 +103,16 @@ public final class RenderHtml implements Renderizador {
     return r.archivo( destino );
   }
 
+  /**
+   * Alto maximo (mm) de una figura impresa: el alto util de la pagina (A4 297 mm o Letter 279 mm, menos
+   * los margenes de 18 y 20 mm de @page) menos ~34 mm para el titulo del bloque, el marco y la nota. Un
+   * diagrama o una imagen mas alta quedaba entera en la pagina siguiente y dejaba paginas en blanco.
+   */
+  public static int altoFiguraMm( Tema tema ) {
+    boolean carta = tema != null && Tema.LETTER.equalsIgnoreCase( tema.pagina );
+    return carta ? 207 : 225;
+  }
+
   /** El HTML completo como texto (lo usan las pruebas y quien necesite el texto sin archivo). */
   public String html( Informe inf, Tema tema ) {
     return html( inf, tema, Progreso.NULO, new ArrayList<String>() );
@@ -448,6 +458,7 @@ public final class RenderHtml implements Renderizador {
       m.put( "suaveBanda", bandaOscura ? claro( primario, 0.18f ) : Tema.TEXTO );
       m.put( "tenueBanda", bandaOscura ? claro( primario, 0.42f ) : Tema.TEXTO_TENUE );
       m.put( "pagina", Tema.LETTER.equalsIgnoreCase( tema.pagina ) ? "letter" : "A4" );
+      m.put( "altoFigura", altoFiguraMm( tema ) + "mm" );
       m.put( "pie", Html.cadenaCss( Tema.PIE ) );
       m.put( "pagina_txt", Html.cadenaCss( t( "page" ) ) );
       m.put( "de_txt", Html.cadenaCss( t( "of" ) ) );
@@ -801,7 +812,13 @@ public final class RenderHtml implements Renderizador {
       float escala = im.escala > 0 ? im.escala : 1f;
       sb.append( "<img src=\"" ).append( Html.dataUri( im.mime, im.datos ) ).append( '"' );
       if ( im.ancho > 0 ) {
-        sb.append( " width=\"" ).append( Math.round( im.ancho / escala ) ).append( '"' );
+        long ancho = Math.round( im.ancho / escala );
+        if ( paraImprimir && im.alto > 0 ) {
+          // en el PDF una imagen alta (un lienzo de Spoon vertical) no puede pasar del alto de la pagina: se
+          // le baja el ancho, asi el alto proporcional entra (el CSS solo pone el tope, y con object-fit)
+          ancho = Math.min( ancho, (long) Math.floor( altoFiguraMm( tema ) / 25.4 * 96 * im.ancho / im.alto ) );
+        }
+        sb.append( " width=\"" ).append( Math.max( 1L, ancho ) ).append( '"' );
       }
       String a = alt != null ? alt : im.alt;
       sb.append( " alt=\"" ).append( Html.esc( a == null ? "" : a ) ).append( "\">" );

@@ -28,6 +28,7 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
 import io.github.ivi2511.pentahomcp.informes.modelo.ModeloJson;
+import io.github.ivi2511.pentahomcp.informes.modelo.Parrafo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
 import io.github.ivi2511.pentahomcp.informes.modelo.Tabla;
 
@@ -35,8 +36,10 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Tabla;
  * Seccion lineage: de donde sale cada campo de los steps destino (diseno §2.4.1).
  * <p>
  * Motor principal: metaverse ({@link LinajeMetaverse}); respaldo: {@link LinajePropio}, por destino y
- * por campo (lo que metaverse no resuelve lo resuelve el propio). Destinos: {@code Pedido.linajeStep}
- * o, si no, cada step final que escribe. Por destino van un diagrama Mermaid ({@code flowchart LR}, un
+ * por campo (lo que metaverse no resuelve lo resuelve el propio; el detalle tecnico de un fallo de metaverse
+ * va al log, el informe solo dice que motor se uso y para que campos). Destinos: {@code Pedido.linajeStep}
+ * o, si no, cada step final que escribe. Abre con un parrafo de para que sirve el linaje. Por destino van
+ * un diagrama Mermaid ({@code flowchart LR}, un
  * subgraph por step, la operacion sobre la flecha; solo los nodos donde algo cambia) y una tabla; los
  * steps cuyos campos no se pudieron calcular dejan la seccion "parcial" con su motivo.
  * <p>
@@ -132,9 +135,12 @@ final class SecLinaje implements Recolector {
         corrida = LinajeMetaverse.calcular( tm, campos, propio, resta );
         mvDatos.put( "ms", corrida.msTotal );
       } catch ( Throwable e ) {
+        // el detalle tecnico (excepcion y pila) va al log y a los datos; el informe dice solo que motor se uso
         Throwable x = causa( e );
+        LinajeMetaverse.log( null, null, x );
+        mvDatos.put( "error", motivoCorto( x ) );
         mvMotivo = LinajeMetaverse.esTimeout( x ) ? rot.f( "metaverse.tiempo", Math.max( 1L, resta / 1000 ) )
-          : rot.f( "metaverse.error", motivoCorto( x ) );
+          : rot.s( "metaverse.error" );
       }
     }
     mvDatos.put( "available", corrida != null );
@@ -155,12 +161,16 @@ final class SecLinaje implements Recolector {
       ctx.progreso().paso( rot.f( "progreso.destino", d.getName() ), i + 1, destinos.size() );
       LinajeMetaverse.Respuesta mv = corrida == null ? null : corrida.destinos.get( d.getName() );
       if ( mv != null && mv.error != null ) {
-        respaldo.put( d.getName(), rot.f( "metaverse.error", mv.error ) );
+        // mv.error es tecnico (ya esta en el log): al informe va la frase de siempre
+        respaldo.put( d.getName(), rot.s( "metaverse.error" ) );
       }
       resultados.add( combinar( propio, d, mv, orden ) );
     }
 
-    // ---- bloques
+    // ---- bloques: primero para que sirve el linaje (no todos lo conocen), despues los avisos
+    Parrafo paraQue = new Parrafo( rot.s( "para_que" ) );
+    paraQue.id = "lineage-purpose";
+    sec.bloques.add( paraQue );
     if ( mvMotivo != null && corrida == null && problema == null ) {
       arriba.add( new Aviso( Aviso.INFO, rot.f( "aviso.metaverse", mvMotivo ) ) );
     }
@@ -237,7 +247,12 @@ final class SecLinaje implements Recolector {
     return out;
   }
 
-  /** Campos del destino: los caminos de metaverse donde los hay, los del motor propio donde no. */
+  /**
+   * Campos del destino: los caminos de metaverse donde los hay, los del motor propio donde no. Donde hay
+   * de los dos, tambien los caminos del propio que metaverse no trajo (mismos steps y campos): metaverse a
+   * veces pierde uno de los que pasan por un Append (probado con una practica de un DW: de una corrida a
+   * otra faltaba la entrada del tail o una clave de busqueda) y el campo parecia venir de una sola entrada.
+   */
   static LinajePropio.Destino combinar( LinajePropio propio, StepMeta d, LinajeMetaverse.Respuesta mv,
                                        List<StepMeta> orden ) {
     RowMetaInterface rm = propio.campos( d );
@@ -246,6 +261,7 @@ final class SecLinaje implements Recolector {
     }
     LinajePropio.Destino r = new LinajePropio.Destino( d );
     int deMv = 0;
+    boolean completados = false;
     for ( ValueMetaInterface v : rm.getValueMetaList() ) {
       List<List<LinajePropio.Nodo>> cs = mv == null || mv.error != null ? null : mv.caminos.get( v.getName() );
       LinajePropio.Campo c;
@@ -253,8 +269,21 @@ final class SecLinaje implements Recolector {
         c = new LinajePropio.Campo( v.getName() );
         c.tipo = v.getTypeDesc();
         c.motor = LinajeMetaverse.MOTOR;
-        c.truncado = cs.size() > LinajePropio.MAX_CAMINOS;
-        c.caminos.addAll( c.truncado ? cs.subList( 0, LinajePropio.MAX_CAMINOS ) : cs );
+        List<List<LinajePropio.Nodo>> todos = new ArrayList<>( cs );
+        Set<String> vistos = new HashSet<>();
+        for ( List<LinajePropio.Nodo> camino : cs ) {
+          vistos.add( recorrido( camino ) );
+        }
+        for ( List<LinajePropio.Nodo> camino : propio.campo( d, v ).caminos ) {
+          // un camino que el propio no pudo resolver no completa nada: metaverse ya lo trazo
+          if ( !LinajePropio.DESCONOCIDO.equals( camino.get( 0 ).clase ) && vistos.add( recorrido( camino ) ) ) {
+            todos.add( camino );
+            c.motor = MOTOR_MIXTO;
+            completados = true;
+          }
+        }
+        c.truncado = todos.size() > LinajePropio.MAX_CAMINOS;
+        c.caminos.addAll( c.truncado ? todos.subList( 0, LinajePropio.MAX_CAMINOS ) : todos );
         deMv++;
       } else {
         c = propio.campo( d, v );
@@ -262,9 +291,18 @@ final class SecLinaje implements Recolector {
       propio.ordenar( c.caminos, orden );
       r.campos.add( c );
     }
-    r.motor = deMv == r.campos.size() && deMv > 0 ? LinajeMetaverse.MOTOR : deMv == 0 ? LinajePropio.MOTOR
-      : MOTOR_MIXTO;
+    r.motor = deMv == r.campos.size() && deMv > 0 && !completados ? LinajeMetaverse.MOTOR
+      : deMv == 0 ? LinajePropio.MOTOR : MOTOR_MIXTO;
     return r;
+  }
+
+  /** "step\0campo\0step\0campo...": un camino sin las clases ni las operaciones (cada motor las rotula). */
+  private static String recorrido( List<LinajePropio.Nodo> camino ) {
+    StringBuilder sb = new StringBuilder();
+    for ( LinajePropio.Nodo n : camino ) {
+      sb.append( n.step ).append( '\u0000' ).append( n.campo ).append( '\u0000' );
+    }
+    return sb.toString();
   }
 
   // ---------------------------------------------------------------- tabla
@@ -282,7 +320,16 @@ final class SecLinaje implements Recolector {
       t.pie = rot.f( "pie.truncado", LinajePropio.MAX_CAMINOS );
     }
     String motor = rot.s( "motor." + d.motor );
-    if ( !LinajeMetaverse.MOTOR.equals( d.motor ) ) {
+    List<String> propios = new ArrayList<>();
+    for ( LinajePropio.Campo c : d.campos ) {
+      if ( LinajePropio.MOTOR.equals( c.motor ) ) {
+        propios.add( c.nombre );
+      }
+    }
+    if ( MOTOR_MIXTO.equals( d.motor ) && !propios.isEmpty() ) {
+      // metaverse anduvo con el resto: se nombran los campos que traza el motor propio
+      t.nota = rot.f( "nota.motor_campos", motor, y( propios, rot ) );
+    } else if ( !LinajeMetaverse.MOTOR.equals( d.motor ) ) {
       String porque = respaldo != null ? respaldo : mvMotivo;
       t.nota = porque == null ? rot.f( "nota.motor", motor ) : rot.f( "nota.motor_porque", motor, porque );
     } else {

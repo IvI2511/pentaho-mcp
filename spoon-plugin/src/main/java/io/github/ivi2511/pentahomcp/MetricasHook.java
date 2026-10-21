@@ -17,7 +17,7 @@ import org.pentaho.di.trans.TransMeta;
  * OPCIONAL y APAGADO por defecto (diseno §2.4.2): con {@code PENTAHO_LIVE_METRICS=on} (system property,
  * linea en kettle.properties o variable de entorno) activa en TODAS las corridas la recoleccion de
  * metricas (lo mismo que "Gather performance metrics") y los snapshots de rendimiento, asi la seccion
- * de metricas de la ultima corrida tiene un Gantt real y la linea de filas por intervalo.
+ * de metricas de la ultima corrida tiene un Gantt real y el ritmo de los steps (filas por segundo).
  * <p>
  * Los snapshots son un flag de la TransMeta (la del documento, en Spoon): se pone al preparar y se
  * restaura al terminar, porque si no se guardaria en el .ktr. Kettle lee el flag tambien al terminar

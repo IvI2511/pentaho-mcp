@@ -120,6 +120,13 @@ pre.mermaid[data-processed] { color: {{texto}}; }
   tr, .tarjeta, .aviso, .figura, .pendiente { page-break-inside: avoid; break-inside: avoid; }
   h2, h3, .titulo-bloque { page-break-after: avoid; break-after: avoid; }
   .tabla { overflow: visible; }
+  /* Una figura nunca es mas alta que la pagina (menos su titulo y su nota). Un SVG o una imagen no se
+     parten: si no entraban, Chromium los pasaba enteros a la pagina siguiente y dejaba el titulo solo, un
+     marco vacio y paginas en blanco. El SVG conserva su ancho y el dibujo se achica centrado (viewBox);
+     la imagen, sin deformarse (RenderHtml ademas le baja el ancho en el PDF). */
+  .figura pre.mermaid svg, .figura .svg svg { max-height: {{altoFigura}}; }
+  .figura img { max-height: {{altoFigura}}; object-fit: contain; }
+  pre.mermaid, .figura .svg, .figura .lienzo { page-break-inside: avoid; break-inside: avoid; }
 }
 /*==IMPRIMIR==*/
 @page { size: {{pagina}}; margin: 18mm 16mm 20mm;

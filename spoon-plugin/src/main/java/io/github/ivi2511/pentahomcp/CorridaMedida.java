@@ -171,7 +171,7 @@ public final class CorridaMedida {
     boolean usada;
   }
 
-  /** Serie de snapshots de un step (filas escritas por intervalo). */
+  /** Serie de snapshots de un step (filas escritas en cada intervalo: SecMetricas las pasa a filas por segundo). */
   static final class Snapshots {
     /** Instantes absolutos de cada punto (los del step con mas puntos). */
     final List<Long> instantes = new ArrayList<Long>();

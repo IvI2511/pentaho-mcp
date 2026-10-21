@@ -6,6 +6,7 @@ import static io.github.ivi2511.pentahomcp.Verificador.contiene;
 import static io.github.ivi2511.pentahomcp.Verificador.falla;
 import static io.github.ivi2511.pentahomcp.Verificador.falso;
 import static io.github.ivi2511.pentahomcp.Verificador.igual;
+import static io.github.ivi2511.pentahomcp.Verificador.noContiene;
 import static io.github.ivi2511.pentahomcp.Verificador.noNulo;
 
 import java.io.File;
@@ -409,6 +410,7 @@ public class PruebaPanelSwt {
       return null;
     } );
     igual( conf + 1, servicio.confirmaciones.size(), "pregunto antes de conectarse" );
+    noContiene( servicio.confirmaciones.get( conf ), "%n", "la confirmacion con saltos de linea, sin «%n» literal" );
     falso( ui( () -> ( (Button) buscar( "consultar_base" ) ).getSelection() ), "sin confirmar queda desmarcado" );
     servicio.confirmar = true;
     ui( () -> {
