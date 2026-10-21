@@ -49,9 +49,9 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * La pestana se refresca con un timerExec que mira el contador de cambios de la leccion: sin hilos propios.
  * <p>
  * Si el usuario oculta el panel de resultados, Spoon desecha el composite con la pestana: el DisposeListener pausa la
- * leccion (motivo panel_hidden, solo guided/auto) y, al volver a abrir el panel, {@link LeccionTabExtender} (gancho
- * loadTab de TransGraph.addAllTabs) la repone con {@link #alCargarPestanas}, que es idempotente y reanuda la pausa
- * que puso el panel (no una pausa pedida).
+ * leccion (motivo panel_hidden, solo guided/auto) y, al volver a abrir el panel, {@link #vigilar} repone la pestana
+ * (el gancho loadTab de {@link LeccionTabExtender} no llega en PDI 9.4: Spoon no registra ese tipo de plugin).
+ * Reponerla es idempotente y reanuda la pausa que puso el panel (no una pausa pedida).
  * <p>
  * A-/A+ cambia la letra de la pestana, no la de las notas: un restyle a mitad de clase reacomoda notas con steps
  * que todavia no existen y deja un Ctrl+Z encima del paso (que «Atras» ya no podria deshacer). Las notas se agrandan
@@ -65,6 +65,7 @@ final class LeccionPanel {
   /** Clave del CTabItem con su LeccionPanel. */
   static final String CLAVE = "pentaho-live-leccion";
   static final int REFRESCO_MS = 250;
+  static final int VIGILAR_MS = 500;
   static final int FUENTE_MIN = 7;
   static final int FUENTE_MAX = 28;
 
@@ -89,6 +90,8 @@ final class LeccionPanel {
 
   final Leccion l;
   final LeccionMotor.Entorno ent;
+  /** El TransGraph de Spoon, o null (pruebas). */
+  final TransGraph grafo;
   final Rotulos r;
   final CTabItem item;
   final Composite raiz;
@@ -137,6 +140,15 @@ final class LeccionPanel {
    * reemplaza). Si la leccion estaba pausada porque se oculto el panel, la reanuda. (UI)
    */
   static LeccionPanel agregar( CTabFolder f, Leccion l, LeccionMotor.Entorno ent ) {
+    return agregar( f, null, l, ent );
+  }
+
+  /** Igual, en el panel de resultados de un TransGraph de Spoon (para reponer la pestana si se oculta). (UI) */
+  static LeccionPanel agregar( TransGraph tg, Leccion l, LeccionMotor.Entorno ent ) {
+    return agregar( tg.extraViewTabFolder, tg, l, ent );
+  }
+
+  private static LeccionPanel agregar( CTabFolder f, TransGraph tg, Leccion l, LeccionMotor.Entorno ent ) {
     LeccionPanel p = de( f );
     if ( p != null ) {
       if ( p.l == l ) {
@@ -146,9 +158,47 @@ final class LeccionPanel {
       p.propio = true;
       p.item.dispose();
     }
-    p = new LeccionPanel( f, l, ent );
+    p = new LeccionPanel( f, tg, l, ent );
     LeccionMotor.panelVisible( l );
     return p;
+  }
+
+  /**
+   * Con el panel de resultados oculto, mira cada {@link #VIGILAR_MS} si el usuario lo volvio a abrir y repone la
+   * pestana (y la elige). Hace falta porque el Spoon de PDI 9.4 no registra SpoonUiExtenderPluginType: los
+   * extensores loadTab de la carpeta plugins nunca se escanean (probado en Spoon real), asi que
+   * {@link LeccionTabExtender} queda solo para un Spoon que si lo registre. Termina con la leccion detenida o
+   * reemplazada, o con la pestana del documento cerrada. (UI)
+   */
+  static void vigilar( final TransGraph tg, final Leccion l, final LeccionMotor.Entorno ent ) {
+    final Display d = tg.getDisplay();
+    d.timerExec( VIGILAR_MS, new Runnable() {
+      @Override
+      public void run() {
+        try {
+          if ( tg.isDisposed() || LeccionMotor.deDocumento( tg.getTransMeta() ) != l ) {
+            return;
+          }
+          synchronized ( l ) {
+            if ( l.estado == Estado.STOPPED ) {
+              return;
+            }
+          }
+          if ( tg.isExecutionResultsPaneVisible() && tg.extraViewTabFolder != null
+            && !tg.extraViewTabFolder.isDisposed() ) {
+            if ( de( tg.extraViewTabFolder ) == null ) {
+              LeccionPanel p = agregar( tg, l, ent );
+              tg.extraViewTabFolder.setSelection( p.item );
+            }
+            return;
+          }
+        } catch ( RuntimeException e ) {
+          McpLifecycleListener.LOG.logDebug( "Pentaho Live: lesson tab watch failed: " + e );
+          return;
+        }
+        d.timerExec( VIGILAR_MS, this );
+      }
+    } );
   }
 
   /**
@@ -170,7 +220,7 @@ final class LeccionPanel {
     if ( tg.extraViewTabFolder == null || tg.extraViewTabFolder.isDisposed() ) {
       return "the results panel did not open";
     }
-    LeccionPanel p = agregar( tg.extraViewTabFolder, l, LeccionMotor.spoon() );
+    LeccionPanel p = agregar( tg, l, LeccionMotor.spoon() );
     tg.extraViewTabFolder.setSelection( p.item );
     return null;
   }
@@ -187,14 +237,15 @@ final class LeccionPanel {
         return;
       }
     }
-    agregar( tg.extraViewTabFolder, l, LeccionMotor.spoon() );
+    agregar( tg, l, LeccionMotor.spoon() );
   }
 
   // ---------------------------------------------------------------- armado
 
-  private LeccionPanel( CTabFolder f, Leccion l, LeccionMotor.Entorno ent ) {
+  private LeccionPanel( CTabFolder f, TransGraph tg, Leccion l, LeccionMotor.Entorno ent ) {
     this.l = l;
     this.ent = ent;
+    this.grafo = tg;
     String idioma;
     synchronized ( l ) {
       idioma = l.idioma;
@@ -279,6 +330,9 @@ final class LeccionPanel {
     item.addDisposeListener( e -> {
       if ( !propio ) {
         LeccionMotor.panelOculto( l );
+        if ( grafo != null && !grafo.isDisposed() ) {
+          vigilar( grafo, l, ent );
+        }
       }
       if ( !raiz.isDisposed() ) {
         raiz.dispose();

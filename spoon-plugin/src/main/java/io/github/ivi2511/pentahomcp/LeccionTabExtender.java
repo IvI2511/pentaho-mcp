@@ -14,8 +14,10 @@ import org.pentaho.di.ui.spoon.trans.TransGraph;
  * transformacion (docs/modo-clase-diseno.md §6). TransGraph.addAllTabs (al abrir el panel, que ocultarlo desecha
  * entero) llama a los SpoonUiExtenderPluginInterface registrados para TransGraph con el evento loadTab.
  * <p>
- * Lo encuentra el escaneo de anotaciones de la carpeta plugins (SpoonUiExtenderPluginType), como el
- * {@code @SpoonPlugin} de Informes. <b>Sin {@code classLoaderGroup}</b>: tiene que cargar en el mismo classloader que
+ * <b>En PDI 9.4 no llega:</b> Spoon.main no agrega SpoonUiExtenderPluginType al PluginRegistry, asi que el escaneo de
+ * la carpeta plugins no lo levanta (probado en Spoon real: la pestana no volvio por aca). Lo que repone la pestana es
+ * {@link LeccionPanel#vigilar}; esto queda para un Spoon que registre el tipo (y es idempotente con aquello).
+ * <b>Sin {@code classLoaderGroup}</b>: tiene que cargar en el mismo classloader que
  * el {@code @LifecyclePlugin} para ver las lecciones de {@link LeccionMotor}. PluginRegistry.loadClass crea una
  * instancia por evento: sin estado propio. Nada de lo que pase aca puede romper el panel de Spoon (catch Throwable).
  */
