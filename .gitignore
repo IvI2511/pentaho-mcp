@@ -15,10 +15,10 @@ tools/generador-catalogo/build/
 
 spoon-plugin/.ruff_cache/
 
-# Instalador de Windows: lo que arma instalador/preparar.ps1 (staging y cache del JRE) y lo que
-# compila Inno Setup. Se versionan los scripts, el lanzador, las letras y pentaho-live.ico.
-instalador/staging/
-instalador/cache/
+# Instalador de Windows: lo que arma preparar_instalador.ps1 (staging y cache del JRE, en
+# build/instalador/) y lo que compila Inno Setup (instalador/ guarda solo los Instalador_*.exe). Se
+# versionan instalador.iss, preparar_instalador.ps1, launcher/ y tools/instalador/.
+/build/
 instalador/*.exe
 
 # Salida del ejemplo Grano de Oro (almacén SQLite, rechazos y KPI): se regenera con el job

@@ -24,9 +24,11 @@ import io.github.ivi2511.pentahomcp.informes.Contexto;
 import io.github.ivi2511.pentahomcp.informes.Recolector;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.SeccionId;
+import io.github.ivi2511.pentahomcp.informes.diagramas.Grafo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
+import io.github.ivi2511.pentahomcp.informes.modelo.Esquema;
 import io.github.ivi2511.pentahomcp.informes.modelo.ModeloJson;
 import io.github.ivi2511.pentahomcp.informes.modelo.Parrafo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Seccion;
@@ -452,7 +454,125 @@ final class SecLinaje implements Recolector {
     g.titulo = rot.f( "titulo.diagrama", d.step.getName() );
     g.alt = rot.f( "alt.diagrama", d.campos.size(), d.step.getName() );
     g.mermaid = mermaid( d, rot, orden );
+    try {
+      g.grafo = grafo( d, rot, orden ); // diagrama propio (sin grafo: el Mermaid de siempre)
+    } catch ( RuntimeException e ) {
+      g.grafo = null;
+    }
     return g;
+  }
+
+  /**
+   * El grafo del diagrama propio (informes.diagramas): los mismos nodos y caminos que {@link #mermaid}, con un
+   * grupo por step, la operacion sobre el campo que crea (no sobre la flecha) y las claves de busqueda o de
+   * union como aristas {@link Grafo#CLAVE}. Los pasos seguidos dentro de un step y la operacion comun a todos
+   * los campos de un step los pliega el motor al dibujar.
+   */
+  static Esquema grafo( LinajePropio.Destino d, Rotulos rot, List<StepMeta> orden ) {
+    Map<String, LinajePropio.Nodo> nodos = new LinkedHashMap<>(); // step\0campo -> nodo
+    Map<String, List<String>> porStep = new LinkedHashMap<>();
+    Map<String, Set<String>> ops = new HashMap<>();
+    Set<String> aristas = new LinkedHashSet<>(); // a\0b\0clase
+    for ( LinajePropio.Campo c : d.campos ) {
+      for ( List<LinajePropio.Nodo> camino : c.caminos ) {
+        if ( !esClave( camino ) ) {
+          cadenaGrafo( significativos( camino ), nodos, porStep, ops, aristas, rot );
+        }
+      }
+    }
+    Set<String> pares = new HashSet<>();
+    for ( LinajePropio.Campo c : d.campos ) {
+      for ( List<LinajePropio.Nodo> camino : c.caminos ) {
+        if ( !esClave( camino ) ) {
+          continue;
+        }
+        List<LinajePropio.Nodo> sig = significativos( camino );
+        int k = 0;
+        while ( k < sig.size() && !LinajePropio.ROL_CLAVE.equals( sig.get( k ).rol ) ) {
+          k++;
+        }
+        if ( k == 0 || k >= sig.size() ) {
+          continue;
+        }
+        String step = sig.get( k ).step;
+        List<String> destinos = new ArrayList<>();
+        List<String> delStep = porStep.get( step );
+        if ( delStep != null ) {
+          for ( String x : delStep ) {
+            LinajePropio.Nodo v = nodos.get( x );
+            if ( ( LinajePropio.BUSCA.equals( v.clase ) || LinajePropio.UNE.equals( v.clase ) )
+              && !LinajePropio.ROL_CLAVE.equals( v.rol ) ) {
+              destinos.add( x );
+            }
+          }
+        }
+        if ( destinos.isEmpty() && delStep == null ) {
+          continue; // el step de busqueda no aparece en el diagrama: la clave no aporta nada
+        }
+        String origen = cadenaGrafo( sig.subList( 0, k ), nodos, porStep, ops, aristas, rot );
+        if ( destinos.isEmpty() ) {
+          destinos.add( porStep.get( step ).get( 0 ) );
+        }
+        for ( String dest : destinos ) {
+          if ( origen != null && !origen.equals( dest ) && pares.add( origen + "\u0000" + dest ) ) {
+            aristas.add( origen + "\u0000" + dest + "\u0000" + Grafo.CLAVE );
+          }
+        }
+      }
+    }
+    Grafo g = new Grafo( Grafo.LINAJE, rot.f( "titulo.diagrama", d.step.getName() ) );
+    Map<String, Grafo.Nodo> ids = new HashMap<>();
+    for ( String step : ordenar( porStep.keySet(), orden ) ) {
+      Grafo.Grupo gr = g.grupo( step );
+      gr.destino = step.equals( d.step.getName() );
+      for ( String clave : porStep.get( step ) ) {
+        Grafo.Nodo n = g.campo( gr, "c" + ids.size(), nodos.get( clave ).campo );
+        Set<String> o = ops.get( clave );
+        n.op = o == null || o.isEmpty() ? null : unir( new ArrayList<>( o ), " · " );
+        ids.put( clave, n );
+      }
+    }
+    for ( String a : aristas ) {
+      String[] p = a.split( "\u0000", -1 );
+      g.arista( ids.get( p[ 0 ] + "\u0000" + p[ 1 ] ), ids.get( p[ 2 ] + "\u0000" + p[ 3 ] ), p[ 4 ] );
+    }
+    return g.esquema();
+  }
+
+  /** Registra una cadena de nodos del grafo con sus aristas; devuelve la clave del ultimo (null si no hay). */
+  private static String cadenaGrafo( List<LinajePropio.Nodo> camino, Map<String, LinajePropio.Nodo> nodos,
+                                     Map<String, List<String>> porStep, Map<String, Set<String>> ops,
+                                     Set<String> aristas, Rotulos rot ) {
+    String anterior = null;
+    for ( LinajePropio.Nodo x : camino ) {
+      String clave = x.step + "\u0000" + x.campo;
+      if ( !nodos.containsKey( clave ) ) {
+        nodos.put( clave, x );
+        List<String> l = porStep.get( x.step );
+        if ( l == null ) {
+          l = new ArrayList<>();
+          porStep.put( x.step, l );
+        }
+        l.add( clave );
+      }
+      String op = null;
+      if ( anterior != null && !anterior.equals( clave ) ) {
+        op = LinajePropio.PASA.equals( x.clase ) ? null : x.op != null ? x.op : rot.s( "clase." + x.clase );
+        aristas.add( anterior + "\u0000" + clave + "\u0000" + Grafo.NORMAL );
+      } else if ( anterior == null && LinajePropio.CREA.equals( x.clase ) ) {
+        op = x.op != null ? x.op : rot.s( "clase." + x.clase ); // nace en este step (constante, secuencia...)
+      }
+      if ( op != null && !op.trim().isEmpty() ) {
+        Set<String> s = ops.get( clave );
+        if ( s == null ) {
+          s = new LinkedHashSet<>();
+          ops.put( clave, s );
+        }
+        s.add( recortar( op.trim(), 80 ) );
+      }
+      anterior = clave;
+    }
+    return anterior;
   }
 
   /** flowchart LR con un subgraph por step y la operacion sobre la flecha (sintaxis de Mermaid 9+). */

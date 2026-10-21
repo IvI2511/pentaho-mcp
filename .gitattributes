@@ -5,4 +5,4 @@
 *.cmd -text
 *.bat -text
 *.sh -text
-instalador/bin/pentaho-live -text
+launcher/pentaho-live -text

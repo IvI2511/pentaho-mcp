@@ -87,6 +87,7 @@ import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.graficos.SvgAPng;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
+import io.github.ivi2511.pentahomcp.informes.modelo.Capitulo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
 import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
@@ -399,17 +400,32 @@ public final class RenderDocx implements Renderizador {
       vinetas();
       doc.enforceUpdateFields(); // Word rehace el indice y los numeros de pagina al abrir
 
-      List<Seccion> cuerpo = cuerpo( inf );
-      portada( RenderDocx.portada( inf ) );
-      indice( cuerpo );
+      // un informe simple da un solo grupo (como siempre); uno combinado, la parte general y un capitulo por
+      // documento: Heading 1 por documento y Heading 2 numerado («2.3») por seccion
+      List<Capitulos.Grupo> grupos = Capitulos.grupos( inf );
+      Capitulos.Grupo general = grupos.isEmpty() || grupos.get( 0 ).capitulo != null ? null : grupos.get( 0 );
+      portada( general != null ? general.portada : RenderDocx.portada( inf ) );
+      indice( grupos );
 
-      List<Seccion> vivas = vivas( cuerpo );
-      for ( int i = 0; i < vivas.size(); i++ ) {
-        cancelar( progreso );
-        Seccion s = vivas.get( i );
-        progreso.paso( r.f( "progreso", titulo( s ) ), i, vivas.size() );
-        boolean salto = i == 0 || !Html.corta( s );
-        seccion( s, null, 1, salto );
+      int total = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        total += g.vivas().size();
+      }
+      int hecho = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        int nivel = 1;
+        if ( g.capitulo != null ) {
+          capitulo( g );
+          nivel = 2;
+        }
+        List<Seccion> vivas = g.vivas();
+        for ( int i = 0; i < vivas.size(); i++ ) {
+          cancelar( progreso );
+          Seccion s = vivas.get( i );
+          progreso.paso( r.f( "progreso", titulo( s ) ), hecho++, total );
+          boolean salto = i == 0 || !Html.corta( s );
+          seccion( s, Capitulos.numero( g, i ), nivel, salto );
+        }
       }
       if ( diagramasComoTabla > 0 ) {
         avisos.add( r.f( "aviso_diagramas", diagramasComoTabla ) );
@@ -718,17 +734,27 @@ public final class RenderDocx implements Renderizador {
      * Pagina de indice: el titulo, un campo TOC (Word lo rehace al abrir; hasta entonces muestra los titulos
      * con hipervinculo y sin numero de pagina), una ayuda y las secciones omitidas.
      */
-    void indice( List<Seccion> secciones ) {
+    void indice( List<Capitulos.Grupo> grupos ) {
       XWPFParagraph h = doc.createParagraph();
       h.setStyle( "PliveIndiceTitulo" );
       correr( h, texto( "contents" ), 0, null, false, false );
       List<String[]> entradas = new ArrayList<>(); // estilo, texto, marcador
       List<String> omitidas = new ArrayList<>();
-      for ( Seccion s : secciones ) {
-        if ( Seccion.OMITIDA.equals( s.estado ) ) {
-          omitidas.add( titulo( s ) + ( PptxDiapos.vacio( s.motivo ) ? "" : ": " + s.motivo.trim() ) );
-        } else {
-          entradas.add( new String[] { "TOC1", titulo( s ), marcadorDe( s ) } );
+      for ( Capitulos.Grupo g : grupos ) {
+        if ( g.capitulo != null ) {
+          entradas.add( new String[] { "TOC1", g.numero + "  " + tituloCapitulo( g.capitulo ), marcadorCapitulo(
+            g.capitulo ) } );
+        }
+        int i = 0;
+        for ( Seccion s : g.secciones ) {
+          if ( Seccion.OMITIDA.equals( s.estado ) ) {
+            String n = titulo( s ) + ( g.capitulo != null ? " (" + tituloCapitulo( g.capitulo ) + ")" : "" );
+            omitidas.add( n + ( PptxDiapos.vacio( s.motivo ) ? "" : ": " + s.motivo.trim() ) );
+          } else {
+            String num = Capitulos.numero( g, i++ );
+            entradas.add( new String[] { g.capitulo != null ? "TOC2" : "TOC1", ( num == null ? "" : num + "  " )
+              + titulo( s ), marcadorDe( s ) } );
+          }
         }
       }
       if ( entradas.isEmpty() ) {
@@ -744,7 +770,7 @@ public final class RenderDocx implements Renderizador {
           CTR ri = x.addNewR();
           CTText it = ri.addNewInstrText();
           it.setSpace( SpaceAttribute.Space.PRESERVE );
-          it.setStringValue( " TOC \\o \"1-1\" \\h \\z \\u " );
+          it.setStringValue( " TOC \\o \"" + ( inf.combinado() ? "1-2" : "1-1" ) + "\" \\h \\z \\u " );
           campo( x, STFldCharType.SEPARATE, false );
         }
         if ( e[ 2 ] != null ) {
@@ -783,7 +809,7 @@ public final class RenderDocx implements Renderizador {
     String marcadorDe( Seccion s ) {
       String m = marcadorSeccion.get( s );
       if ( m == null ) {
-        String base = marcador( "sec-" + Html.idSeguro( s.id ) );
+        String base = marcador( Capitulos.ancla( s ) ); // "sec_flow"; en un capitulo, "sec_d2_flow"
         m = base;
         for ( int i = 2; !marcadores.add( m ); i++ ) {
           m = base + "_" + i;
@@ -802,7 +828,66 @@ public final class RenderDocx implements Renderizador {
       return s.length() > 36 ? s.substring( 0, 36 ) : s;
     }
 
-    // ------------------------------------------------------------------ secciones
+    /** Marcador de la apertura de un capitulo: "cap_d2". */
+    String marcadorCapitulo( Capitulo c ) {
+      return marcador( "cap-" + c.id );
+    }
+
+    String tituloCapitulo( Capitulo c ) {
+      return !PptxDiapos.vacio( c.titulo ) ? c.titulo.trim() : !PptxDiapos.vacio( c.nombreDoc ) ? c.nombreDoc
+        .trim() : c.id;
+    }
+
+    // ------------------------------------------------------------------ capitulos y secciones
+
+    /**
+     * Apertura de un documento en un informe combinado: Heading 1 numerado en pagina nueva, tipo y nombre,
+     * los datos de su portada, sus avisos y un mini indice con vinculos a sus secciones.
+     */
+    void capitulo( Capitulos.Grupo g ) throws Exception {
+      Capitulo c = g.capitulo;
+      XWPFParagraph h = titulo( 1, g.numero + "  " + tituloCapitulo( c ), marcadorCapitulo( c ), true );
+      h.setSpacingAfter( 120 );
+      String tipo = Informe.JOB.equals( c.tipoDoc ) ? rr.s( "doc_job" ) : rr.s( "doc_transformation" );
+      XWPFParagraph pt = doc.createParagraph();
+      correr( pt, tipo.toUpperCase( locale ) + ( PptxDiapos.vacio( c.nombreDoc ) ? "" : "  ·  " + c.nombreDoc
+        .trim() ), 9, tenue, false, false );
+      if ( !PptxDiapos.vacio( c.subtitulo ) ) {
+        XWPFParagraph ps = doc.createParagraph();
+        correr( ps, c.subtitulo, 12, null, false, false );
+      }
+      if ( g.portada != null ) {
+        for ( Bloque b : Html.lista( g.portada.bloques ) ) {
+          if ( b instanceof Lista ) {
+            for ( String it : Html.lista( ( (Lista) b ).items ) ) {
+              XWPFParagraph pd = doc.createParagraph();
+              pd.setStyle( "PliveDato" );
+              conMarcas( pd, PptxDiapos.limpio( it ), 10, null );
+            }
+          } else if ( b != null && !( b instanceof Imagen ) ) {
+            bloque( b, 3 );
+          }
+        }
+        if ( !PptxDiapos.vacio( g.portada.resumen ) ) {
+          XWPFParagraph pr = doc.createParagraph();
+          pr.setStyle( "PliveResumen" );
+          conMarcas( pr, g.portada.resumen, 0, null );
+        }
+      }
+      for ( String a : Html.lista( c.avisos ) ) {
+        aviso( Aviso.WARN, a );
+      }
+      List<Seccion> vivas = g.vivas();
+      for ( int i = 0; i < vivas.size(); i++ ) {
+        XWPFParagraph p = doc.createParagraph();
+        p.setStyle( "TOC2" );
+        CTHyperlink hl = p.getCTP().addNewHyperlink();
+        hl.setAnchor( marcadorDe( vivas.get( i ) ) );
+        hl.addNewR().addNewT().setStringValue( PptxDiapos.limpio( Capitulos.numero( g, i ) + "  " + titulo( vivas
+          .get( i ) ) ) );
+      }
+      ocupado = Double.NaN;
+    }
 
     String titulo( Seccion s ) {
       if ( !PptxDiapos.vacio( s.titulo ) ) {
@@ -840,7 +925,8 @@ public final class RenderDocx implements Renderizador {
           }
         }
       }
-      int sub = Math.min( 3, nivel + 1 );
+      // en un combinado los titulos de bloque son Heading 3 tambien en la parte general: el TOC (1-2) no los lista
+      int sub = inf.combinado() ? 3 : Math.min( 3, nivel + 1 );
       for ( Bloque b : Html.lista( s.bloques ) ) {
         if ( b == null ) {
           continue;

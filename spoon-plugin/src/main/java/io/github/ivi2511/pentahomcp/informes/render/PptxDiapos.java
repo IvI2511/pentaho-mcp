@@ -588,7 +588,7 @@ final class PptxDiapos {
         }
       }
       // presentacion: el detalle de consulta y lo que pasa de MAX_DIAPOS_SECCION va al anexo (o queda fuera)
-      if ( !enAnexo && ( b.anexo || ( diaposSeccion > MAX_DIAPOS_SECCION && !( b instanceof Parrafo )
+      if ( !enAnexo && ( detalle( b ) || ( diaposSeccion > MAX_DIAPOS_SECCION && !( b instanceof Parrafo )
         && !( b instanceof Aviso ) ) ) ) {
         apartar( titulo, b );
         continue;
@@ -685,6 +685,15 @@ final class PptxDiapos {
   }
 
   // ================================================================== anexo
+
+  /**
+   * Detalle de consulta que no va en el cuerpo de la presentacion: {@link Bloque#anexo} y el anexo del
+   * diccionario (una tabla por step: 19 diapositivas en un ejercicio de clase). Va al anexo si el tema lo
+   * pide; si no, queda en el HTML, el PDF y el Word.
+   */
+  static boolean detalle( Bloque b ) {
+    return b.anexo || b.id != null && b.id.startsWith( "dictionary-anexo" );
+  }
 
   /** Aparta un bloque para el anexo; sin anexo, anota su titulo para la nota de la seccion. */
   private void apartar( String seccion, Bloque b ) {
@@ -1397,7 +1406,7 @@ final class PptxDiapos {
     double alto = 0;
     for ( int k = desde; k < bs.size(); k++ ) {
       Bloque b = bs.get( k );
-      if ( b.anexo ) {
+      if ( detalle( b ) ) {
         continue;
       }
       if ( b instanceof Aviso && !vacio( ( (Aviso) b ).texto ) ) {

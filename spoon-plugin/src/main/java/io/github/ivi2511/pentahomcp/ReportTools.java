@@ -9,10 +9,12 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -263,6 +265,19 @@ final class ReportTools {
     /** true si vino "sections": no se completa con los defaults. */
     boolean seccionesExplicitas;
     final List<String> avisos = new ArrayList<>();
+    /** "documents": ids, rutas o nombres de pestana (varios documentos). */
+    final List<String> documentos = new ArrayList<>();
+    /** "include_job_transformations": suma lo que ejecuta cada job. */
+    boolean incluirJob;
+    /** "combine": un solo informe con un capitulo por documento. */
+    boolean combinar;
+    /** "pptx_appendix"; null = lo de los ajustes. */
+    Boolean pptxAnexo;
+
+    /** true si el informe es de varios documentos (o puede serlo: un job con sus transformaciones). */
+    boolean varios() {
+      return !documentos.isEmpty() || incluirJob;
+    }
   }
 
   /** Progreso de una tool: no muestra nada; se cancela si se vence el plazo. */
@@ -293,16 +308,30 @@ final class ReportTools {
         + "an optional narrative. Formats: html (one self-contained file with interactive diagrams), html_light "
         + "(no JavaScript, much smaller), pdf (needs Edge or Chrome; without them you get a printable HTML and a "
         + "warning), md (Markdown plus a folder with the images, for Obsidian or GitHub), pptx (PowerPoint), json "
-        + "(the report data). Use it when the user wants to document, present or hand in an ETL. To add a "
+        + "(the report data), docx (Word with real headings and a contents table Word fills on open), xlsx (one "
+        + "sheet per table plus an index), images (a <name>_imagenes folder with PNG and SVG of every diagram and "
+        + "chart, ready for slides). Several documents at once: 'documents' (and 'include_job_transformations' "
+        + "for what a job runs), one set of files per document or, with combine=true, ONE report with a cover, "
+        + "contents and a chapter per document. Use it when the user wants to document, present or hand in an ETL. To add a "
         + "narrative, call get_report_data first and write it from the real numbers. It does not switch tabs or "
         + "perspectives (show_in_spoon=true only if the user asks to see it in Spoon). By default it runs "
-        + "nothing: metrics=run_copy and profile_step EXECUTE a copy of the transformation and its output steps "
+        + "nothing: metrics=run_copy and profile_step(s) EXECUTE a copy of the transformation and its output steps "
         + "WRITE their files and tables, so use them only if the user agreed. Returns the files written, the "
         + "status of each section and the warnings.",
       esquema( Modo.CONSTRUIR ),
       a -> {
         Tema tema = Ajustes.cargar();
         Peticion op = peticion( a, tema, Modo.CONSTRUIR );
+        if ( op.varios() ) {
+          List<Captura> cs = capturarVarios( a, op );
+          if ( cs.size() > 1 ) {
+            return construirVarios( cs, op, tema );
+          }
+          if ( op.incluirJob ) {
+            op.avisos.add( "include_job_transformations: no local transformation or job file was found to add" );
+          }
+          return construir( cs.get( 0 ), op, tema );
+        }
         Captura c = capturar( a );
         final Informe[] hecho = new Informe[ 1 ];
         ObjectNode o = construir( c, op, tema, hecho );
@@ -384,13 +413,28 @@ final class ReportTools {
       for ( Formato f : Formato.values() ) {
         fs.add( f.clave );
       }
-      sc.raw( "formats", listaEnum( "Formats to write: html, html_light, pdf, md, pptx, json (one or more).", fs,
-        true ), true );
+      sc.raw( "formats", listaEnum( "Formats to write (one or more): html, html_light, pdf, md, pptx, docx (Word "
+        + "with real headings and a contents table Word fills on open), xlsx (one sheet per table plus an index), "
+        + "images (a <name>_imagenes folder with PNG and SVG of every diagram and chart, ready for slides), json.",
+        fs, true ), true );
       sc.str( "output_dir", "Absolute folder for the files (created if missing); a relative path is an error. "
         + "Default: the folder in the user's report settings, or else an 'informes' folder next to the "
         + ".ktr/.kjb.", false );
       sc.str( "file_name", "Base name of the files, without extension (default: the name of the .ktr/.kjb). "
-        + "Existing files with the same name are overwritten, so links to them keep working.", false );
+        + "Existing files with the same name are overwritten, so links to them keep working. With several "
+        + "documents it is used only when combine=true.", false );
+      ObjectNode docs = Tools.obj().put( "type", "array" ).put( "description", "Several documents in one call: "
+        + "ids, .ktr/.kjb paths (open in Spoon or not) or tab names, in report order. Do not pass 'document' "
+        + "too. Without combine, one set of files per document." ).put( "minItems", 1 ).put( "maxItems",
+          InformeServicio.MAX_DOCUMENTOS );
+      docs.putObject( "items" ).put( "type", "string" );
+      sc.raw( "documents", docs, false );
+      sc.bool( "include_job_transformations", "Also report the transformations and sub-jobs that each job runs "
+        + "(local files that exist, in run order, up to 3 levels). Default false.", false );
+      sc.bool( "combine", "With several documents: ONE report with a general cover, a table of contents and one "
+        + "chapter per document, instead of one set of files per document. Default false.", false );
+      sc.bool( "pptx_appendix", "PowerPoint: put the long reference tables in an appendix at the end instead of "
+        + "leaving them out. Default: the user's report settings (off).", false );
     }
     sc.strEnum( "language", "Language of the report texts (titles, labels, automatic summaries): en, es or pt. "
       + "Default: the one in the user's report settings, or else Spoon's language. Names written by the user "
@@ -408,6 +452,11 @@ final class ReportTools {
         + "values). Adds the profile section. It RUNS a copy of the transformation up to that step, reading "
         + "profile_rows rows; output steps upstream of it write their files or tables. Only if the user agreed.",
         false );
+      ObjectNode ps = Tools.obj().put( "type", "array" ).put( "description", "Several steps to profile in ONE run "
+        + "of the copy (joined with profile_step). Same warning: output steps upstream of them WRITE. Only if the "
+        + "user agreed." ).put( "minItems", 1 ).put( "maxItems", 10 );
+      ps.putObject( "items" ).put( "type", "string" );
+      sc.raw( "profile_steps", ps, false );
       sc.raw( "profile_rows", Tools.obj().put( "type", "integer" ).put( "minimum", 1 ).put( "maximum", PERFIL_MAX )
         .put( "description", "How many rows the profile reads (the first N). Default 5000." ), false );
       sc.strEnum( "metrics", "Source of the run metrics: last_run (default: the last run made in Spoon, if "
@@ -520,13 +569,20 @@ final class ReportTools {
     p.titulo = titulo == null ? null : titulo.trim();
     p.linajeStep = sinBlancos( Tools.optStr( a, "lineage_step", null ) );
     p.perfilStep = sinBlancos( Tools.optStr( a, "profile_step", null ) );
+    List<String> pasos = listaTextos( a, "profile_steps" ); // sin pasar a minusculas: son nombres de step
+    if ( pasos != null ) {
+      if ( pasos.size() > 10 ) {
+        throw new ToolError( "'profile_steps' takes at most 10 steps, got " + pasos.size() );
+      }
+      p.perfilSteps.addAll( pasos );
+    }
     int filasDef = tema != null && tema.perfil != null && tema.perfil.filas > 0 ? tema.perfil.filas : 5000;
     int filas = Tools.optInt( a, "profile_rows", filasDef );
     if ( filas < 1 || filas > PERFIL_MAX ) {
       throw new ToolError( "'profile_rows' must be between 1 and " + PERFIL_MAX + ", got: " + filas );
     }
     p.perfilFilas = filas;
-    if ( p.perfilStep != null ) {
+    if ( !p.pasosPerfil().isEmpty() ) {
       if ( p.secciones != null && !p.secciones.contains( SeccionId.PERFIL ) ) {
         p.secciones = ordenar( mas( p.secciones, SeccionId.PERFIL ) ); // profile_step = quiere el perfil
       }
@@ -546,7 +602,88 @@ final class ReportTools {
     }
     p.destinoConsultarBase = Tools.optBool( a, "query_database", false );
     op.mostrar = Tools.optBool( a, "show_in_spoon", false );
+    if ( a != null && a.has( "pptx_appendix" ) && !a.get( "pptx_appendix" ).isNull() ) {
+      op.pptxAnexo = Tools.optBool( a, "pptx_appendix", false );
+    }
+    List<String> docs = listaTextos( a, "documents" );
+    if ( docs != null ) {
+      if ( Tools.optStr( a, "document", null ) != null ) {
+        throw new ToolError( "Pass either 'document' or 'documents', not both" );
+      }
+      for ( String d : docs ) {
+        if ( !op.documentos.contains( d ) ) {
+          op.documentos.add( d );
+        }
+      }
+      if ( op.documentos.size() > InformeServicio.MAX_DOCUMENTOS ) {
+        throw new ToolError( "'documents' takes at most " + InformeServicio.MAX_DOCUMENTOS + " documents, got "
+          + op.documentos.size() );
+      }
+    }
+    op.incluirJob = Tools.optBool( a, "include_job_transformations", false );
+    op.combinar = Tools.optBool( a, "combine", false );
+    if ( op.documentos.size() > 1 ) {
+      validarVarios( op );
+    }
     return op;
+  }
+
+  /** Con varios documentos no van las opciones que ejecutan algo o que eligen un step de UN documento. */
+  static void validarVarios( Peticion op ) throws ToolError {
+    Pedido p = op.pedido;
+    if ( p.linajeStep != null ) {
+      throw new ToolError( "'lineage_step' works only with a single document (it names a step of one of them)" );
+    }
+    if ( !p.pasosPerfil().isEmpty() ) {
+      throw new ToolError( "'profile_step'/'profile_steps' work only with a single document (they run a copy of "
+        + "it)" );
+    }
+    if ( Pedido.METRICAS_COPIA.equals( p.metricas ) ) {
+      throw new ToolError( "metrics=run_copy works only with a single document (it runs a copy of it)" );
+    }
+    if ( op.mostrar ) {
+      throw new ToolError( "show_in_spoon works only with a single document" );
+    }
+  }
+
+  /**
+   * Un argumento lista de textos tal cual (nombres de step, rutas): array de strings, o un string con un
+   * array JSON o un solo valor. Sin repetidos ni vacios; null si no vino.
+   */
+  static List<String> listaTextos( JsonNode a, String k ) throws ToolError {
+    JsonNode v = a == null ? null : a.get( k );
+    if ( v == null || v.isNull() ) {
+      return null;
+    }
+    if ( v.isTextual() ) {
+      String t = v.asText().trim();
+      if ( t.startsWith( "[" ) ) {
+        try {
+          v = McpHttpServer.JSON.readTree( t );
+        } catch ( Exception e ) {
+          throw new ToolError( "'" + k + "' must be an array of strings, got: " + t );
+        }
+      } else {
+        List<String> out = new ArrayList<>();
+        if ( !t.isEmpty() ) {
+          out.add( t );
+        }
+        return out;
+      }
+    }
+    if ( !v.isArray() ) {
+      throw new ToolError( "'" + k + "' must be an array of strings, got: " + v );
+    }
+    List<String> out = new ArrayList<>();
+    for ( JsonNode x : v ) {
+      if ( !x.isTextual() || x.asText().trim().isEmpty() ) {
+        throw new ToolError( "'" + k + "' must be an array of strings, got: " + v );
+      }
+      if ( !out.contains( x.asText().trim() ) ) {
+        out.add( x.asText().trim() );
+      }
+    }
+    return out;
   }
 
   /** El idioma del informe cuando no viene "language": el de los ajustes, si no el de Spoon, si no en. */
@@ -778,7 +915,7 @@ final class ReportTools {
     o.put( "name", c.nombre );
     o.put( "output_dir", dir.getPath() );
     ArrayNode files = o.putArray( "files" );
-    Tema t = tema.copia();
+    Tema t = temaDe( tema, op );
     Thread hilo = Thread.currentThread();
     ClassLoader antes = hilo.getContextClassLoader();
     hilo.setContextClassLoader( ReportTools.class.getClassLoader() ); // POI (JAXB) lo necesita
@@ -794,7 +931,7 @@ final class ReportTools {
             ObjectNode x = files.addObject();
             x.put( "format", f.clave );
             x.put( "path", principal.getPath() );
-            x.put( "bytes", principal.length() );
+            x.put( "bytes", principal.isDirectory() ? r.bytes : principal.length() );
             if ( r.archivos.size() > 1 ) {
               x.put( "extra_files", r.archivos.size() - 1 );
             }
@@ -828,6 +965,242 @@ final class ReportTools {
       throw new ToolError( "No file was written. " + String.join( "; ", avisos ) );
     }
     return o;
+  }
+
+  /** Copia del tema con lo que pidio la IA para esta llamada (pptx_appendix). */
+  private static Tema temaDe( Tema tema, Peticion op ) {
+    Tema t = tema.copia();
+    if ( op.pptxAnexo != null ) {
+      if ( t.salida == null ) {
+        t.salida = new Tema.Salida();
+      }
+      t.salida.pptxAnexo = op.pptxAnexo;
+    }
+    return t;
+  }
+
+  // ---------------------------------------------------------------- varios documentos
+
+  /**
+   * Las capturas de 'documents' (o de 'document' / el activo), en orden; con include_job_transformations,
+   * despues de cada job lo que ejecuta (archivos locales que existen, leidos sin abrir pestana). Sin
+   * repetidos y con el tope de {@link InformeServicio#MAX_DOCUMENTOS}.
+   */
+  static List<Captura> capturarVarios( JsonNode a, Peticion op ) throws Exception {
+    List<Captura> base = new ArrayList<>();
+    if ( op.documentos.isEmpty() ) {
+      base.add( capturar( a ) );
+    } else {
+      for ( String ref : op.documentos ) {
+        base.add( capturarRef( ref ) );
+      }
+    }
+    List<Captura> out = new ArrayList<>();
+    Set<String> vistos = new HashSet<>();
+    for ( Captura c : base ) {
+      if ( !vistos.add( claveDoc( c ) ) ) {
+        continue;
+      }
+      out.add( c );
+      if ( op.incluirJob && c.esJob() ) {
+        for ( String ruta : InformeServicio.transformacionesDeJob( c, true ) ) {
+          if ( vistos.contains( claveArchivo( ruta ) ) ) {
+            continue;
+          }
+          Captura h = capturarAbiertoOArchivo( ruta );
+          if ( vistos.add( claveDoc( h ) ) ) {
+            out.add( h );
+          }
+        }
+      }
+      if ( out.size() > InformeServicio.MAX_DOCUMENTOS ) {
+        throw new ToolError( "Too many documents: at most " + InformeServicio.MAX_DOCUMENTOS + " per report" );
+      }
+    }
+    if ( out.size() > 1 ) {
+      validarVarios( op );
+    }
+    return out;
+  }
+
+  /** Un documento de 'documents': abierto en Spoon (id, ruta, nombre de pestana) o un .ktr/.kjb del disco. */
+  static Captura capturarRef( String ref ) throws Exception {
+    final ObjectNode a = Tools.obj();
+    a.put( "document", ref );
+    try {
+      return capturar( a );
+    } catch ( Exception e ) {
+      File f = new File( ref.trim() );
+      String n = f.getName().toLowerCase( Locale.ROOT );
+      if ( f.isAbsolute() && f.isFile() && ( n.endsWith( ".ktr" ) || n.endsWith( ".kjb" ) ) ) {
+        return InformeServicio.capturarArchivo( f.getPath(), UiThread.display() );
+      }
+      throw e;
+    }
+  }
+
+  /** Una ruta que ejecuta un job: la pestana si esta abierta (con sus cambios), si no el archivo. */
+  private static Captura capturarAbiertoOArchivo( String ruta ) throws Exception {
+    try {
+      final ObjectNode a = Tools.obj();
+      a.put( "document", ruta );
+      return capturar( a );
+    } catch ( Exception e ) {
+      return InformeServicio.capturarArchivo( ruta, UiThread.display() );
+    }
+  }
+
+  private static String claveDoc( Captura c ) {
+    return c.archivo != null ? claveArchivo( c.archivo ) : "id:" + c.docId;
+  }
+
+  private static String claveArchivo( String ruta ) {
+    try {
+      return "file:" + new File( ruta ).getCanonicalPath().toLowerCase( Locale.ROOT );
+    } catch ( Exception e ) {
+      return "file:" + new File( ruta ).getAbsolutePath().toLowerCase( Locale.ROOT );
+    }
+  }
+
+  /**
+   * build_report de varios documentos: arma cada uno (secciones pedidas que aplican a ese documento) y
+   * escribe un juego de archivos por documento o, con combine, un solo informe con un capitulo por
+   * documento. Fuera de la UI.
+   */
+  static ObjectNode construirVarios( List<Captura> cs, Peticion op, Tema tema ) throws Exception {
+    File dir = carpetaSalida( op.carpeta, tema, cs.get( 0 ) );
+    if ( !dir.isDirectory() && !dir.mkdirs() ) {
+      throw new ToolError( "Could not create the folder " + dir );
+    }
+    List<String> avisos = new ArrayList<>( op.avisos );
+    if ( !op.combinar && op.archivo != null ) {
+      avisos.add( "file_name is ignored: with several documents each one keeps its own name (use combine=true "
+        + "for one file)" );
+    }
+    if ( op.pedido.narrativa != null && ( op.pedido.narrativa.resumen != null || !op.pedido.narrativa.porSeccion
+      .isEmpty() ) ) {
+      avisos.add( "narrative summary and sections are ignored with several documents; only conclusions are used"
+        + ( op.combinar ? "" : " (and only with combine=true)" ) );
+    }
+    ProgresoMcp pr = new ProgresoMcp();
+    List<Informe> partes = new ArrayList<>();
+    ObjectNode o = Tools.obj();
+    o.put( "combined", op.combinar );
+    o.put( "output_dir", dir.getPath() );
+    ArrayNode files = o.putArray( "files" );
+    ArrayNode documentos = o.putArray( "documents" );
+    for ( Captura c : cs ) {
+      Pedido p = pedidoDe( op, c );
+      List<String> av = new ArrayList<>();
+      avisosDeCaptura( c, op, av );
+      Informe inf = armar( c, p, pr );
+      partes.add( inf );
+      ObjectNode d = documentos.addObject();
+      d.put( "document", c.docId );
+      d.put( "name", c.nombre );
+      d.set( "sections", estados( inf ) );
+      ArrayNode w = d.putArray( "warnings" );
+      for ( String x : av ) {
+        w.add( x );
+      }
+      if ( inf.avisos != null ) {
+        for ( String x : inf.avisos ) {
+          w.add( x );
+        }
+      }
+    }
+    Tema t = temaDe( tema, op );
+    if ( op.combinar ) {
+      Informe comb = InformeServicio.combinar( partes, op.pedido.titulo, op.pedido.idioma, t );
+      InformeServicio.conclusionesCombinadas( comb, op.pedido.narrativa );
+      String base = op.archivo == null ? InformeServicio.nombreBase( comb, tema ) : nombreBase( op.archivo, tema,
+        new Date() );
+      escribirFormatos( comb, t, op, dir, base, pr, files, avisos );
+      o.put( "name", comb.titulo );
+      o.set( "sections", estados( comb ) );
+    } else {
+      List<String> bases = new ArrayList<>();
+      for ( Informe inf : partes ) {
+        bases.add( InformeServicio.nombreBase( inf, tema ) );
+      }
+      bases = InformeServicio.basesUnicas( bases );
+      for ( int i = 0; i < partes.size(); i++ ) {
+        ArrayNode suyos = ( (ObjectNode) documentos.get( i ) ).putArray( "files" );
+        List<String> av = new ArrayList<>();
+        escribirFormatos( partes.get( i ), t, op, dir, bases.get( i ), pr, suyos, av );
+        for ( JsonNode x : suyos ) {
+          files.add( x.deepCopy() );
+        }
+        ArrayNode w = (ArrayNode) documentos.get( i ).get( "warnings" );
+        for ( String x : av ) {
+          w.add( x );
+        }
+      }
+    }
+    ArrayNode w = o.putArray( "warnings" );
+    for ( String x : avisos ) {
+      w.add( x );
+    }
+    if ( files.size() == 0 ) {
+      throw new ToolError( "No file was written. " + String.join( "; ", avisos ) );
+    }
+    return o;
+  }
+
+  /** El pedido de un documento de la tanda: las secciones pedidas que le aplican; sin los steps de uno solo. */
+  private static Pedido pedidoDe( Peticion op, Captura c ) {
+    Pedido b = op.pedido;
+    Pedido p = new Pedido();
+    p.idioma = b.idioma;
+    p.secciones = b.secciones == null ? null : InformeServicio.queAplican( c, b.secciones, b.idioma );
+    if ( p.secciones != null ) {
+      p.secciones.remove( SeccionId.NARRATIVA ); // las conclusiones van al informe combinado, no a cada uno
+    }
+    p.metricas = b.metricas;
+    p.destinoConsultarBase = b.destinoConsultarBase;
+    p.perfilFilas = b.perfilFilas;
+    p.timeoutMs = b.timeoutMs;
+    return p;
+  }
+
+  /** Escribe cada formato de op en dir/base.*; agrega cada archivo a files y los avisos a avisos. */
+  private static void escribirFormatos( Informe inf, Tema t, Peticion op, File dir, String base, ProgresoMcp pr,
+    ArrayNode files, List<String> avisos ) {
+    Thread hilo = Thread.currentThread();
+    ClassLoader antes = hilo.getContextClassLoader();
+    hilo.setContextClassLoader( ReportTools.class.getClassLoader() ); // POI (JAXB) lo necesita
+    try {
+      for ( Formato f : op.formatos ) {
+        File destino = InformeServicio.archivo( dir, base, f );
+        try {
+          Resultado r = InformeServicio.exportar( inf, t, f, destino, pr );
+          if ( r == null || r.archivos == null || r.archivos.isEmpty() ) {
+            avisos.add( f.clave + ": nothing was written" );
+          } else {
+            File principal = r.archivos.get( 0 );
+            ObjectNode x = files.addObject();
+            x.put( "format", f.clave );
+            x.put( "path", principal.getPath() );
+            x.put( "bytes", principal.isDirectory() ? r.bytes : principal.length() );
+            if ( r.archivos.size() > 1 ) {
+              x.put( "extra_files", r.archivos.size() - 1 );
+            }
+          }
+          if ( r != null && r.avisos != null ) {
+            for ( String w : r.avisos ) {
+              avisos.add( f.clave + ": " + w );
+            }
+          }
+        } catch ( Throwable e ) {
+          if ( !( e instanceof ToolError ) ) {
+            McpLifecycleListener.LOG.logError( "build_report: fallo el formato " + f.clave, e );
+          }
+          avisos.add( f.clave + ": " + mensaje( e ) );
+        }
+      }
+    } finally {
+      hilo.setContextClassLoader( antes );
+    }
   }
 
   /** get_report_data sobre una captura ya tomada. Fuera de la UI. */
@@ -901,6 +1274,9 @@ final class ReportTools {
       ObjectNode x = a.addObject();
       x.put( "id", s.id );
       x.put( "status", estado( s.estado ) );
+      if ( s.capitulo != null ) {
+        x.put( "chapter", s.capitulo );
+      }
       if ( s.motivo != null && !s.motivo.isEmpty() ) {
         x.put( "reason", s.motivo );
       }
@@ -947,7 +1323,7 @@ final class ReportTools {
    * file_name se usa InformeServicio.nombreBase, el mismo nombre que pone el panel.
    */
   static String nombreBase( String argumento, Tema tema, Date fecha ) throws ToolError {
-    String n = new File( argumento.trim() ).getName().replaceFirst( "(?i)\\.(html?|pdf|md|pptx|json)$", "" );
+    String n = new File( argumento.trim() ).getName().replaceFirst( "(?i)\\.(html?|pdf|md|pptx|docx|xlsx|json)$", "" );
     n = limpiarNombre( n );
     if ( n.isEmpty() ) {
       throw new ToolError( "'file_name' is not a valid file name: " + argumento );
@@ -1016,7 +1392,7 @@ final class ReportTools {
       "nivel", "level", "clase", "kind", "imagen", "image", "alternativa", "fallback_table", "ancho", "width",
       "alto", "height", "escala", "scale", "unidad", "unit", "categorias", "categories", "nombre", "name",
       "valores", "values", "tramos", "spans", "categoria", "category", "inicioMs", "start_ms", "finMs",
-      "end_ms" };
+      "end_ms", "capitulos", "chapters", "capitulo", "chapter", "anexo", "appendix" };
     for ( int i = 0; i < c.length; i += 2 ) {
       CLAVES.put( c[ i ], c[ i + 1 ] );
     }

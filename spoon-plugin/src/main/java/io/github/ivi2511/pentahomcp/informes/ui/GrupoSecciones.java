@@ -18,6 +18,8 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Spinner;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 import org.pentaho.di.trans.TransMeta;
 
@@ -44,7 +46,8 @@ final class GrupoSecciones {
   final Group grupo;
   final Map<String, Button> checks = new LinkedHashMap<String, Button>();
   final Combo linaje;
-  final Combo perfilStep;
+  /** Steps a perfilar: una tabla con casillas (varios en una sola corrida). */
+  final Table perfilSteps;
   final Spinner perfilFilas;
   final Label ultimaCorrida;
   final Button medir;
@@ -68,7 +71,7 @@ final class GrupoSecciones {
 
     // un renglon por seccion; los controles propios van debajo, con sangria (la columna es angosta)
     Combo cLinaje = null;
-    Combo cPerfil = null;
+    Table tPerfil = null;
     Spinner sFilas = null;
     Label lUltima = null;
     Button bMedir = null;
@@ -101,20 +104,21 @@ final class GrupoSecciones {
           }
         } );
       } else if ( SeccionId.PERFIL.equals( id ) ) {
-        extra = sangria( grupo, 2 );
-        cPerfil = new Combo( extra, SWT.READ_ONLY | SWT.DROP_DOWN );
-        cPerfil.setToolTipText( r.s( "profile_step_tip" ) );
-        cPerfil.setData( PanelInformes.CLAVE, "perfil_step" );
-        cPerfil.setVisibleItemCount( 15 );
-        cPerfil.setLayoutData( ancho( 100 ) );
+        extra = sangria( grupo, 1 );
+        tPerfil = new Table( extra, SWT.CHECK | SWT.BORDER | SWT.V_SCROLL );
+        tPerfil.setToolTipText( r.s( "profile_steps_tip" ) );
+        tPerfil.setData( PanelInformes.CLAVE, "perfil_steps" );
+        GridData gt = ancho( 120 );
+        gt.heightHint = tPerfil.getItemHeight() * 5 + 4; // unas 5 filas; despues, scroll
+        tPerfil.setLayoutData( gt );
         sFilas = new Spinner( extra, SWT.BORDER );
         sFilas.setValues( 5000, 100, 1000000, 0, 1000, 10000 );
         sFilas.setToolTipText( r.s( "profile_rows_tip" ) );
         sFilas.setData( PanelInformes.CLAVE, "perfil_filas" );
-        final Combo perfil = cPerfil;
+        final Table perfil = tPerfil;
         b.addListener( SWT.Selection, e -> {
-          if ( b.getSelection() && perfil.getSelectionIndex() < 0 && perfil.getItemCount() > 0 ) {
-            perfil.select( perfil.getItemCount() - 1 ); // el ultimo step suele ser la salida
+          if ( b.getSelection() && marcados( perfil ).isEmpty() && perfil.getItemCount() > 0 ) {
+            perfil.getItem( perfil.getItemCount() - 1 ).setChecked( true ); // el ultimo step suele ser la salida
           }
           if ( b.getSelection() ) {
             panel.perfilMarcado(); // §2.4.3: avisa que muestra valores reales
@@ -136,7 +140,7 @@ final class GrupoSecciones {
       filas.put( id, extra == null ? new Control[] { b } : new Control[] { b, extra } );
     }
     linaje = cLinaje;
-    perfilStep = cPerfil;
+    perfilSteps = tPerfil;
     perfilFilas = sFilas;
     ultimaCorrida = lUltima;
     medir = bMedir;
@@ -209,7 +213,7 @@ final class GrupoSecciones {
     }
     linaje.setEnabled( checks.get( SeccionId.LINAJE ).isEnabled() && linaje.getItemCount() > 1 );
     boolean perfil = checks.get( SeccionId.PERFIL ).isEnabled();
-    perfilStep.setEnabled( perfil && perfilStep.getItemCount() > 0 );
+    perfilSteps.setEnabled( perfil && perfilSteps.getItemCount() > 0 );
     perfilFilas.setEnabled( perfil );
     consultarBase.setEnabled( checks.get( SeccionId.DESTINO ).isEnabled() );
     if ( !consultarBase.isEnabled() ) {
@@ -237,10 +241,10 @@ final class GrupoSecciones {
         linaje.select( i );
       }
     }
-    if ( p.perfilStep != null ) {
-      int i = perfilStep.indexOf( p.perfilStep );
-      if ( i >= 0 ) {
-        perfilStep.select( i );
+    List<String> pasos = p.pasosPerfil();
+    if ( !pasos.isEmpty() ) {
+      for ( TableItem it : perfilSteps.getItems() ) {
+        it.setChecked( pasos.contains( it.getText() ) );
       }
     }
     if ( p.perfilFilas > 0 ) {
@@ -276,10 +280,25 @@ final class GrupoSecciones {
     return i <= 0 ? null : linaje.getItem( i );
   }
 
-  /** null si no se eligio step. */
+  /** Los steps marcados para el perfil, en el orden del documento (vacia si ninguno). */
+  List<String> perfilSteps() {
+    return marcados( perfilSteps );
+  }
+
+  /** El primero de {@link #perfilSteps()}, o null. */
   String perfilStep() {
-    int i = perfilStep.getSelectionIndex();
-    return i < 0 ? null : perfilStep.getItem( i );
+    List<String> l = perfilSteps();
+    return l.isEmpty() ? null : l.get( 0 );
+  }
+
+  private static List<String> marcados( Table t ) {
+    List<String> out = new ArrayList<String>();
+    for ( TableItem it : t.getItems() ) {
+      if ( it.getChecked() ) {
+        out.add( it.getText() );
+      }
+    }
+    return out;
   }
 
   int perfilFilas() {
@@ -344,12 +363,12 @@ final class GrupoSecciones {
   private void llenarSteps( Captura c ) {
     String antesLinaje = linajeStep();
     linaje.removeAll();
-    perfilStep.removeAll();
+    perfilSteps.removeAll();
     linaje.add( r.s( "lineage_final" ) );
     if ( c != null && c.copia instanceof TransMeta ) {
       for ( String s : ( (TransMeta) c.copia ).getStepNames() ) {
         linaje.add( s );
-        perfilStep.add( s );
+        new TableItem( perfilSteps, SWT.NONE ).setText( s );
       }
     }
     int i = antesLinaje == null ? -1 : linaje.indexOf( antesLinaje );

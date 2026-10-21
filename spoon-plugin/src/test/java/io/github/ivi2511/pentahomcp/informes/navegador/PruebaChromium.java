@@ -562,11 +562,12 @@ public class PruebaChromium {
     }
     try {
       // IE solo hace el layout (y getBBox da ancho) con la ventana abierta: se abre fuera de la pantalla,
-      // como ventana de herramientas (sin boton en la barra de tareas).
+      // como ventana de herramientas (sin boton en la barra de tareas) y sin activarla: open() la traeria al
+      // frente con el foco; setVisible(true) de una Shell no modal muestra con SW_SHOWNOACTIVATE.
       Shell s = new Shell( d, SWT.NO_TRIM | SWT.TOOL );
       s.setLayout( new FillLayout() );
-      s.setBounds( -12000, -12000, 1200, 900 );
-      s.open();
+      s.setBounds( -20000, -20000, 1200, 900 );
+      s.setVisible( true );
       Browser b;
       try {
         b = new Browser( s, SWT.NONE );
@@ -613,20 +614,22 @@ public class PruebaChromium {
     }
   }
 
-  /** Solo a pedido (-Dpruebas.ie.captura=true): muestra la ventana un instante y guarda una captura. */
+  /**
+   * Solo a pedido (-Dpruebas.ie.captura=true): guarda una captura del Browser dibujado sobre una imagen
+   * ({@code Control.print(GC)}), con la ventana fuera de la pantalla.
+   */
   private static void capturar( Display d, Shell s, Browser b, File captura ) throws Exception {
-    s.setLocation( 0, 0 );
     for ( int i = 0; i < 40; i++ ) {
       while ( d.readAndDispatch() ) {
         // bombear
       }
       Thread.sleep( 25 );
     }
-    org.eclipse.swt.graphics.GC gc = new org.eclipse.swt.graphics.GC( b );
     org.eclipse.swt.graphics.Point t = b.getSize();
     org.eclipse.swt.graphics.Image img = new org.eclipse.swt.graphics.Image( d, t.x, t.y );
+    org.eclipse.swt.graphics.GC gc = new org.eclipse.swt.graphics.GC( img );
     try {
-      gc.copyArea( img, 0, 0 );
+      b.print( gc );
       org.eclipse.swt.graphics.ImageLoader il = new org.eclipse.swt.graphics.ImageLoader();
       il.data = new org.eclipse.swt.graphics.ImageData[] { img.getImageData() };
       try ( OutputStream out = new FileOutputStream( captura ) ) {

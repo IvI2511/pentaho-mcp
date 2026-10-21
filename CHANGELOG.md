@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-21
+
+<!-- Lo completa el integrador (pulido de Informes tras las pruebas del usuario). -->
+
+### Added
+
+- **Arrange canvas (Pentaho Live)** in Spoon: a button on the transformation and job canvas toolbars and an item in the canvas right-click menu run the same auto-layout as `arrange_canvas` (one Ctrl+Z).
+- TODO (integrator): Word/Excel/image export, combined documents, own diagram engine...
+
+### Changed
+
+- Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root, `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`.
+- TODO (integrator)
+
+### Fixed
+
+- TODO (integrator)
+
 ## [0.5.0] - 2026-10-21
 
 ### Added

@@ -116,94 +116,106 @@ public final class RenderImagenes implements Renderizador {
       throw new IOException( "No se pudo crear la carpeta " + dir );
     }
     Resultado res = new Resultado().archivo( dir );
-    Set<String> usados = new HashSet<>();
-    int n = 0;
     int sinDibujo = 0;
     int soloSvg = 0;
-    List<Seccion> vivas = RenderDocx.vivas( RenderDocx.cuerpo( inf ) );
-    for ( int k = 0; k < vivas.size(); k++ ) {
-      Seccion s = vivas.get( k );
-      String titulo = !PptxDiapos.vacio( s.titulo ) ? s.titulo.trim() : SeccionId.titulo( s.id, idioma );
-      pr.paso( r.f( "progreso", titulo ), k, vivas.size() );
-      String sec = Html.idSeguro( titulo );
-      for ( Bloque b : Html.lista( s.bloques ) ) {
-        if ( pr.cancelado() ) {
-          throw new CancellationException( "Imagenes" );
-        }
-        if ( b instanceof Diagrama ) {
-          Diagrama d = (Diagrama) b;
-          if ( d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0 ) {
-            String base = nombre( usados, ++n, sec, r.s( "lienzo" ) );
-            escribir( res, new File( dir, base + extension( d.imagen.mime ) ), d.imagen.datos );
+    // informe combinado: una subcarpeta «N_documento» por capitulo, con su propia numeracion
+    List<Capitulos.Grupo> grupos = Capitulos.grupos( inf );
+    int total = 0;
+    for ( Capitulos.Grupo g : grupos ) {
+      total += g.vivas().size();
+    }
+    int k = 0;
+    Set<String> carpetas = new HashSet<>();
+    for ( Capitulos.Grupo g : grupos ) {
+      File carpeta = g.capitulo == null ? dir : new File( dir, subcarpeta( carpetas, g ) );
+      if ( !carpeta.isDirectory() && !carpeta.mkdirs() && !carpeta.isDirectory() ) {
+        throw new IOException( "No se pudo crear la carpeta " + carpeta );
+      }
+      Set<String> usados = new HashSet<>();
+      int n = 0;
+      for ( Seccion s : g.vivas() ) {
+        String titulo = !PptxDiapos.vacio( s.titulo ) ? s.titulo.trim() : SeccionId.titulo( s.id, idioma );
+        pr.paso( r.f( "progreso", titulo ), k++, total );
+        String sec = Html.idSeguro( titulo );
+        for ( Bloque b : Html.lista( s.bloques ) ) {
+          if ( pr.cancelado() ) {
+            throw new CancellationException( "Imagenes" );
           }
-          List<Dibujo> ds = Figuras.dibujos( d, Objetivo.DIAPOSITIVA, idioma );
-          if ( ds != null ) {
-            String base = nombre( usados, ++n, sec, que( b, r.s( "diagrama" ) ) );
-            for ( Dibujo x : ds ) {
-              String nb = ds.size() > 1 ? base + "-" + x.parte : base;
-              byte[] png;
-              try {
-                png = x.png( 2 );
-              } catch ( Throwable e ) {
-                png = null;
-              }
-              if ( png != null && png.length > 0 ) {
-                escribir( res, new File( dir, nb + ".png" ), png );
-              } else {
-                soloSvg++;
-              }
-              escribir( res, new File( dir, nb + ".svg" ), suelto( x.svgEscalado() ).getBytes(
-                StandardCharsets.UTF_8 ) );
+          if ( b instanceof Diagrama ) {
+            Diagrama d = (Diagrama) b;
+            if ( d.imagen != null && d.imagen.datos != null && d.imagen.datos.length > 0 ) {
+              String base = nombre( usados, ++n, sec, r.s( "lienzo" ) );
+              escribir( res, new File( carpeta, base + extension( d.imagen.mime ) ), d.imagen.datos );
             }
-            continue;
-          }
-          if ( PptxDiapos.vacio( d.mermaid ) ) {
-            continue;
-          }
-          byte[] png = d.id == null ? null : pngMermaid.get( d.id );
-          String svg = d.id == null ? null : svgMermaid.get( d.id );
-          boolean hayPng = png != null && png.length > 0;
-          boolean haySvg = svg != null && svg.contains( "<svg" );
-          if ( !hayPng && !haySvg ) {
-            sinDibujo++;
-            continue;
-          }
-          String base = nombre( usados, ++n, sec, que( b, r.s( "diagrama" ) ) );
-          if ( hayPng ) {
-            escribir( res, new File( dir, base + ".png" ), png );
-          }
-          if ( haySvg ) {
-            escribir( res, new File( dir, base + ".svg" ), suelto( svg ).getBytes( StandardCharsets.UTF_8 ) );
-          }
-        } else if ( b instanceof Grafico ) {
-          String svg;
-          try {
-            svg = svgs.svg( (Grafico) b, t, GraficosSvg.ANCHO );
-          } catch ( Exception e ) {
-            svg = null;
-          }
-          if ( svg == null || !svg.contains( "<svg" ) ) {
-            sinDibujo++;
-            continue;
-          }
-          String base = nombre( usados, ++n, sec, que( b, r.s( "grafico" ) ) );
-          escribir( res, new File( dir, base + ".svg" ), suelto( svg ).getBytes( StandardCharsets.UTF_8 ) );
-          byte[] png;
-          try {
-            png = SvgAPng.png( svg, ANCHO_PNG_GRAFICO );
-          } catch ( Throwable e ) {
-            png = null;
-          }
-          if ( png != null && png.length > 0 ) {
-            escribir( res, new File( dir, base + ".png" ), png );
-          } else {
-            soloSvg++; // queda el SVG
-          }
-        } else if ( b instanceof Imagen ) {
-          Imagen im = (Imagen) b;
-          if ( im.datos != null && im.datos.length > 0 ) {
-            String base = nombre( usados, ++n, sec, que( b, r.s( "imagen" ) ) );
-            escribir( res, new File( dir, base + extension( im.mime ) ), im.datos );
+            List<Dibujo> ds = Figuras.dibujos( d, Objetivo.DIAPOSITIVA, idioma );
+            if ( ds != null ) {
+              String base = nombre( usados, ++n, sec, que( b, r.s( "diagrama" ) ) );
+              for ( Dibujo x : ds ) {
+                String nb = ds.size() > 1 ? base + "-" + x.parte : base;
+                byte[] png;
+                try {
+                  png = x.png( 2 );
+                } catch ( Throwable e ) {
+                  png = null;
+                }
+                if ( png != null && png.length > 0 ) {
+                  escribir( res, new File( carpeta, nb + ".png" ), png );
+                } else {
+                  soloSvg++;
+                }
+                escribir( res, new File( carpeta, nb + ".svg" ), suelto( x.svgEscalado() ).getBytes(
+                  StandardCharsets.UTF_8 ) );
+              }
+              continue;
+            }
+            if ( PptxDiapos.vacio( d.mermaid ) ) {
+              continue;
+            }
+            byte[] png = d.id == null ? null : pngMermaid.get( d.id );
+            String svg = d.id == null ? null : svgMermaid.get( d.id );
+            boolean hayPng = png != null && png.length > 0;
+            boolean haySvg = svg != null && svg.contains( "<svg" );
+            if ( !hayPng && !haySvg ) {
+              sinDibujo++;
+              continue;
+            }
+            String base = nombre( usados, ++n, sec, que( b, r.s( "diagrama" ) ) );
+            if ( hayPng ) {
+              escribir( res, new File( carpeta, base + ".png" ), png );
+            }
+            if ( haySvg ) {
+              escribir( res, new File( carpeta, base + ".svg" ), suelto( svg ).getBytes( StandardCharsets.UTF_8 ) );
+            }
+          } else if ( b instanceof Grafico ) {
+            String svg;
+            try {
+              svg = svgs.svg( (Grafico) b, t, GraficosSvg.ANCHO );
+            } catch ( Exception e ) {
+              svg = null;
+            }
+            if ( svg == null || !svg.contains( "<svg" ) ) {
+              sinDibujo++;
+              continue;
+            }
+            String base = nombre( usados, ++n, sec, que( b, r.s( "grafico" ) ) );
+            escribir( res, new File( carpeta, base + ".svg" ), suelto( svg ).getBytes( StandardCharsets.UTF_8 ) );
+            byte[] png;
+            try {
+              png = SvgAPng.png( svg, ANCHO_PNG_GRAFICO );
+            } catch ( Throwable e ) {
+              png = null;
+            }
+            if ( png != null && png.length > 0 ) {
+              escribir( res, new File( carpeta, base + ".png" ), png );
+            } else {
+              soloSvg++; // queda el SVG
+            }
+          } else if ( b instanceof Imagen ) {
+            Imagen im = (Imagen) b;
+            if ( im.datos != null && im.datos.length > 0 ) {
+              String base = nombre( usados, ++n, sec, que( b, r.s( "imagen" ) ) );
+              escribir( res, new File( carpeta, base + extension( im.mime ) ), im.datos );
+            }
           }
         }
       }
@@ -218,6 +230,21 @@ public final class RenderImagenes implements Renderizador {
       res.avisos.add( r.s( "aviso_vacia" ) );
     }
     return res;
+  }
+
+  /** "2_ejercicio-2": numero del capitulo y su titulo, hasta {@value #MAX_NOMBRE} caracteres y sin repetir. */
+  static String subcarpeta( Set<String> usadas, Capitulos.Grupo g ) {
+    String t = !PptxDiapos.vacio( g.capitulo.titulo ) ? g.capitulo.titulo.trim() : !PptxDiapos.vacio(
+      g.capitulo.nombreDoc ) ? g.capitulo.nombreDoc.trim() : g.capitulo.id;
+    String b = g.numero + "_" + Html.idSeguro( t );
+    if ( b.length() > MAX_NOMBRE ) {
+      b = b.substring( 0, MAX_NOMBRE ).replaceAll( "[-_]+$", "" );
+    }
+    String x = b;
+    for ( int i = 2; !usadas.add( x.toLowerCase( Locale.ROOT ) ); i++ ) {
+      x = b + "-" + i;
+    }
+    return x;
   }
 
   /** El titulo del bloque como parte del nombre; si no tiene, el texto dado ("diagrama", "grafico"...). */

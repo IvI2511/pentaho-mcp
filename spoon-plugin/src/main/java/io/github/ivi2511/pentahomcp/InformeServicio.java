@@ -55,6 +55,7 @@ import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.ui.spoon.Spoon;
 
 import io.github.ivi2511.pentahomcp.informes.Captura;
+import io.github.ivi2511.pentahomcp.informes.Combinar;
 import io.github.ivi2511.pentahomcp.informes.Disponibilidad;
 import io.github.ivi2511.pentahomcp.informes.Formato;
 import io.github.ivi2511.pentahomcp.informes.Pedido;
@@ -323,7 +324,7 @@ public final class InformeServicio {
   /**
    * Las secciones que se arman, en el orden del informe. Con {@code p.secciones} explicitas van todas
    * las validas (las que no aplican salen "omitidas" con su motivo); sin ellas, las marcadas por
-   * defecto ({@code tema.secciones} o §2.3) que aplican, mas profile si hay perfilStep y narrative si
+   * defecto ({@code tema.secciones} o §2.3) que aplican, mas profile si hay steps a perfilar y narrative si
    * hay conclusiones.
    */
   static List<String> seleccion( Captura c, Pedido p, Tema tema, List<String> avisos ) {
@@ -349,7 +350,7 @@ public final class InformeServicio {
           marcada = marcada && !Pedido.METRICAS_NINGUNA.equals( p.metricas )
             && ( hubo || Pedido.METRICAS_COPIA.equals( p.metricas ) );
         } else if ( SeccionId.PERFIL.equals( id ) ) {
-          marcada = Txt.vacio( p.perfilStep ) != null;
+          marcada = !p.pasosPerfil().isEmpty();
         } else if ( SeccionId.NARRATIVA.equals( id ) ) {
           marcada = p.narrativa != null && Txt.vacio( p.narrativa.conclusiones ) != null;
         }
@@ -947,6 +948,162 @@ public final class InformeServicio {
       }
     }
     return null;
+  }
+
+  // ================================================================ varios documentos (0.5.1)
+
+  /** Tope de documentos de un informe combinado o de una exportacion en tanda (memoria). */
+  public static final int MAX_DOCUMENTOS = 10;
+  /** Niveles de sub-jobs que recorre {@link #transformacionesDeJob}. */
+  static final int MAX_NIVELES_JOB = 3;
+
+  /**
+   * Junta varios informes ya armados en uno (portada general, documentos del informe y un capitulo por
+   * documento). Ver {@link Combinar}.
+   */
+  public static Informe combinar( List<Informe> partes, String titulo, String idioma, Tema t ) {
+    return Combinar.combinar( partes, titulo, idioma, t );
+  }
+
+  /**
+   * Los archivos que ejecuta un job (Transformation y, con {@code recursivo}, Job y lo que corren esos
+   * sub-jobs hasta {@link #MAX_NIVELES_JOB} niveles): rutas locales que existen, en el orden de ejecucion
+   * y sin repetidos. Ni el propio job ni lo que vive en un repositorio. Lee los sub-jobs del disco (worker).
+   */
+  public static List<String> transformacionesDeJob( Captura c, boolean recursivo ) {
+    Set<String> out = new LinkedHashSet<String>();
+    if ( c == null || !( c.copia instanceof JobMeta ) ) {
+      return new ArrayList<String>( out );
+    }
+    Set<String> vistos = new LinkedHashSet<String>();
+    if ( c.archivo != null ) {
+      vistos.add( clave( new File( c.archivo ) ) );
+    }
+    llamadasDe( (JobMeta) c.copia, c.archivo, recursivo ? MAX_NIVELES_JOB : 1, vistos, out );
+    return new ArrayList<String>( out );
+  }
+
+  private static void llamadasDe( JobMeta jm, String archivo, int niveles, Set<String> vistos, Set<String> out ) {
+    if ( niveles <= 0 ) {
+      return;
+    }
+    VariableSpace vs = Txt.variables( jm );
+    File carpeta = archivo == null ? null : new File( archivo ).getAbsoluteFile().getParentFile();
+    for ( SecFlujo.Llamada l : SecFlujo.llamadas( jm, archivo ) ) {
+      if ( !Boolean.TRUE.equals( l.existe ) || l.crudo == null ) {
+        continue;
+      }
+      String local = Txt.local( vs.environmentSubstitute( l.crudo ) );
+      if ( local == null ) {
+        continue;
+      }
+      File f = new File( local );
+      if ( !f.isAbsolute() && carpeta != null ) {
+        f = new File( carpeta, local );
+      }
+      f = f.getAbsoluteFile();
+      if ( !f.isFile() || !vistos.add( clave( f ) ) ) {
+        continue;
+      }
+      out.add( f.getPath() );
+      if ( l.job && niveles > 1 ) {
+        try {
+          llamadasDe( new JobMeta( f.getPath(), null ), f.getPath(), niveles - 1, vistos, out );
+        } catch ( Throwable e ) {
+          log().logDebug( "Pentaho Live: could not read the sub-job " + f + ": " + e );
+        }
+      }
+    }
+  }
+
+  private static String clave( File f ) {
+    try {
+      return f.getCanonicalPath().toLowerCase( Locale.ROOT );
+    } catch ( Exception e ) {
+      return f.getAbsolutePath().toLowerCase( Locale.ROOT );
+    }
+  }
+
+  /**
+   * Pregunta (ya traducida) antes de perfilar varios steps: la union de lo que escribe aguas arriba de
+   * todos ellos, una sola vez; null si nada escribe. Con un step, el texto de siempre.
+   */
+  public static String confirmacionPerfil( Captura c, List<String> steps, String idioma ) {
+    if ( c == null || !( c.copia instanceof TransMeta ) || steps == null || steps.isEmpty() ) {
+      return null;
+    }
+    TransMeta tm = (TransMeta) c.copia;
+    if ( steps.size() == 1 ) {
+      return CorridaMedida.textoConfirmacionPerfil( tm, steps.get( 0 ), idioma );
+    }
+    List<String> escritores = new ArrayList<String>();
+    for ( String s : steps ) {
+      for ( String w : CorridaMedida.escritoresAguasArriba( tm, s ) ) {
+        if ( !escritores.contains( w ) ) {
+          escritores.add( w );
+        }
+      }
+    }
+    if ( escritores.isEmpty() ) {
+      return null;
+    }
+    Rotulos r = Rotulos.de( SecMetricas.AREA, idioma );
+    return r.f( "confirm.profile_n", CorridaMedida.lista( steps, r ), CorridaMedida.lista( escritores, r ) );
+  }
+
+  /** De {@code ids}, los que aplican a ese documento (para armar varios con las mismas casillas). */
+  public static List<String> queAplican( Captura c, List<String> ids, String idioma ) {
+    List<String> out = new ArrayList<String>();
+    if ( ids == null ) {
+      return out;
+    }
+    for ( String id : ids ) {
+      Recolector rec = recolector( id );
+      if ( rec != null && noAplica( rec, c, idioma ) == null && !out.contains( id ) ) {
+        out.add( id );
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Las conclusiones de un informe combinado: la seccion narrative de la parte general (capitulo null),
+   * igual que la arma SecNarrativa para un documento. No hace nada sin texto.
+   */
+  public static void conclusionesCombinadas( Informe inf, Narrativa n ) {
+    String texto = n == null ? null : Txt.recortar( n.conclusiones, MAX_NARRATIVA );
+    if ( inf == null || texto == null ) {
+      return;
+    }
+    Seccion s = new Seccion( SeccionId.NARRATIVA, SeccionId.titulo( SeccionId.NARRATIVA, inf.idioma ) );
+    Parrafo par = new Parrafo( texto );
+    par.id = "narrative-texto";
+    par.ia = Narrativa.IA.equals( n.origen );
+    s.con( par );
+    ObjectNode datos = Txt.obj();
+    datos.put( "section", SeccionId.NARRATIVA );
+    datos.put( "origin", par.ia ? Narrativa.IA : Narrativa.USUARIO );
+    datos.put( "characters", texto.length() );
+    s.datos = datos;
+    inf.secciones.add( s );
+  }
+
+  /**
+   * Los nombres base sin repetir (sin distinguir mayusculas): el segundo "Ejercicio" pasa a "Ejercicio-2",
+   * y asi. Para exportar varios documentos a la misma carpeta sin pisarse.
+   */
+  public static List<String> basesUnicas( List<String> bases ) {
+    List<String> out = new ArrayList<String>();
+    Set<String> usadas = new LinkedHashSet<String>();
+    for ( String b : bases ) {
+      String x = b == null || b.trim().isEmpty() ? "informe" : b.trim();
+      String y = x;
+      for ( int n = 2; !usadas.add( y.toLowerCase( Locale.ROOT ) ); n++ ) {
+        y = x + "-" + n;
+      }
+      out.add( y );
+    }
+    return out;
   }
 
   /** Copia sin byte[] (para get_report_data). Delega en el modelo. */

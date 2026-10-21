@@ -37,6 +37,14 @@ public enum Formato {
     return extension.isEmpty();
   }
 
+  /**
+   * true si el formato usa Edge/Chrome cuando lo hay: el PDF lo imprime el navegador y PowerPoint, Word e
+   * imagenes pre-renderizan con el los diagramas Mermaid que queden (sin navegador salen como tabla o no salen).
+   */
+  public boolean usaNavegador() {
+    return this == PDF || this == PPTX || this == DOCX || this == IMAGENES;
+  }
+
   /** El formato con esa clave (sin distinguir mayusculas), o null. */
   public static Formato deClave( String clave ) {
     for ( Formato f : values() ) {

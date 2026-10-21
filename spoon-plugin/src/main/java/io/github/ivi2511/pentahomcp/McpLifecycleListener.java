@@ -28,7 +28,7 @@ public class McpLifecycleListener implements LifecycleListener {
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
   /** Si el jar no trae pentaho-mcp-version.txt (compilado a mano, sin build.ps1). */
-  private static final String VERSION_RESPALDO = "0.5.0";
+  private static final String VERSION_RESPALDO = "0.5.1";
 
   /** La version del plugin: la escribe build.ps1 en el jar, sacada del archivo VERSION del repo. */
   static final String VERSION = leerVersion();
@@ -116,6 +116,8 @@ public class McpLifecycleListener implements LifecycleListener {
     } catch ( Throwable t ) {
       LOG.logError( "Pentaho MCP: no se pudo arrancar el servidor", t );
     }
+    // boton «Ordenar lienzo (Pentaho Live)» en la barra y el menu contextual de los lienzos (no lanza)
+    OrdenarLienzo.instalarDesde( handler );
   }
 
   /**

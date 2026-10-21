@@ -220,7 +220,16 @@ public final class RenderXlsx implements Renderizador {
     void armar() {
       propiedades();
       XSSFSheet ind = hoja( r.s( "hoja_indice" ) );
-      List<Seccion> vivas = RenderDocx.vivas( RenderDocx.cuerpo( inf ) );
+      // informe combinado: las secciones de cada documento en su orden, con el numero «2.3» delante
+      List<Seccion> vivas = new ArrayList<>();
+      List<String> numeros = new ArrayList<>();
+      for ( Capitulos.Grupo g : Capitulos.grupos( inf ) ) {
+        List<Seccion> vs = g.vivas();
+        for ( int i = 0; i < vs.size(); i++ ) {
+          vivas.add( vs.get( i ) );
+          numeros.add( Capitulos.numero( g, i ) );
+        }
+      }
       int n = 0;
       for ( int k = 0; k < vivas.size(); k++ ) {
         Seccion s = vivas.get( k );
@@ -228,6 +237,9 @@ public final class RenderXlsx implements Renderizador {
           return;
         }
         String sec = !PptxDiapos.vacio( s.titulo ) ? s.titulo.trim() : SeccionId.titulo( s.id, idioma );
+        if ( numeros.get( k ) != null ) {
+          sec = numeros.get( k ) + " " + sec;
+        }
         progreso.paso( r.f( "progreso", sec ), k, vivas.size() );
         for ( Bloque b : Html.lista( s.bloques ) ) {
           Tabla t = null;

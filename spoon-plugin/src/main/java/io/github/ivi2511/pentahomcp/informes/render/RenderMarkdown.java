@@ -597,17 +597,29 @@ public final class RenderMarkdown implements Renderizador {
     }
 
     /**
-     * Diagrama propio: cada parte como .svg en la carpeta de archivos, el lienzo (como imagen si no es una
-     * tira; si lo es, un enlace al .png) y el codigo Mermaid plegado ({@code > [!note]-}: Obsidian lo
-     * muestra cerrado y dibuja el diagrama al abrirlo; GitHub lo muestra como cita).
+     * Diagrama propio: cada parte como .png (doble resolucion) en la carpeta de archivos, el lienzo (como
+     * imagen si no es una tira; si lo es, un enlace al .png) y el codigo Mermaid plegado en un
+     * {@code <details>} (GitHub lo dibuja al abrirlo; Obsidian lo muestra como codigo). Si Batik falla, la
+     * parte va como .svg.
      */
     void propio( Diagrama d, List<Dibujo> ds ) throws Exception {
       String base = d.id != null ? d.id : "diagrama";
       String alt = d.alt != null ? d.alt : d.titulo != null ? d.titulo : "";
       for ( Dibujo x : ds ) {
-        String nombre = archivo( ds.size() > 1 ? base + "-" + x.parte : base, "svg" );
+        String parte = ds.size() > 1 ? base + "-" + x.parte : base;
+        byte[] png = null;
+        try {
+          png = x.png( 2 );
+        } catch ( Exception | LinkageError e ) {
+          png = null; // sin Batik: el SVG
+        }
+        String nombre = archivo( parte, png != null ? "png" : "svg" );
         File f = new File( carpeta, nombre );
-        Html.escribir( f, RenderImagenes.suelto( x.svgEscalado() ) );
+        if ( png != null ) {
+          Html.escribir( f, png );
+        } else {
+          Html.escribir( f, RenderImagenes.suelto( x.svgEscalado() ) );
+        }
         archivos.add( f );
         if ( ds.size() > 1 ) {
           cursiva( Figuras.parte( inf.idioma, x.parte, x.partes ) );
@@ -636,12 +648,9 @@ public final class RenderMarkdown implements Renderizador {
       if ( d.mermaid != null && !d.mermaid.trim().isEmpty() ) {
         String texto = d.mermaid.replace( "\r\n", "\n" ).trim();
         String c = cerca( texto );
-        sb.append( "> [!note]- " ).append( esc( t( "mermaid_code" ) ) ).append( '\n' );
-        sb.append( "> " ).append( c ).append( "mermaid\n" );
-        for ( String l : texto.split( "\n" ) ) {
-          sb.append( l.isEmpty() ? ">" : "> " + l ).append( '\n' );
-        }
-        sb.append( "> " ).append( c ).append( "\n\n" );
+        sb.append( "<details>\n<summary>" ).append( Html.esc( t( "mermaid_code" ) ) ).append( "</summary>\n\n" );
+        sb.append( c ).append( "mermaid\n" ).append( texto ).append( '\n' ).append( c ).append( "\n\n" );
+        sb.append( "</details>\n\n" );
       }
     }
 

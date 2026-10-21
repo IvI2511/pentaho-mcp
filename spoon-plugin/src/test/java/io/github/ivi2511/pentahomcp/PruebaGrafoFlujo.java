@@ -12,11 +12,15 @@ import java.util.List;
 
 import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.trans.TransMeta;
+import org.pentaho.di.trans.step.StepMeta;
+import org.pentaho.di.trans.steps.dummytrans.DummyTransMeta;
 
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.diagramas.Diagramas;
 import io.github.ivi2511.pentahomcp.informes.diagramas.Dibujo;
 import io.github.ivi2511.pentahomcp.informes.diagramas.Grafo;
 import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
+import io.github.ivi2511.pentahomcp.informes.modelo.Esquema;
 
 /**
  * GrafoFlujo: el grafo del diagrama propio de los ejemplos (copias en {@code <prueba>\ej}) tiene lo mismo
@@ -150,6 +154,71 @@ public class PruebaGrafoFlujo {
     noNulo( off, "el hop deshabilitado" );
     cierto( !off.activa, "inactiva" );
     contiene( off.rotulo, "deshabilitado", "rotulo deshabilitado" );
+  }
+
+  /**
+   * SecLinaje.grafo: un grupo por step, el destino marcado, las dos entradas de un Append llegan al campo,
+   * la operacion va sobre el campo (no sobre la flecha) y la clave de busqueda es una arista CLAVE.
+   */
+  public void pruebaGrafoLinaje() throws Exception {
+    LinajePropio.Destino d = new LinajePropio.Destino( new StepMeta( "Dummy", "Cargar ventas", new DummyTransMeta() ) );
+    LinajePropio.Campo cli = new LinajePropio.Campo( "cod_cliente" );
+    cli.caminos.add( camino( n( "Leer ventas", "cod_cliente", LinajePropio.FUENTE, null ), n( "Unir ventas",
+      "cod_cliente", LinajePropio.PASA, null ), n( "Cargar ventas", "cod_cliente", LinajePropio.PASA, null ) ) );
+    cli.caminos.add( camino( n( "Ventas eventos", "cod_cliente", LinajePropio.FUENTE, null ), n( "Unir ventas",
+      "cod_cliente", LinajePropio.PASA, null ), n( "Cargar ventas", "cod_cliente", LinajePropio.PASA, null ) ) );
+    LinajePropio.Campo total = new LinajePropio.Campo( "total" );
+    total.caminos.add( camino( n( "Leer ventas", "precio", LinajePropio.FUENTE, null ), n( "Calcular", "total",
+      LinajePropio.CALCULA, "precio × cantidad" ), n( "Cargar ventas", "total", LinajePropio.PASA, null ) ) );
+    LinajePropio.Campo pk = new LinajePropio.Campo( "pk_cliente" );
+    pk.caminos.add( camino( n( "Clientes", "pk_cliente", LinajePropio.FUENTE, null ), n( "Buscar", "pk_cliente",
+      LinajePropio.BUSCA, "busca" ), n( "Cargar ventas", "pk_cliente", LinajePropio.PASA, null ) ) );
+    LinajePropio.Nodo clave = n( "Buscar", "cod_cliente", LinajePropio.BUSCA, "busca por" );
+    clave.rol = LinajePropio.ROL_CLAVE;
+    pk.caminos.add( camino( n( "Leer ventas", "cod_cliente", LinajePropio.FUENTE, null ), clave, n( "Cargar ventas",
+      "pk_cliente", LinajePropio.PASA, null ) ) );
+    d.campos.add( cli );
+    d.campos.add( total );
+    d.campos.add( pk );
+
+    Esquema e = SecLinaje.grafo( d, Rotulos.de( SecLinaje.AREA, "es" ), null );
+    igual( Grafo.LINAJE, e.tipo, "tipo" );
+    Grafo g = Grafo.desde( e );
+    igual( "Cargar ventas", g.destino().nombre, "grupo destino" );
+    Grafo.Nodo destinoCli = null;
+    Grafo.Nodo calc = null;
+    for ( Grafo.Nodo x : g.nodos() ) {
+      if ( "cod_cliente".equals( x.titulo ) && "Cargar ventas".equals( x.grupo().nombre ) ) {
+        destinoCli = x;
+      }
+      if ( "total".equals( x.titulo ) && "Calcular".equals( x.grupo().nombre ) ) {
+        calc = x;
+      }
+    }
+    noNulo( destinoCli, "cod_cliente en el destino" );
+    noNulo( calc, "total en Calcular" );
+    igual( "precio × cantidad", calc.op, "la operacion va sobre el campo" );
+    List<String> desde = new java.util.ArrayList<>();
+    int claves = 0;
+    for ( Grafo.Arista a : g.aristas() ) {
+      cierto( a.rotulo == null, "sin rotulos en las flechas del linaje" );
+      if ( a.b == destinoCli ) {
+        desde.add( a.a.grupo().nombre );
+      }
+      claves += Grafo.CLAVE.equals( a.clase ) ? 1 : 0;
+    }
+    cierto( desde.contains( "Leer ventas" ) && desde.contains( "Ventas eventos" ), "las dos entradas del Append: "
+      + desde );
+    igual( 1, claves, "una arista de clave" );
+    dibujar( g, "linaje" );
+  }
+
+  private static LinajePropio.Nodo n( String step, String campo, String clase, String op ) {
+    return new LinajePropio.Nodo( step, campo, clase, op );
+  }
+
+  private static List<LinajePropio.Nodo> camino( LinajePropio.Nodo... ns ) {
+    return new java.util.ArrayList<>( java.util.Arrays.asList( ns ) );
   }
 
   private static List<Dibujo> dibujar( Grafo g, String nombre ) throws Exception {

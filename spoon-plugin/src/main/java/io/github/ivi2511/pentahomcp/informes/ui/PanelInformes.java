@@ -158,6 +158,35 @@ public class PanelInformes {
       return null;
     }
 
+    /**
+     * Igual, para varios steps perfilados en una sola corrida: una sola pregunta con la union de lo que
+     * escribe aguas arriba de todos. (UI)
+     */
+    default String confirmacionPerfil( Captura c, List<String> steps, String idioma ) {
+      if ( steps == null || steps.isEmpty() ) {
+        return null;
+      }
+      if ( steps.size() == 1 ) {
+        return confirmacionPerfil( c, steps.get( 0 ), idioma );
+      }
+      return io.github.ivi2511.pentahomcp.InformeServicio.confirmacionPerfil( c, steps, idioma );
+    }
+
+    /**
+     * Las transformaciones y sub-jobs que ejecuta un job (rutas locales que existen, en orden, sin
+     * repetidos). (worker)
+     */
+    default List<String> transformacionesDeJob( Captura c ) {
+      return io.github.ivi2511.pentahomcp.InformeServicio.transformacionesDeJob( c, true );
+    }
+
+    /** Un informe con portada, indice y un capitulo por cada informe, mas las conclusiones. (worker) */
+    default Informe combinar( List<Informe> partes, String titulo, String idioma, Tema t, Narrativa n ) {
+      Informe inf = io.github.ivi2511.pentahomcp.informes.Combinar.combinar( partes, titulo, idioma, t );
+      io.github.ivi2511.pentahomcp.InformeServicio.conclusionesCombinadas( inf, n );
+      return inf;
+    }
+
     /** Por que no se puede exportar PowerPoint en este proceso (XmlBeans que no es 3.1), o null. (UI) */
     default String problemaPptx( String idioma ) {
       return null;
@@ -219,9 +248,13 @@ public class PanelInformes {
       return n;
     }
 
-    /** El archivo de un formato en la carpeta: base.html, base.light.html, base.pdf, base.md, base.pptx. */
+    /**
+     * El archivo de un formato en la carpeta: base.html, base.light.html, base.pdf, base.md, base.pptx...; las
+     * imagenes van a la carpeta base_imagenes.
+     */
     default File archivo( File carpeta, String base, Formato f ) {
-      return new File( carpeta, f == Formato.HTML_ESTATICO ? base + ".light.html" : base + "." + f.extension );
+      return new File( carpeta, f == Formato.HTML_ESTATICO ? base + ".light.html" : f.esCarpeta() ? base
+        + "_imagenes" : base + "." + f.extension );
     }
   }
 
@@ -343,6 +376,7 @@ public class PanelInformes {
   final BarraDocumento barra;
   final GrupoSecciones secciones;
   final GrupoIdentidad identidad;
+  final GrupoDocumentos documentos;
   final GrupoExportar exportar;
   final VistaPrevia vista;
   final EstadoUi estado;
@@ -416,6 +450,7 @@ public class PanelInformes {
     izquierda.setLayout( gi );
     secciones = new GrupoSecciones( izquierda, this );
     identidad = new GrupoIdentidad( izquierda, this );
+    documentos = new GrupoDocumentos( izquierda, this );
     exportar = new GrupoExportar( izquierda, this );
     scroll.setContent( izquierda );
     scroll.setExpandHorizontal( true );
@@ -565,6 +600,15 @@ public class PanelInformes {
         estado.error( r.f( "folder_relative", texto ) );
         return;
       }
+      if ( documentos.esVarios() ) {
+        List<Documento> elegidos = documentos.elegidos( d );
+        if ( elegidos.size() < 2 ) {
+          estado.error( r.s( "docs_menos_dos" ) );
+          return;
+        }
+        exportarVarios( elegidos, d, formatos, carpeta );
+        return;
+      }
       final Captura c = capturar( d );
       if ( c == null ) {
         return;
@@ -578,7 +622,7 @@ public class PanelInformes {
         return;
       }
       final Tema t = tema.copia();
-      final boolean necesitaNavegador = formatos.contains( Formato.PDF ) || formatos.contains( Formato.PPTX );
+      final boolean necesitaNavegador = necesitaNavegador( formatos );
       lanzar( true, r.s( "status_exporting_start" ), ( gen, pr ) -> {
         Informe inf = null;
         if ( previo != null && previo.sirve( d.id, firma( ped, t ), firmaDoc( c ) ) ) {
@@ -611,7 +655,7 @@ public class PanelInformes {
             enUi( gen, () -> servicio.abrir( imprimir ) );
           }
           if ( res != null ) {
-            archivosEscritos += res.archivos.size();
+            archivosEscritos += contar( res, f );
             for ( String a : res.avisos ) {
               if ( a != null && !avisos.contains( a ) ) {
                 avisos.add( a );
@@ -633,6 +677,311 @@ public class PanelInformes {
           fin = r.f( "status_more", fin, r.s( "no_browser" ) );
         }
         return fin;
+      } );
+    } catch ( Throwable t ) {
+      fallo( t );
+    }
+  }
+
+  // ---------------------------------------------------------------- varios documentos (UI)
+
+  /** Los archivos que cuenta el estado: la carpeta de imagenes no es un archivo. */
+  static int contar( Resultado res, Formato f ) {
+    int n = 0;
+    for ( File x : res.archivos ) {
+      if ( x != null && !( f.esCarpeta() && x.isDirectory() ) ) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /** PDF, PowerPoint, Word e imagenes usan Edge/Chrome (PDF y diagramas Mermaid). */
+  static boolean necesitaNavegador( List<Formato> formatos ) {
+    return formatos.contains( Formato.PDF ) || formatos.contains( Formato.PPTX ) || formatos.contains( Formato.DOCX )
+      || formatos.contains( Formato.IMAGENES );
+  }
+
+  /** Captura un documento de la tanda sin tocar los checks de secciones; null si fallo. (UI) */
+  private Captura capturarSuelta( Documento d ) {
+    try {
+      Captura c = d.cargado ? archivos.get( d.id ) : servicio.capturar( d.id );
+      if ( c == null ) {
+        throw new IllegalStateException( r.f( "doc_closed", d.nombre ) );
+      }
+      return c;
+    } catch ( Throwable t ) {
+      fallo( t );
+      return null;
+    }
+  }
+
+  /**
+   * El pedido de otro documento de la tanda: las secciones marcadas que le aplican; sin linaje elegido,
+   * sin perfil y sin consultar la base (esas opciones son del documento elegido arriba), sin narrativa.
+   */
+  private Pedido pedidoPara( Pedido base, Captura c ) {
+    Pedido p = new Pedido();
+    p.idioma = base.idioma;
+    List<String> ids = new ArrayList<String>();
+    List<Disponibilidad> disp = null;
+    try {
+      disp = servicio.disponibles( c, idiomaUi );
+    } catch ( Throwable t ) {
+      servicio.log( "Pentaho Live: could not tell which sections apply", t );
+    }
+    for ( String id : base.secciones ) {
+      if ( SeccionId.PERFIL.equals( id ) || SeccionId.NARRATIVA.equals( id ) ) {
+        continue;
+      }
+      boolean aplica = disp == null;
+      if ( disp != null ) {
+        for ( Disponibilidad x : disp ) {
+          if ( x != null && id.equals( x.id ) ) {
+            aplica = x.aplica;
+          }
+        }
+      }
+      if ( aplica ) {
+        ids.add( id );
+      }
+    }
+    p.secciones = ids;
+    p.perfilFilas = base.perfilFilas;
+    p.metricas = base.metricas;
+    p.timeoutMs = base.timeoutMs;
+    return p;
+  }
+
+  /**
+   * Exporta varios documentos: cada uno con sus archivos (nombres sin pisarse) o todos en un informe
+   * combinado. Captura todo en la UI; el linaje elegido y el perfil son solo del documento de arriba (y se
+   * pregunta solo por el); con «Todo en un archivo» las conclusiones van al informe combinado. Reusa la
+   * vista completa del documento elegido si sirve. La vista previa sigue siendo de un documento. (UI)
+   */
+  private void exportarVarios( final List<Documento> docs, final Documento sel, final List<Formato> formatos,
+    final File carpeta ) {
+    final boolean combinar = documentos.combinar();
+    final String titulo = documentos.titulo();
+    final Pedido base = pedido( false, Pedido.METRICAS_ULTIMA );
+    final List<Captura> cs = new ArrayList<Captura>();
+    final List<Pedido> ps = new ArrayList<Pedido>();
+    Captura cSel = null;
+    for ( Documento x : docs ) {
+      boolean esSel = sel != null && x.id.equals( sel.id );
+      Captura c = esSel ? capturar( x ) : capturarSuelta( x );
+      if ( c == null ) {
+        return;
+      }
+      Pedido p;
+      if ( esSel ) {
+        cSel = c;
+        p = pedido( false, Pedido.METRICAS_ULTIMA );
+        if ( combinar ) {
+          p.narrativa = null; // las conclusiones van al informe combinado
+          if ( p.secciones != null ) {
+            p.secciones.remove( SeccionId.NARRATIVA );
+          }
+        }
+      } else {
+        p = pedidoPara( base, c );
+      }
+      cs.add( c );
+      ps.add( p );
+    }
+    final Completo previo = completo;
+    if ( cSel != null ) {
+      Pedido pSel = ps.get( indice( docs, sel ) );
+      boolean perfila = pSel.secciones != null && pSel.secciones.contains( SeccionId.PERFIL );
+      if ( perfila && !( previo != null && previo.sirve( sel.id, firma( pSel, tema ), firmaDoc( cSel ) ) )
+        && !confirmarPerfil( cSel, pSel ) ) {
+        return;
+      }
+    }
+    final Narrativa conclusiones = combinar ? base.narrativa : null;
+    final Tema t = tema.copia();
+    final boolean navegador = necesitaNavegador( formatos );
+    final String idioma = base.idioma;
+    lanzar( true, r.s( "status_exporting_start" ), ( gen, pr ) -> {
+      List<Informe> infs = new ArrayList<Informe>();
+      for ( int i = 0; i < cs.size(); i++ ) {
+        if ( pr.cancelado() ) {
+          return null;
+        }
+        Documento x = docs.get( i );
+        pr.paso( r.f( "status_building_doc", x.nombre, i + 1, cs.size() ), i, cs.size() );
+        Informe inf = null;
+        if ( sel != null && x.id.equals( sel.id ) && previo != null && previo.sirve( x.id, firma( ps.get( i ), t ),
+          firmaDoc( cs.get( i ) ) ) ) {
+          inf = previo.informe;
+        }
+        if ( inf == null ) {
+          inf = esperar( servicio.armar( cs.get( i ), ps.get( i ), t, pr ), ps.get( i ), pr );
+          if ( inf == null ) {
+            return null;
+          }
+        }
+        infs.add( inf );
+      }
+      List<Informe> salen = new ArrayList<Informe>();
+      List<String> bases = new ArrayList<String>();
+      if ( combinar ) {
+        Informe comb = servicio.combinar( infs, titulo, idioma, t, conclusiones );
+        salen.add( comb );
+        bases.add( servicio.nombreBase( comb, t ) );
+      } else {
+        salen.addAll( infs );
+        for ( Informe inf : infs ) {
+          bases.add( servicio.nombreBase( inf, t ) );
+        }
+        bases = basesUnicas( bases );
+      }
+      if ( !carpeta.isDirectory() && !carpeta.mkdirs() ) {
+        throw new IOException( r.f( "folder_error", carpeta.getPath() ) );
+      }
+      int archivosEscritos = 0;
+      List<String> avisos = new ArrayList<String>();
+      int total = salen.size() * formatos.size();
+      int hecho = 0;
+      for ( int k = 0; k < salen.size(); k++ ) {
+        for ( Formato f : formatos ) {
+          if ( pr.cancelado() ) {
+            return null;
+          }
+          pr.paso( r.f( "status_exporting", nombreFormato( f ) ), hecho++, total );
+          Resultado res = servicio.exportar( salen.get( k ), t, f, servicio.archivo( carpeta, bases.get( k ), f ),
+            pr );
+          if ( res != null ) {
+            archivosEscritos += contar( res, f );
+            for ( String a : res.avisos ) {
+              if ( a != null && !avisos.contains( a ) ) {
+                avisos.add( a );
+              }
+            }
+          }
+        }
+      }
+      enUi( gen, () -> {
+        ultimaCarpeta = carpeta;
+        exportar.exportado( carpeta );
+      } );
+      String fin = r.f( "status_exported_n", docs.size(), archivosEscritos, carpeta.getPath() );
+      if ( !avisos.isEmpty() ) {
+        fin = r.f( "status_more", fin, avisos.get( 0 ) );
+      } else if ( navegador && !servicio.hayNavegador( t ) ) {
+        fin = r.f( "status_more", fin, r.s( "no_browser" ) );
+      }
+      return fin;
+    } );
+  }
+
+  private static int indice( List<Documento> docs, Documento d ) {
+    for ( int i = 0; i < docs.size(); i++ ) {
+      if ( docs.get( i ).id.equals( d.id ) ) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  /** Los nombres base sin repetir (sin distinguir mayusculas): "x", "x-2", "x-3"... */
+  static List<String> basesUnicas( List<String> bases ) {
+    List<String> out = new ArrayList<String>();
+    java.util.Set<String> usadas = new java.util.HashSet<String>();
+    for ( String b : bases ) {
+      String x = b == null || b.trim().isEmpty() ? "report" : b.trim();
+      String y = x;
+      for ( int n = 2; !usadas.add( y.toLowerCase( java.util.Locale.ROOT ) ); n++ ) {
+        y = x + "-" + n;
+      }
+      out.add( y );
+    }
+    return out;
+  }
+
+  /**
+   * «Añadir transformaciones del job»: con un job elegido arriba, carga (en el worker, sin abrir pestanas)
+   * lo que ejecuta, lo pone en la lista justo despues del job y lo marca; lo que ya esta abierto en una
+   * pestana se marca sin cargarlo otra vez. (UI)
+   */
+  void agregarTransformacionesDeJob() {
+    try {
+      if ( pesado ) {
+        return;
+      }
+      final Documento d = barra.seleccionado();
+      if ( d == null || !d.esJob() ) {
+        estado.error( r.s( "docs_job_no_job" ) );
+        return;
+      }
+      final Captura c = capturarSuelta( d );
+      if ( c == null ) {
+        return;
+      }
+      final List<Documento> abiertos = new ArrayList<Documento>();
+      try {
+        List<Documento> l = servicio.documentos();
+        if ( l != null ) {
+          abiertos.addAll( l );
+        }
+      } catch ( Throwable t ) {
+        servicio.log( "Pentaho Live: could not list the open documents", t );
+      }
+      lanzar( true, r.s( "docs_job" ), ( gen, pr ) -> {
+        List<String> rutas = servicio.transformacionesDeJob( c );
+        if ( rutas == null || rutas.isEmpty() ) {
+          return r.s( "docs_job_none" );
+        }
+        final List<String> ids = new ArrayList<String>();
+        final List<Object[]> nuevos = new ArrayList<Object[]>();
+        for ( String ruta : rutas ) {
+          if ( pr.cancelado() ) {
+            return null;
+          }
+          File f = new File( ruta ).getAbsoluteFile();
+          String abierto = null;
+          for ( Documento x : abiertos ) {
+            if ( !x.cargado && x.archivo != null && new File( x.archivo ).getAbsoluteFile().equals( f ) ) {
+              abierto = x.id;
+            }
+          }
+          if ( abierto != null ) {
+            ids.add( abierto );
+            continue;
+          }
+          Captura h = servicio.capturarArchivo( f.getPath(), display );
+          if ( h != null ) {
+            String id = "file:" + f.getPath();
+            ids.add( id );
+            nuevos.add( new Object[] { id, h, f } );
+          }
+        }
+        enUi( gen, () -> {
+          for ( Object[] n : nuevos ) {
+            String id = (String) n[ 0 ];
+            Captura h = (Captura) n[ 1 ];
+            File f = (File) n[ 2 ];
+            String tipo = h.tipo != null ? h.tipo : ( f.getName().toLowerCase().endsWith( ".kjb" ) ? Captura.JOB
+              : Captura.TRANSFORMACION );
+            archivos.put( id, h );
+            for ( Iterator<Documento> it = cargados.iterator(); it.hasNext(); ) {
+              if ( it.next().id.equals( id ) ) {
+                it.remove();
+              }
+            }
+            cargados.add( new Documento( id, h.nombre != null ? h.nombre : f.getName(), tipo, f.getPath(), false,
+              true ) );
+          }
+          documentos.agregados( d.id, ids );
+          if ( !documentos.esVarios() ) {
+            documentos.varios.setSelection( true );
+            documentos.uno.setSelection( false );
+            documentos.modo();
+          }
+          refrescarDocumentos();
+          barra.seleccionar( d.id );
+        } );
+        return r.f( "docs_job_added", ids.size() );
       } );
     } catch ( Throwable t ) {
       fallo( t );
@@ -877,10 +1226,13 @@ public class PanelInformes {
    * ejecuta una copia hasta ese step y esos steps escriben de verdad (diseno §2.4.3). true = seguir. (UI)
    */
   private boolean confirmarPerfil( Captura c, Pedido p ) {
-    if ( p == null || p.secciones == null || !p.secciones.contains( SeccionId.PERFIL ) || p.perfilStep == null ) {
+    if ( p == null || p.secciones == null || !p.secciones.contains( SeccionId.PERFIL ) || p.pasosPerfil()
+      .isEmpty() ) {
       return true;
     }
-    String texto = servicio.confirmacionPerfil( c, p.perfilStep, idiomaUi );
+    List<String> pasos = p.pasosPerfil();
+    String texto = pasos.size() == 1 ? servicio.confirmacionPerfil( c, pasos.get( 0 ), idiomaUi ) : servicio
+      .confirmacionPerfil( c, pasos, idiomaUi );
     return texto == null || servicio.confirmar( raiz.getShell(), r.s( "profile_title" ), texto );
   }
 
@@ -1142,6 +1494,7 @@ public class PanelInformes {
     }
     docs.addAll( cargados );
     barra.cargar( docs );
+    documentos.cargar( docs );
     if ( docs.isEmpty() ) {
       vista.vaciar();
       estado.listo( r.s( "no_documents" ) );
@@ -1179,12 +1532,15 @@ public class PanelInformes {
     if ( liviano ) {
       ids.retainAll( LIVIANAS );
     }
-    if ( ids.contains( SeccionId.PERFIL ) && secciones.perfilStep() == null ) {
+    List<String> pasos = secciones.perfilSteps();
+    if ( ids.contains( SeccionId.PERFIL ) && pasos.isEmpty() ) {
       ids.remove( SeccionId.PERFIL ); // sin step la seccion no corre (ejecuta la transformacion)
     }
     p.secciones = ids;
     p.linajeStep = secciones.linajeStep();
-    p.perfilStep = secciones.perfilStep();
+    p.perfilStep = pasos.isEmpty() ? null : pasos.get( 0 );
+    p.perfilSteps = pasos.size() > 1 ? new ArrayList<String>( pasos.subList( 1, pasos.size() ) )
+      : new ArrayList<String>();
     p.perfilFilas = secciones.perfilFilas();
     p.metricas = metricas;
     p.destinoConsultarBase = !liviano && secciones.consultarBase();
