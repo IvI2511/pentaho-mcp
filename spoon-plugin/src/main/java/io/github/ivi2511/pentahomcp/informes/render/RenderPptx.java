@@ -45,6 +45,8 @@ public final class RenderPptx implements Renderizador {
   }
 
   private final Map<String, byte[]> pngMermaid;
+  /** true = el detalle de consulta va en diapositivas de anexo al final (Tema.salida.pptxAnexo). */
+  private boolean conAnexo;
   /** null = GraficosSvg con Informe.idioma (numeros y leyendas en el idioma del informe, no en el del tema). */
   private ProveedorSvg proveedorSvg;
 
@@ -60,6 +62,12 @@ public final class RenderPptx implements Renderizador {
   /** Cambia de donde salen los SVG de los graficos (pruebas, o un SVG ya calculado). Devuelve this. */
   public RenderPptx conSvgGraficos( ProveedorSvg p ) {
     this.proveedorSvg = p;
+    return this;
+  }
+
+  /** Con anexo: las tablas de detalle y lo que no entra van al final, tras una diapositiva «Anexo». */
+  public RenderPptx conAnexo( boolean si ) {
+    this.conAnexo = si;
     return this;
   }
 
@@ -116,7 +124,7 @@ public final class RenderPptx implements Renderizador {
       final String idiomaGraficos = idioma;
       ProveedorSvg svgs = proveedorSvg != null ? proveedorSvg
         : ( g, te, ancho ) -> GraficosSvg.svg( g, te, ancho, idiomaGraficos );
-      PptxDiapos diapos = new PptxDiapos( ppt, inf, t, pngMermaid, svgs, pr );
+      PptxDiapos diapos = new PptxDiapos( ppt, inf, t, pngMermaid, svgs, pr, conAnexo );
       diapos.armar();
       PptxDiapos.cancelar( pr );
       pr.paso( Rotulos.de( AREA, idioma ).s( "progreso_escribir" ), 0, 0 );

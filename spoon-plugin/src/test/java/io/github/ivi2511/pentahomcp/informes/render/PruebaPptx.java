@@ -261,25 +261,26 @@ public class PruebaPptx {
     new RenderPptx( null ).escribir( inf, new Tema(), f, Progreso.NULO );
     try ( XMLSlideShow ppt = abrir( f ) ) {
       List<XSLFSlide> ds = ppt.getSlides();
-      igual( 5, ds.size(), "portada, agenda y 3 de tabla" );
+      // presentacion: una tabla ocupa como mucho PptxDiapos.MAX_DIAPOS_TABLA diapositivas; el resto, una nota
+      igual( 4, ds.size(), "portada, agenda y 2 de tabla" );
       igual( "Diccionario de datos", ds.get( 2 ).getTitle(), "primera" );
       igual( "Diccionario de datos (cont.)", ds.get( 3 ).getTitle(), "segunda" );
-      igual( "Diccionario de datos (cont.)", ds.get( 4 ).getTitle(), "tercera" );
-      int[] filas = { 11, 11, 6 };
-      for ( int i = 0; i < 3; i++ ) {
+      contiene( texto( ds.get( 3 ) ), "+5", "nota: las 5 filas que siguen estan en el informe" );
+      int[] filas = { 11, 11 };
+      for ( int i = 0; i < 2; i++ ) {
         XSLFTable tbl = tabla( ds.get( 2 + i ) );
         noNulo( tbl, "tabla en la diapositiva " + ( 3 + i ) );
         igual( filas[ i ], tbl.getNumberOfRows(), "filas (con cabecera) en la diapositiva " + ( 3 + i ) );
         igual( "Campo", tbl.getCell( 0, 1 ).getText(), "cabecera repetida" );
         contiene( texto( ds.get( 2 + i ) ), i == 0 ? "Campos" : "Campos (cont.)", "subtitulo de la tabla" );
       }
-      igual( "25", tabla( ds.get( 4 ) ).getCell( 5, 0 ).getText(), "ultima fila" );
+      igual( "20", tabla( ds.get( 3 ) ).getCell( 10, 0 ).getText(), "ultima fila en la presentacion" );
     }
   }
 
   /**
    * Idioma de todo el texto (PowerPoint revisa la ortografia con el), tablas chicas sin partir y
-   * diagramas que no se agrandan mas alla de su tamano natural.
+   * diagramas que se agrandan como mucho al doble de su tamano natural.
    */
   public void pruebaIdiomaYMaquetacion() throws Exception {
     // 1) cada run (cuadros, tablas, notas) con el idioma del informe
@@ -355,7 +356,9 @@ public class PruebaPptx {
         }
       }
       noNulo( pic, "el PNG del diagrama" );
-      igual( 100.0, Math.round( pic.getAnchor().getWidth() * 10 ) / 10.0, "tamano natural (200 px a escala 2)" );
+      // presentacion: se agranda hasta PptxDiapos.AMPLIAR_DIAGRAMA veces (200 px a escala 2 = 100 natural)
+      igual( 100.0 * PptxDiapos.AMPLIAR_DIAGRAMA, Math.round( pic.getAnchor().getWidth() * 10 ) / 10.0,
+        "el doble del tamano natural, no el ancho entero" );
     }
   }
 

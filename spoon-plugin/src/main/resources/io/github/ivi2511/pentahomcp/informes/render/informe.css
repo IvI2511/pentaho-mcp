@@ -37,6 +37,19 @@ code, pre { font-family: {{fuenteCodigo}}; }
 .indice li { margin: 3px 0; }
 .indice li.omitida { color: {{tenue}}; }
 .indice .motivo { font-size: 12px; color: {{tenue}}; }
+.indice li.cap { margin: 8px 0 2px; font-weight: bold; }
+.indice ol.sub { margin: 2px 0 4px; padding-left: 18px; list-style: none; font-weight: normal; }
+
+/* ---- capitulos (informe combinado: un documento por capitulo) */
+.capitulo { margin: 40px 0 0; padding: 22px 30px 14px; background: {{fondoTenue}}; border-left: 6px solid {{primario}}; }
+.capitulo .tipo { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: {{tenue}}; margin: 0 0 6px; }
+.capitulo h1 { margin: 0 0 6px; font-size: 26px; color: {{primario}}; }
+.capitulo h1 .num { color: {{acento}}; margin-right: 6px; }
+.capitulo .subtitulo { font-size: 15px; color: {{tenue}}; margin: 0 0 10px; }
+.capitulo ul.datos { list-style: none; padding: 0; margin: 8px 0; }
+.capitulo ul.datos li { padding: 4px 0; border-bottom: 1px solid {{borde}}; }
+.capitulo ul.datos li:last-child { border-bottom: 0; }
+.capitulo .resumen-portada { margin: 6px 0 8px; color: {{tenue}}; }
 
 /* ---- secciones */
 .seccion { margin: 30px 0 0; }
@@ -103,6 +116,14 @@ pre.mermaid[data-processed] { color: {{texto}}; }
 .pendiente { margin: 0 0 8px; padding: 18px 12px; text-align: center; font-size: 13px; color: {{tenue}};
   background: {{fondoTenue}}; border: 1px dashed {{borde}}; }
 .alternativa { margin: 8px 0 0; }
+/* diagramas propios (flujo, job, linaje): una figura por parte, y el lienzo de Spoon si es una tira, plegado */
+.propio { margin: 0 0 16px; }
+.propio .figura { margin: 0 0 12px; }
+.parte { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: {{tenue}}; }
+.lienzo-plegado { margin: 0 0 16px; }
+.lienzo-plegado summary { cursor: pointer; font-size: 12px; color: {{tenue}}; }
+.lienzo-ancho { overflow-x: auto; margin: 8px 0 0; }
+.lienzo-ancho img { max-width: none; }
 
 /* ---- pie y marca de agua */
 .pie { margin: 32px 0 0; padding: 8px 0 0; border-top: 1px solid {{borde}}; font-size: 7.5pt; color: {{tenue}}; }
@@ -123,6 +144,15 @@ pre.mermaid[data-processed] { color: {{texto}}; }
   tr, .tarjeta, .aviso, .figura, .pendiente { page-break-inside: avoid; break-inside: avoid; }
   h2, h3, .titulo-bloque { page-break-after: avoid; break-after: avoid; }
   .tabla { overflow: visible; }
+  /* Una figura nunca es mas alta que la pagina (menos su titulo y su nota). Un SVG o una imagen no se
+     parten: si no entraban, Chromium los pasaba enteros a la pagina siguiente y dejaba el titulo solo, un
+     marco vacio y paginas en blanco. El SVG conserva su ancho y el dibujo se achica centrado (viewBox);
+     la imagen, sin deformarse (RenderHtml ademas le baja el ancho en el PDF). */
+  .figura pre.mermaid svg, .figura .svg svg { max-height: {{altoFigura}}; }
+  .figura img { max-height: {{altoFigura}}; object-fit: contain; }
+  pre.mermaid, .figura .svg, .figura .lienzo { page-break-inside: avoid; break-inside: avoid; }
+  .parte { page-break-after: avoid; break-after: avoid; }
+  .lienzo-plegado { display: none; }
 }
 /*==IMPRIMIR==*/
 @page { size: {{pagina}}; margin: 18mm 16mm 20mm;
@@ -130,6 +160,7 @@ pre.mermaid[data-processed] { color: {{texto}}; }
   @bottom-right { content: "{{pagina_txt}} " counter(page) " {{de_txt}} " counter(pages); font-family: {{fuente}};
     font-size: 7.5pt; color: {{tenue}}; } }
 .seccion { page-break-before: always; break-before: page; margin-top: 0; }
+.capitulo { page-break-before: always; break-before: page; margin-top: 0; }
 /* una seccion corta (validacion, conexiones...) sigue en la misma pagina, entera */
 .seccion.corta { page-break-before: auto; break-before: auto; page-break-inside: avoid; break-inside: avoid;
   margin-top: 28px; }

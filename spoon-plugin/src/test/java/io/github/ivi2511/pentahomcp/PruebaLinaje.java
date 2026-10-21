@@ -86,13 +86,20 @@ public class PruebaLinaje {
       for ( StepMeta d : finales ) {
         LinajeMetaverse.Respuesta mv = corrida.destinos.get( d.getName() );
         noNulo( mv, ej + ": respuesta de metaverse para " + d.getName() );
-        if ( mv.error != null ) {
-          // 06 "Escribir errores" (hop de error): metaverse falla y el propio responde
-          igual( "06", ej, "solo 06 tiene un destino donde metaverse falla: " + d.getName() + " " + mv.error );
+        if ( mv.error != null || !mv.fallidos.isEmpty() ) {
+          // 06 "Escribir errores" (hop de error): metaverse falla (con todos o con algunos campos; los que
+          // fallan van al motor propio) y el propio responde
+          igual( "06", ej, "solo 06 tiene un destino donde metaverse falla: " + d.getName() + " " + mv.error + " "
+            + mv.fallidos );
           igual( "Escribir errores", d.getName(), "destino donde metaverse falla" );
-          continue;
+          if ( mv.error != null ) {
+            continue;
+          }
         }
         for ( ValueMetaInterface v : propio.campos( d ).getValueMetaList() ) {
+          if ( mv.fallidos.contains( v.getName() ) ) {
+            continue;
+          }
           List<List<LinajePropio.Nodo>> deMv = mv.caminos.get( v.getName() );
           noNulo( deMv, ej + ": metaverse da caminos para " + d.getName() + "." + v.getName() );
           LinajePropio.Campo c = propio.campo( d, v );
@@ -276,7 +283,9 @@ public class PruebaLinaje {
       if ( b instanceof Tabla ) {
         tablas++;
         if ( ( (Tabla) b ).titulo.contains( "Escribir errores" ) ) {
-          contiene( b.nota, "metaverse failed", "nota: por que se uso el respaldo" );
+          // por que se uso el respaldo, sin la excepcion (esa va al log)
+          contiene( b.nota, "metaverse could not", "nota: por que se uso el respaldo" );
+          noContiene( b.nota, "Exception", "nota sin detalles tecnicos" );
         }
       }
     }

@@ -5,10 +5,12 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,8 +50,10 @@ import io.github.ivi2511.pentahomcp.informes.tema.Tema;
  * filas y ms); categorias ordenadas de mayor a menor por la primera serie; el valor escrito al final de
  * cada barra con {@code unidad}; si la unidad es "%", la escala va de 0 a 100. Con 2 series de unidades
  * distintas, dejar {@code unidad} en null y poner la unidad en el nombre de cada serie.</li>
- * <li>gantt: filas en el orden de {@code categorias} (y despues las que solo estan en los tramos); eje
- * en ms, o en s si dura 2 s o mas; init en gris y exec en el primario; la duracion de exec al final.</li>
+ * <li>gantt: filas en el orden de {@code categorias} (y despues las que solo estan en los tramos), hasta
+ * {@link #MAX_FILAS_GANTT}: si hay mas, quedan las mas largas y las mas rapidas van como «+N mas»; eje en
+ * ms, o en s si dura 2 s o mas, de toda la corrida; init en gris y exec en el primario; la duracion de exec
+ * al final.</li>
  * <li>linea: hasta 5 series (las demas se cuentan en la leyenda); un null corta la linea; eje Y desde 0
  * y la unidad arriba del eje.</li>
  * </ul>
@@ -67,8 +71,13 @@ public final class GraficosSvg {
   public static final int ANCHO = 720;
   /** Alto de cada fila de barras_h (una serie) y de gantt. */
   public static final int FILA = 22;
-  /** Tope de barras y de filas del Gantt; el resto va como «+N mas». */
+  /** Tope de barras; el resto va como «+N mas». */
   public static final int MAX_BARRAS = 25;
+  /**
+   * Tope de filas del Gantt (las de CorridaMedida.MAX_FILAS_GANTT entran enteras). Si hay mas, quedan las
+   * mas largas en su orden y el resto (las mas rapidas) va como «+N mas».
+   */
+  public static final int MAX_FILAS_GANTT = 40;
   /** barras_h dibuja 1 o 2 series. */
   public static final int MAX_SERIES_BARRAS = 2;
   /** linea dibuja hasta 5 series. */
@@ -294,16 +303,36 @@ public final class GraficosSvg {
         l.add( t );
       }
     }
-    List<String> nombres = new ArrayList<>( filas.keySet() );
-    int n = nombres.size();
-    int visibles = Math.min( n, MAX_BARRAS );
+    final List<String> todas = new ArrayList<>( filas.keySet() );
+    int n = todas.size();
+    int visibles = Math.min( n, MAX_FILAS_GANTT );
     int resto = n - visibles;
+    // el eje cubre toda la corrida, tambien las filas que no se dibujan
     long tmin = 0;
     long tmax = Long.MIN_VALUE;
-    for ( int i = 0; i < visibles; i++ ) {
-      for ( Tramo t : filas.get( nombres.get( i ) ) ) {
+    for ( List<Tramo> l : filas.values() ) {
+      for ( Tramo t : l ) {
         tmin = Math.min( tmin, Math.min( t.inicioMs, t.finMs ) );
         tmax = Math.max( tmax, Math.max( t.inicioMs, t.finMs ) );
+      }
+    }
+    List<String> nombres = todas;
+    if ( resto > 0 ) {
+      // si no entran todas, quedan las mas largas (en su orden): las que se cortan son las mas rapidas
+      List<String> porDuracion = new ArrayList<>( todas );
+      final LinkedHashMap<String, List<Tramo>> f = filas;
+      Collections.sort( porDuracion, new Comparator<String>() {
+        @Override
+        public int compare( String a, String b ) {
+          return Long.compare( duracion( f.get( b ) ), duracion( f.get( a ) ) );
+        }
+      } );
+      Set<String> quedan = new HashSet<>( porDuracion.subList( 0, visibles ) );
+      nombres = new ArrayList<>();
+      for ( String x : todas ) {
+        if ( quedan.contains( x ) ) {
+          nombres.add( x );
+        }
       }
     }
     if ( tmax == Long.MIN_VALUE ) {
