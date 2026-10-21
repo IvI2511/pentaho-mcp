@@ -43,9 +43,11 @@ import org.pentaho.di.ui.core.PropsUI;
  * arriba a la derecha del icono (o ninguna, con {@link Densidad#SIN_NOTA}); el texto completo va a la pestana
  * y a la guia. Si la compacta corta algo, queda fuera del lienzo. Mas de 12 pasos: aviso para partir en etapas.
  * <p>
- * Medidas: una nota con {@code width = W} y {@code height = H} se dibuja con {@code W + 2*5} por
- * {@code H + 2*5} px (BasePainter.drawNote suma Const.NOTE_MARGIN a cada lado), y es ese rectangulo el que se
- * verifica. El nombre de un step va centrado bajo el icono, 5 px debajo (TransPainter.getNamePosition).
+ * Medidas: BasePainter.drawNote (bytecode de 9.4) usa {@code W = max(width, texto + 2*5)} y
+ * {@code H = max(height, alto del texto + 2*5)} y dibuja un poligono de {@code W + 5} por {@code H + 5} (la
+ * esquina doblada). Aca se reserva {@code W + 2*5} por {@code H + 2*5}, 5 px mas de lo dibujado, y es ese
+ * rectangulo (+4 px de aire) el que se verifica. El nombre de un step va centrado bajo el icono, 5 px debajo
+ * (TransPainter.getNamePosition).
  * <p>
  * Hilos: {@link #calcular} es pura y se puede llamar desde cualquier hilo si el Medidor lo permite; un
  * {@link MedidorGc} sobre un SWTGC solo en el hilo de UI.
@@ -257,7 +259,7 @@ final class LeccionLayout {
     }
   }
 
-  /** Una nota ubicada. ancho/alto son los campos width/height de NotePadMeta; dibujada ocupa 2*MARGEN mas. */
+  /** Una nota ubicada. ancho/alto son los campos width/height de NotePadMeta; se reserva 2*MARGEN mas. */
   static final class Ubicada {
     final Pedida pedida;
     Banda banda;
@@ -283,7 +285,7 @@ final class LeccionLayout {
       return banda != Banda.FUERA;
     }
 
-    /** Rectangulo dibujado {x, y, ancho, alto}. */
+    /** Rectangulo reservado {x, y, ancho, alto} (5 px mas que el poligono que dibuja Spoon). */
     int[] rect() {
       return new int[] { x, y, ancho + 2 * MARGEN, alto + 2 * MARGEN };
     }

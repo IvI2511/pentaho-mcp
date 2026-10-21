@@ -639,6 +639,36 @@ public class PruebaLeccionLayout {
     igual( 220, t.ancho, "sin columnas, ancho de una nota" );
   }
 
+  public void pruebaDeterministaYSinTocarLaEntrada() {
+    // el plan se calcula una vez en lesson_start y se puede repetir (relayout): mismo resultado, entrada intacta
+    Entrada e = nueva( 32 );
+    e.step( "B", new Point( 900, 40 ) ).step( "A", new Point( 20, 500 ) ).step( "C", null );
+    e.hop( "A", "B" ).hop( "B", "C" );
+    e.nota( Tipo.TITULO, null, 0, "Lección · Repetible" );
+    e.nota( Tipo.PASO, "A", 1, "1 · A\nQué: primero." );
+    e.nota( Tipo.OJO, "A", 1, "¡Ojo! (paso 1) algo que mirar." );
+    e.nota( Tipo.PASO, "C", 2, "2 · C\nQué: despues." );
+    e.previa( "usuario", 300, 300, 80, 20 );
+    Plan p1 = LeccionLayout.calcular( e, m );
+    Plan p2 = LeccionLayout.calcular( e, m );
+    punto( 900, 40, e.actuales.get( 0 ), "la posicion actual de B no cambia" );
+    punto( 20, 500, e.actuales.get( 1 ), "la de A tampoco" );
+    nulo( e.actuales.get( 2 ), "C sigue sin posicion" );
+    igual( 300, e.previas.get( 0 ).x, "la previa de la entrada no se mueve" );
+    for ( int i = 0; i < p1.posiciones.length; i++ ) {
+      punto( p1.posiciones[ i ].x, p1.posiciones[ i ].y, p2.posiciones[ i ], "misma posicion de " + p1.steps.get( i ) );
+    }
+    igual( p1.notas.size(), p2.notas.size(), "mismas notas" );
+    for ( int i = 0; i < p1.notas.size(); i++ ) {
+      Ubicada a = p1.notas.get( i );
+      Ubicada b = p2.notas.get( i );
+      igual( a.banda + " " + a.x + "," + a.y + " " + a.ancho + "x" + a.alto + " " + a.texto,
+        b.banda + " " + b.x + "," + b.y + " " + b.ancho + "x" + b.alto + " " + b.texto, "nota " + i + " igual" );
+    }
+    igual( p1.avisos, p2.avisos, "mismos avisos" );
+    sinChoques( e, p1 );
+  }
+
   // ---------------------------------------------------------------- ayudas
 
   private static Entrada nueva( int icono ) {
