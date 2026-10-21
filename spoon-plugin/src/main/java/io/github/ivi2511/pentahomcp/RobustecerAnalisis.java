@@ -844,6 +844,26 @@ final class RobustecerAnalisis {
       + "<value_length>-1</value_length><value_precision>-1</value_precision><replace_field/></formula>";
   }
 
+  /** Manda por nombre y no es un Filter rows (Switch/case, Java filter): insertar detrás es a mano. */
+  private static boolean porNombreSinFiltro( StepMeta f ) {
+    return MANDAN_POR_NOMBRE.contains( f.getStepID() ) && !"FilterRows".equals( f.getStepID() );
+  }
+
+  /** Si f es un Filter rows que manda a 'viejo' por nombre, ahora manda a 'nuevo' (el step que se inserta). */
+  private void redirigir( StepMeta f, StepMeta viejo, String nuevo, Propuesta x ) {
+    if ( !"FilterRows".equals( f.getStepID() ) ) {
+      return;
+    }
+    for ( String tag : new String[] { "send_true_to", "send_false_to" } ) {
+      if ( txt( f, tag ).equalsIgnoreCase( viejo.getName() ) ) {
+        Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", f.getName() );
+        rc.xml = XMLHandler.addTagValue( tag, nuevo, false );
+        rc.diff = "~ " + f.getName() + ": " + tag + " -> " + nuevo;
+        x.cambios.add( rc );
+      }
+    }
+  }
+
   // ---------------------------------------------------------------- R12 input_file_parameter
 
   private void parametros() {
@@ -978,6 +998,9 @@ final class RobustecerAnalisis {
       }
       if ( claves == null ) {
         claves = clavesDe( s );
+        if ( claves.size() != 1 ) {
+          continue; // una tabla de hechos (2+ claves) se agrupa (aggregate_to_grain), no se deduplica
+        }
       }
       if ( claves.isEmpty() ) {
         continue;
@@ -1004,7 +1027,7 @@ final class RobustecerAnalisis {
       String tabla = Nodos.txt( Nodos.hijo( xml( s ), "lookup" ), "table" );
       String nombre = unico( t( "Remove duplicate ", "Quitar repetidos ", "Remover repetidos " )
         + ( tabla.isEmpty() ? s.getName() : tabla ) );
-      if ( ent.size() != 1 || MANDAN_POR_NOMBRE.contains( ent.get( 0 ).getFromStep().getStepID() ) ) {
+      if ( ent.size() != 1 || porNombreSinFiltro( ent.get( 0 ).getFromStep() ) ) {
         x.nivel = Receta.MANUAL;
         x.comoHacerlo = "Insert a Unique rows (HashSet) by " + String.join( ", ", claves ) + " right before '"
           + s.getName() + "' (it gets rows from several hops or by name).";
@@ -1024,6 +1047,7 @@ final class RobustecerAnalisis {
       u.atributos.put( REASON, "first row per " + String.join( ", ", claves ) + " wins" );
       u.diff = "+ " + nombre + " (Unique rows (HashSet) by " + String.join( ", ", claves ) + "; declared drops=duplicates)";
       x.cambios.add( u );
+      redirigir( f, s, nombre, x );
       x.cambios.add( quitarHop( f.getName(), s.getName() ) );
       x.cambios.add( hop( f.getName(), nombre, false ) );
       x.cambios.add( hop( nombre, s.getName(), false ) );
@@ -1114,7 +1138,7 @@ final class RobustecerAnalisis {
       Propuesta x = new Propuesta( Receta.WAIT_FOR_LOADS, l.getName() );
       x.porQue = "'" + l.getName() + "' reads " + tabla + " while " + String.join( ", ", nombres ) + " is still "
         + "writing it (in Kettle every step starts at once): rows can miss keys that are being loaded.";
-      if ( ent.size() != 1 || MANDAN_POR_NOMBRE.contains( ent.get( 0 ).getFromStep().getStepID() ) ) {
+      if ( ent.size() != 1 || porNombreSinFiltro( ent.get( 0 ).getFromStep() ) ) {
         x.nivel = Receta.MANUAL;
         x.comoHacerlo = "Insert a Block until steps finish (waiting for " + String.join( ", ", nombres )
           + ") right before '" + l.getName() + "'.";
@@ -1142,6 +1166,7 @@ final class RobustecerAnalisis {
       Cambio b = nuevo( nombre, "BlockUntilStepsFinish", pasos.toString(), pos, Receta.WAIT_FOR_LOADS );
       b.diff = "+ " + nombre + " (Block until steps finish: " + String.join( ", ", nombres ) + ")";
       x.cambios.add( b );
+      redirigir( f, l, nombre, x );
       x.cambios.add( quitarHop( f.getName(), l.getName() ) );
       x.cambios.add( hop( f.getName(), nombre, false ) );
       x.cambios.add( hop( nombre, l.getName(), false ) );
@@ -1150,6 +1175,105 @@ final class RobustecerAnalisis {
   }
 
   // ---------------------------------------------------------------- R05, R07, R08, R09, R10: manuales en la v1
+
+  /**
+   * R08 con aplicación (confirm): tras la búsqueda, un Filter rows con IS NOT NULL en lo que devuelve (sin valor por
+   * defecto) → falso: un User Defined Java Expression con el motivo («no está en <tabla>: <clave>=valor») → la cola.
+   * Si no se puede (varias salidas, nombres que no son identificadores...), la propuesta queda manual con el cómo.
+   */
+  private void huerfanos( StepMeta s, Propuesta pr, boolean come ) {
+    Element x = xml( s );
+    Element lk = Nodos.hijo( x, "lookup" );
+    List<String> claves = new ArrayList<String>();
+    for ( Element k : Nodos.hijos( lk, "key" ) ) {
+      claves.add( Nodos.txt( k, "name" ) );
+    }
+    List<String> devueltos = new ArrayList<String>();
+    for ( Element v : Nodos.hijos( lk, "value" ) ) {
+      String n = Nodos.txt( v, "rename" ).isEmpty() ? Nodos.txt( v, "name" ) : Nodos.txt( v, "rename" );
+      if ( Nodos.txt( v, "default" ).isEmpty() && !n.isEmpty() ) {
+        devueltos.add( n );
+      }
+    }
+    List<TransHopMeta> sal = salidas( s );
+    if ( devueltos.isEmpty() || claves.isEmpty() || sal.size() != 1 || s.getStepErrorMeta() != null
+      && s.getStepErrorMeta().isEnabled() ) {
+      return;
+    }
+    for ( String n : devueltos ) {
+      if ( !IDENTIFICADOR.matcher( n ).matches() ) {
+        return;
+      }
+    }
+    for ( String n : claves ) {
+      if ( !IDENTIFICADOR.matcher( n ).matches() ) {
+        return;
+      }
+    }
+    RowMetaInterface campos;
+    try {
+      campos = tm.getStepFields( s );
+    } catch ( Exception e ) {
+      pr.avisos.add( "fields unknown: " + RunMotor.primeraLinea( e ) );
+      return;
+    }
+    if ( campos == null || campos.isEmpty() ) {
+      return;
+    }
+    StepMeta siguiente = sal.get( 0 ).getToStep();
+    String tabla = "DBLookup".equals( s.getStepID() ) ? Nodos.txt( lk, "table" ) : txt( s, "from" );
+    String fl = normalizar( tabla.isEmpty() ? s.getName() : tabla );
+    String filtro = unico( t( "Found in " + fl + "?", "¿Está en " + fl + "?", "Está em " + fl + "?" ) );
+    String motivo = unico( t( "Reason not in " + fl, "Motivo no está en " + fl, "Motivo não está em " + fl ) );
+    int[] pf = libre( ( s.getLocation().x + siguiente.getLocation().x ) / 2, s.getLocation().y + 60 );
+    int[] pm = libre( pf[ 0 ], pf[ 1 ] + 100 );
+    StringBuilder cond = new StringBuilder( "<compare><condition><negated>N</negated><conditions>" );
+    for ( int i = 0; i < devueltos.size(); i++ ) {
+      cond.append( "<condition><negated>N</negated>" ).append( i == 0 ? "" : "<operator>AND</operator>" )
+        .append( XMLHandler.addTagValue( "leftvalue", devueltos.get( i ), false ) )
+        .append( "<function>IS NOT NULL</function><rightvalue/></condition>" );
+    }
+    cond.append( "</conditions></condition></compare>" );
+    Cambio cf = nuevo( filtro, "FilterRows", XMLHandler.addTagValue( "send_true_to", siguiente.getName(), false )
+      + XMLHandler.addTagValue( "send_false_to", motivo, false ) + cond, pf, Receta.ORPHANS_TO_REJECTS );
+    cf.diff = "+ " + filtro + " (Filter rows: " + String.join( " AND ", conNotNull( devueltos ) ) + ")";
+    String vacio = devueltos.get( 0 ) + " == null";
+    StringBuilder ex = new StringBuilder( "\"" + t( "Not in ", "No está en ", "Não está em " ) + tabla + ":\"" );
+    StringBuilder ec = new StringBuilder( "\"\"" );
+    for ( String k : claves ) {
+      ex.append( " + \" " ).append( k ).append( "=\" + " ).append( k );
+      ec.append( " + \"" ).append( k ).append( ", \"" );
+    }
+    String janino = formula( MOTIVO, "(" + vacio + " ? " + ex + " : \"\")" ) + formula( CAMPOS_ERROR, "(" + vacio
+      + " ? " + ec + " : \"\")" );
+    Cambio cm = nuevo( motivo, "Janino", janino, pm, Receta.ORPHANS_TO_REJECTS );
+    cm.diff = "+ " + motivo + " (User Defined Java Expression: " + MOTIVO + " = which key is not in " + tabla + ")";
+    Cola c = cola( conMotivo( campos ), s );
+    pr.nivel = Receta.CONFIRM;
+    pr.comoHacerlo = null;
+    pr.cambios.add( cf );
+    pr.cambios.add( cm );
+    if ( come ) {
+      try {
+        Element copia = (Element) lk.cloneNode( true );
+        LintArreglos.texto( copia, "eat_row_on_failure", "N" );
+        Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", s.getName() );
+        rc.xml = Xml.texto( copia );
+        rc.diff = "~ " + s.getName() + ": eat_row_on_failure=N (rows not found reach the filter)";
+        pr.cambios.add( rc );
+      } catch ( Exception e ) {
+        pr.avisos.add( "Set eat_row_on_failure=N on '" + s.getName() + "' by hand." );
+      }
+    }
+    pr.cambios.add( quitarHop( s.getName(), siguiente.getName() ) );
+    pr.cambios.add( hop( s.getName(), filtro, false ) );
+    pr.cambios.add( hop( filtro, siguiente.getName(), false ) );
+    pr.cambios.add( hop( filtro, motivo, false ) );
+    pr.cambios.addAll( c.cambios );
+    pr.cambios.add( hop( motivo, c.limpiar, false ) );
+    pr.avisos.add( "If the source SQL joins with an INNER JOIN, the orphans disappear before this filter: make it a "
+      + "LEFT JOIN (by hand)." );
+  }
 
   private void manuales() {
     List<StepMeta> cargas = new ArrayList<StepMeta>();
@@ -1221,6 +1345,8 @@ final class RobustecerAnalisis {
             + "keys) -> false: a User Defined Java Expression with motivo = \"the <natural key> X is not in <table>\" "
             + "-> the rejects tail. Set eat_row_on_failure=N. If the source SQL has an INNER JOIN, make it a LEFT JOIN "
             + "so orphans reach the filter. Or default 0 = an 'unknown' member that exists in the dimension.";
+          pr.nivel = Receta.MANUAL; // pasa a confirm si se puede aplicar
+          huerfanos( s, pr, come );
           plan.propuestas.add( pr );
         }
       }

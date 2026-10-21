@@ -196,9 +196,10 @@ public class PruebaRobustecer {
     contiene( r12.diff(), "+ parameter ARCHIVO_VENTAS (default ventas.csv)", "el parámetro" );
     contiene( r12.diff(), "${Internal.Entry.Current.Directory}/${ARCHIVO_VENTAS}", "la ruta con el parámetro" );
     Propuesta r08 = propuesta( plan.propuestas, "harden:orphans_to_rejects:Buscar clave cliente" );
-    igual( Receta.MANUAL, r08.nivel, "R08 es manual en la v1" );
-    noNulo( r08.comoHacerlo, "con el cómo" );
-    cierto( r08.cambios.isEmpty(), "sin cambios" );
+    igual( Receta.CONFIRM, r08.nivel, "R08 se confirma" );
+    contiene( r08.diff(), "+ ¿Está en dim_cliente? (Filter rows: sk_cliente IS NOT NULL)", "el filtro de huérfanos" );
+    contiene( r08.diff(), "Limpiar motivo ventas_3", "la misma cola que los errores del hecho" );
+    nulo( propuesta( plan.propuestas, "harden:dedupe_before_load:Cargar ventas" ), "un hecho no se deduplica" );
     cierto( propuesta( plan.propuestas, "harden:aggregate_to_grain:Cargar ventas" ).semantica, "R10 cambia la semántica" );
     // las confirm no se aplican sin su key
     List<Propuesta> el = RobustecerAnalisis.elegir( plan, p );
@@ -276,6 +277,7 @@ public class PruebaRobustecer {
     noNulo( quitar, "deduplicar antes de la dimensión" );
     igual( "duplicates", quitar.getAttribute( RobustecerAnalisis.GRUPO, RobustecerAnalisis.DROPS ), "declarado" );
     noNulo( tm.findStep( "Esperar dim_cliente" ), "esperar a la dimensión" );
+    noNulo( tm.findStep( "¿Está en dim_cliente?" ), "el filtro de huérfanos" );
     nulo( tm.findTransHop( tm.findStep( "Leer ventas" ), tm.findStep( "Convertir tipos" ) ), "el hop viejo no está" );
     contiene( tm.findStep( "Leer ventas" ).getXML(), "${Internal.Entry.Current.Directory}/${ARCHIVO_VENTAS}",
       "la entrada con el parámetro" );
@@ -401,6 +403,7 @@ public class PruebaRobustecer {
     contiene( texto( r ), "Faltan campos obligatorios: id_cliente", "el motivo de la clave vacía" );
     contiene( texto( r ), "Faltan campos obligatorios: fecha", "el motivo de la fecha vacía" );
     contiene( texto( r ), "CHECK constraint failed", "el motivo de la BD" );
+    contiene( texto( r ), "No está en dim_cliente: id_cliente=C07", "el huérfano con su motivo" );
     noContiene( texto( r ), "KettleDatabaseException: |", "sin la clase de la excepción delante" );
     igual( 4, filas( db, "dim_cliente" ), "las buenas se cargan (C08 también)" );
     igual( 4, filas( db, "fact_venta" ), "ninguna venta rota se cargó y no se duplicó nada" );

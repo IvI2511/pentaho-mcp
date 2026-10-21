@@ -58,7 +58,7 @@ public final class Receta {
     l.add( new Receta( "R11", WAIT_FOR_LOADS, AUTO, false ) );
     l.add( new Receta( "R05", SAFE_SPLIT, MANUAL, false ) );
     l.add( new Receta( "R07", STABLE_SURROGATE_KEYS, MANUAL, true ) );
-    l.add( new Receta( "R08", ORPHANS_TO_REJECTS, MANUAL, false ) );
+    l.add( new Receta( "R08", ORPHANS_TO_REJECTS, CONFIRM, false ) );
     l.add( new Receta( "R09", IDEMPOTENT_LOAD, MANUAL, true ) );
     l.add( new Receta( "R10", AGGREGATE_TO_GRAIN, MANUAL, true ) );
     l.add( new Receta( "R13", DEFAULT_OPTIONAL, MANUAL, false ) );
