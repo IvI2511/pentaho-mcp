@@ -180,6 +180,20 @@ public class PruebaEstresBalance {
     igual( EstresResultado.AVISO, estado( i2, "idempotent" ), "mismas filas, otras claves" );
   }
 
+  public void pruebaMensajeDeErrorDelLog() {
+    String log = "2026/10/22 00:03:01 - Convert types.0 - ERROR (version 9.4.0.0-343, build 0.0) : Unexpected error\n"
+      + "2026/10/22 00:03:01 - Convert types.0 - ERROR (version 9.4.0.0-343, build 0.0) : "
+      + "org.pentaho.di.core.exception.KettleConversionException: \n"
+      + "fecha String : couldn't convert string [31/02/2021] to a date using format [yyyy-MM-dd]\n"
+      + "\tat org.pentaho.di.core.row.value.ValueMetaBase.convertData(ValueMetaBase.java:1)\n"
+      + "2026/10/22 00:03:01 - Read sales.0 - Finished processing (I=20, O=0, R=0, W=20, U=0, E=0)\n";
+    String m = EstresMain.primerError( log );
+    contiene( m, "Convert types.0: Unexpected error", "el primer ERROR con su step" );
+    contiene( m, "couldn't convert string [31/02/2021]", "y la causa que viene después de la excepción" );
+    cierto( !m.contains( "ValueMetaBase.java" ), "sin la pila: " + m );
+    cierto( EstresMain.primerError( "2026/10/22 00:03:01 - T - Finished\n" ) == null, "sin errores, null" );
+  }
+
   public void pruebaColumnaMotivo() {
     cierto( Balance.esColumnaMotivo( "Motivo", null ), "motivo" );
     cierto( Balance.esColumnaMotivo( "reason", null ), "reason" );
