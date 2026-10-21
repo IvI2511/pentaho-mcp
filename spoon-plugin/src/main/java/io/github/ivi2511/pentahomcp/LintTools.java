@@ -63,6 +63,10 @@ final class LintTools {
         .integer( "deep_timeout_s", "Budget of the deep mode in seconds (default 60, max 300)", false )
         .strList( "rules", "Only these rule ids (see pentaho://lint/rules). The rules that are off by default "
           + "(db_output_without_error_handling, job_entry_without_failure_hop) only run when named here", false )
+        .bool( "robustness", "Also run the robustness rules (off by default: rows that would stop the load or vanish "
+          + "without a trace, rejects without a reason, unstable surrogate keys, loads that duplicate when re-run...) "
+          + "and return their separate 0-100 score in 'robustness'; the main score does not change. Each of these "
+          + "findings names in evidence.recipe the harden_etl recipe that fixes it. Default false", false )
         .strEnum( "min_severity", "Lowest severity to list (default info). The score always counts everything",
           false, "info", "warning", "error" )
         .strList( "steps", "Only list findings about these steps", false )
@@ -148,6 +152,7 @@ final class LintTools {
       throw new ToolError( "'min_severity' must be info, warning or error, got: " + ms );
     }
     op.kettleChecks = Tools.optBool( a, "include_kettle_checks", false );
+    op.robustez = Tools.optBool( a, "robustness", false );
     op.lang = Tools.optStr( a, "language", "en" );
     if ( op.rules != null ) {
       try {

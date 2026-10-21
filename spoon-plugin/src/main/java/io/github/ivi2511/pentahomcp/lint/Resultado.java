@@ -32,6 +32,11 @@ public final class Resultado {
   public final List<Hallazgo> kettleChecks = new ArrayList<Hallazgo>();
   public final List<NoEvaluado> notEvaluated = new ArrayList<NoEvaluado>();
   public final Profundo deep = new Profundo();
+  /**
+   * Sub-puntaje de robustez (score, grade, counts, penalties; mismo cálculo que el general) sobre los hallazgos de la
+   * familia robustness que no están silenciados; null si la familia no corrió. Sus hallazgos van en findings.
+   */
+  public Resultado robustez;
   public long ms;
 
   public static String banda( int score ) {

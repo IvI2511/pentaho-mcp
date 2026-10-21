@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<transformation>
+  <info>
+    <name>antes</name>
+    <description>Synthetic fragile load (tests of the robustness rules)</description>
+    <extended_description/><trans_version/><trans_type>Normal</trans_type><directory>/</directory>
+    <parameters></parameters>
+    <size_rowset>10000</size_rowset><sleep_time_empty>50</sleep_time_empty><sleep_time_full>50</sleep_time_full>
+    <unique_connections>N</unique_connections><feedback_shown>Y</feedback_shown><feedback_size>50000</feedback_size>
+    <using_thread_priorities>Y</using_thread_priorities><shared_objects_file/>
+    <capture_step_performance>N</capture_step_performance><step_performance_capturing_delay>1000</step_performance_capturing_delay>
+    <step_performance_capturing_size_limit>100</step_performance_capturing_size_limit>
+    <dependencies></dependencies><partitionschemas></partitionschemas><slaveservers></slaveservers><clusterschemas></clusterschemas>
+    <created_user>-</created_user><created_date>2026/10/21 23:00:00.000</created_date>
+    <modified_user>-</modified_user><modified_date>2026/10/21 23:00:00.000</modified_date>
+    <key_for_session_key/><is_key_private>N</is_key_private>
+  </info>
+  <notepads></notepads>
+  <connection>
+    <name>dwh</name><server>db.invalid</server><type>POSTGRESQL</type><access>Native</access><database>dwh</database>
+    <port>5432</port><username>etl</username><password/><servername/><data_tablespace/><index_tablespace/>
+    <attributes><attribute><code>PORT_NUMBER</code><attribute>5432</attribute></attribute></attributes>
+  </connection>
+  <order>
+<hop><from>Read sales</from><to>Valid date?</to><enabled>Y</enabled></hop>
+<hop><from>Valid date?</from><to>Split address</to><enabled>Y</enabled></hop>
+<hop><from>Split address</from><to>Customer key</to><enabled>Y</enabled></hop>
+<hop><from>Customer key</from><to>Load dim_customer</to><enabled>Y</enabled></hop>
+<hop><from>Split address</from><to>Look up customer</to><enabled>Y</enabled></hop>
+<hop><from>Look up customer</from><to>Convert amount</to><enabled>Y</enabled></hop>
+<hop><from>Convert amount</from><to>Load fact_sales</to><enabled>Y</enabled></hop>
+<hop><from>Load fact_sales</from><to>Bad sales</to><enabled>Y</enabled></hop>
+<hop><from>Read products</from><to>Look up supplier</to><enabled>Y</enabled></hop>
+<hop><from>Look up supplier</from><to>Copy products</to><enabled>Y</enabled></hop>
+  </order>
+  <step>
+    <name>Read sales</name>
+    <type>CsvInput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <filename>${Internal.Entry.Current.Directory}/datos/sales.csv</filename>
+    <filename_field/><rownum_field/><include_filename>N</include_filename><separator>;</separator><enclosure>"</enclosure>
+    <header>Y</header><buffer_size>50000</buffer_size><lazy_conversion>N</lazy_conversion><add_filename_result>N</add_filename_result>
+    <parallel>N</parallel><newline_possible>N</newline_possible><format>mixed</format><encoding>UTF-8</encoding>
+    <fields><field><name>sale_id</name><type>Integer</type><format>#</format><currency/><decimal>.</decimal><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>sale_date</name><type>Date</type><format>yyyy-MM-dd</format><currency/><decimal>.</decimal><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>customer_id</name><type>String</type><format/><currency/><decimal>.</decimal><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field>
+      <field><name>name</name><type>String</type><format/><currency/><decimal>.</decimal><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>address</name><type>String</type><format/><currency/><decimal>.</decimal><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>amount</name><type>String</type><format/><currency/><decimal>.</decimal><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>64</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Valid date?</name>
+    <type>FilterRows</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <send_true_to>Split address</send_true_to>
+    <send_false_to/>
+    <compare><condition><negated>N</negated><leftvalue>sale_date</leftvalue><function>&gt;</function><rightvalue/>
+      <value><name>constant</name><type>Date</type><text>2000/01/01 00:00:00.000</text><length>-1</length><precision>-1</precision><isnull>N</isnull><mask>yyyy/MM/dd HH:mm:ss.SSS</mask></value>
+    </condition></compare>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>224</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Split address</name>
+    <type>FieldSplitter</type>
+    <description/>
+    <distribute>N</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <splitfield>address</splitfield><delimiter>,</delimiter><enclosure/>
+    <fields><field><name>street</name><id/><idrem>N</idrem><type>String</type><format/><group/><decimal/><currency/>
+      <length>-1</length><precision>-1</precision><nullif/><ifnull/><trimtype>none</trimtype></field>
+      <field><name>city</name><id/><idrem>N</idrem><type>String</type><format/><group/><decimal/><currency/>
+      <length>-1</length><precision>-1</precision><nullif/><ifnull/><trimtype>none</trimtype></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>384</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Customer key</name>
+    <type>Sequence</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <valuename>customer_sk</valuename><use_database>N</use_database><connection/><schema/><seqname>SEQ_</seqname>
+    <use_counter>Y</use_counter><counter_name/><start_at>1</start_at><increment_by>1</increment_by><max_value>999999999</max_value>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>544</xloc><yloc>64</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Load dim_customer</name>
+    <type>TableOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><schema/><table>dim_customer</table><commit>1000</commit><truncate>N</truncate>
+    <ignore_errors>N</ignore_errors><use_batch>Y</use_batch><specify_fields>Y</specify_fields><partitioning_enabled>N</partitioning_enabled>
+    <partitioning_field/><partitioning_daily>N</partitioning_daily><partitioning_monthly>Y</partitioning_monthly>
+    <tablename_in_field>N</tablename_in_field><tablename_field/><tablename_in_table>Y</tablename_in_table>
+    <return_keys>N</return_keys><return_field/>
+    <fields><field><column_name>customer_sk</column_name><stream_name>customer_sk</stream_name></field>
+      <field><column_name>customer_id</column_name><stream_name>customer_id</stream_name></field>
+      <field><column_name>name</column_name><stream_name>name</stream_name></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>704</xloc><yloc>64</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Look up customer</name>
+    <type>DBLookup</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><cache>Y</cache><cache_load_all>N</cache_load_all><cache_size>0</cache_size>
+    <lookup><schema/><table>dim_customer</table><orderby/><fail_on_multiple>N</fail_on_multiple><eat_row_on_failure>N</eat_row_on_failure>
+      <key><name>customer_id</name><field>customer_id</field><condition>=</condition><name2/></key>
+      <value><name>customer_sk</name><rename>customer_sk</rename><default/><type>Integer</type></value></lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>544</xloc><yloc>288</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Convert amount</name>
+    <type>SelectValues</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><select_unspecified>N</select_unspecified>
+      <meta><name>amount</name><rename>amount</rename><type>Number</type><length>-1</length><precision>-1</precision>
+        <storage_type/><conversion_mask>#.##</conversion_mask><date_format_lenient>false</date_format_lenient>
+        <date_format_locale/><date_format_timezone/><lenient_string_to_number>true</lenient_string_to_number>
+        <encoding/><decimal_symbol>.</decimal_symbol><grouping_symbol/><currency_symbol/></meta></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>704</xloc><yloc>288</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Load fact_sales</name>
+    <type>InsertUpdate</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><commit>100</commit><update_bypassed>N</update_bypassed>
+    <lookup><schema/><table>fact_sales</table>
+      <key><name>customer_sk</name><field>customer_sk</field><condition>=</condition><name2/></key>
+      <key><name>sale_date</name><field>sale_date</field><condition>=</condition><name2/></key>
+      <value><name>customer_sk</name><rename>customer_sk</rename><update>N</update></value>
+      <value><name>sale_date</name><rename>sale_date</rename><update>N</update></value>
+      <value><name>amount</name><rename>amount</rename><update>Y</update></value></lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>864</xloc><yloc>288</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Bad sales</name>
+    <type>Dummy</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>864</xloc><yloc>432</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Read products</name>
+    <type>TableInput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection>
+    <sql>SELECT p.product_id, p.name, c.category
+FROM products p
+JOIN categories c ON c.category_id = p.category_id</sql>
+    <limit>0</limit><lookup/><execute_each_row>N</execute_each_row><variables_active>N</variables_active>
+    <lazy_conversion_active>N</lazy_conversion_active><cached_row_meta_active>N</cached_row_meta_active>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>64</xloc><yloc>560</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Look up supplier</name>
+    <type>DBLookup</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><cache>Y</cache><cache_load_all>N</cache_load_all><cache_size>0</cache_size>
+    <lookup><schema/><table>suppliers</table><orderby/><fail_on_multiple>N</fail_on_multiple><eat_row_on_failure>Y</eat_row_on_failure>
+      <key><name>product_id</name><field>product_id</field><condition>=</condition><name2/></key>
+      <value><name>supplier</name><rename>supplier</rename><default/><type>String</type></value></lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>224</xloc><yloc>560</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Copy products</name>
+    <type>TableOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><schema/><table>dim_product</table><commit>1000</commit><truncate>N</truncate>
+    <ignore_errors>N</ignore_errors><use_batch>Y</use_batch><specify_fields>N</specify_fields><partitioning_enabled>N</partitioning_enabled>
+    <partitioning_field/><partitioning_daily>N</partitioning_daily><partitioning_monthly>Y</partitioning_monthly>
+    <tablename_in_field>N</tablename_in_field><tablename_field/><tablename_in_table>Y</tablename_in_table>
+    <return_keys>N</return_keys><return_field/><fields></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>384</xloc><yloc>560</yloc><draw>Y</draw></GUI>
+  </step>
+  <step_error_handling>
+    <error><source_step>Load fact_sales</source_step><target_step>Bad sales</target_step><is_enabled>Y</is_enabled>
+      <nr_valuename/><descriptions_valuename/><fields_valuename/><codes_valuename/><max_errors/><max_pct_errors/><min_pct_rows/></error>
+  </step_error_handling>
+  <slave-step-copy-partition-distribution></slave-step-copy-partition-distribution>
+  <slave_transformation>N</slave_transformation>
+  <attributes/>
+</transformation>

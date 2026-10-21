@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<transformation>
+  <info>
+    <name>06_carga_tolerante</name>
+    <description>Fault-tolerant load: every bad row goes to a rejects file with its reason (motivo); re-running changes nothing</description>
+    <extended_description>Pattern 06. A flat sales file loads dim_customer (stable surrogate keys) and fact_sales (one row per customer and day). Missing required fields, bad dates or numbers, orphan sales and database errors (CHECK constraints) never stop the load: each row goes to salida/rechazos/ with motivo and campos_error. Duplicates and the aggregation are declared drops (pentaho-live-robust attributes). Make the transformation database transactional = Y: one SQLite connection, committed at the end.</extended_description>
+    <trans_version/><trans_type>Normal</trans_type><directory>/</directory>
+    <parameters>
+      <parameter><name>ARCHIVO_VENTAS</name><default_value>ventas.csv</default_value>
+        <description>File to load from datos/ (ventas_rotas.csv = the dirty-data test)</description></parameter>
+    </parameters>
+    <size_rowset>10000</size_rowset><sleep_time_empty>50</sleep_time_empty><sleep_time_full>50</sleep_time_full>
+    <unique_connections>Y</unique_connections><feedback_shown>Y</feedback_shown><feedback_size>50000</feedback_size>
+    <using_thread_priorities>Y</using_thread_priorities><shared_objects_file/>
+    <capture_step_performance>N</capture_step_performance><step_performance_capturing_delay>1000</step_performance_capturing_delay>
+    <step_performance_capturing_size_limit>100</step_performance_capturing_size_limit>
+    <dependencies></dependencies><partitionschemas></partitionschemas><slaveservers></slaveservers><clusterschemas></clusterschemas>
+    <created_user>-</created_user><created_date>2026/10/21 23:00:00.000</created_date>
+    <modified_user>-</modified_user><modified_date>2026/10/21 23:00:00.000</modified_date>
+    <key_for_session_key/><is_key_private>N</is_key_private>
+  </info>
+  <notepads>
+    <notepad>
+      <note>Every bad row ends in salida/rechazos/*.csv with motivo (why) and campos_error (which fields).&#xa;Rows read = loaded + rejected + declared drops (duplicates, aggregation): nothing is lost in silence.</note>
+      <xloc>64</xloc><yloc>656</yloc><width>560</width><heigth>40</heigth><fontname/><fontsize>-1</fontsize>
+      <fontbold>N</fontbold><fontitalic>N</fontitalic><fontcolorred>0</fontcolorred><fontcolorgreen>0</fontcolorgreen>
+      <fontcolorblue>0</fontcolorblue><backgroundcolorred>255</backgroundcolorred><backgroundcolorgreen>205</backgroundcolorgreen>
+      <backgroundcolorblue>112</backgroundcolorblue><bordercolorred>100</bordercolorred><bordercolorgreen>100</bordercolorgreen>
+      <bordercolorblue>100</bordercolorblue><drawshadow>Y</drawshadow>
+    </notepad>
+  </notepads>
+  <connection>
+    <name>dwh</name><server/><type>SQLITE</type><access>Native</access>
+    <database>${Internal.Entry.Current.Directory}/salida/06_dwh.sqlite</database>
+    <port>-1</port><username/><password/><servername/><data_tablespace/><index_tablespace/>
+    <attributes>
+      <attribute><code>FORCE_IDENTIFIERS_TO_LOWERCASE</code><attribute>N</attribute></attribute>
+      <attribute><code>FORCE_IDENTIFIERS_TO_UPPERCASE</code><attribute>N</attribute></attribute>
+      <attribute><code>IS_CLUSTERED</code><attribute>N</attribute></attribute>
+      <attribute><code>PORT_NUMBER</code><attribute>-1</attribute></attribute>
+      <attribute><code>PRESERVE_RESERVED_WORD_CASE</code><attribute>Y</attribute></attribute>
+      <attribute><code>QUOTE_ALL_FIELDS</code><attribute>N</attribute></attribute>
+      <attribute><code>SUPPORTS_BOOLEAN_DATA_TYPE</code><attribute>Y</attribute></attribute>
+      <attribute><code>SUPPORTS_TIMESTAMP_DATA_TYPE</code><attribute>Y</attribute></attribute>
+      <attribute><code>USE_POOLING</code><attribute>N</attribute></attribute>
+    </attributes>
+  </connection>
+  <order>
+<hop><from>Read sales</from><to>Required fields?</to><enabled>Y</enabled></hop>
+<hop><from>Required fields?</from><to>Convert types</to><enabled>Y</enabled></hop>
+<hop><from>Required fields?</from><to>Reason missing fields</to><enabled>Y</enabled></hop>
+<hop><from>Reason missing fields</from><to>Clean reason input</to><enabled>Y</enabled></hop>
+<hop><from>Convert types</from><to>Clean reason input</to><enabled>Y</enabled></hop>
+<hop><from>Clean reason input</from><to>Write rejects input</to><enabled>Y</enabled></hop>
+<hop><from>Convert types</from><to>Remove duplicate customers</to><enabled>Y</enabled></hop>
+<hop><from>Remove duplicate customers</from><to>Look up existing key</to><enabled>Y</enabled></hop>
+<hop><from>Look up existing key</from><to>Join max</to><enabled>Y</enabled></hop>
+<hop><from>Max key</from><to>Join max</to><enabled>Y</enabled></hop>
+<hop><from>Join max</from><to>Number new</to><enabled>Y</enabled></hop>
+<hop><from>Number new</from><to>Compute key</to><enabled>Y</enabled></hop>
+<hop><from>Compute key</from><to>Load dim_customer</to><enabled>Y</enabled></hop>
+<hop><from>Load dim_customer</from><to>Clean reason customers</to><enabled>Y</enabled></hop>
+<hop><from>Clean reason customers</from><to>Write rejects customers</to><enabled>Y</enabled></hop>
+<hop><from>Convert types</from><to>Remove duplicate sales</to><enabled>Y</enabled></hop>
+<hop><from>Remove duplicate sales</from><to>Buffer sales</to><enabled>Y</enabled></hop>
+<hop><from>Buffer sales</from><to>Wait for dim_customer</to><enabled>Y</enabled></hop>
+<hop><from>Wait for dim_customer</from><to>Look up customer_sk</to><enabled>Y</enabled></hop>
+<hop><from>Look up customer_sk</from><to>Customer found?</to><enabled>Y</enabled></hop>
+<hop><from>Customer found?</from><to>Aggregate to grain</to><enabled>Y</enabled></hop>
+<hop><from>Customer found?</from><to>Reason orphan</to><enabled>Y</enabled></hop>
+<hop><from>Reason orphan</from><to>Write rejects orphans</to><enabled>Y</enabled></hop>
+<hop><from>Aggregate to grain</from><to>Load fact_sales</to><enabled>Y</enabled></hop>
+<hop><from>Load fact_sales</from><to>Clean reason sales</to><enabled>Y</enabled></hop>
+<hop><from>Clean reason sales</from><to>Write rejects sales</to><enabled>Y</enabled></hop>
+  </order>
+  <step>
+    <name>Read sales</name>
+    <type>CsvInput</type>
+    <description>Everything as String (trimmed): the types are converted later, where a bad value can go to the rejects</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <filename>${Internal.Entry.Current.Directory}/datos/${ARCHIVO_VENTAS}</filename>
+    <filename_field/><rownum_field/><include_filename>N</include_filename>
+    <separator>;</separator><enclosure>"</enclosure><header>Y</header><buffer_size>50000</buffer_size>
+    <lazy_conversion>N</lazy_conversion><add_filename_result>N</add_filename_result><parallel>N</parallel>
+    <newline_possible>N</newline_possible><format>mixed</format><encoding>UTF-8</encoding>
+    <fields><field><name>sale_id</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>sale_date</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>customer_id</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>customer_name</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>city</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>amount</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field><field><name>quantity</name><type>String</type><format/><currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>64</xloc><yloc>304</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Required fields?</name>
+    <type>FilterRows</type>
+    <description>sale_id, sale_date, customer_id and amount must be there (an empty string is null in Kettle)</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <send_true_to>Convert types</send_true_to>
+    <send_false_to>Reason missing fields</send_false_to>
+    <compare><condition><negated>N</negated><conditions><condition><negated>N</negated><leftvalue>sale_id</leftvalue><function>IS NOT NULL</function><rightvalue/></condition><condition><negated>N</negated><operator>AND</operator><leftvalue>sale_date</leftvalue><function>IS NOT NULL</function><rightvalue/></condition><condition><negated>N</negated><operator>AND</operator><leftvalue>customer_id</leftvalue><function>IS NOT NULL</function><rightvalue/></condition><condition><negated>N</negated><operator>AND</operator><leftvalue>amount</leftvalue><function>IS NOT NULL</function><rightvalue/></condition></conditions></condition></compare>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>224</xloc><yloc>304</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Reason missing fields</name>
+    <type>Janino</type>
+    <description>Lists what is missing (Janino, no JavaScript); the trailing comma is removed by Clean reason</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <formula><field_name>motivo</field_name><formula_string>&quot;Faltan campos obligatorios: &quot; + (sale_id == null ? &quot;sale_id, &quot; : &quot;&quot;) + (sale_date == null ? &quot;sale_date, &quot; : &quot;&quot;) + (customer_id == null ? &quot;customer_id, &quot; : &quot;&quot;) + (amount == null ? &quot;amount, &quot; : &quot;&quot;)</formula_string><value_type>String</value_type><value_length>-1</value_length><value_precision>-1</value_precision><replace_field/></formula><formula><field_name>campos_error</field_name><formula_string>(sale_id == null ? &quot;sale_id, &quot; : &quot;&quot;) + (sale_date == null ? &quot;sale_date, &quot; : &quot;&quot;) + (customer_id == null ? &quot;customer_id, &quot; : &quot;&quot;) + (amount == null ? &quot;amount, &quot; : &quot;&quot;)</formula_string><value_type>String</value_type><value_length>-1</value_length><value_precision>-1</value_precision><replace_field/></formula>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>224</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Convert types</name>
+    <type>SelectValues</type>
+    <description>String -&gt; Integer / Date / Number, NOT lenient: 2026-02-31 or 'mil' go to the error hop with Kettle's message</description>
+    <distribute>N</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><select_unspecified>N</select_unspecified><meta><name>sale_id</name><rename>sale_id</rename><type>Integer</type><length>-1</length><precision>-1</precision><storage_type/><conversion_mask>#</conversion_mask><date_format_lenient>false</date_format_lenient><date_format_locale/><date_format_timezone/><lenient_string_to_number>false</lenient_string_to_number><encoding/><decimal_symbol>.</decimal_symbol><grouping_symbol/><currency_symbol/></meta><meta><name>sale_date</name><rename>sale_date</rename><type>Date</type><length>-1</length><precision>-1</precision><storage_type/><conversion_mask>yyyy-MM-dd</conversion_mask><date_format_lenient>false</date_format_lenient><date_format_locale/><date_format_timezone/><lenient_string_to_number>false</lenient_string_to_number><encoding/><decimal_symbol/><grouping_symbol/><currency_symbol/></meta><meta><name>amount</name><rename>amount</rename><type>Number</type><length>-1</length><precision>-1</precision><storage_type/><conversion_mask>#.##</conversion_mask><date_format_lenient>false</date_format_lenient><date_format_locale/><date_format_timezone/><lenient_string_to_number>false</lenient_string_to_number><encoding/><decimal_symbol>.</decimal_symbol><grouping_symbol/><currency_symbol/></meta><meta><name>quantity</name><rename>quantity</rename><type>Integer</type><length>-1</length><precision>-1</precision><storage_type/><conversion_mask>#</conversion_mask><date_format_lenient>false</date_format_lenient><date_format_locale/><date_format_timezone/><lenient_string_to_number>false</lenient_string_to_number><encoding/><decimal_symbol>.</decimal_symbol><grouping_symbol/><currency_symbol/></meta></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>384</xloc><yloc>304</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Clean reason input</name>
+    <type>ReplaceString</type>
+    <description>Kettle's message has several lines: one line, no spaces at the ends, no trailing comma</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>^\s+|\s+$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>\s*[\r\n]+\s*</replace_string><replace_by_string> | </replace_by_string><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>,\s*$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>campos_error</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>,\s*$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>384</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Write rejects input</name>
+    <type>TextFileOutput</type>
+    <description>Created even when there are no rejects (empty = nothing was rejected)</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <separator>;</separator><enclosure>"</enclosure><enclosure_forced>N</enclosure_forced>
+    <enclosure_fix_disabled>N</enclosure_fix_disabled><header>Y</header><footer>N</footer><format>UNIX</format>
+    <compression>None</compression><encoding>UTF-8</encoding><endedLine/><fileNameInField>N</fileNameInField>
+    <fileNameField/><create_parent_folder>Y</create_parent_folder>
+    <file><name>${Internal.Entry.Current.Directory}/salida/rechazos/rechazos_ventas</name><servlet_output>N</servlet_output>
+      <do_not_open_new_file_init>N</do_not_open_new_file_init><extention>csv</extention><append>N</append>
+      <split>N</split><haspartno>N</haspartno><add_date>N</add_date><add_time>N</add_time>
+      <SpecifyFormat>N</SpecifyFormat><date_time_format/><add_to_result_filenames>Y</add_to_result_filenames>
+      <pad>N</pad><fast_dump>N</fast_dump><splitevery>0</splitevery></file>
+    <fields><field><name>sale_id</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>sale_date</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>customer_id</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>customer_name</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>city</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>amount</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>quantity</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>motivo</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>campos_error</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>384</xloc><yloc>576</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Remove duplicate customers</name>
+    <type>UniqueRowsByHashSet</type>
+    <description>One row per customer_id (the first one wins). Declared drop: duplicates</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <store_values>N</store_values><reject_duplicate_row>N</reject_duplicate_row><error_description/><fields><field><name>customer_id</name></field></fields>
+    <attributes><group><name>pentaho-live-robust</name><attribute><key>drops</key><value>duplicates</value></attribute><attribute><key>reason</key><value>one row per customer_id before loading the dimension</value></attribute></group></attributes>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>544</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Look up existing key</name>
+    <type>DBLookup</type>
+    <description>The key the customer already has (null if new): re-running never changes a key</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><cache>N</cache><cache_load_all>N</cache_load_all><cache_size>0</cache_size>
+    <lookup><schema/><table>dim_customer</table><orderby/><fail_on_multiple>N</fail_on_multiple>
+      <eat_row_on_failure>N</eat_row_on_failure>
+      <key><name>customer_id</name><field>customer_id</field><condition>=</condition><name2/></key>
+      <value><name>customer_sk</name><rename>existing_sk</rename><default/><type>Integer</type></value>
+    </lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>704</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Max key</name>
+    <type>TableInput</type>
+    <description>Highest key already used (0 on an empty table)</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection>
+    <sql>SELECT COALESCE(MAX(customer_sk), 0) AS max_sk FROM dim_customer</sql>
+    <limit>0</limit><lookup/><execute_each_row>N</execute_each_row><variables_active>N</variables_active>
+    <lazy_conversion_active>N</lazy_conversion_active><cached_row_meta_active>N</cached_row_meta_active>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>864</xloc><yloc>48</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Join max</name>
+    <type>JoinRows</type>
+    <description>Adds max_sk to every customer (one row from Max key, no condition)</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <directory>%%java.io.tmpdir%%</directory><prefix>out</prefix><cache_size>500</cache_size>
+    <main>Look up existing key</main>
+    <compare><condition><negated>N</negated><leftvalue/><function>=</function><rightvalue/></condition></compare>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>864</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Number new</name>
+    <type>Sequence</type>
+    <description>1..n in this run (only used for the customers that have no key yet)</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <valuename>n</valuename><use_database>N</use_database><connection/><schema/><seqname>SEQ_</seqname>
+    <use_counter>Y</use_counter><counter_name/><start_at>1</start_at><increment_by>1</increment_by><max_value>999999999</max_value>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1024</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Compute key</name>
+    <type>Calculator</type>
+    <description>customer_sk = existing key, or max_sk + n for a new customer</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <calculation><field_name>new_sk</field_name><calc_type>ADD</calc_type><field_a>max_sk</field_a><field_b>n</field_b><field_c/>
+      <value_type>Integer</value_type><value_length>-1</value_length><value_precision>-1</value_precision><remove>Y</remove>
+      <conversion_mask/><decimal_symbol/><grouping_symbol/><currency_symbol/></calculation>
+    <calculation><field_name>customer_sk</field_name><calc_type>NVL</calc_type><field_a>existing_sk</field_a><field_b>new_sk</field_b><field_c/>
+      <value_type>Integer</value_type><value_length>-1</value_length><value_precision>-1</value_precision><remove>N</remove>
+      <conversion_mask/><decimal_symbol/><grouping_symbol/><currency_symbol/></calculation>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1184</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Load dim_customer</name>
+    <type>InsertUpdate</type>
+    <description>Insert / update by customer_id: re-running inserts nothing; customer_sk is never updated</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><commit>100</commit><update_bypassed>N</update_bypassed>
+    <lookup><schema/><table>dim_customer</table><key><name>customer_id</name><field>customer_id</field><condition>=</condition><name2/></key><value><name>customer_sk</name><rename>customer_sk</rename><update>N</update></value><value><name>customer_id</name><rename>customer_id</rename><update>N</update></value><value><name>name</name><rename>customer_name</rename><update>Y</update></value><value><name>city</name><rename>city</rename><update>Y</update></value></lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1344</xloc><yloc>160</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Clean reason customers</name>
+    <type>ReplaceString</type>
+    <description>Database errors (CHECK, too long, out of range) arrive with several lines</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>^\s+|\s+$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>\s*[\r\n]+\s*</replace_string><replace_by_string> | </replace_by_string><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>,\s*$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>campos_error</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>,\s*$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1344</xloc><yloc>48</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Write rejects customers</name>
+    <type>TextFileOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <separator>;</separator><enclosure>"</enclosure><enclosure_forced>N</enclosure_forced>
+    <enclosure_fix_disabled>N</enclosure_fix_disabled><header>Y</header><footer>N</footer><format>UNIX</format>
+    <compression>None</compression><encoding>UTF-8</encoding><endedLine/><fileNameInField>N</fileNameInField>
+    <fileNameField/><create_parent_folder>Y</create_parent_folder>
+    <file><name>${Internal.Entry.Current.Directory}/salida/rechazos/rechazos_clientes</name><servlet_output>N</servlet_output>
+      <do_not_open_new_file_init>N</do_not_open_new_file_init><extention>csv</extention><append>N</append>
+      <split>N</split><haspartno>N</haspartno><add_date>N</add_date><add_time>N</add_time>
+      <SpecifyFormat>N</SpecifyFormat><date_time_format/><add_to_result_filenames>Y</add_to_result_filenames>
+      <pad>N</pad><fast_dump>N</fast_dump><splitevery>0</splitevery></file>
+    <fields><field><name>customer_id</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>customer_name</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>city</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>customer_sk</name><type>Integer</type><format>0</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>motivo</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>campos_error</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1504</xloc><yloc>48</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Remove duplicate sales</name>
+    <type>UniqueRowsByHashSet</type>
+    <description>The same sale_id twice is loaded once. Declared drop: duplicates</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <store_values>N</store_values><reject_duplicate_row>N</reject_duplicate_row><error_description/><fields><field><name>sale_id</name></field></fields>
+    <attributes><group><name>pentaho-live-robust</name><attribute><key>drops</key><value>duplicates</value></attribute><attribute><key>reason</key><value>one row per sale_id</value></attribute></group></attributes>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>544</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Buffer sales</name>
+    <type>BlockingStep</type>
+    <description>Takes every sale (spilling to disk) so Convert types never waits for the wait below: no deadlock with more rows than the hop buffer</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <pass_all_rows>Y</pass_all_rows><directory>%%java.io.tmpdir%%</directory><prefix>block</prefix>
+    <cache_size>5000</cache_size><compress>Y</compress>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>704</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Wait for dim_customer</name>
+    <type>BlockUntilStepsFinish</type>
+    <description>All steps start at once: the key lookup must see the customers loaded in this same run</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <steps><step><name>Load dim_customer</name><CopyNr>0</CopyNr></step></steps>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>864</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Look up customer_sk</name>
+    <type>DBLookup</type>
+    <description>No default: a customer that is not in the dimension stays null and is rejected below</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><cache>N</cache><cache_load_all>N</cache_load_all><cache_size>0</cache_size>
+    <lookup><schema/><table>dim_customer</table><orderby/><fail_on_multiple>N</fail_on_multiple>
+      <eat_row_on_failure>N</eat_row_on_failure>
+      <key><name>customer_id</name><field>customer_id</field><condition>=</condition><name2/></key>
+      <value><name>customer_sk</name><rename>customer_sk</rename><default/><type>Integer</type></value>
+    </lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1024</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Customer found?</name>
+    <type>FilterRows</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <send_true_to>Aggregate to grain</send_true_to>
+    <send_false_to>Reason orphan</send_false_to>
+    <compare><condition><negated>N</negated><leftvalue>customer_sk</leftvalue><function>IS NOT NULL</function><rightvalue/></condition></compare>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1184</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Reason orphan</name>
+    <type>Janino</type>
+    <description>Orphan sale: rejected with its reason instead of vanishing (as an INNER JOIN would do)</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <formula><field_name>motivo</field_name><formula_string>&quot;El cliente &quot; + customer_id + &quot; no está en dim_customer&quot;</formula_string><value_type>String</value_type><value_length>-1</value_length><value_precision>-1</value_precision><replace_field/></formula><formula><field_name>campos_error</field_name><formula_string>&quot;customer_id&quot;</formula_string><value_type>String</value_type><value_length>-1</value_length><value_precision>-1</value_precision><replace_field/></formula>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1184</xloc><yloc>576</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Write rejects orphans</name>
+    <type>TextFileOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <separator>;</separator><enclosure>"</enclosure><enclosure_forced>N</enclosure_forced>
+    <enclosure_fix_disabled>N</enclosure_fix_disabled><header>Y</header><footer>N</footer><format>UNIX</format>
+    <compression>None</compression><encoding>UTF-8</encoding><endedLine/><fileNameInField>N</fileNameInField>
+    <fileNameField/><create_parent_folder>Y</create_parent_folder>
+    <file><name>${Internal.Entry.Current.Directory}/salida/rechazos/rechazos_huerfanos</name><servlet_output>N</servlet_output>
+      <do_not_open_new_file_init>N</do_not_open_new_file_init><extention>csv</extention><append>N</append>
+      <split>N</split><haspartno>N</haspartno><add_date>N</add_date><add_time>N</add_time>
+      <SpecifyFormat>N</SpecifyFormat><date_time_format/><add_to_result_filenames>Y</add_to_result_filenames>
+      <pad>N</pad><fast_dump>N</fast_dump><splitevery>0</splitevery></file>
+    <fields><field><name>sale_id</name><type>Integer</type><format>0</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>sale_date</name><type>Date</type><format>yyyy-MM-dd</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>customer_id</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>amount</name><type>Number</type><format>0.00</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>motivo</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>campos_error</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1344</xloc><yloc>576</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Aggregate to grain</name>
+    <type>MemoryGroupBy</type>
+    <description>One row per (customer_sk, sale_date), the primary key of fact_sales. Declared drop: aggregate</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <give_back_row>N</give_back_row>
+    <group><field><name>customer_sk</name></field><field><name>sale_date</name></field></group>
+    <fields><field><aggregate>amount</aggregate><subject>amount</subject><type>SUM</type><valuefield/></field>
+      <field><aggregate>quantity</aggregate><subject>quantity</subject><type>SUM</type><valuefield/></field></fields>
+    <attributes><group><name>pentaho-live-robust</name><attribute><key>drops</key><value>aggregate</value></attribute><attribute><key>reason</key><value>the fact grain is customer and day</value></attribute></group></attributes>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1344</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Load fact_sales</name>
+    <type>InsertUpdate</type>
+    <description>Insert / update by the grain: re-running never duplicates</description>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>dwh</connection><commit>100</commit><update_bypassed>N</update_bypassed>
+    <lookup><schema/><table>fact_sales</table><key><name>customer_sk</name><field>customer_sk</field><condition>=</condition><name2/></key><key><name>sale_date</name><field>sale_date</field><condition>=</condition><name2/></key><value><name>customer_sk</name><rename>customer_sk</rename><update>N</update></value><value><name>sale_date</name><rename>sale_date</rename><update>N</update></value><value><name>amount</name><rename>amount</rename><update>Y</update></value><value><name>quantity</name><rename>quantity</rename><update>Y</update></value></lookup>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1504</xloc><yloc>448</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Clean reason sales</name>
+    <type>ReplaceString</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>^\s+|\s+$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>\s*[\r\n]+\s*</replace_string><replace_by_string> | </replace_by_string><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>motivo</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>,\s*$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field><field><in_stream_name>campos_error</in_stream_name><out_stream_name/><use_regex>yes</use_regex><replace_string>,\s*$</replace_string><replace_by_string/><set_empty_string>N</set_empty_string><replace_field_by_string/><whole_word>no</whole_word><case_sensitive>no</case_sensitive><is_unicode>no</is_unicode></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1504</xloc><yloc>576</yloc><draw>Y</draw></GUI>
+  </step>
+  <step>
+    <name>Write rejects sales</name>
+    <type>TextFileOutput</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <separator>;</separator><enclosure>"</enclosure><enclosure_forced>N</enclosure_forced>
+    <enclosure_fix_disabled>N</enclosure_fix_disabled><header>Y</header><footer>N</footer><format>UNIX</format>
+    <compression>None</compression><encoding>UTF-8</encoding><endedLine/><fileNameInField>N</fileNameInField>
+    <fileNameField/><create_parent_folder>Y</create_parent_folder>
+    <file><name>${Internal.Entry.Current.Directory}/salida/rechazos/rechazos_hechos</name><servlet_output>N</servlet_output>
+      <do_not_open_new_file_init>N</do_not_open_new_file_init><extention>csv</extention><append>N</append>
+      <split>N</split><haspartno>N</haspartno><add_date>N</add_date><add_time>N</add_time>
+      <SpecifyFormat>N</SpecifyFormat><date_time_format/><add_to_result_filenames>Y</add_to_result_filenames>
+      <pad>N</pad><fast_dump>N</fast_dump><splitevery>0</splitevery></file>
+    <fields><field><name>customer_sk</name><type>Integer</type><format>0</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>sale_date</name><type>Date</type><format>yyyy-MM-dd</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>amount</name><type>Number</type><format>0.00</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>quantity</name><type>Integer</type><format>0</format><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>motivo</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field><field><name>campos_error</name><type>String</type><format/><currency/><decimal>.</decimal><group/><nullif/><trim_type>none</trim_type><length>-1</length><precision>-1</precision></field></fields>
+    <attributes/>
+    <cluster_schema/>
+    <remotesteps><input></input><output></output></remotesteps>
+    <GUI><xloc>1664</xloc><yloc>576</yloc><draw>Y</draw></GUI>
+  </step>
+  <step_error_handling>
+<error><source_step>Convert types</source_step><target_step>Clean reason input</target_step><is_enabled>Y</is_enabled>
+      <nr_valuename/><descriptions_valuename>motivo</descriptions_valuename><fields_valuename>campos_error</fields_valuename>
+      <codes_valuename/><max_errors/><max_pct_errors/><min_pct_rows/></error>
+<error><source_step>Load dim_customer</source_step><target_step>Clean reason customers</target_step><is_enabled>Y</is_enabled>
+      <nr_valuename/><descriptions_valuename>motivo</descriptions_valuename><fields_valuename>campos_error</fields_valuename>
+      <codes_valuename/><max_errors/><max_pct_errors/><min_pct_rows/></error>
+<error><source_step>Load fact_sales</source_step><target_step>Clean reason sales</target_step><is_enabled>Y</is_enabled>
+      <nr_valuename/><descriptions_valuename>motivo</descriptions_valuename><fields_valuename>campos_error</fields_valuename>
+      <codes_valuename/><max_errors/><max_pct_errors/><min_pct_rows/></error>
+  </step_error_handling>
+  <slave-step-copy-partition-distribution></slave-step-copy-partition-distribution>
+  <slave_transformation>N</slave_transformation>
+  <attributes/>
+</transformation>

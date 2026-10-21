@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<job>
+  <name>06_carga_tolerante</name>
+  <description>Creates the tables (with CHECK constraints), checks that the input file exists and runs the fault-tolerant load</description>
+  <extended_description>Pattern 06, entry point. Run it with the clean file, again with the clean file (nothing changes: same rows, same customer_sk) and with ARCHIVO_VENTAS=ventas_rotas.csv (exit 0; every broken line ends in salida/rechazos/ with its reason).</extended_description>
+  <job_version/><job_status>0</job_status><directory>/</directory>
+  <created_user>-</created_user><created_date>2026/10/21 23:00:00.000</created_date>
+  <modified_user>-</modified_user><modified_date>2026/10/21 23:00:00.000</modified_date>
+    <parameters>
+      <parameter><name>ARCHIVO_VENTAS</name><default_value>ventas.csv</default_value>
+        <description>File to load from datos/ (ventas_rotas.csv = the dirty-data test)</description></parameter>
+    </parameters>
+  <connection>
+    <name>dwh</name><server/><type>SQLITE</type><access>Native</access>
+    <database>${Internal.Entry.Current.Directory}/salida/06_dwh.sqlite</database>
+    <port>-1</port><username/><password/><servername/><data_tablespace/><index_tablespace/>
+    <attributes>
+      <attribute><code>FORCE_IDENTIFIERS_TO_LOWERCASE</code><attribute>N</attribute></attribute>
+      <attribute><code>FORCE_IDENTIFIERS_TO_UPPERCASE</code><attribute>N</attribute></attribute>
+      <attribute><code>IS_CLUSTERED</code><attribute>N</attribute></attribute>
+      <attribute><code>PORT_NUMBER</code><attribute>-1</attribute></attribute>
+      <attribute><code>PRESERVE_RESERVED_WORD_CASE</code><attribute>Y</attribute></attribute>
+      <attribute><code>QUOTE_ALL_FIELDS</code><attribute>N</attribute></attribute>
+      <attribute><code>SUPPORTS_BOOLEAN_DATA_TYPE</code><attribute>Y</attribute></attribute>
+      <attribute><code>SUPPORTS_TIMESTAMP_DATA_TYPE</code><attribute>Y</attribute></attribute>
+      <attribute><code>USE_POOLING</code><attribute>N</attribute></attribute>
+    </attributes>
+  </connection>
+  <slaveservers></slaveservers>
+  <pass_batchid>N</pass_batchid>
+  <shared_objects_file/>
+  <entries>
+    <entry>
+      <name>START</name>
+      <description/>
+      <type>SPECIAL</type>
+      <attributes/>
+      <start>Y</start><dummy>N</dummy><repeat>N</repeat><schedulerType>0</schedulerType>
+      <intervalSeconds>0</intervalSeconds><intervalMinutes>60</intervalMinutes><hour>12</hour><minutes>0</minutes>
+      <weekDay>1</weekDay><DayOfMonth>1</DayOfMonth>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>64</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Create output folder</name>
+      <description/>
+      <type>CREATE_FOLDER</type>
+      <attributes/>
+      <foldername>${Internal.Entry.Current.Directory}/salida</foldername>
+      <fail_of_folder_exists>N</fail_of_folder_exists>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>224</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Create tables</name>
+      <description>CHECK constraints: SQLite does not enforce VARCHAR lengths, so too long text and out of range amounts are tested with CHECK</description>
+      <type>SQL</type>
+      <attributes/>
+      <sql>CREATE TABLE IF NOT EXISTS dim_customer (&#xa;  customer_sk   INTEGER PRIMARY KEY,&#xa;  customer_id   VARCHAR(10) NOT NULL UNIQUE,&#xa;  name          VARCHAR(40) CHECK (length(name) &lt;= 40),&#xa;  city          VARCHAR(30) CHECK (length(city) &lt;= 30)&#xa;);&#xa;CREATE TABLE IF NOT EXISTS fact_sales (&#xa;  customer_sk   INTEGER NOT NULL,&#xa;  sale_date     DATE NOT NULL,&#xa;  amount        NUMERIC(10,2) CHECK (amount BETWEEN 0 AND 99999),&#xa;  quantity      INTEGER CHECK (quantity &gt;= 0),&#xa;  PRIMARY KEY (customer_sk, sale_date)&#xa;);</sql>
+      <useVariableSubstitution>F</useVariableSubstitution><sqlfromfile>F</sqlfromfile><sqlfilename/>
+      <sendOneStatement>F</sendOneStatement><connection>dwh</connection>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>384</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Input file exists?</name>
+      <description/>
+      <type>FILE_EXISTS</type>
+      <attributes/>
+      <filename>${Internal.Entry.Current.Directory}/datos/${ARCHIVO_VENTAS}</filename>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>544</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Load sales</name>
+      <description/>
+      <type>TRANS</type>
+      <attributes/>
+      <specification_method>filename</specification_method><trans_object_id/>
+      <filename>${Internal.Entry.Current.Directory}/06_carga_tolerante.ktr</filename><transname/>
+      <arg_from_previous>N</arg_from_previous><params_from_previous>N</params_from_previous><exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows><clear_files>N</clear_files><set_logfile>N</set_logfile><logfile/><logext/>
+      <add_date>N</add_date><add_time>N</add_time><loglevel>Basic</loglevel><cluster>N</cluster><slave_server_name/>
+      <set_append_logfile>N</set_append_logfile><wait_until_finished>Y</wait_until_finished>
+      <follow_abort_remote>N</follow_abort_remote><create_parent_folder>N</create_parent_folder>
+      <logging_remote_work>N</logging_remote_work><run_configuration>Pentaho local</run_configuration>
+      <suppress_result_data>N</suppress_result_data>
+      <parameters><pass_all_parameters>Y</pass_all_parameters>
+        <parameter><name>ARCHIVO_VENTAS</name><stream_name/><value>${ARCHIVO_VENTAS}</value></parameter>
+      </parameters>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>704</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Report rejects</name>
+      <description/>
+      <type>WRITE_TO_LOG</type>
+      <attributes/>
+      <logmessage>Load finished. Rows that could not be loaded are in salida/rechazos/ (column motivo); empty files = nothing rejected.</logmessage>
+      <loglevel>Basic</loglevel><logsubject>06_carga_tolerante</logsubject>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>864</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Success</name>
+      <description/>
+      <type>SUCCESS</type>
+      <attributes/>
+
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>1024</xloc><yloc>112</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Log missing file</name>
+      <description/>
+      <type>WRITE_TO_LOG</type>
+      <attributes/>
+      <logmessage>Input file not found: ${Internal.Entry.Current.Directory}/datos/${ARCHIVO_VENTAS}</logmessage>
+      <loglevel>Error</loglevel><logsubject>06_carga_tolerante</logsubject>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>544</xloc><yloc>240</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Abort</name>
+      <description/>
+      <type>ABORT</type>
+      <attributes/>
+      <message>Pattern 06 failed: see the log above</message>
+      <parallel>N</parallel><draw>Y</draw><nr>0</nr><xloc>704</xloc><yloc>240</yloc>
+      <attributes_kjc/>
+    </entry>
+  </entries>
+  <hops>
+    <hop><from>START</from><to>Create output folder</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>Y</unconditional></hop>
+    <hop><from>Create output folder</from><to>Create tables</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Create tables</from><to>Input file exists?</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Input file exists?</from><to>Load sales</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Load sales</from><to>Report rejects</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Report rejects</from><to>Success</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Create output folder</from><to>Abort</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>N</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Create tables</from><to>Abort</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>N</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Input file exists?</from><to>Log missing file</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>N</evaluation><unconditional>N</unconditional></hop>
+    <hop><from>Log missing file</from><to>Abort</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>Y</evaluation><unconditional>Y</unconditional></hop>
+    <hop><from>Load sales</from><to>Abort</to><from_nr>0</from_nr><to_nr>0</to_nr><enabled>Y</enabled>
+      <evaluation>N</evaluation><unconditional>N</unconditional></hop>
+  </hops>
+  <notepads></notepads>
+  <attributes/>
+</job>

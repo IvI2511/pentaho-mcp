@@ -115,7 +115,12 @@ final class McpResources {
       "When to run lint_etl and how to read its findings and its 0-100 score, the rules and the Pan/Kitchen error "
         + "each one prevents, the deep mode that reads the sources, applying fixes, silencing a rule, and the "
         + "quality section of the reports. The machine-readable rule catalog is pentaho://lint/rules.",
-      "manual/06-calidad.md" )
+      "manual/06-calidad.md" ),
+    new Doc( "pentaho://guide/robustness", "robustness", "Robustness (lint_etl robustness, harden_etl, stress_test)",
+      "How to make a load tolerate dirty data: every bad row to a rejects file with its reason, nothing lost in "
+        + "silence, stable keys and re-runnable loads; the fast path with the tools, each recipe by hand with "
+        + "its PDI 9.4 XML (tested in pattern 06), declared drops, pitfalls and how to read stress_test.",
+      "manual/09-robustez.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

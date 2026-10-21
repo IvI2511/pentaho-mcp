@@ -112,6 +112,11 @@ $patrones = [ordered]@{
   '05' = @{ Carpeta = '05_hecho_con_claves'; Pasos = @(
       @{ Job = '05_hecho_con_claves.kjb'; Nombre = 'run1_batch1'; Chequeo = '05-1'; Params = @('LOTE=1') },
       @{ Job = '05_hecho_con_claves.kjb'; Nombre = 'run2_batch2'; Chequeo = '05-2'; Params = @('LOTE=2') }) }
+  '06' = @{ Carpeta = '06_carga_tolerante'; Pasos = @(
+      @{ Job = '06_carga_tolerante.kjb'; Nombre = 'run1_clean'; Chequeo = '06-1' },
+      @{ Job = '06_carga_tolerante.kjb'; Nombre = 'run2_clean_again'; Chequeo = '06-2' },
+      @{ Job = '06_carga_tolerante.kjb'; Nombre = 'run3_broken_file'; Chequeo = '06-3'
+         Params = @('ARCHIVO_VENTAS=ventas_rotas.csv') }) }
 }
 
 $resultados = [ordered]@{}

@@ -13,6 +13,7 @@ import io.github.ivi2511.pentahomcp.lint.reglas.ReglasEstilo;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasEstructura;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasJob;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasOrden;
+import io.github.ivi2511.pentahomcp.lint.reglas.ReglasRobustez;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasRutas;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasSeguridad;
 
@@ -37,6 +38,7 @@ public final class Catalogo {
     l.addAll( ReglasRutas.todas() );
     l.addAll( ReglasSeguridad.todas() );
     l.addAll( ReglasEstilo.todas() );
+    l.addAll( ReglasRobustez.todas() ); // apagadas: corren con robustness=true y dan su sub-puntaje
     l.add( ReglasEstructura.kettleCheck() );
     Set<String> ids = new HashSet<String>();
     for ( Regla r : l ) {
@@ -75,6 +77,14 @@ public final class Catalogo {
    * esas (también las apagadas). Un id que no existe es un error, con la lista de los válidos.
    */
   public static List<Regla> seleccionar( Set<String> ids, boolean kettleChecks ) {
+    return seleccionar( ids, kettleChecks, false );
+  }
+
+  /**
+   * Como {@link #seleccionar(Set, boolean)}; con robustez, además todas las reglas de la familia robustness (las
+   * pedidas en ids siguen corriendo: sin ids, las de siempre + la familia).
+   */
+  public static List<Regla> seleccionar( Set<String> ids, boolean kettleChecks, boolean robustez ) {
     Set<String> pedidas = new LinkedHashSet<String>();
     if ( ids != null ) {
       List<String> malos = new ArrayList<String>();
@@ -95,6 +105,9 @@ public final class Catalogo {
       boolean kc = r.id().equals( KETTLE_CHECK );
       boolean va = pedidas.isEmpty() ? !r.apagada() && !kc : pedidas.contains( r.id() );
       if ( kc && kettleChecks ) {
+        va = true;
+      }
+      if ( robustez && Regla.ROBUSTNESS.equals( r.categoria() ) ) {
         va = true;
       }
       // cycle corre siempre que haga falta campos: decide si las demás pueden calcularlos
@@ -119,6 +132,17 @@ public final class Catalogo {
       }
     }
     return false;
+  }
+
+  /** Los ids de la familia robustness, en el orden del catálogo. */
+  public static List<String> idsRobustez() {
+    List<String> l = new ArrayList<String>();
+    for ( Regla r : TODAS ) {
+      if ( Regla.ROBUSTNESS.equals( r.categoria() ) ) {
+        l.add( r.id() );
+      }
+    }
+    return l;
   }
 
   public static String idsValidos() {
