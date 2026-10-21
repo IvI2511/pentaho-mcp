@@ -1015,7 +1015,9 @@ final class PptxDiapos {
   private void nota( String t ) {
     String n = limpio( t );
     double alto = altoTexto( Arrays.asList( n.split( "\r?\n" ) ), 9.5, ANCHO_UTIL, 0 );
-    if ( y + alto > Y_LIMITE && !vacia() ) {
+    // una nota corta que se pasa un poco del limite va en el margen de abajo (hasta el pie): abrir otra
+    // diapositiva solo para ella la dejaba casi vacia («+5 filas mas...» sola)
+    if ( y + alto > Y_LIMITE && !vacia() && y - ESPACIO + 4 + alto > Y_PIE - 2 ) {
       continuar();
     }
     // pegada al bloque de arriba

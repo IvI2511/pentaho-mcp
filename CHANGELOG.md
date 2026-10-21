@@ -38,6 +38,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   explanation, and only appears when the run is long enough to say something.
 - Run timeline (Gantt): when there are too many rows, the fastest ones are left out (and named), never
   the slowest.
+- The "What it does" column of the step list shows file paths relative to the folder of the `.ktr` /
+  `.kjb`, so a shared report does not carry the author's local folders.
 - Windows installer sources reorganised: `instalador.iss` and `preparar_instalador.ps1` at the repo root,
   `launcher/` (launcher, `pentaho-live` commands and icon), `tools/instalador/` (image generator and
   fonts); build intermediates in `build/instalador/` and only the `Instalador_*.exe` in `instalador/`.
