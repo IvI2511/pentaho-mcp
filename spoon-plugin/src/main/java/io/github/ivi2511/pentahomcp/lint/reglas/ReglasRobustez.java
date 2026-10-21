@@ -55,8 +55,8 @@ public final class ReglasRobustez {
     "XMLInputStream", "getXMLData", "ParallelGzipCsvInput", "FixedInput", "LoadFileInput" );
   static final Set<String> BUSQUEDAS = conjunto( "DBLookup", "StreamLookup", "DBJoin", "FuzzyMatch" );
   /** Steps que escriben algo: un terminal de una rama de rechazo que es uno de estos no es un callejón sin salida. */
-  static final Set<String> ESCRITORES = conjunto( "TextFileOutput", "ExcelOutput", "TypeExitExcelWriterStep", "JsonOutput",
-    "XMLOutput", "TableOutput", "InsertUpdate", "Update", "SynchronizeAfterMerge", "WriteToLog", "AccessOutput",
+  public static final Set<String> ESCRITORES = conjunto( "TextFileOutput", "ExcelOutput", "TypeExitExcelWriterStep",
+    "JsonOutput", "XMLOutput", "TableOutput", "InsertUpdate", "Update", "SynchronizeAfterMerge", "WriteToLog", "AccessOutput",
     "SQLFileOutput", "PropertyOutput", "CubeOutput", "MongoDbOutput", "TextFileOutputLegacy" );
   /** Quitan o juntan filas por diseño: deduplicar o agregar ya es una decisión, no una pérdida. */
   static final Set<String> DEDUPLICAN = conjunto( "UniqueRows", "UniqueRowsByHashSet", "GroupBy", "MemoryGroupBy" );
@@ -66,6 +66,8 @@ public final class ReglasRobustez {
     "stream_fieldname", "column_name" );
   /** Controles de nulos: Filter rows / Java filter con IS NULL / IS NOT NULL, Data validator. */
   static final Set<String> VALIDADORES = conjunto( "Validator" );
+  /** Calculan un campo (un motivo, una marca) a partir de otros: pueden mirar si una búsqueda no encontró nada. */
+  static final Set<String> CLASIFICAN = conjunto( "Janino", "ScriptValueMod", "Formula" );
 
   private static final Pattern STAGING = Pattern.compile( "(?i)(^|[._])(stg|tmp|temp|staging)(_|$)|staging" );
   private static final Pattern COMENTARIOS = Pattern.compile( "(?s)/\\*.*?\\*/|--[^\\r\\n]*" );
@@ -327,7 +329,8 @@ public final class ReglasRobustez {
       Grafo g = new Grafo( ctx );
       for ( StepMeta s : ctx.trans().getSteps() ) {
         StepErrorMeta em = s.getStepErrorMeta();
-        if ( s.isDoingErrorHandling() && em != null && vacio( em.getErrorDescriptionsValuename() ) ) {
+        if ( s.isDoingErrorHandling() && em != null && vacio( em.getErrorDescriptionsValuename() )
+          && !motivoEnLaRama( ctx, g, em.getTargetStep() ) ) {
           String destino = em.getTargetStep() == null ? "" : em.getTargetStep().getName();
           out.add( hallazgo( ctx, Sev.WARNING, s, "error_handling", "reject_reason", "rejects_without_reason.msg",
             "target", destino ) );
@@ -935,9 +938,24 @@ public final class ReglasRobustez {
         String c = Nodos.txt( ctx.xml( s ), "condition" );
         return c.contains( "null" ) && ( campo == null || c.contains( campo ) );
       }
+      if ( campo != null && CLASIFICAN.contains( s.getStepID() ) ) {
+        // un motivo calculado a partir de la búsqueda («sk_tienda == null ? "TIENDA_DESCONOCIDA" : ...») que un filtro
+        // posterior separa: el huérfano ya está controlado
+        String q = Pattern.quote( campo );
+        return Pattern.compile( "(?i)(\\b" + q + "\\b\\s*[!=]=\\s*null|null\\s*[!=]=\\s*\\b" + q + "\\b|(ISNULL|ISBLANK)"
+          + "\\s*\\(\\s*\\[?" + q + "\\b)" ).matcher( textoDe( s ) ).find();
+      }
       return false;
     } catch ( Exception e ) {
       return false;
+    }
+  }
+
+  private static String textoDe( StepMeta s ) {
+    try {
+      return s.getXML();
+    } catch ( Exception e ) {
+      return "";
     }
   }
 
@@ -954,7 +972,7 @@ public final class ReglasRobustez {
   }
 
   /** Campos de una entrada de archivo que no se leen como String. */
-  static List<String> camposTipados( Element x ) {
+  public static List<String> camposTipados( Element x ) {
     List<String> r = new ArrayList<String>();
     for ( Element f : Nodos.hijos( Nodos.hijo( x, "fields" ), "field" ) ) {
       String t = Nodos.txt( f, "type" );
@@ -989,7 +1007,7 @@ public final class ReglasRobustez {
     return false;
   }
 
-  static boolean tieneMotivo( List<String> campos ) {
+  public static boolean tieneMotivo( List<String> campos ) {
     for ( String c : campos ) {
       String x = c.toLowerCase( Locale.ROOT );
       if ( x.contains( "motivo" ) || x.contains( "reason" ) || x.contains( "error" ) || x.contains( "causa" )
@@ -998,6 +1016,24 @@ public final class ReglasRobustez {
       }
     }
     return false;
+  }
+
+  /**
+   * La rama de rechazos pone su motivo aunque el hop de error no lo traiga: todos los escritores que alcanza declaran
+   * sus campos y uno es un motivo (un Add constants con motivo_rechazo = DUPLICADO antes del archivo, por ejemplo).
+   */
+  static boolean motivoEnLaRama( Ctx ctx, Grafo g, StepMeta destino ) throws Exception {
+    if ( destino == null ) {
+      return false;
+    }
+    List<StepMeta> ws = escritoresDesde( g, destino );
+    for ( StepMeta w : ws ) {
+      List<String> campos = Nodos.nombres( ctx.xml( w ), "fields", "field", "name" );
+      if ( campos.isEmpty() || !tieneMotivo( campos ) ) {
+        return false;
+      }
+    }
+    return !ws.isEmpty();
   }
 
   /** Los escritores que se alcanzan desde el inicio de una rama (él incluido). */

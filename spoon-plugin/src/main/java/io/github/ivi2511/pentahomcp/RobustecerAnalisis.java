@@ -31,6 +31,7 @@ import org.pentaho.di.trans.step.StepMeta;
 import org.w3c.dom.Element;
 
 import io.github.ivi2511.pentahomcp.lint.Nodos;
+import io.github.ivi2511.pentahomcp.lint.reglas.ReglasRobustez;
 import io.github.ivi2511.pentahomcp.robustez.Cambio;
 import io.github.ivi2511.pentahomcp.robustez.Propuesta;
 import io.github.ivi2511.pentahomcp.robustez.Receta;
@@ -506,6 +507,11 @@ final class RobustecerAnalisis {
     if ( "DBLookup".equals( id ) ) {
       return "Y".equalsIgnoreCase( txt( s, "fail_on_multiple" ) );
     }
+    if ( ENTRADAS_ARCHIVO.contains( id ) ) {
+      // un campo leído como número o fecha: un valor mal escrito para la carga entera (el CSV input lo manda al hop
+      // de error con el campo en null y el mensaje de Kettle)
+      return !ReglasRobustez.camposTipados( xml( s ) ).isEmpty();
+    }
     return false;
   }
 
@@ -530,7 +536,8 @@ final class RobustecerAnalisis {
     }
     RowMetaInterface prev;
     try {
-      prev = tm.getPrevStepFields( s );
+      // una entrada de archivo manda al hop de error su propia fila (sus campos de salida)
+      prev = ENTRADAS_ARCHIVO.contains( s.getStepID() ) ? tm.getStepFields( s ) : tm.getPrevStepFields( s );
     } catch ( Exception x ) {
       por[ 0 ] = "fields unknown: " + RunMotor.primeraLinea( x );
       return null;
@@ -551,7 +558,8 @@ final class RobustecerAnalisis {
 
   private void erroresACola() {
     for ( StepMeta s : tm.getSteps() ) {
-      if ( rechazo.contains( s ) || propio( s ) || !puedeFallarPorFila( s ) || arriba( s ).isEmpty() ) {
+      if ( rechazo.contains( s ) || propio( s ) || !puedeFallarPorFila( s )
+        || ( arriba( s ).isEmpty() && !ENTRADAS_ARCHIVO.contains( s.getStepID() ) ) ) {
         continue;
       }
       StepErrorMeta em = s.getStepErrorMeta();
@@ -583,6 +591,28 @@ final class RobustecerAnalisis {
 
   // ---------------------------------------------------------------- R02 reject_reason
 
+  /**
+   * La rama de rechazos ya pone su motivo aunque el hop de error no lo traiga: todos los escritores que alcanza
+   * declaran sus campos y uno es un motivo (un Add constants con motivo_rechazo = DUPLICADO antes del archivo, por
+   * ejemplo). Misma regla que rejects_without_reason del linter.
+   */
+  private boolean motivoEnLaRama( StepMeta destino ) {
+    Set<StepMeta> rama = new LinkedHashSet<StepMeta>( abajo( destino ) );
+    rama.add( destino );
+    boolean alguno = false;
+    for ( StepMeta w : rama ) {
+      if ( !ReglasRobustez.ESCRITORES.contains( w.getStepID() ) || "WriteToLog".equals( w.getStepID() ) ) {
+        continue;
+      }
+      List<String> campos = Nodos.nombres( xml( w ), "fields", "field", "name" );
+      if ( campos.isEmpty() || !ReglasRobustez.tieneMotivo( campos ) ) {
+        return false;
+      }
+      alguno = true;
+    }
+    return alguno;
+  }
+
   private void motivos() {
     for ( StepMeta s : tm.getSteps() ) {
       StepErrorMeta em = s.getStepErrorMeta();
@@ -590,7 +620,7 @@ final class RobustecerAnalisis {
         continue;
       }
       boolean sinMotivo = vacio( em.getErrorDescriptionsValuename() );
-      if ( !sinMotivo ) {
+      if ( !sinMotivo || motivoEnLaRama( em.getTargetStep() ) ) {
         continue;
       }
       Propuesta x = new Propuesta( Receta.REJECT_REASON, s.getName() );

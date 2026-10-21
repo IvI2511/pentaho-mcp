@@ -613,6 +613,78 @@ public class PruebaRobustecer {
     contiene( f.getXML(), "<send_true_to>ventas complete</send_true_to>", "verdadero -> el reparto" );
   }
 
+  /**
+   * Un CSV que lee un campo como número: «abc» paraba la carga en la propia entrada. R01 le pone el hop de error (la
+   * fila llega con el campo en null y el mensaje de Kettle), y una rama de rechazos que ya pone su motivo con un Add
+   * constants no recibe otro (R02). Lo encontró la prueba de punta a punta de R3 sobre una copia del ejemplo.
+   */
+  private static final String CSV_TIPADO = "<filename>${Internal.Entry.Current.Directory}/tipada.csv</filename>"
+    + "<separator>;</separator><enclosure>\"</enclosure><header>Y</header><lazy_conversion>N</lazy_conversion>"
+    + "<encoding>UTF-8</encoding><fields><field><name>id</name><type>String</type><format/><length>-1</length>"
+    + "<precision>-1</precision><trim_type>both</trim_type></field><field><name>cantidad</name><type>Integer</type>"
+    + "<format>#</format><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field></fields>";
+
+  public void pruebaEntradaTipadaAlHopDeError() throws Exception {
+    File dir = EntornoKettle.salida( "robustecer-tipada" );
+    EntornoKettle.borrar( dir.toPath() );
+    dir.mkdirs();
+    EntornoKettle.escribir( new File( dir, "tipada.csv" ), "id;cantidad\nA;1\nB;abc\nC;3\n" );
+    TransMeta tm = new TransMeta();
+    tm.setName( "tipada" );
+    TransOps.agregarStep( tm, "CsvInput", "Leer", CSV_TIPADO, 100, 100, null, null, null );
+    TransOps.agregarStep( tm, "TextFileOutput", "Escribir", "<separator>;</separator><enclosure>\"</enclosure>"
+      + "<header>Y</header><encoding>UTF-8</encoding><file><name>${Internal.Entry.Current.Directory}/ok</name>"
+      + "<extention>csv</extention></file><fields/>", 300, 100, "Leer", null, null );
+    TransOps.resolverReferencias( tm );
+    File ktr = new File( dir, "tipada.ktr" );
+    EntornoKettle.escribir( ktr, tm.getXML() );
+    tm = new TransMeta( ktr.getPath() );
+    RobustecerAnalisis.Pedido p = pedido( "{\"dry_run\":false}" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    List<Propuesta> el = RobustecerAnalisis.elegir( plan, p );
+    cierto( keys( el ).contains( "harden:rejects_on_error:Leer" ), "R01 en la entrada tipada: " + keys( el ) );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, el, UndoGrupo.sinSpoon( tm ), null );
+    cierto( tm.findStep( "Leer" ).isDoingErrorHandling(), "la entrada manda sus errores: " + saltados( h ) );
+    EntornoKettle.escribir( ktr, tm.getXML() );
+    Trans t = new Trans( new TransMeta( ktr.getPath() ) );
+    t.execute( null );
+    t.waitUntilFinished();
+    igual( 0, t.getErrors(), "no aborta" );
+    List<String> ok = Files.readAllLines( new File( dir, "ok.csv" ).toPath(), StandardCharsets.UTF_8 );
+    igual( 3, ok.size(), "cabecera + A + C: " + ok );
+    List<String[]> r = rechazos( dir );
+    igual( 1, r.size(), "B rechazada" );
+    cierto( r.get( 0 )[ 1 ] != null && !r.get( 0 )[ 1 ].trim().isEmpty(), "con motivo: " + r.get( 0 )[ 2 ] );
+
+    // la rama de rechazos que ya pone su motivo (Add constants motivo_rechazo) no recibe otro
+    TransMeta g = new TransMeta();
+    g.setName( "tipada_con_motivo" );
+    TransOps.agregarStep( g, "CsvInput", "Leer", CSV_TIPADO, 100, 100, null, null, null );
+    StepMeta leer = g.findStep( "Leer" );
+    TransOps.agregarStep( g, "Constant", "Marcar", "<fields><field><name>motivo_rechazo</name><type>String</type>"
+      + "<nullif>CANTIDAD_NO_VALIDA</nullif><length>-1</length><precision>-1</precision></field></fields>", 100, 300,
+      null, null, null );
+    TransOps.agregarStep( g, "TextFileOutput", "Rechazos", "<separator>;</separator><header>Y</header><file><name>"
+      + "${Internal.Entry.Current.Directory}/rech</name><extention>csv</extention></file><fields><field><name>id"
+      + "</name><type>String</type></field><field><name>motivo_rechazo</name><type>String</type></field></fields>",
+      300, 300, "Marcar", null, null );
+    TransHopMeta eh = new TransHopMeta( leer, g.findStep( "Marcar" ) );
+    eh.setErrorHop( true );
+    g.addTransHop( eh );
+    StepErrorMeta em = new StepErrorMeta( g, leer, g.findStep( "Marcar" ) );
+    em.setEnabled( true );
+    leer.setStepErrorMeta( em );
+    TransOps.resolverReferencias( g );
+    List<String> k = keys( RobustecerAnalisis.analizar( g, pedido( "{}" ) ).propuestas );
+    falso( k.contains( "harden:reject_reason:Leer" ), "la rama ya pone su motivo: " + k );
+    io.github.ivi2511.pentahomcp.lint.Opciones op = new io.github.ivi2511.pentahomcp.lint.Opciones();
+    op.robustez = true;
+    op.entorno = new LintEntorno( g );
+    String lint = io.github.ivi2511.pentahomcp.lint.LintJson.resultado( io.github.ivi2511.pentahomcp.lint.LintMotor
+      .analizar( g, op ) ).toString();
+    noContiene( lint, "rejects_without_reason", "el linter tampoco lo marca" );
+  }
+
   /** El patrón 06 de la guía ya es tolerante: harden_etl no propone nada automático. */
   public void pruebaPatronTolerante() throws Exception {
     File ktr = new File( EntornoKettle.recursos().getParentFile().getParentFile().getParentFile().getParentFile(),
