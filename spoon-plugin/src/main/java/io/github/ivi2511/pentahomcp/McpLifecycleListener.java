@@ -55,7 +55,9 @@ public class McpLifecycleListener implements LifecycleListener {
       + "undone with Ctrl+Z in Spoon. The step catalog and the guides are also available as MCP resources "
       + "(pentaho://...) for clients that do not have the pentaho-etl skill. In class mode the explanations are "
       + "lesson notes on the canvas: lesson_notes lists, adds, hides, shows, removes, restyles or re-places them "
-      + "(one Ctrl+Z each; notes the user wrote are never touched).";
+      + "(one Ctrl+Z each; notes the user wrote are never touched). To teach, lesson_start sends a whole lesson "
+      + "script (steps with what/why) that Spoon plays one step at a time (pace guided, auto or manual with "
+      + "lesson_next); follow the class with lesson_status wait_s and steer it with lesson_control.";
 
   private McpHttpServer server;
 

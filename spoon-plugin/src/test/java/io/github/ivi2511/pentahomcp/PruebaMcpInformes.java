@@ -58,9 +58,10 @@ public class PruebaMcpInformes {
 
   /**
    * 54 tools de 0.4.0 + build_report, get_report_data, show_report y set_error_handling (0.5.0) + lint_etl,
-   * apply_lint_fixes y suppress_lint (linter) + lesson_notes (modo clase, WP2).
+   * apply_lint_fixes y suppress_lint (linter) + lesson_notes (modo clase, WP2) + lesson_start, lesson_next,
+   * lesson_status y lesson_control (WP3).
    */
-  private static final int TOOLS = 62;
+  private static final int TOOLS = 66;
 
   private McpHttpServer server;
   private int puerto;
