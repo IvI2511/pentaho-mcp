@@ -118,7 +118,8 @@ public class PruebaMcpInformes {
     JsonNode build = porNombre.get( "build_report" );
     noNulo( build, "build_report registrada" );
     igual( set( "document", "sections", "formats", "output_dir", "file_name", "language", "title", "narrative",
-      "lineage_step", "profile_step", "profile_rows", "metrics", "query_database", "show_in_spoon" ), props( build ),
+      "lineage_step", "profile_step", "profile_rows", "metrics", "query_database", "show_in_spoon", "documents",
+      "include_job_transformations", "combine", "pptx_appendix", "profile_steps" ), props( build ),
       "argumentos de build_report (diseno §1.5)" );
     igual( "[\"formats\"]", build.path( "inputSchema" ).path( "required" ).toString(), "formats es obligatorio" );
     List<String> formatos = new ArrayList<>();
@@ -126,7 +127,8 @@ public class PruebaMcpInformes {
       formatos.add( f.clave );
     }
     igual( formatos, textos( prop( build, "formats" ).path( "items" ).path( "enum" ) ), "enum de formats" );
-    igual( Arrays.asList( "html", "html_light", "pdf", "md", "pptx", "json" ), formatos, "claves de Formato" );
+    igual( Arrays.asList( "html", "html_light", "pdf", "md", "pptx", "docx", "xlsx", "images", "json" ), formatos,
+      "claves de Formato" );
     igual( SeccionId.ORDEN, textos( prop( build, "sections" ).path( "items" ).path( "enum" ) ), "enum de sections" );
     igual( Arrays.asList( "last_run", "run_copy", "none" ), textos( prop( build, "metrics" ).path( "enum" ) ),
       "enum de metrics" );
@@ -154,9 +156,9 @@ public class PruebaMcpInformes {
     cierto( r.path( "isError" ).asBoolean(), "build_report sin Spoon es isError" );
     contiene( texto( r ), "Spoon is not available", "build_report sin Spoon" );
 
-    r = llamar( "build_report", "{\"formats\":[\"docx\"]}" );
+    r = llamar( "build_report", "{\"formats\":[\"rtf\"]}" );
     cierto( r.path( "isError" ).asBoolean(), "formato desconocido" );
-    contiene( texto( r ), "Unknown format 'docx'", "formato desconocido, antes de buscar Spoon" );
+    contiene( texto( r ), "Unknown format 'rtf'", "formato desconocido, antes de buscar Spoon" );
 
     r = llamar( "get_report_data", "{\"sections\":[\"profile\"]}" );
     cierto( r.path( "isError" ).asBoolean(), "profile en get_report_data" );
@@ -418,7 +420,8 @@ public class PruebaMcpInformes {
     for ( JsonNode x : r.path( "files" ) ) {
       File f = new File( x.path( "path" ).asText() );
       archivos.put( x.path( "format" ).asText(), f );
-      igual( f.length(), x.path( "bytes" ).asLong(), "bytes de " + f.getName() );
+      // la carpeta de imagenes informa la suma de sus archivos
+      igual( f.isDirectory() ? tamano( f ) : f.length(), x.path( "bytes" ).asLong(), "bytes de " + f.getName() );
     }
     String avisos = r.path( "warnings" ).toString();
     for ( String clave : new String[] { "html", "html_light", "md", "pptx", "json" } ) {
@@ -668,6 +671,18 @@ public class PruebaMcpInformes {
     }
     sb.append( "| warnings: " ).append( r.path( "warnings" ) );
     return sb.toString();
+  }
+
+  /** Lo que ocupan los archivos de una carpeta (y sus subcarpetas). */
+  private static long tamano( File dir ) {
+    long n = 0;
+    File[] hijos = dir.listFiles();
+    if ( hijos != null ) {
+      for ( File h : hijos ) {
+        n += h.isDirectory() ? tamano( h ) : h.length();
+      }
+    }
+    return n;
   }
 
   private static JsonNode json( String s ) throws Exception {

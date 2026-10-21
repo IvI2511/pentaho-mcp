@@ -362,13 +362,16 @@ final class GrupoSecciones {
 
   private void llenarSteps( Captura c ) {
     String antesLinaje = linajeStep();
+    List<String> antesPerfil = perfilSteps(); // las casillas sobreviven al refresco (mismos nombres)
     linaje.removeAll();
     perfilSteps.removeAll();
     linaje.add( r.s( "lineage_final" ) );
     if ( c != null && c.copia instanceof TransMeta ) {
       for ( String s : ( (TransMeta) c.copia ).getStepNames() ) {
         linaje.add( s );
-        new TableItem( perfilSteps, SWT.NONE ).setText( s );
+        TableItem it = new TableItem( perfilSteps, SWT.NONE );
+        it.setText( s );
+        it.setChecked( antesPerfil.contains( s ) );
       }
     }
     int i = antesLinaje == null ? -1 : linaje.indexOf( antesLinaje );
