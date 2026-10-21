@@ -22,6 +22,7 @@ import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
+import io.github.ivi2511.pentahomcp.informes.modelo.Capitulo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
 import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
@@ -282,6 +283,11 @@ public final class RenderMarkdown implements Renderizador {
     String documento() throws Exception {
       List<Seccion> secciones = RenderHtml.ordenadas( inf );
       frontMatter();
+      if ( inf.combinado() ) {
+        combinado( Capitulos.grupos( inf ) );
+        sb.append( "---\n\n*" ).append( esc( t( "generated_with" ) + " " + Tema.PIE ) ).append( "*\n" );
+        return sb.toString();
+      }
       portada( secciones );
       int n = secciones.size();
       int i = 0;
@@ -404,8 +410,96 @@ public final class RenderMarkdown implements Renderizador {
       return SeccionId.titulo( s.id, r.idioma() );
     }
 
+    /** "2.3 " delante del titulo de la seccion que se escribe (solo en los capitulos). */
+    String numeroSeccion;
+
+    /**
+     * Informe combinado: portada del conjunto, indice de documentos y secciones numeradas, y cada documento
+     * como capitulo ("# 2. Nombre", tipo y datos de su portada) con sus secciones ("## 2.3 Titulo").
+     */
+    void combinado( List<Capitulos.Grupo> grupos ) throws Exception {
+      Capitulos.Grupo general = !grupos.isEmpty() && grupos.get( 0 ).capitulo == null ? grupos.get( 0 ) : null;
+      List<Seccion> cab = new ArrayList<>();
+      if ( general != null ) {
+        if ( general.portada != null ) {
+          cab.add( general.portada );
+        }
+        cab.addAll( general.secciones );
+      }
+      portada( cab );
+      sb.append( "**" ).append( esc( t( "contents" ) ) ).append( "**\n\n" );
+      for ( Capitulos.Grupo g : grupos ) {
+        String sangria = "";
+        if ( g.capitulo != null ) {
+          sb.append( g.numero ).append( ". " ).append( esc( tituloCapitulo( g.capitulo ) ) ).append( '\n' );
+          sangria = "   ";
+        }
+        List<Seccion> vivas = g.vivas();
+        for ( int k = 0; k < vivas.size(); k++ ) {
+          String num = Capitulos.numero( g, k );
+          sb.append( sangria ).append( "- " ).append( num == null ? "" : num + " " ).append( esc( tituloSeccion(
+            vivas.get( k ) ) ) ).append( '\n' );
+        }
+      }
+      sb.append( '\n' );
+      int n = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        n += g.vivas().size();
+      }
+      int i = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        if ( g.capitulo != null ) {
+          capitulo( g );
+        }
+        List<Seccion> vivas = g.vivas();
+        for ( int k = 0; k < vivas.size(); k++ ) {
+          if ( p.cancelado() ) {
+            throw new CancellationException();
+          }
+          p.paso( t( "writing_markdown" ), ++i, n );
+          String num = Capitulos.numero( g, k );
+          numeroSeccion = num == null ? null : num + " ";
+          seccion( vivas.get( k ) );
+          numeroSeccion = null;
+        }
+      }
+    }
+
+    String tituloCapitulo( Capitulo c ) {
+      return c.titulo != null && !c.titulo.trim().isEmpty() ? c.titulo.trim() : c.nombreDoc != null && !c.nombreDoc
+        .trim().isEmpty() ? c.nombreDoc.trim() : c.id;
+    }
+
+    void capitulo( Capitulos.Grupo g ) throws Exception {
+      Capitulo c = g.capitulo;
+      sb.append( "# " ).append( g.numero ).append( ". " ).append( esc( tituloCapitulo( c ) ) ).append( "\n\n" );
+      String tipo = Informe.JOB.equals( c.tipoDoc ) ? t( "doc_job" ) : t( "doc_transformation" );
+      sb.append( "**" ).append( esc( tipo + ( c.nombreDoc == null || c.nombreDoc.trim().isEmpty() ? "" : " · "
+        + c.nombreDoc.trim() ) ) ).append( "**" );
+      if ( c.subtitulo != null && !c.subtitulo.trim().isEmpty() ) {
+        sb.append( "  \n" ).append( inicioSeguro( esc( c.subtitulo.trim() ) ) );
+      }
+      sb.append( "\n\n" );
+      if ( g.portada != null ) {
+        if ( g.portada.resumen != null && !g.portada.resumen.trim().isEmpty() ) {
+          parrafos( g.portada.resumen );
+        }
+        for ( Bloque b : Html.lista( g.portada.bloques ) ) {
+          if ( b != null && !( b instanceof Imagen ) ) {
+            bloque( b );
+          }
+        }
+      }
+      for ( String a : Html.lista( c.avisos ) ) {
+        if ( a != null && !a.trim().isEmpty() ) {
+          aviso( Aviso.WARN, null, a );
+        }
+      }
+    }
+
     void seccion( Seccion s ) throws Exception {
-      sb.append( "## " ).append( esc( tituloSeccion( s ) ) ).append( "\n\n" );
+      sb.append( "## " ).append( esc( ( numeroSeccion == null ? "" : numeroSeccion ) + tituloSeccion( s ) ) ).append(
+        "\n\n" );
       if ( Seccion.PARCIAL.equals( s.estado ) ) {
         aviso( Aviso.WARN, t( "status_partial" ), s.motivo );
       } else if ( Seccion.ERROR.equals( s.estado ) ) {

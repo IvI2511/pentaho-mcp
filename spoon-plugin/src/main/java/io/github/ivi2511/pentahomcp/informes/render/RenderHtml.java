@@ -27,6 +27,7 @@ import io.github.ivi2511.pentahomcp.informes.diagramas.Objetivo;
 import io.github.ivi2511.pentahomcp.informes.graficos.GraficosSvg;
 import io.github.ivi2511.pentahomcp.informes.modelo.Aviso;
 import io.github.ivi2511.pentahomcp.informes.modelo.Bloque;
+import io.github.ivi2511.pentahomcp.informes.modelo.Capitulo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Diagrama;
 import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
@@ -417,6 +418,16 @@ public final class RenderHtml implements Renderizador {
       }
       sb.append( "<div class=\"hoja\">\n" );
       List<Seccion> secciones = ordenadas( inf );
+      if ( inf.combinado() ) {
+        combinado( Capitulos.grupos( inf ) );
+        pie();
+        sb.append( "</div>\n" );
+        if ( modo == Modo.INTERACTIVO ) {
+          scripts();
+        }
+        sb.append( "</body>\n</html>\n" );
+        return sb.toString();
+      }
       portada( secciones );
       indice( secciones );
       avisosGenerales();
@@ -452,6 +463,135 @@ public final class RenderHtml implements Renderizador {
         return inf.nombreDoc.trim();
       }
       return t( "report" );
+    }
+
+    // ------------------------------------------------------------ informe combinado (capitulos)
+
+    /** "2.3 " delante del titulo de la seccion que se escribe (solo en los capitulos). */
+    String numeroSeccion;
+
+    /**
+     * Informe combinado: la portada del conjunto, un indice de dos niveles (documentos y sus secciones
+     * numeradas), y despues cada documento como capitulo: apertura en pagina nueva y sus secciones.
+     */
+    void combinado( List<Capitulos.Grupo> grupos ) {
+      Capitulos.Grupo general = !grupos.isEmpty() && grupos.get( 0 ).capitulo == null ? grupos.get( 0 ) : null;
+      List<Seccion> cab = new ArrayList<>();
+      if ( general != null && general.portada != null ) {
+        cab.add( general.portada );
+      }
+      portada( cab );
+      indiceCapitulos( grupos );
+      avisosGenerales();
+      int n = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        n += g.vivas().size();
+      }
+      int i = 0;
+      for ( Capitulos.Grupo g : grupos ) {
+        if ( g.capitulo != null ) {
+          capitulo( g );
+        }
+        List<Seccion> vivas = g.vivas();
+        for ( int k = 0; k < vivas.size(); k++ ) {
+          if ( p.cancelado() ) {
+            throw new CancellationException();
+          }
+          Seccion s = vivas.get( k );
+          p.paso( t( "writing_html" ), ++i, n );
+          String num = Capitulos.numero( g, k );
+          numeroSeccion = num == null ? null : num + " ";
+          seccion( s, k > 0 && Html.corta( s ) );
+          numeroSeccion = null;
+        }
+      }
+    }
+
+    String tituloCapitulo( Capitulo c ) {
+      return !vacio( c.titulo ) ? c.titulo.trim() : !vacio( c.nombreDoc ) ? c.nombreDoc.trim() : c.id;
+    }
+
+    String anclaCapitulo( Capitulo c ) {
+      return "cap-" + Html.idSeguro( c.id );
+    }
+
+    void indiceCapitulos( List<Capitulos.Grupo> grupos ) {
+      sb.append( "<div class=\"indice\">\n<h2>" ).append( Html.esc( t( "contents" ) ) ).append( "</h2>\n<ol>\n" );
+      List<String> omitidas = new ArrayList<>();
+      for ( Capitulos.Grupo g : grupos ) {
+        List<Seccion> vivas = g.vivas();
+        if ( g.capitulo != null ) {
+          sb.append( "<li class=\"cap\"><a href=\"#" ).append( anclaCapitulo( g.capitulo ) ).append( "\">" ).append(
+            Html.esc( tituloCapitulo( g.capitulo ) ) ).append( "</a>\n" );
+        }
+        if ( !vivas.isEmpty() ) {
+          sb.append( g.capitulo != null ? "<ol class=\"sub\">\n" : "" );
+          for ( int k = 0; k < vivas.size(); k++ ) {
+            Seccion s = vivas.get( k );
+            String num = Capitulos.numero( g, k );
+            sb.append( "<li><a href=\"#" ).append( anclaSeccion( s ) ).append( "\">" ).append( Html.esc( ( num == null
+              ? "" : num + " " ) + tituloSeccion( s ) ) ).append( "</a>" );
+            insignia( s );
+            sb.append( "</li>\n" );
+          }
+          sb.append( g.capitulo != null ? "</ol>\n" : "" );
+        }
+        if ( g.capitulo != null ) {
+          sb.append( "</li>\n" );
+        }
+        for ( Seccion s : g.secciones ) {
+          if ( Seccion.OMITIDA.equals( s.estado ) ) {
+            omitidas.add( tituloSeccion( s ) + ( g.capitulo != null ? " (" + tituloCapitulo( g.capitulo ) + ")" : "" ) );
+          }
+        }
+      }
+      sb.append( "</ol>\n" );
+      if ( !omitidas.isEmpty() ) {
+        sb.append( "<p class=\"motivo\">" ).append( Html.esc( t( "omitted_sections" ) + ": " + String.join( "; ",
+          omitidas ) ) ).append( ".</p>\n" );
+      }
+      sb.append( "</div>\n" );
+    }
+
+    /** Apertura de un documento: pagina nueva con numero, tipo y nombre, datos de su portada y avisos. */
+    void capitulo( Capitulos.Grupo g ) {
+      Capitulo c = g.capitulo;
+      sb.append( "<section class=\"capitulo\" id=\"" ).append( id( anclaCapitulo( c ) ) ).append( "\">\n" );
+      String tipo = Informe.JOB.equals( c.tipoDoc ) ? t( "doc_job" ) : t( "doc_transformation" );
+      sb.append( "<p class=\"tipo\">" ).append( Html.esc( tipo ) );
+      if ( !vacio( c.nombreDoc ) ) {
+        sb.append( " &middot; " ).append( Html.esc( c.nombreDoc.trim() ) );
+      }
+      sb.append( "</p>\n<h1><span class=\"num\">" ).append( g.numero ).append( "</span> " ).append( Html.esc(
+        tituloCapitulo( c ) ) ).append( "</h1>\n" );
+      if ( !vacio( c.subtitulo ) ) {
+        sb.append( "<p class=\"subtitulo\">" ).append( Html.esc( c.subtitulo.trim() ) ).append( "</p>\n" );
+      }
+      if ( g.portada != null ) {
+        if ( !vacio( g.portada.resumen ) ) {
+          sb.append( Html.parrafos( g.portada.resumen, "resumen-portada" ) );
+        }
+        for ( Bloque b : Html.lista( g.portada.bloques ) ) {
+          if ( b == null || b instanceof Imagen ) {
+            continue;
+          }
+          if ( b instanceof Lista && b.titulo == null ) {
+            sb.append( "<ul class=\"datos\">" );
+            for ( String it : Html.lista( ( (Lista) b ).items ) ) {
+              sb.append( "<li>" ).append( Html.enLinea( it ) ).append( "</li>" );
+            }
+            sb.append( "</ul>\n" );
+          } else {
+            bloque( b );
+          }
+        }
+      }
+      for ( String a : Html.lista( c.avisos ) ) {
+        if ( !vacio( a ) ) {
+          aviso( Aviso.WARN, a );
+        }
+      }
+      sb.append( "</section>\n" );
     }
 
     // ------------------------------------------------------------ CSS
@@ -668,7 +808,7 @@ public final class RenderHtml implements Renderizador {
     }
 
     String anclaSeccion( Seccion s ) {
-      return "sec-" + Html.idSeguro( s.id );
+      return Capitulos.ancla( s ); // "sec-flow"; en un capitulo, "sec-d2-flow"
     }
 
     void insignia( Seccion s ) {
@@ -688,7 +828,7 @@ public final class RenderHtml implements Renderizador {
         s.resumen ) ? 0 : 30 ) : Double.NaN;
       sb.append( "<section class=\"seccion" ).append( corta ? " corta" : "" ).append( "\" id=\"" ).append( id(
         anclaSeccion( s ) ) ).append( "\">\n<h2>" );
-      sb.append( Html.esc( tituloSeccion( s ) ) );
+      sb.append( Html.esc( ( numeroSeccion == null ? "" : numeroSeccion ) + tituloSeccion( s ) ) );
       insignia( s );
       sb.append( "</h2>\n" );
       if ( ( Seccion.PARCIAL.equals( s.estado ) || Seccion.ERROR.equals( s.estado ) ) && s.motivo != null

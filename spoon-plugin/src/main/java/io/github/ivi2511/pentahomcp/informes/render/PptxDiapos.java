@@ -71,6 +71,7 @@ import io.github.ivi2511.pentahomcp.informes.modelo.Grafico;
 import io.github.ivi2511.pentahomcp.informes.modelo.Imagen;
 import io.github.ivi2511.pentahomcp.informes.modelo.Indicador;
 import io.github.ivi2511.pentahomcp.informes.modelo.Indicadores;
+import io.github.ivi2511.pentahomcp.informes.modelo.Capitulo;
 import io.github.ivi2511.pentahomcp.informes.modelo.Informe;
 import io.github.ivi2511.pentahomcp.informes.modelo.Lista;
 import io.github.ivi2511.pentahomcp.informes.modelo.Parrafo;
@@ -246,6 +247,10 @@ final class PptxDiapos {
   void armar() {
     propiedades();
     simbolos();
+    if ( inf.combinado() ) {
+      armarCombinado();
+      return;
+    }
 
     List<Seccion> secciones = new ArrayList<>();
     Seccion portada = null;
@@ -285,6 +290,110 @@ final class PptxDiapos {
       avisos.add( r.f( "aviso_graficos", graficosComoTabla ) );
     }
     fijarIdioma();
+  }
+
+  /** Las secciones de la parte general entran en la agenda; las de los capitulos no (solo el capitulo). */
+  private boolean seccionesEnAgenda = true;
+
+  /**
+   * Informe combinado: portada del conjunto, agenda con los documentos, y por cada documento una diapositiva
+   * de apertura («2  Nombre», tipo, datos de su portada y avisos) seguida de sus secciones («2.3 Titulo»).
+   */
+  private void armarCombinado() {
+    List<Capitulos.Grupo> grupos = Capitulos.grupos( inf );
+    Capitulos.Grupo general = !grupos.isEmpty() && grupos.get( 0 ).capitulo == null ? grupos.get( 0 ) : null;
+    cancelar( progreso );
+    portada( general == null ? null : general.portada );
+    XSLFSlide diapoAgenda = nuevaDiapo( tituloAgenda(), laySoloTitulo );
+    int total = 0;
+    for ( Capitulos.Grupo g : grupos ) {
+      total += g.vivas().size();
+    }
+    int i = 0;
+    for ( Capitulos.Grupo g : grupos ) {
+      if ( g.capitulo != null ) {
+        XSLFSlide d = aperturaCapitulo( g );
+        agenda.add( new Object[] { tituloCapitulo( g.capitulo ), ppt.getSlides().indexOf( d ) + 1, String.valueOf(
+          g.numero ) } );
+      }
+      seccionesEnAgenda = g.capitulo == null;
+      List<Seccion> vivas = g.vivas();
+      for ( int k = 0; k < vivas.size(); k++ ) {
+        cancelar( progreso );
+        Seccion s = vivas.get( k );
+        String num = Capitulos.numero( g, k );
+        String titulo = ( num == null ? "" : num + "  " ) + tituloDe( s );
+        progreso.paso( r.f( "progreso", titulo ), i++, total );
+        seccion( s, titulo );
+      }
+    }
+    seccionesEnAgenda = true;
+    if ( !anexo.isEmpty() ) {
+      cancelar( progreso );
+      diaposAnexo();
+    }
+    llenarAgenda( diapoAgenda );
+    if ( diagramasComoTabla > 0 ) {
+      avisos.add( r.f( "aviso_diagramas", diagramasComoTabla ) );
+    }
+    if ( graficosComoTabla > 0 ) {
+      avisos.add( r.f( "aviso_graficos", graficosComoTabla ) );
+    }
+    fijarIdioma();
+  }
+
+  private static String tituloCapitulo( Capitulo c ) {
+    return !vacio( c.titulo ) ? c.titulo.trim() : !vacio( c.nombreDoc ) ? c.nombreDoc.trim() : c.id;
+  }
+
+  private XSLFSlide aperturaCapitulo( Capitulos.Grupo g ) {
+    Capitulo c = g.capitulo;
+    XSLFSlide d = nuevaDiapo( g.numero + "  " + tituloCapitulo( c ), laySoloTitulo );
+    List<String> lineas = new ArrayList<>();
+    Rotulos rh = Rotulos.de( RenderHtml.AREA, idioma );
+    String tipo = Informe.JOB.equals( c.tipoDoc ) ? rh.s( "doc_job" ) : rh.s( "doc_transformation" );
+    if ( g.portada != null ) {
+      for ( Bloque b : g.portada.bloques == null ? new ArrayList<Bloque>() : g.portada.bloques ) {
+        if ( b instanceof Lista && ( (Lista) b ).items != null ) {
+          for ( String it : ( (Lista) b ).items ) {
+            if ( !vacio( it ) ) {
+              lineas.add( it );
+            }
+          }
+        }
+      }
+    }
+    XSLFTextBox tb = caja( d, X0 + 20, Y_CONTENIDO + 10, ANCHO_UTIL - 40, 40 );
+    run( parrafo( tb ), limpio( tipo.toUpperCase( locale ) + ( vacio( c.nombreDoc ) ? "" : "  ·  " + c.nombreDoc
+      .trim() ) ), 13, tenue, true, false );
+    double yy = Y_CONTENIDO + 56;
+    if ( !vacio( c.subtitulo ) ) {
+      XSLFTextBox st = caja( d, X0 + 20, yy, ANCHO_UTIL - 40, 30 );
+      run( parrafo( st ), limpio( c.subtitulo ), 16, texto, false, false );
+      yy += 36;
+    }
+    if ( !lineas.isEmpty() ) {
+      int n = Math.min( lineas.size(), 10 );
+      double size = n > 7 ? 12 : 14;
+      XSLFTextBox lb = caja( d, X0 + 20, yy, ANCHO_UTIL - 40, n * size * 1.6 + 8 );
+      for ( int k = 0; k < n; k++ ) {
+        XSLFTextParagraph p = parrafo( lb );
+        p.setSpaceAfter( -4.0 );
+        run( p, limpio( lineas.get( k ) ), size, texto, false, false );
+      }
+      yy += n * size * 1.6 + 16;
+    }
+    if ( c.avisos != null && !c.avisos.isEmpty() && yy < Y_LIMITE - 20 ) {
+      int n = Math.min( 3, c.avisos.size() );
+      XSLFTextBox ab = caja( d, X0 + 20, yy, ANCHO_UTIL - 40, n * 14 + 6 );
+      for ( int k = 0; k < n; k++ ) {
+        run( parrafo( ab ), limpio( c.avisos.get( k ) ), 10, WARN, false, true );
+      }
+    }
+    if ( g.portada != null && !vacio( g.portada.resumen ) ) {
+      notas( d, g.portada.resumen );
+    }
+    return d;
   }
 
   // ================================================================== idioma del texto
@@ -534,7 +643,10 @@ final class PptxDiapos {
       p.setTextAlign( TextAlign.LEFT );
       p.addTabStops( 34, TabStopType.LEFT );
       p.addTabStops( 600, TabStopType.RIGHT );
-      run( p, String.valueOf( n++ ), size, acento, true, false );
+      // en un combinado, el numero del documento (las secciones de la parte general van sin numero)
+      String num = e.length > 2 ? (String) e[ 2 ] : inf.combinado() ? "" : String.valueOf( n );
+      n++;
+      run( p, num, size, acento, true, false );
       run( p, "\t" + limpio( (String) e[ 0 ] ), size, texto, false, false );
       run( p, "\t" + e[ 1 ], size, tenue, false, false );
     }
@@ -554,7 +666,9 @@ final class PptxDiapos {
     XSLFSlide primera = nuevaDiapo( titulo, laySoloTitulo );
     diaposSeccion = 1;
     fuera.clear();
-    agenda.add( new Object[] { titulo, ppt.getSlides().indexOf( primera ) + 1 } );
+    if ( seccionesEnAgenda ) {
+      agenda.add( new Object[] { titulo, ppt.getSlides().indexOf( primera ) + 1 } );
+    }
 
     if ( Seccion.PARCIAL.equals( s.estado ) || Seccion.ERROR.equals( s.estado ) ) {
       boolean error = Seccion.ERROR.equals( s.estado );
@@ -693,7 +807,8 @@ final class PptxDiapos {
    * pide; si no, queda en el HTML, el PDF y el Word.
    */
   static boolean detalle( Bloque b ) {
-    return b.anexo || b.id != null && b.id.startsWith( "dictionary-anexo" );
+    // en un informe combinado los ids llevan el prefijo del capitulo ("d2-dictionary-anexo-...")
+    return b.anexo || b.id != null && b.id.replaceFirst( "^d\\d+-", "" ).startsWith( "dictionary-anexo" );
   }
 
   /** Aparta un bloque para el anexo; sin anexo, anota su titulo para la nota de la seccion. */

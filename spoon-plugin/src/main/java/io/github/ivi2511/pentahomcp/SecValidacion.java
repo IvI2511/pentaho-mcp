@@ -48,6 +48,29 @@ final class SecValidacion implements Recolector {
     return null;
   }
 
+  /**
+   * Algunos mensajes en castellano de PDI 9.4 llegan con U+FFFD en lugar de la vocal acentuada (el
+   * properties de Kettle esta en Latin-1): «uno o m\uFFFDs espacios», «car\uFFFDcter». Se reparan las
+   * palabras conocidas; lo demas queda como viene.
+   */
+  static String reparar( String texto ) {
+    if ( texto == null || texto.indexOf( '\uFFFD' ) < 0 ) {
+      return texto;
+    }
+    String[][] palabras = { { "m\uFFFDs", "más" }, { "car\uFFFDcter", "carácter" }, { "n\uFFFDmero", "número" },
+      { "v\uFFFDlido", "válido" }, { "v\uFFFDlida", "válida" }, { "conexi\uFFFDn", "conexión" }, { "est\uFFFD",
+        "está" }, { "informaci\uFFFDn", "información" }, { "tambi\uFFFDn", "también" }, { "b\uFFFDsqueda",
+          "búsqueda" }, { "l\uFFFDnea", "línea" }, { "despu\uFFFDs", "después" }, { "s\uFFFDlo", "sólo" }, {
+            "aqu\uFFFD", "aquí" }, { "a\uFFFDn", "aún" }, { "\uFFFDnico", "único" }, { "c\uFFFDdigo", "código" },
+      { "par\uFFFDmetro", "parámetro" }, { "opci\uFFFDn", "opción" }, { "acci\uFFFDn", "acción" }, {
+        "funci\uFFFDn", "función" }, { "versi\uFFFDn", "versión" }, { "posici\uFFFDn", "posición" } };
+    String s = texto;
+    for ( String[] p : palabras ) {
+      s = s.replace( p[ 0 ], p[ 1 ] );
+    }
+    return s;
+  }
+
   @Override
   public Seccion armar( Contexto ctx ) throws Exception {
     Rotulos r = ctx.rotulos( InformeServicio.AREA );
@@ -125,7 +148,7 @@ final class SecValidacion implements Recolector {
         } else {
           continue; // OK y COMMENT no salen con detalle = false
         }
-        t.fila( e.getKey(), nivel, texto );
+        t.fila( e.getKey(), nivel, reparar( texto ) );
       }
     }
     if ( !t.filas.isEmpty() ) {
