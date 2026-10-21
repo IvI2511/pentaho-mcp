@@ -18,7 +18,9 @@ whichever you prefer, but name new tools and arguments in English.
 | `.claude-plugin/marketplace.json` | The `pentaho-tools` marketplace that publishes `claude/` |
 | `tools/generador-catalogo/` | Generates the step and job entry catalog from a PDI install |
 | `instalar.ps1`, `instalar.sh` | Installers (see [`INSTALL.md`](INSTALL.md)) |
-| `instalador/` | Windows installer (Inno Setup 7): `preparar.ps1` stages PDI, the plugin, Java 21 and the `pentaho-live` launcher; then `instalador.iss` is compiled with Inno Setup |
+| `instalador.iss`, `preparar_instalador.ps1` | Windows installer (Inno Setup 7): `preparar_instalador.ps1` stages PDI, the plugin, Java 21 and the launcher in `build/instalador/staging/` (not versioned, like the JRE cache in `build/instalador/cache/`); then `instalador.iss` is compiled with Inno Setup and only the `Instalador_PentahoLive_X.Y.Z.exe` lands in `instalador/` |
+| `launcher/` | What the installer puts in `{app}\bin`: the IDCLauncher splash launcher (see its `NOTICE.md`), the `pentaho-live` commands, and the `pentaho-live.ico` icon |
+| `tools/instalador/` | `generar_imagenes.py` (the installer's wizard images and icon) and its fonts |
 | `VERSION` | The version, single source for the plugin, `plugin.json` (checked) and the installer |
 | `docs/api-spoon.md` | Internal design: Spoon API, threading, dialogs to avoid |
 

@@ -24,6 +24,7 @@
 
   Uso:
     powershell -ExecutionPolicy Bypass -File preparar_instalador.ps1 -PdiHome "<...>\data-integration"
+    (con -SinCompilar usa el plugin de spoon-plugin\dist\pentaho-mcp sin volver a correr build.ps1)
 
   Requiere: un JDK (para compilar el plugin, ver spoon-plugin\build.ps1), Python con
   playwright y pillow (pip install playwright pillow) y Google Chrome, con -FuenteLanzador el csc.exe de .NET
@@ -36,7 +37,10 @@ param(
   [string]$JreRelease = "jdk-21.0.12.1+1",
   # La carpeta plantillas del portafolio de IDC Studios (privada): con ella se recompilan
   # launcher\IDCLauncher.exe e idc-launcher.png. Sin ella se usan los del repo.
-  [string]$FuenteLanzador = $env:IDC_PLANTILLAS
+  [string]$FuenteLanzador = $env:IDC_PLANTILLAS,
+  # No corre spoon-plugin\build.ps1: usa el plugin que ya dejo en spoon-plugin\dist\pentaho-mcp
+  # (tiene que ser el de VERSION). Para cuando el build se acaba de hacer o no se puede repetir.
+  [switch]$SinCompilar
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,11 +69,18 @@ Write-Host "PDI de origen: $PdiHome"
 
 # ------------------------------------------------------------------ 1. plugin
 Paso "1. Plugin de Spoon (spoon-plugin\build.ps1)"
-& (Join-Path $repo "spoon-plugin\build.ps1") -PdiHome $PdiHome
+if ($SinCompilar) {
+  Write-Host "   -SinCompilar: se usa el de spoon-plugin\dist\pentaho-mcp tal como esta"
+} else {
+  & (Join-Path $repo "spoon-plugin\build.ps1") -PdiHome $PdiHome
+}
 $distPlugin = Join-Path $repo "spoon-plugin\dist\pentaho-mcp"
 if (-not (Test-Path (Join-Path $distPlugin "pentaho-mcp-core-$Version.jar"))) {
-  Falla "build.ps1 no dejo pentaho-mcp-core-$Version.jar en $distPlugin"
+  Falla "no esta pentaho-mcp-core-$Version.jar en $distPlugin (correr spoon-plugin\build.ps1)"
 }
+# Uno solo: un jar de otra version al lado cargaria dos veces las mismas clases en Spoon.
+$jars = @(Get-ChildItem $distPlugin -Filter "pentaho-mcp-core-*.jar")
+if ($jars.Count -ne 1) { Falla "en $distPlugin hay $($jars.Count) pentaho-mcp-core-*.jar (tiene que haber uno)" }
 
 # ------------------------------------------------------------------ 2. staging limpio + PDI
 Paso "2. Copia limpia de PDI"

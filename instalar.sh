@@ -65,7 +65,7 @@ instalar_rosetta() {
   softwareupdate --install-rosetta --agree-to-license 2>&1 | sed 's/^/   /'
   hay_rosetta
 }
-instalar_java_x64() {   # Temurin 21 x64 into $JAVA_X64, with the SHA-256 of the Adoptium API (as preparar.ps1)
+instalar_java_x64() {   # Temurin 21 x64 into $JAVA_X64, with the SHA-256 of the Adoptium API (as preparar_instalador.ps1)
   local json par sha url
   json=$(curl -fsSL "$ADOPTIUM_API") || { echo "   could not read $ADOPTIUM_API"; return 1; }
   # the .tar.gz is binary.package (binary.installer is the .pkg); JavaScript for Automation reads the JSON

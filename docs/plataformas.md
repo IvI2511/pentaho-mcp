@@ -38,7 +38,7 @@ los usuarios), el script hace los pasos 1, 2 y 4 de abajo. En el paso 3 («Java�
 busca un Java x64 (`PENTAHO_JAVA_HOME`, `~/pentaho/java-x64`, `JAVA_HOME`, `java_home -a x86_64`), dice
 qué falta y qué haría —Rosetta 2 con `softwareupdate --install-rosetta --agree-to-license` (acepta la licencia
 de Apple) y Temurin 21 x64 en `<destino>/java-x64`, con el SHA-256 y el enlace de la API de Adoptium, como
-`instalador/preparar.ps1`— y lo hace solo con una «y» explícita (Enter solo es «no») o con `--rosetta`. Si
+`preparar_instalador.ps1`— y lo hace solo con una «y» explícita (Enter solo es «no») o con `--rosetta`. Si
 la API no da un SHA-256 válido o el enlace no es de `github.com/adoptium/`, no baja nada. Después deja
 `data-integration/spoon-rosetta.sh`, que abre Spoon con `PENTAHO_JAVA_HOME` y `arch -x86_64`. «Done. Next»
 imprime ese comando en lugar de `spoon.sh`. En Linux y en Mac Intel no cambia nada de esto:

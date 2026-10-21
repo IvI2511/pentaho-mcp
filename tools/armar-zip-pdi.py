@@ -1,7 +1,7 @@
 """Arma pdi-ce-9.4-con-pentaho-mcp.zip (el PDI completo con el plugin) desde una carpeta data-integration.
 
 Uso:  python -I tools/armar-zip-pdi.py <carpeta que contiene data-integration> <zip de salida>
-      (en el release: instalador/staging  spoon-plugin/dist/pdi-ce-9.4-con-pentaho-mcp.zip)
+      (en el release: build/instalador/staging  spoon-plugin/dist/pdi-ce-9.4-con-pentaho-mcp.zip)
 
 Por qué un script: armado en Windows, un zip guarda los permisos como «MS-DOS» y todo sale 0666, así que en
 macOS/Linux `spoon.sh` no se puede ejecutar y la .app no abre (pasó con la 0.4.0 y la 0.4.1). Acá cada
