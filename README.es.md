@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>Claude arma tus ETLs de Pentaho Data Integration (Spoon) en vivo, mientras mirás.</strong><br>
+  <strong>Claude arma tus ETLs de Pentaho Data Integration (Spoon) en vivo, mientras miras.</strong><br>
   Un plugin de Spoon que levanta un servidor MCP local, más un plugin de Claude Code con la skill para usarlo.
 </p>
 
@@ -24,7 +24,7 @@
 </p>
 
 > [!TIP]
-> **¿Sos un agente (Claude Code, Codex…) y te pidieron instalar esto?** Seguí [`INSTALL.md`](INSTALL.md).
+> **¿Eres un agente (Claude Code, Codex…) y te han pedido instalar esto?** Sigue [`INSTALL.md`](INSTALL.md).
 
 <!-- GIF DE DEMO: reemplazar este comentario y la línea de abajo por
 <p align="center"><img src="docs/images/demo.gif" alt="Claude armando una transformación en vivo en Spoon" width="860"></p>
@@ -33,7 +33,7 @@
 
 ## Qué hace
 
-Abrís Spoon, le pedís a Claude un ETL con tus palabras y lo ves pasar en el lienzo: Claude agrega los
+Abres Spoon, le pides a Claude un ETL con tus palabras y lo ves pasar en el lienzo: Claude agrega los
 steps, los conecta y los configura, revisa qué campos salen de cada uno, valida, muestra filas reales de
 preview y ejecuta la transformación. Cada cambio pasa por el deshacer de Spoon, así que **Ctrl+Z**
 siempre funciona.
@@ -76,29 +76,29 @@ datos sucios: copias rotas de tus archivos de entrada corren contra una copia de
 entorno aislado, y la prueba comprueba que cada fila leída se cargó o se rechazó con su motivo, y que
 ejecutarla dos veces no duplica nada.
 
-¿No tenés Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
+¿No tienes Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
 
-## Qué le podés pedir
+## Qué le puedes pedir
 
-| Le decís… | Claude… |
+| Le dices… | Claude… |
 |---|---|
-| *"Armá una transformación que lea `ventas.csv`, le agregue la ciudad desde `clientes.csv`, sume el importe por ciudad y lo escriba en un CSV."* | la arma step por step en el lienzo, la valida y te muestra el resultado |
-| *"Agregá un Filter rows después del CSV input que deje las filas con saldo > 1000 y mostrame el preview."* | inserta el step en la transformación abierta y te muestra las filas que pasan |
-| *"Conectate a mi base PostgreSQL y cargá este archivo en la tabla `clientes`."* | agrega la conexión (la contraseña la escribís vos en Spoon), lista tablas y columnas y mapea los campos |
-| *"Hacé un job que corra estas dos transformaciones en orden y que pare si falla la primera."* | arma el job con sus entradas y los hops de éxito / error |
-| *"El lienzo es un lío, ordenalo."* | acomoda los steps de izquierda a derecha, sin líneas cruzadas |
+| *"Arma una transformación que lea `ventas.csv`, le agregue la ciudad desde `clientes.csv`, sume el importe por ciudad y lo escriba en un CSV."* | la arma step por step en el lienzo, la valida y te muestra el resultado |
+| *"Añade un Filter rows después del CSV input que deje las filas con saldo > 1000 y enséñame el preview."* | inserta el step en la transformación abierta y te muestra las filas que pasan |
+| *"Conéctate a mi base PostgreSQL y carga este archivo en la tabla `clientes`."* | agrega la conexión (la contraseña la escribes tú en Spoon), lista tablas y columnas y mapea los campos |
+| *"Haz un job que ejecute estas dos transformaciones en orden y que pare si falla la primera."* | arma el job con sus entradas y los hops de éxito / error |
+| *"El lienzo es un lío, ordénalo."* | acomoda los steps de izquierda a derecha, sin líneas cruzadas |
 | *"¿Por qué este `.ktr` falla en Pan?"* | lo lee, encuentra el problema con la lista de errores verificados y lo corrige |
-| *"Revisá las buenas prácticas de esta transformación antes de que la entregue y arreglá lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
+| *"Revisa las buenas prácticas de esta transformación antes de que la entregue y arregla lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
 | *"Da la lección de Stream lookup paso a paso, nivel principiante."* | la construye un step por cada clic en Siguiente ▶, con una nota numerada en el lienzo por step y las filas que produce |
-| *"Haceme un informe de esta transformación para el TP, en PDF y PowerPoint, con una conclusión corta."* | arma el informe (linaje, diccionario de datos, métricas…), escribe la conclusión con los datos reales y exporta los dos archivos |
+| *"Hazme un informe de esta transformación para la práctica, en PDF y PowerPoint, con una conclusión corta."* | arma el informe (linaje, diccionario de datos, métricas…), escribe la conclusión con los datos reales y exporta los dos archivos |
 | *"Con esta solución, un pack de corrección con un caso oculto; y después, las notas de las entregas de `C:\TP3\entregas`."* | corre la solución para sacar la salida esperada, corrige cada entrega en JVMs aparte y resume las notas, quién falló qué y por qué; la planilla y la devolución de cada alumno quedan en la carpeta de resultados |
 
 ## Cómo funciona
 
 ```mermaid
 flowchart LR
-    you(["Vos"])
+    you(["Tú"])
     subgraph agent ["Claude Code"]
         claude["Claude"]
         skill["skill pentaho-etl<br/>formato .ktr/.kjb, catálogo de steps"]
@@ -108,7 +108,7 @@ flowchart LR
         canvas["lienzo de Spoon"]
         engine["motor de Kettle<br/>validar, preview, ejecutar"]
     end
-    you -- "le pedís" --> claude
+    you -- "le pides" --> claude
     claude -. "consulta" .-> skill
     claude <-- "MCP por HTTP<br/>127.0.0.1:8765" --> plugin
     plugin <--> canvas
@@ -127,18 +127,18 @@ flowchart LR
 
 **Lo más fácil: pedíselo a tu agente.** En Claude Code o Codex escribí:
 
-> instalá IvI2511/pentaho-mcp
+> instala IvI2511/pentaho-mcp
 
-El agente sigue [`INSTALL.md`](INSTALL.md): te pregunta si ya tenés Pentaho, baja lo que falta, instala
+El agente sigue [`INSTALL.md`](INSTALL.md): te pregunta si ya tienes Pentaho, baja lo que falta, instala
 el plugin de Spoon y se configura solo.
 
-| Si… | Bajás del [último release](https://github.com/IvI2511/pentaho-mcp/releases/latest) | Script de Windows |
+| Si… | Descargas del [último release](https://github.com/IvI2511/pentaho-mcp/releases/latest) | Script de Windows |
 |---|---|---|
-| **ya tenés PDI** | `pentaho-mcp.zip` (el plugin de Spoon, ~11 MB con la librería de PowerPoint): se descomprime en `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
-| **no tenés PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE con el plugin ya puesto, ~370 MB) | `instalar.ps1 -InstalarPdi` |
-| **preferís un instalador de Windows** | `Instalador_PentahoLive_X.Y.Z.exe`: PDI 9.4 CE + plugin + Java 21, o solo el plugin en tu PDI; acceso en el menú Inicio y el comando `pentaho-live`. Todavía no está firmado: en el aviso de SmartScreen, **Más información → Ejecutar de todas formas** ([detalles](INSTALL.md#option-c--windows-installer-exe)) | no hace falta |
+| **ya tienes PDI** | `pentaho-mcp.zip` (el plugin de Spoon, ~11 MB con la librería de PowerPoint): se descomprime en `data-integration/plugins/` | `instalar.ps1 -PdiHome <data-integration>` |
+| **no tienes PDI** | `pdi-ce-9.4-con-pentaho-mcp.zip` (PDI 9.4 CE con el plugin ya puesto, ~370 MB) | `instalar.ps1 -InstalarPdi` |
+| **prefieres un instalador de Windows** | `Instalador_PentahoLive_X.Y.Z.exe`: PDI 9.4 CE + plugin + Java 21, o solo el plugin en tu PDI; acceso en el menú Inicio y el comando `pentaho-live`. Todavía no está firmado: en el aviso de SmartScreen, **Más información → Ejecutar de todas formas** ([detalles](INSTALL.md#option-c--windows-installer-exe)) | no hace falta |
 
-Después abrí Spoon, reiniciá Claude Code (o corré `/reload-plugins`) y pedile tu primer ETL.
+Después abre Spoon, reinicia Claude Code (o ejecuta `/reload-plugins`) y pídele tu primer ETL.
 
 <details>
 <summary><strong>Instalación a mano y otros agentes</strong></summary>
@@ -170,12 +170,12 @@ curl -fsSL https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/instalar.s
 bash /tmp/instalar-pentaho-mcp.sh --pdi "/ruta/a/data-integration"   # o --instalar-pdi
 ```
 
-**Codex:** `codex mcp add pentaho --url http://127.0.0.1:8765/mcp`, y copiá `claude/skills/pentaho-etl`
+**Codex:** `codex mcp add pentaho --url http://127.0.0.1:8765/mcp`, y copia `claude/skills/pentaho-etl`
 a `~/.codex/skills/pentaho-etl`.
 
 **Para probar:** con Spoon abierto, `curl http://127.0.0.1:8765/ping` responde `{"ok":true,"spoon":true,...}`.
 
-**Otro puerto:** corré el script con `-Puerto 8770` (le pone `PENTAHO_MCP_PORT` a Spoon) y cambiá la
+**Otro puerto:** ejecuta el script con `-Puerto 8770` (le pone `PENTAHO_MCP_PORT` a Spoon) y cambia la
 opción `mcp_url` del plugin a `http://127.0.0.1:8770/mcp` en `/config`.
 
 Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.md) (en inglés).
@@ -201,7 +201,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Jobs | Agregar, configurar y conectar entradas; hops de éxito / error / incondicionales |
 | Campos | Listar los campos que salen de cada step, antes de configurar el siguiente |
 | Controles | Validar; preview de filas reales de cualquier step |
-| Calidad | Revisar buenas prácticas más allá de la validación, con un puntaje de 0 a 100 (y, si lo pedís, leyendo las fuentes para probar un problema); aplicar los arreglos propuestos; silenciar una regla donde es a propósito |
+| Calidad | Revisar buenas prácticas más allá de la validación, con un puntaje de 0 a 100 (y, si lo pides, leyendo las fuentes para probar un problema); aplicar los arreglos propuestos; silenciar una regla donde es a propósito |
 | Modo clase | Reproducir una lección paso a paso con notas en el lienzo y una pestaña Lección (ritmo guiado, automático o manual), seguirla, volver atrás, ocultar, mostrar o quitar sus notas y convertirla en una guía |
 | Robustez | Encontrar lo que pararía una carga o perdería filas con datos sucios; robustecerla (rechazos con su motivo, campos obligatorios, duplicados, huérfanos) con un solo Ctrl+Z; demostrarlo con una prueba de datos sucios en un entorno aislado que solo usa copias y bases de datos de archivo |
 | Ejecución | Ejecutar una transformación o un job, seguir su estado y su log, detenerlo |
@@ -220,16 +220,16 @@ Todo corre en tu computadora. No hay servidores, cuentas, analíticas ni telemet
 - La conexión MCP va solo a `http://127.0.0.1:8765/mcp`. El plugin de Spoon escucha únicamente en la
   interfaz loopback y rechaza pedidos de páginas web de otros orígenes.
 - Las contraseñas de las bases se enmascaran antes de devolverle cualquier cosa a Claude. Lo recomendado
-  es que escribas las contraseñas vos en Spoon.
-- Solo se escriben archivos donde le pedís a Claude que guarde; las transformaciones se ejecutan solo
-  cuando lo pedís.
+  es que escribas tú las contraseñas en Spoon.
+- Solo se escriben archivos donde le pides a Claude que guarde; las transformaciones se ejecutan solo
+  cuando lo pides.
 - Los informes nunca llevan contraseñas. Pueden llevar nombres de hosts, rutas de archivos y, en el perfil
   de datos y la revisión profunda de calidad, valores reales de tus datos (se pueden ocultar en los ajustes
   del informe). El perfil y la
-  opción «Medir» ejecutan una copia de la transformación solo cuando lo pedís, y esa copia escribe sus
+  opción «Medir» ejecutan una copia de la transformación solo cuando lo pides, y esa copia escribe sus
   salidas como una ejecución normal.
 - La revisión de calidad (`lint_etl`) no ejecuta la transformación. Su modo profundo lee hasta 5000 filas
-  de tus fuentes solo cuando lo pedís, con previews limitadas a steps de solo lectura, y sus hallazgos
+  de tus fuentes solo cuando lo pides, con previews limitadas a steps de solo lectura, y sus hallazgos
   pueden citar valores que leyó.
 - El corrector ejecuta la solución y las entregas solo cuando se le pide, cada una en un proceso Java
   aparte con una configuración de Kettle vacía y sobre copias de los datos; nunca modifica una entrega y
@@ -261,7 +261,7 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   en `127.0.0.1` a propósito. En el chat de claude.ai solo sirve la skill; para editar en vivo hace falta
   un agente en la misma computadora donde corre Spoon.
 - **PDI no trae drivers de MySQL, MariaDB, SQL Server ni Oracle** (sí de PostgreSQL, SQLite y H2).
-  Copiá el `.jar` del conector a `data-integration/lib/` y reiniciá Spoon (con MySQL Connector/J 8+
+  Copia el `.jar` del conector a `data-integration/lib/` y reinicia Spoon (con MySQL Connector/J 8+
   alcanza el tipo de conexión MySQL normal).
 - El PDI 9.4 CE del release no tiene contenedor OSGi (karaf), así que faltan los steps de big data y
   streaming que dependen de él. Los 216 steps del catálogo están todos.
@@ -331,7 +331,7 @@ Además:
 | Regenerar el catálogo de steps | `bash tools/generador-catalogo/generar.sh <data-integration>` |
 | Diseño interno (API de Spoon, hilos, diálogos a evitar) | [`docs/api-spoon.md`](docs/api-spoon.md) |
 
-Las contribuciones son bienvenidas: mirá [`CONTRIBUTING.md`](CONTRIBUTING.md). La documentación interna
+Las contribuciones son bienvenidas: mira [`CONTRIBUTING.md`](CONTRIBUTING.md). La documentación interna
 y los comentarios del código están en español; la skill, las herramientas MCP, la ficha del plugin y la
 documentación para usuarios, en inglés.
 
