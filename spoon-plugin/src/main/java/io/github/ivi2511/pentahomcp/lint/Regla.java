@@ -9,12 +9,14 @@ import java.util.List;
  */
 public interface Regla {
 
-  /** correctness | portability | security | structure | style */
+  /** correctness | portability | security | structure | style | robustness */
   String CORRECTNESS = "correctness";
   String PORTABILITY = "portability";
   String SECURITY = "security";
   String STRUCTURE = "structure";
   String STYLE = "style";
+  /** Familia robustness (docs/robustez-diseno.md §3): apagada por defecto, con su propio sub-puntaje. */
+  String ROBUSTNESS = "robustness";
 
   /** Id en snake_case; es el que va en la key del hallazgo y en las supresiones. */
   String id();

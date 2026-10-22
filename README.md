@@ -66,6 +66,13 @@ class or for learning alone; afterwards the notes can be hidden for the exercise
 handout in PDF or Word. Three tested lessons (filter, Sort + Group by, Stream lookup vs Merge join) come
 with the skill in English, Spanish and Portuguese.
 
+**Robustness.** Ask Claude to make a load tolerate dirty data: every bad row (a missing field, a date that
+does not parse, a text too long for its column, a sale whose customer does not exist) goes to a rejects
+file with the reason, instead of stopping the load or vanishing. Claude finds what is missing, shows you
+the plan and applies it as one Ctrl+Z, then proves it with a dirty-data test: broken copies of your input
+files run against a copy of the transformation in a sandbox, and the test checks that every row read was
+loaded or rejected with a reason, and that running it twice duplicates nothing.
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 
@@ -192,6 +199,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Checks | Validate, preview real rows from any step |
 | Quality | Check good practices beyond validation with a 0-100 score (optionally reading the sources to prove a problem), apply the proposed fixes, silence a rule where it is deliberate |
 | Class mode | Play a lesson step by step with notes on the canvas and a Lesson tab (guided, automatic or manual pace), follow it, go back, hide, show or remove its notes, and turn it into a handout |
+| Robustness | Find what would stop a load or lose rows on dirty data; harden it (rejects files with the reason, required fields, dedupe, orphans) as one Ctrl+Z; prove it with a dirty-data test in a sandbox that runs only on copies and file databases |
 | Running | Run a transformation or job, follow its status and logs, stop it |
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
@@ -220,6 +228,9 @@ Everything runs on your computer. There are no servers, accounts, analytics or t
   Java process with its own empty Kettle settings, on copies of the data; it never modifies a submission and
   writes results only to the folder you choose. Trust mode (letting dangerous steps run) exists only in
   Spoon's Grader perspective, never over MCP.
+- The dirty-data test (`stress_test`) runs only when you ask, on a copy of the transformation in a separate
+  Java process with its own Kettle settings, and only when every database it uses is a SQLite or H2 file
+  (which it copies first). It never connects to any other database and writes only in a temporary folder.
 - What the tools return (steps, field names, logs, preview rows) becomes part of your conversation with
   Claude, like anything else you share.
 

@@ -274,7 +274,9 @@ You see the step error (e.g. C7) and then `03_ventas_por_producto - ERROR (…) 
 
 ## D. Silent errors (exit 0, wrong result)
 
-These are the dangerous ones: Pan says it finished fine.
+These are the dangerous ones: Pan says it finished fine. The opposite problem (one dirty row aborts the
+whole load, or rows vanish in a filter, an INNER JOIN or a lookup without anyone noticing) is
+`09-robustez.md`: rejects with a reason, `lint_etl robustness=true`, `harden_etl`, `stress_test`.
 
 ### D1. Duplicate step names → a step disappears (or Pan hangs) · `duplicate_step_name`
 

@@ -68,6 +68,14 @@ projetada ou para aprender sozinho; no fim, as notas podem ser ocultadas para o 
 uma apostila em PDF ou Word. A skill traz três lições testadas (filtrar, Sort + Group by, Stream lookup vs
 Merge join) em português, inglês e espanhol.
 
+**Robustez.** Peça ao Claude que uma carga tolere dados sujos: cada linha ruim (um campo que falta, uma
+data que não dá para ler, um texto longo demais para a coluna, uma venda de um cliente que não existe) vai
+para um arquivo de rejeitados com o motivo, em vez de parar a carga ou sumir. O Claude encontra o que
+falta, mostra o plano e aplica tudo com um único Ctrl+Z; depois prova com um teste de dados sujos: cópias
+quebradas dos seus arquivos de entrada rodam contra uma cópia da transformação num ambiente isolado, e o
+teste confere que cada linha lida foi carregada ou rejeitada com o motivo, e que rodar duas vezes não
+duplica nada.
+
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
 
@@ -195,6 +203,7 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Verificações | Validar; preview de linhas reais de qualquer step |
 | Qualidade | Revisar boas práticas além da validação, com uma pontuação de 0 a 100 (e, se você pedir, lendo as fontes para provar um problema); aplicar as correções propostas; silenciar uma regra onde ela é proposital |
 | Modo aula | Reproduzir uma lição passo a passo com notas no canvas e uma aba Lição (ritmo guiado, automático ou manual), acompanhá-la, voltar, ocultar, mostrar ou remover as notas e transformá-la numa apostila |
+| Robustez | Encontrar o que pararia uma carga ou perderia linhas com dados sujos; robustecer (rejeitados com o motivo, campos obrigatórios, duplicados, órfãos) com um único Ctrl+Z; provar com um teste de dados sujos num ambiente isolado que só usa cópias e bancos de dados em arquivo |
 | Execução | Executar uma transformação ou um job, acompanhar o status e o log, parar |
 | Bancos de dados | Listar tipos de conexão; criar, testar e excluir conexões; ver tabelas e colunas; rodar consultas SQL (somente leitura, a menos que você peça escrita) |
 | Parâmetros | Listar, definir e excluir parâmetros |
@@ -226,6 +235,10 @@ Tudo roda no seu computador. Não há servidores, contas, analytics nem telemetr
   configuração do Kettle vazia e sobre cópias dos dados; nunca altera uma entrega e grava os resultados só na
   pasta que você escolher. O modo confiança (deixar rodar steps perigosos) existe só na perspectiva Corretor
   do Spoon, nunca via MCP.
+- O teste de dados sujos (`stress_test`) só roda quando você pede, sobre uma cópia da transformação num
+  processo Java separado com sua própria configuração do Kettle, e só se todos os bancos de dados que ela
+  usa forem arquivos SQLite ou H2 (que ele copia antes). Nunca se conecta a outro banco e só grava numa
+  pasta temporária.
 - O que as ferramentas devolvem (steps, nomes de campos, logs, linhas de preview) passa a fazer parte da
   sua conversa com o Claude, como qualquer outra coisa que você compartilhe.
 

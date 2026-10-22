@@ -1,0 +1,13 @@
+sale_id;sale_date;customer_id;customer_name;city;amount;quantity
+1;2026-10-01;C01;Ana Ruiz;Madrid;10.50;1
+2;2026-10-01;C02;Luis Gómez;Sevilla;20.00;2
+3;2026-10-01;C01;Ana Ruiz;Madrid;5.25;1
+4;2026-10-02;C03;Marta Díaz;Valencia;7.80;3
+5;2026-10-02;C04;Pedro Sanz;Bilbao;12.00;1
+6;2026-10-03;C05;Lucía Mora;Málaga;30.00;2
+7;2026-10-03;C02;Luis Gómez;Sevilla;8.40;1
+8;2026-10-04;C03;Marta Díaz;Valencia;15.00;5
+9;2026-10-04;C01;Ana Ruiz;Madrid;9.99;1
+10;2026-10-05;C04;Pedro Sanz;Bilbao;4.50;2
+11;2026-10-05;C05;Lucía Mora;Málaga;6.75;1
+12;2026-10-05;C05;Lucía Mora;Málaga;3.25;1

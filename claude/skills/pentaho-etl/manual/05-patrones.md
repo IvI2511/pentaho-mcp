@@ -22,6 +22,7 @@ it with `configure_step`, `save` under a new name.
 | 03 | `03_carga_incremental/` | Load only what changed since the last run (watermark by `updated_at`) | Table input + Set variables, Table input with `${VAR}`, Insert / update, SQL job entry | `03_preparar_origen.kjb` (test source), then `03_carga_incremental.kjb` | Run 1: 6 rows; new data; run 2: **4** rows (3 inserts, 1 update); run 3: 0 rows, watermark unchanged |
 | 04 | `04_scd_tipo2/` | Dimension with history (SCD type 2): surrogate key, version, valid from/to | Dimension lookup/update (Insert = type 2, Punch through = type 1), Get variables | `04_scd_tipo2.kjb`, params `ARCHIVO_CLIENTES`, `FECHA_CARGA` | Day 1: 5 customers v1; day 2: customer 3 gets v2 and v1 is closed on 2026-10-15; email fixed in place; same snapshot again changes nothing |
 | 05 | `05_hecho_con_claves/` | Fact table: natural keys → surrogate keys, unknown member, repeatable load | Calculator, Database lookup, Stream lookup, Insert / update, `unique_connections` | `05_hecho_con_claves.kjb`, param `LOTE` | Batch 1: 6 sales (unknown customer and product → key 0); batch 2: 1 corrected in place + 2 new = 8 |
+| 06 | `06_carga_tolerante/` | Fault-tolerant load: no bad row stops it or vanishes, re-running changes nothing | CSV input (all String) → Filter rows (required) + Janino reason, Select values (not lenient, error hop), Unique rows (HashSet, declared), stable keys (Database lookup + max + Add sequence + Calculator NVL), Insert / update with error hops, Blocking step + Block until steps finish, Memory group by, rejects queues (Replace in string + Text file output) | `06_carga_tolerante.kjb`, param `ARCHIVO_VENTAS` | Clean: 5 customers, 10 facts, 0 rejects; again: `O=0 U=0`, same keys; broken file (22 lines): exit 0, 8 rejects with reason in 4 files, 1 declared duplicate, 12 facts, keys unchanged |
 
 ## Conventions shared by all the patterns
 
@@ -33,7 +34,8 @@ it with `configure_step`, `save` under a new name.
   SQLite files live in `salida/` of the pattern (`.gitignore`); deleting `salida/` resets the pattern.
 - Step and entry names in English, unique; file names in Spanish, like the rest of the skill.
 - No step has two normal outputs, so no `<distribute>` decision is needed; error hops (declared in
-  `<step_error_handling>`) do not count as outputs for distribution.
+  `<step_error_handling>`) do not count as outputs for distribution. The exception is 06, where
+  `Convert types` feeds the dimension and the fact branches: `<distribute>N</distribute>` (copy to both).
 - **Portable DDL**: `VARCHAR`, `INTEGER`, `NUMERIC(12,2)`, `DATE`/`TIMESTAMP`. The only SQLite-specific
   line is `INTEGER PRIMARY KEY AUTOINCREMENT` in 04 (PostgreSQL: `GENERATED ALWAYS AS IDENTITY` or
   `SERIAL`; MySQL: `INT AUTO_INCREMENT PRIMARY KEY`).
@@ -65,4 +67,6 @@ Verified while testing them; they matter as soon as you use SQLite as the target
 Every step ends with a line with its counters; with a Spanish JVM it reads
 `Procesamiento finalizado (I=…, O=…, R=…, W=…, U=…, E=…)` instead of `Finished processing (…)`: match the
 counters, not the text. `U` is rows updated (Insert / update, Dimension lookup/update), `O` rows written to
-the database or file. A step whose counters are all 0 prints that line only at `/level:Detailed`.
+the database or file. A step whose counters are all 0 prints that line only at `/level:Detailed`. `E` is the
+rows the step sent to its error hop or rejected as duplicates (06: `Load fact_sales … E=1`), not errors
+that fail the run.

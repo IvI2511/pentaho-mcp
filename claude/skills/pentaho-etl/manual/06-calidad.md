@@ -132,10 +132,38 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
 | `parameter_without_default` | I | Parameter without a default (credentials excluded) | by hand | — |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
+| the robustness family (below) | W / I | **Off by default**: `robustness: true` runs them with a score of their own | `harden_etl` | `09-robustez.md` |
 | `kettle_check` | E / W | What Spoon's Verify says (`include_kettle_checks`), listed apart | — | — |
 
 The full catalog (title, why and fix in en/es/pt, whether a rule is off, depends on the computer or needs the
 saved file) is the `pentaho://lint/rules` resource.
+
+### Robustness rules (`robustness: true`)
+
+A family of its own, **off by default** and outside the main score: with `robustness: true` they run and
+`lint_etl` adds `robustness: {score, grade, counts, penalties}` (same formula). Each finding names in
+`evidence.recipe` the `harden_etl` recipe that fixes it. How to make a load tolerant, recipe by recipe:
+`09-robustez.md`.
+
+| Rule | Sev | What it catches |
+|---|---|---|
+| `no_rejects_on_load` | W | Database load without error handling: one bad row stops the whole load (Table output on SQLite: use Insert / update) |
+| `no_rejects_on_conversion` | W | Type conversion (Select values, typed CSV input) without error handling |
+| `rejects_without_reason` | W | Error hop without the description field, or false branch written without a reason column |
+| `rejects_dead_end` | W | Rejected rows that end in a Dummy or a step that writes nothing |
+| `silent_filter_drop` | I | Filter rows without false branch (Switch / case without default) before a load; silence it = declare it |
+| `lookup_drops_rows` | W | Database lookup that eats the row on failure, INNER Merge join before a load |
+| `unchecked_lookup` | W | Lookup key without default that reaches a load with no null check |
+| `inner_join_in_source` | I | Table input with an inner JOIN feeding a load |
+| `no_required_check` | I | File input that reaches a load or lookup by key with no null check |
+| `lenient_conversion` | W | Select values converting dates or numbers in lenient mode |
+| `fragile_split` | I | Field splitter on file data without error handling |
+| `no_dedupe_before_load` | I | Load fed by a file or several sources without dedupe |
+| `counter_as_surrogate_key` | W | Add sequence counter loaded as a key: keys change between runs |
+| `insert_only_load` | I | Table output without truncate to a non-staging table |
+| `fact_not_grouped` | I | Load with 2+ keys without a Group by before it |
+| `lookup_before_load_finishes` | W | Lookup of a table the same transformation loads, without Block until steps finish |
+| `fixed_input_file` | I | File input without a parameter in its name |
 
 ## 6. Deep mode (`deep=true`)
 

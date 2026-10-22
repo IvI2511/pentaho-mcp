@@ -44,7 +44,10 @@ public class McpLifecycleListener implements LifecycleListener {
       + "flow in one call use build_steps; (4) get_step_fields to confirm which columns come out of each step "
       + "before configuring the next one; (5) validate and preview_step to see real rows, and lint_etl for the "
       + "good practices Kettle does not check (0-100 score, findings and how to fix them; apply_lint_fixes applies "
-      + "the fixes it proposes, asking the person first for the ones with confirm=true); (6) arrange_canvas "
+      + "the fixes it proposes, asking the person first for the ones with confirm=true); to make it fault-tolerant "
+      + "(every bad row to a rejects file with its motivo instead of aborting the load) see what is missing with "
+      + "lint_etl robustness=true and the guide pentaho://guide/robustness, then use harden_etl: plan first, "
+      + "then apply in one Ctrl+Z, and stress_test to prove with dirty data that no row is lost; (6) arrange_canvas "
       + "if there are branches or lookups, so no lines cross; (7) save with a .ktr/.kjb path. Place steps left "
       + "to right, ~150 px apart. If a step has several outputs, by default each one gets a copy of every row "
       + "(change it with set_output_mode). generate_report writes a Markdown report of the document and "
@@ -124,6 +127,8 @@ public class McpLifecycleListener implements LifecycleListener {
       LintTools.register( server );
       CorrectorTools.register( server );
       LessonTools.register( server );
+      RobustezTools.register( server );
+      EstresTools.register( server );
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("

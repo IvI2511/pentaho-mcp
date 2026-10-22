@@ -64,6 +64,23 @@ public final class LintJson {
       x.put( "code", n.code );
       x.put( "reason", n.reason );
     }
+    if ( r.robustez != null ) {
+      ObjectNode rb = o.putObject( "robustness" );
+      rb.put( "score", r.robustez.score ).put( "grade", r.robustez.grade );
+      ObjectNode rc = rb.putObject( "counts" );
+      for ( Map.Entry<String, Integer> e : r.robustez.counts.entrySet() ) {
+        rc.put( e.getKey(), e.getValue() );
+      }
+      ArrayNode rp = rb.putArray( "penalties" );
+      for ( Penalidad p : r.robustez.penalties ) {
+        rp.addObject().put( "rule", p.rule ).put( "severity", p.severity.codigo() ).put( "hits", p.hits )
+          .put( "points", p.points );
+      }
+      if ( r.robustez.infoPointsRaw > r.robustez.infoPoints ) {
+        rb.putObject( "score_caps" ).put( "info_points", r.robustez.infoPointsRaw ).put( "info_cap",
+          Puntaje.TOPE_INFO );
+      }
+    }
     ObjectNode d = o.putObject( "deep" );
     d.put( "ran", r.deep.ran );
     if ( r.deep.reason != null ) {
@@ -155,6 +172,8 @@ public final class LintJson {
     sc.put( "info_cap", Puntaje.TOPE_INFO );
     sc.put( "error_gate", Puntaje.COMPUERTA_ERROR );
     sc.put( "grades", "A 90-100, B 75-89, C 50-74, D <50" );
+    sc.put( "robustness", "the rules of category robustness are off by default; with robustness=true they run and "
+      + "give a separate score (same formula) that never changes the main one" );
     ArrayNode a = o.putArray( "rules" );
     for ( Regla r : Catalogo.todas() ) {
       ObjectNode x = a.addObject();

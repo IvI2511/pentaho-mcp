@@ -145,7 +145,12 @@ final class McpResources {
       "How to teach a transformation step by step on the canvas: the lesson script for lesson_start, pace and the "
         + "Lesson tab, writing good what/why notes, following the class with lesson_status, hiding or removing the "
         + "notes, the handout (build_report sections=[\"lesson\"]) and the ready lessons L1-L3 of the skill.",
-      "manual/08-modo-clase.md" )
+      "manual/08-modo-clase.md" ),
+    new Doc( "pentaho://guide/robustness", "robustness", "Robustness (lint_etl robustness, harden_etl, stress_test)",
+      "How to make a load tolerate dirty data: every bad row to a rejects file with its reason, nothing lost in "
+        + "silence, stable keys and re-runnable loads; the fast path with the tools, each recipe by hand with "
+        + "its PDI 9.4 XML (tested in pattern 06), declared drops, pitfalls and how to read stress_test.",
+      "manual/09-robustez.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

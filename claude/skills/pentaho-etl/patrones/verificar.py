@@ -199,6 +199,81 @@ def check_05(folder, log, run):
         check_step(log, "Upsert fact_sales", R=3, O=2, U=1)
 
 
+# ----------------------------------------------------------------------------------------------- 06
+
+# The clean file gives these customers and keys (first appearance order) and 10 rows of fact_sales
+# (one per customer and day: lines 1+3 and 11+12 are added up).
+KEYS_06 = {"C01": 1, "C02": 2, "C03": 3, "C04": 4, "C05": 5}
+
+
+_rejects_read = {}
+
+
+def rejects_06(folder, name):
+    """Data rows of salida/rechazos/<name>.csv (the file exists even with no rejects; then it is empty).
+    Every row must carry a one-line reason (checked once per file)."""
+    if name in _rejects_read:
+        return _rejects_read[name]
+    path = os.path.join(folder, "salida", "rechazos", name + ".csv")
+    if not os.path.exists(path):
+        check(False, f"{path} exists (it is created even when nothing is rejected)")
+        return []
+    with open(path, encoding="utf-8", newline="") as fh:
+        rows = list(csv.DictReader(fh, delimiter=";"))
+    for r in rows:
+        first = next(iter(r.values()))
+        motivo = (r.get("motivo") or "").strip()
+        check(motivo != "" and "\n" not in motivo and not motivo.startswith("|"),
+              f"{name}: row {first} has a one-line reason: {motivo[:70]}")
+    _rejects_read[name] = rows
+    return rows
+
+
+def check_06(folder, log, run):
+    con = db(folder, "06_dwh.sqlite")
+    keys = {r["customer_id"]: r["customer_sk"] for r in con.execute("SELECT * FROM dim_customer")}
+    check(keys == KEYS_06, f"dim_customer = {keys} (5 customers, same customer_sk in every run)")
+    fact = {(r["customer_sk"], local_date(r["sale_date"]).isoformat()): r for r in con.execute("SELECT * FROM fact_sales")}
+    first = fact.get((1, "2026-10-01"))
+    check(first is not None and abs(first["amount"] - 15.75) < 1e-9 and first["quantity"] == 2,
+          "fact (C01, 2026-10-01) = 10.50 + 5.25, quantity 2: aggregated to the grain before the load")
+    names = {n: len(rejects_06(folder, n)) for n in
+             ("rechazos_ventas", "rechazos_clientes", "rechazos_huerfanos", "rechazos_hechos")}
+    if run in (1, 2):
+        check(len(fact) == 10, f"fact_sales has {len(fact)} rows (expected 10)")
+        check(abs(sum(r["amount"] for r in fact.values()) - 133.44) < 1e-6, "total amount 133.44")
+        check(all(v == 0 for v in names.values()), f"no rejects with the clean file: {names}")
+        if run == 1:
+            check_step(log, "Load dim_customer", O=5, U=0, E=0)
+            check_step(log, "Load fact_sales", O=10, U=0, E=0)
+        else:
+            # Re-running is idempotent: nothing inserted, nothing updated, the keys did not move.
+            check_step(log, "Load dim_customer", O=0, U=0, E=0)
+            check_step(log, "Load fact_sales", O=0, U=0, E=0)
+        return
+    # Run 3: the broken file (the 12 clean lines + 10 broken ones), after two clean runs. Exit 0.
+    check(len(fact) == 12, f"fact_sales has {len(fact)} rows (expected 12 = 10 + C01 and C03 on new days)")
+    check((1, "2026-10-06") in fact and (3, "2026-10-07") in fact,
+          "the good new lines are loaded: 17 (repeated customer with other data) and 21 (spaces)")
+    check((2, "2026-10-06") not in fact, "line 19 (amount 150000, out of range) is not in fact_sales")
+    check(names == {"rechazos_ventas": 5, "rechazos_clientes": 1, "rechazos_huerfanos": 1, "rechazos_hechos": 1},
+          f"rejects per file = {names} (expected ventas 5, clientes 1, huerfanos 1, hechos 1)")
+    ventas = {r["sale_id"].strip(): r for r in rejects_06(folder, "rechazos_ventas")}
+    check(set(ventas) == {"13", "14", "15", "16", "22"}, f"rejected lines {sorted(ventas)} = 13, 14, 15, 16, 22")
+    check(ventas.get("13", {}).get("campos_error") == "customer_id", "line 13: campos_error = customer_id")
+    check(ventas.get("14", {}).get("campos_error") == "sale_date", "line 14 (2026-02-31): campos_error = sale_date")
+    clientes = rejects_06(folder, "rechazos_clientes")
+    check(bool(clientes) and "CHECK" in clientes[0]["motivo"], "C06 (60 characters): rejected by the CHECK of name")
+    # Balance of the run, from the log: lines read = rejected + declared drops + loaded.
+    read = step_counts(log, "Read sales")
+    check(read is not None and read["W"] == 22, f"Read sales wrote 22 rows ({read})")
+    check_step(log, "Remove duplicate sales", W=16, E=1)       # line 20 = line 2 again: declared drop
+    check_step(log, "Aggregate to grain", R=15, W=13)          # 15 sale lines -> 13 (customer, day)
+    check_step(log, "Load fact_sales", O=2, U=0, E=1)          # 2 new, 10 unchanged, 1 rejected
+    check_step(log, "Load dim_customer", O=0, U=0, E=1)        # keys of C01..C05 unchanged
+    check(22 == 5 + 1 + 1 + 1 + 14, "22 read = 5 input rejects + 1 duplicate + 1 orphan + 1 fact reject + 14 loaded lines")
+
+
 def main(argv):
     if len(argv) != 4:
         print(__doc__)
@@ -208,7 +283,7 @@ def main(argv):
     run = int(run or 1)
     {"01": lambda: check_01(folder, log), "02": lambda: check_02(folder, log),
      "03": lambda: check_03(folder, log, run), "04": lambda: check_04(folder, log, run),
-     "05": lambda: check_05(folder, log, run)}[pattern]()
+     "05": lambda: check_05(folder, log, run), "06": lambda: check_06(folder, log, run)}[pattern]()
     return 1 if failures else 0
 
 

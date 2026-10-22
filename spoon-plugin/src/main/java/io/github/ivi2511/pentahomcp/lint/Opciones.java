@@ -26,6 +26,11 @@ public final class Opciones {
    * error de Kettle): los informes con "mostrar_valores": false. Los cuenta igual.
    */
   public boolean ocultarValores;
+  /**
+   * Corre también la familia robustness (docs/robustez-diseno.md §3) y calcula su sub-puntaje en
+   * Resultado.robustez; el puntaje general no cambia.
+   */
+  public boolean robustez;
   /** en, es o pt (textos de los hallazgos). */
   public String lang = "en";
   /**

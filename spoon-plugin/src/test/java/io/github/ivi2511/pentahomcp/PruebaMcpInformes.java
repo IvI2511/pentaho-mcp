@@ -46,7 +46,7 @@ import io.github.ivi2511.pentahomcp.informes.navegador.Chromium;
 import io.github.ivi2511.pentahomcp.informes.tema.Tema;
 
 /**
- * La parte MCP de los informes (WP10, diseno §1.5): los esquemas de las 71 tools son JSON Schema
+ * La parte MCP de los informes (WP10, diseno §1.5): los esquemas de las 73 tools son JSON Schema
  * validos y las tres nuevas tienen los argumentos del diseno; generate_report no cambio; los
  * argumentos se validan antes de tocar Spoon; get_report_data devuelve el modelo en ingles y sin
  * binarios; y build_report sobre una captura de archivo (sin Spoon) escribe todos los formatos que
@@ -59,9 +59,10 @@ public class PruebaMcpInformes {
   /**
    * 54 tools de 0.4.0 + build_report, get_report_data, show_report y set_error_handling (0.5.0) + lint_etl,
    * apply_lint_fixes y suppress_lint (linter) + las 5 del corrector (CorrectorTools) + lesson_notes (modo
-   * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3).
+   * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3) + harden_etl y
+   * stress_test (robustez).
    */
-  private static final int TOOLS = 71;
+  private static final int TOOLS = 73;
 
   private McpHttpServer server;
   private int puerto;
@@ -83,6 +84,8 @@ public class PruebaMcpInformes {
     LintTools.register( server );
     CorrectorTools.register( server );
     LessonTools.register( server );
+    RobustezTools.register( server );
+    EstresTools.register( server );
     server.start();
   }
 
@@ -158,7 +161,7 @@ public class PruebaMcpInformes {
     JsonNode lint = porNombre.get( "lint_etl" );
     noNulo( lint, "lint_etl registrada" );
     igual( set( "document", "deep", "deep_timeout_s", "rules", "min_severity", "steps", "include_kettle_checks",
-      "language" ), props( lint ), "argumentos de lint_etl (diseno del linter §6)" );
+      "language", "robustness" ), props( lint ), "argumentos de lint_etl (diseno del linter §6 + robustez §3)" );
     igual( Arrays.asList( "info", "warning", "error" ), textos( prop( lint, "min_severity" ).path( "enum" ) ),
       "enum de min_severity" );
     JsonNode arreglos = porNombre.get( "apply_lint_fixes" );
@@ -174,7 +177,14 @@ public class PruebaMcpInformes {
     igual( set( "document", "rule", "step", "entry", "reason", "remove" ), props( silenciar ),
       "argumentos de suppress_lint" );
     igual( "[\"rule\"]", silenciar.path( "inputSchema" ).path( "required" ).toString(), "rule es obligatorio" );
-    for ( JsonNode t : new JsonNode[] { build, datos, mostrar, lint, arreglos, silenciar } ) {
+    JsonNode robustecer = porNombre.get( "harden_etl" );
+    noNulo( robustecer, "harden_etl registrada" );
+    igual( set( "document", "recipes", "steps", "rejects_file", "required_fields", "keys", "confirm", "dry_run",
+      "language" ), props( robustecer ), "argumentos de harden_etl (diseno de la robustez §4)" );
+    contiene( robustecer.path( "description" ).asText(), "ONE Ctrl+Z", "un solo Ctrl+Z" );
+    contiene( instr, "harden_etl", "las instrucciones nombran harden_etl" );
+    noNulo( porNombre.get( "stress_test" ), "stress_test registrada" );
+    for ( JsonNode t : new JsonNode[] { build, datos, mostrar, lint, arreglos, silenciar, robustecer } ) {
       String json = t.toString();
       cierto( json.chars().allMatch( ch -> ch < 128 ), "la tool " + t.path( "name" ).asText() + " esta en ingles "
         + "(sin caracteres fuera de ASCII)" );
@@ -226,6 +236,15 @@ public class PruebaMcpInformes {
     r = llamar( "suppress_lint", "{\"rule\":\"absolute_path\",\"step\":\"Leer\"}" );
     cierto( r.path( "isError" ).asBoolean(), "suppress_lint sin Spoon es isError" );
     contiene( texto( r ), "Spoon is not available", "suppress_lint sin Spoon" );
+
+    r = llamar( "harden_etl", "{\"recipes\":[\"no_such_recipe\"]}" );
+    cierto( r.path( "isError" ).asBoolean(), "harden_etl con una receta desconocida" );
+    contiene( texto( r ), "Unknown recipe 'no_such_recipe'", "receta desconocida, antes de buscar Spoon" );
+    r = llamar( "harden_etl", "{\"language\":\"fr\"}" );
+    contiene( texto( r ), "'language'", "idioma desconocido, antes de buscar Spoon" );
+    r = llamar( "harden_etl", "{}" );
+    cierto( r.path( "isError" ).asBoolean(), "harden_etl sin Spoon es isError" );
+    contiene( texto( r ), "Spoon is not available", "harden_etl sin Spoon" );
   }
 
   // ---------------------------------------------------------------- argumentos

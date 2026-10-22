@@ -141,6 +141,25 @@ runs. Follow it with `lesson_status wait_s=60`, steer it with `lesson_control`, 
 
 Script format, pace, good notes, the handout and troubleshooting: `manual/08-modo-clase.md`.
 
+## Robustness: loads that tolerate dirty data
+
+When the person wants a load that does not stop or lose rows on bad data (*tolerar fallos, datos sucios,
+rechazos, que no duplique*): every bad row goes to a rejects file with a `motivo` column, nothing vanishes
+in silence, re-running changes nothing and a broken input file proves it.
+
+- **Live**: `lint_etl robustness=true` (separate robustness score; each finding names its recipe) →
+  `harden_etl` (plan by default; `auto` proposals only redirect rows that would abort; show the `confirm`
+  ones, above all `semantics_change`, and pass the accepted keys) → `harden_etl dry_run=false` (one
+  Ctrl+Z) → `stress_test` (dirty copies of the inputs in a sandboxed JVM; only SQLite/H2 file databases,
+  otherwise `export_variants` and run them by hand) → `save`.
+- **By hand**: start from `patrones/06_carga_tolerante/` (tested with Kitchen: clean, again, broken file)
+  and the recipes of `manual/09-robustez.md`: read as String + required-fields filter, strict conversion
+  with error hop, one rejects queue per row layout (clean the reason, Text file output with declared
+  fields), dedupe declared, stable surrogate keys, Insert / update, LEFT JOIN + orphans rejected, Block
+  until steps finish (with a Blocking step before it), aggregate to the fact grain, input file parameter.
+- Never "tolerate" by ignoring errors or ending an error hop in a Dummy: tolerant means *rejected with a
+  reason, in a file someone reads*.
+
 ## Where everything is
 
 | I need… | Read |
@@ -152,11 +171,12 @@ Script format, pace, good notes, the handout and troubleshooting: `manual/08-mod
 | Quality: `lint_etl`, the score, the deep mode, `apply_lint_fixes`, `suppress_lint`, every rule | `manual/06-calidad.md` |
 | Grading exercises: packs, `grade_exercise`, `grade_submissions`, the gradebook, the Grader perspective | `manual/07-corrector.md` |
 | Class mode: `lesson_start`, the Lesson tab, notes, the handout, ready lessons | `manual/08-modo-clase.md`, `lecciones/` |
+| Robustness: rejects with a reason, stable keys, re-runnable loads, `harden_etl`, `stress_test`, the recipes by hand | `manual/09-robustez.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |
 | Complete examples that run | `manual/ejemplos/` (README with what each one does) |
-| A tested ETL to copy and adapt: CSV → staging, deduplication, incremental load, SCD type 2, fact with surrogate keys | `manual/05-patrones.md` (index), then `patrones/<nn>_*/README.md` |
+| A tested ETL to copy and adapt: CSV → staging, deduplication, incremental load, SCD type 2, fact with surrogate keys, fault-tolerant load | `manual/05-patrones.md` (index), then `patrones/<nn>_*/README.md` |
 
 ## The pitfalls that cost the most (details in the manual)
 

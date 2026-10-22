@@ -135,6 +135,14 @@ if wanted 05; then
   record $f $r
 fi
 
+if wanted 06; then
+  f=06_carga_tolerante; start_pattern $f; r=0
+  run_job $f 06_carga_tolerante.kjb run1_clean && { check 06-1 $f || r=1; } &&
+  run_job $f 06_carga_tolerante.kjb run2_clean_again && { check 06-2 $f || r=1; } &&
+  run_job $f 06_carga_tolerante.kjb run3_broken_file ARCHIVO_VENTAS=ventas_rotas.csv && { check 06-3 $f || r=1; } || r=1
+  record $f $r
+fi
+
 echo ""
 echo "== Summary$SUMMARY"
 exit $FAILED

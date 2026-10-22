@@ -34,7 +34,7 @@ public final class LintMotor {
     }
     long t0 = System.currentTimeMillis();
     boolean trans = copia instanceof TransMeta;
-    List<Regla> reglas = Catalogo.seleccionar( op.rules, op.kettleChecks );
+    List<Regla> reglas = Catalogo.seleccionar( op.rules, op.kettleChecks, op.robustez );
     boolean cicloVisible = op.rules == null || op.rules.isEmpty() || contiene( op.rules, Catalogo.CYCLE );
     Ctx ctx = new Ctx( copia, op );
     Map<Hallazgo, Regla> deRegla = new LinkedHashMap<Hallazgo, Regla>();
@@ -100,6 +100,7 @@ public final class LintMotor {
       }
     }
     Puntaje.calcular( cuentan, res );
+    res.robustez = robustez( reglas, trans, visibles, deRegla );
     res.counts.put( Sev.ERROR.codigo(), 0 );
     res.counts.put( Sev.WARNING.codigo(), 0 );
     res.counts.put( Sev.INFO.codigo(), 0 );
@@ -163,6 +164,34 @@ public final class LintMotor {
     if ( deep.ms == 0 ) {
       deep.ms = System.currentTimeMillis() - t0;
     }
+  }
+
+  /**
+   * El sub-puntaje de la familia robustness (§3 de robustez-diseno.md) con los hallazgos visibles (sin silenciados:
+   * silenciar es declarar); null si ninguna regla de la familia corrió (en un job no corre ninguna).
+   */
+  private static Resultado robustez( List<Regla> reglas, boolean trans, List<Hallazgo> visibles,
+    Map<Hallazgo, Regla> deRegla ) {
+    boolean corrio = false;
+    for ( Regla r : reglas ) {
+      corrio |= Regla.ROBUSTNESS.equals( r.categoria() ) && ( trans ? r.paraTrans() : r.paraJobs() );
+    }
+    if ( !corrio ) {
+      return null;
+    }
+    Resultado sub = new Resultado();
+    sub.counts.put( Sev.ERROR.codigo(), 0 );
+    sub.counts.put( Sev.WARNING.codigo(), 0 );
+    sub.counts.put( Sev.INFO.codigo(), 0 );
+    List<Hallazgo> suyos = new ArrayList<Hallazgo>();
+    for ( Hallazgo h : visibles ) {
+      if ( Regla.ROBUSTNESS.equals( deRegla.get( h ).categoria() ) ) {
+        suyos.add( h );
+        sub.counts.put( h.severity.codigo(), sub.counts.get( h.severity.codigo() ) + 1 );
+      }
+    }
+    Puntaje.calcular( suyos, sub );
+    return sub;
   }
 
   private static boolean contiene( Set<String> ids, String id ) {
