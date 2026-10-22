@@ -58,8 +58,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     the recipe that fixes it.
   - `harden_etl` ("Harden"): a plan of recipes with a text diff for each change, applied as **one Ctrl+Z**.
     `auto` recipes (error hop to a rejects file on loads, conversions and file inputs that read a field
-    as a number or date, a reason for each rejected row, wait for the dimension loads before the lookups)
-    apply by default; `confirm` ones (required fields, input file as a
+    as a number or date, a reason for each rejected row, wait for the dimension loads before the lookups,
+    with a Blocking step in front when both share a source so a big load cannot hang) apply by default; `confirm` ones (required fields, input file as a
     parameter, strict conversions, dedupe before a dimension, orphans to rejects) only with their key;
     `manual` ones (safe split, stable surrogate keys, Insert/Update instead of Table output, aggregate to
     the fact's grain) return the steps to follow. `dry_run` (the default) simulates the whole apply on a
@@ -69,8 +69,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     copy of the transformation on each one in a separate sandboxed JVM, and checks that it does not abort,
     that every row read is loaded, rejected with a reason or dropped on purpose, and, on a SQLite or H2
     database, that a re-run duplicates nothing and keeps the keys. It never connects to other databases
-    (`not_run`, and `export_variants` writes the broken files to try by hand) and never writes next to the
-    original files (63 tools).
+    (`not_run`, and `export_variants` writes the broken files to try by hand), never writes next to the
+    original files, switches off database logging in the copies, and does not run steps that leave the
+    machine or write where it cannot redirect them (HTTP, mail, SFTP, message queues, other output
+    plugins) (63 tools).
   - Skill: the guide `manual/09-robustez.md` (recipes R01-R14 with the exact XML, also served as
     `pentaho://guide/robustness`) and the pattern `patrones/06_carga_tolerante` (a load with stable keys,
     Insert/Update, orphans and database errors to rejects, proven clean, re-run and broken with Kitchen).

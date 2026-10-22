@@ -59,12 +59,20 @@ final class EstresSandbox {
   static final Set<String> CARGAS_BD = new HashSet<String>( Arrays.asList( "TableOutput", "InsertUpdate", "Update",
     "Delete", "DimensionLookup", "CombinationLookup", "SynchronizeAfterMerge" ) );
   /** Steps que salen de la máquina, ejecutan cosas o abren otras transformaciones: bloquean la corrida. */
-  static final Set<String> BLOQUEAN = new HashSet<String>( Arrays.asList( "Http", "HTTPPOST", "Rest",
-    "WebServiceLookup", "Mail", "ExecProcess", "SSH", "MetaInject", "TransExecutor", "JobExecutor", "Mapping",
-    "SimpleMapping", "SingleThreader", "SocketWriter", "SocketReader", "DBProc", "CubeOutput", "SQLFileOutput",
-    "AccessOutput", "PropertyOutput", "LDIFOutput", "SalesforceInsert", "SalesforceUpdate", "SalesforceUpsert",
-    "SalesforceDelete", "MongoDbOutput", "KafkaProducerOutput", "JmsProducer", "MQTTProducer", "ShapeFileReader",
-    "WriteToFile", "ProcessFiles", "ZipFile", "SetVariable" ) );
+  static final Set<String> BLOQUEAN = new HashSet<String>( Arrays.asList( "HTTP", "HTTPPOST", "Rest",
+    "WebServiceLookup", "WebServiceAvailable", "Mail", "MailInput", "MailValidator", "SyslogMessage", "SFTPPut",
+    "ExecProcess", "SSH", "PGPEncryptStream", "PGPDecryptStream", "GetSlaveSequence", "OlapInput", "MetaInject",
+    "TransExecutor", "JobExecutor", "Mapping", "SimpleMapping", "SingleThreader", "SocketWriter", "SocketReader",
+    "DBProc", "CubeOutput", "SQLFileOutput", "AccessOutput", "PropertyOutput", "LDIFOutput", "TextFileOutputLegacy",
+    "SalesforceInput", "SalesforceInsert", "SalesforceUpdate", "SalesforceUpsert", "SalesforceDelete", "MongoDbInput",
+    "MongoDbOutput", "CassandraInput", "CassandraOutput", "HBaseInput", "HBaseOutput", "LDAPInput", "LDAPOutput",
+    "ElasticSearchBulk", "KafkaConsumerInput", "KafkaProducerOutput", "JmsConsumer", "JmsProducer", "MQTTConsumer",
+    "MQTTProducer", "RssInput", "RssOutput", "AvroOutput", "ParquetOutput", "OrcOutput", "S3CSVINPUT",
+    "S3FileOutputPlugin", "HadoopFileInputPlugin", "HadoopFileOutputPlugin", "SplunkInput", "SplunkOutput",
+    "PentahoReportingOutput", "TeraFast", "ShapeFileReader", "WriteToFile", "ProcessFiles", "ZipFile",
+    "SetVariable" ) );
+  /** Steps con «output» en el id que sí se sabe manejar (además de SALIDAS_ARCHIVO y CARGAS_BD). */
+  static final Set<String> SALIDAS_CONOCIDAS = new HashSet<String>( Arrays.asList( "MappingOutput" ) );
   /** Lectores de archivos cuyo id no termina en «Input»: se leen del original con la ruta absoluta. */
   static final Set<String> OTROS_LECTORES = new HashSet<String>( Arrays.asList( "GetXMLData", "XMLInputStream",
     "GetFileNames", "getXMLData", "LoadFileInput" ) );
@@ -269,6 +277,9 @@ final class EstresSandbox {
       } else if ( BLOQUEAN.contains( id ) ) {
         a.bloqueos.add( s.getName() + " (" + id + "): it leaves the machine, runs other processes or other "
           + "transformations" );
+      } else if ( escribeAfuera( id ) ) {
+        a.bloqueos.add( s.getName() + " (" + id + "): it writes or sends data somewhere stress_test cannot redirect "
+          + "to the sandbox" );
       }
       // --- conexiones
       DatabaseMeta[] usadas = s.getStepMetaInterface().getUsedDatabaseConnections();
@@ -397,6 +408,21 @@ final class EstresSandbox {
       }
     }
     return a;
+  }
+
+  /**
+   * Red de seguridad de la lista de bloqueo: un step de otro plugin que escribe («Output»), publica o consume
+   * («Producer», «Consumer»), carga a granel («Bulk», «Loader») o ejecuta («Executor») y que el sandbox no sabe
+   * redirigir no corre: más vale un not_run que escribir sobre un archivo de verdad o salir de la máquina.
+   */
+  static boolean escribeAfuera( String id ) {
+    if ( id == null || SALIDAS_ARCHIVO.contains( id ) || CARGAS_BD.contains( id ) || SALIDAS_CONOCIDAS.contains(
+      id ) ) {
+      return false;
+    }
+    String l = id.toLowerCase( Locale.ROOT );
+    return l.contains( "output" ) || l.contains( "producer" ) || l.contains( "consumer" ) || l.contains( "bulk" )
+      || l.contains( "loader" ) || l.contains( "executor" );
   }
 
   /** pentaho-live-robust/drops, o silent_filter_drop silenciado con suppress_lint (silenciar = declarar). */
@@ -623,6 +649,26 @@ final class EstresSandbox {
             poner( s, "create_parent_folder", "Y" );
           }
         }
+      }
+    }
+    // --- registro en BD (tablas de log de la transformación, de steps, de rendimiento, de canales, de métricas y
+    // la fecha máxima): la copia no registra. Si no, la hija escribiría en la BD de logs de verdad (un MySQL, o un
+    // SQLite que ningún step usa y que por eso no se copió al sandbox).
+    Element info = hijo( raiz, "info" );
+    if ( info != null ) {
+      Element log = hijo( info, "log" );
+      for ( Node n = log == null ? null : log.getFirstChild(); n != null; n = n.getNextSibling() ) {
+        if ( n instanceof Element ) {
+          for ( String k : new String[] { "connection", "table" } ) {
+            if ( hijo( (Element) n, k ) != null ) {
+              poner( (Element) n, k, "" );
+            }
+          }
+        }
+      }
+      Element md = hijo( info, "maxdate" );
+      if ( md != null && hijo( md, "connection" ) != null ) {
+        poner( md, "connection", "" );
       }
     }
     // --- conexiones de archivo: copia de la BD en dirDb; la conexión se reescribe entera (también si era compartida)

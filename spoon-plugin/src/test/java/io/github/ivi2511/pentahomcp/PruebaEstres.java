@@ -242,6 +242,56 @@ public class PruebaEstres {
     sinRestos();
   }
 
+  /**
+   * El registro en BD de la transformación (aquí, a un segundo SQLite que ningún step usa) no sale del sandbox: la
+   * copia no registra y la BD de logs original no se toca. Y la política: un HTTP client (id HTTP) o un writer que el
+   * sandbox no redirige (TextFileOutputLegacy) no corren.
+   */
+  public void pruebaLogsYPoliticaQuedanEnElSandbox() throws Exception {
+    baseSqlite();
+    File logs = new File( dir, "db/logs.sqlite" );
+    try ( java.sql.Connection c = java.sql.DriverManager.getConnection( "jdbc:sqlite:" + logs.getAbsolutePath() );
+          java.sql.Statement st = c.createStatement() ) {
+      st.execute( "CREATE TABLE trans_log (id_batch INTEGER)" );
+    }
+    TransMeta tm = new TransMeta( new File( dir, "append_load_sqlite.ktr" ).getAbsolutePath() );
+    tm.addDatabase( new org.pentaho.di.core.database.DatabaseMeta( "logs", "SQLITE", "Native", "", logs
+      .getAbsolutePath().replace( '\\', '/' ), "", "", "" ) );
+    tm.getTransLogTable().setConnectionName( "logs" );
+    tm.getTransLogTable().setTableName( "trans_log" );
+    tm.getStepLogTable().setConnectionName( "logs" );
+    tm.getStepLogTable().setTableName( "step_log" );
+    EntornoKettle.escribir( new File( dir, "logged_load.ktr" ), tm.getXML() );
+    EstresSandbox.Analisis a = EstresSandbox.analizar( new TransMeta( new File( dir, "logged_load.ktr" )
+      .getAbsolutePath() ), 50, null, null );
+    cierto( a.corre(), "los logs no impiden correr: " + a.bdNoArchivo + a.bloqueos );
+    File sb = new File( sandbox, "copia-logs" );
+    File ktr = EstresSandbox.escribirCopia( a, new java.util.HashMap<String, File>(), new File( sb, "salida" ),
+      new File( sb, "db" ), new File( sb, "copia.ktr" ) );
+    TransMeta copia = new TransMeta( ktr.getAbsolutePath() );
+    falso( copia.getTransLogTable().isDefined(), "la copia no registra la transformación" );
+    falso( copia.getStepLogTable().isDefined(), "ni los steps" );
+    EstresTools.borrar( sb );
+    Map<String, String> antes = foto( dir );
+    ObjectNode o = probar( "logged_load.ktr", "combined" );
+    cierto( o.path( "ran" ).asBoolean(), "corrió: " + o );
+    igual( antes, foto( dir ), "la BD de logs original (y todo lo demás) no se tocó" );
+    sinRestos();
+
+    // la política de steps
+    TransOps.agregarStep( tm, "HTTP", "Call API", "<url>http://localhost:1/</url>", 300, 400, null, null, null );
+    TransOps.agregarStep( tm, "TextFileOutputLegacy", "Old writer", "<file><name>out</name><extention>txt"
+      + "</extention></file>", 500, 400, null, null, null );
+    EstresSandbox.Analisis b = EstresSandbox.analizar( tm, 50, null, null );
+    falso( b.corre(), "no corre" );
+    contiene( b.bloqueos.toString(), "Call API (HTTP)", "el HTTP client bloquea" );
+    contiene( b.bloqueos.toString(), "Old writer (TextFileOutputLegacy)", "el writer que no se redirige bloquea" );
+    cierto( EstresSandbox.escribeAfuera( "AvroOutput" ) && EstresSandbox.escribeAfuera( "SomeVendorBulkLoader" )
+      && EstresSandbox.escribeAfuera( "AMQPConsumer" ), "red de seguridad para plugins de salida" );
+    falso( EstresSandbox.escribeAfuera( "TextFileOutput" ) || EstresSandbox.escribeAfuera( "TableOutput" )
+      || EstresSandbox.escribeAfuera( "MappingOutput" ), "lo que sí se maneja no bloquea" );
+  }
+
   private static long filas( File db ) throws Exception {
     try ( java.sql.Connection c = java.sql.DriverManager.getConnection( "jdbc:sqlite:" + db.getAbsolutePath() );
           java.sql.Statement st = c.createStatement();

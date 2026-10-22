@@ -494,6 +494,14 @@ Windows, cuando la hija ya salió [P, corrector P12]).
   Transformation/Job executor y Mapping (la v1 no sigue subtransformaciones), Execute SQL script/row
   (salvo sobre una conexión del sandbox), y cualquier step cuyo plugin falta. JavaScript, Janino y UDJC
   corren (es el código de la persona) con una nota: «no es un sandbox de seguridad».
+  *Implementado (tras la revisión)*: lista de bloqueo con los ids verificados en `kettle-steps.xml` de 9.4
+  (`HTTP`, no `Http`; `SFTPPut`, `SyslogMessage`, `MailInput`, `WebServiceAvailable`, `TextFileOutputLegacy`…)
+  y los plugins conocidos (LDAP, Elasticsearch, Kafka, JMS, MQTT, Mongo, Cassandra, HBase, Avro, Parquet,
+  S3…), más una red de seguridad: un id con «output», «producer», «consumer», «bulk», «loader» o «executor»
+  que el sandbox no sabe redirigir bloquea. Una lista blanca de todos los steps queda para 0.6.1.
+- **Registro en BD**: la copia vacía la conexión y la tabla de las tablas de log de `<info><log>` (transformación,
+  steps, rendimiento, canales, métricas) y la conexión de `<maxdate>`: la hija nunca escribe en la BD de logs
+  de verdad.
 - **Memoria**: antes de lanzar, si la memoria física libre es < 1 GB, espera hasta 2 min y si no hay,
   `not_run` («not enough free memory»). Una hija a la vez.
 

@@ -39,15 +39,22 @@ means *rejected with a reason, in a file that someone reads*.
 1. `lint_etl` with `robustness: true`. Besides the normal result it returns `robustness: {score, grade,
    counts, penalties}` and findings of category `robustness`; each one names in `evidence.recipe` the
    `harden_etl` recipe that fixes it and in `evidence.anchor` the step. The main score does not change.
-2. `harden_etl` (dry run by default): one proposal per recipe and step, with `level` and a text diff.
-   - `auto` (R01 error hop to rejects, R02 reason, R11 wait for loads) only changes what happens to rows
-     that would abort the run today: apply them.
-   - `confirm` changes which rows reach the outputs (R03 required fields, R04 strict conversion, R06
-     dedupe, R08 orphans, R12 parameter) and `semantics_change: true` changes the meaning of the load (R07
-     stable keys, R09 Insert/Update, R10 aggregate to the grain): **show them to the person**, explain
-     what changes, and pass only the accepted keys in `confirm`.
-3. `harden_etl dry_run=false confirm=[…]`: everything is **one Ctrl+Z** in Spoon (the input parameter of
-   R12 is outside the undo, the result says so). Then `validate`.
+2. `harden_etl` (dry run by default): one proposal per planned recipe and step, with `level` and a text
+   diff. By default it plans **only the `auto` recipes**; `recipes: ["all"]` plans every recipe (the
+   `other_recipes` hint in the result says when there are more).
+   - `auto` (R01 error hop to rejects, R02 reason, R11 wait for loads, with a Blocking step in front when
+     the lookup and the load share a source) only changes what happens to rows that would abort the run
+     today: apply them.
+   - `confirm` (R03 required fields, R04 strict conversion, R06 dedupe, R08 orphans to rejects, R12 input
+     parameter) changes which rows reach the outputs or the design: **show each one to the person**,
+     explain what changes, and pass only the accepted keys in `confirm`.
+   - `manual` (R05 safe split, R07 stable keys, R09 Insert/Update, R10 aggregate to the grain, R13
+     defaults, R14 job guard) is **never applied**, whatever `confirm` holds: the proposal gives `how_to`
+     and you build it by hand with §4 (`semantics_change: true` marks R07, R09 and R10, which change the
+     meaning of keys or of the load: ask first). Do not tell the person a load is re-runnable until R07 and
+     R09 are really done.
+3. `harden_etl dry_run=false confirm=[…]`: what it applies is **one Ctrl+Z** in Spoon (the input parameter
+   of R12 is outside the undo, the result says so). Then `validate`.
 4. `stress_test`: breaks copies of the file inputs (missing fields, bad dates and numbers, duplicates,
    cut lines, extra separators, too long text, out of range, other encoding, empty file, header only),
    runs a **copy** of the transformation in a separate JVM and checks no abort, the per-step balance and
@@ -182,7 +189,15 @@ field.
   <storage_type/><conversion_mask>yyyy-MM-dd</conversion_mask><date_format_lenient>false</date_format_lenient>
   <date_format_locale/><date_format_timezone/><lenient_string_to_number>false</lenient_string_to_number>
   <encoding/><decimal_symbol/><grouping_symbol/><currency_symbol/></meta>
+<meta><name>amount</name><rename>amount</rename><type>Number</type><length>-2</length><precision>-2</precision>
+  <storage_type/><conversion_mask>#.##</conversion_mask><date_format_lenient>false</date_format_lenient>
+  <date_format_locale/><date_format_timezone/><lenient_string_to_number>false</lenient_string_to_number>
+  <encoding/><decimal_symbol>.</decimal_symbol><grouping_symbol/><currency_symbol/></meta>
 ```
+
+Always declare `decimal_symbol` (and the mask: `#.##` for Number, `#` for Integer) in a Number or Integer
+conversion, as pattern 06 does. Left empty, the conversion may use the JVM locale (`,` on a Spanish
+machine, the trap of manual 01 §6.3), and `lint_etl` does not check Select values metas for it.
 
 Verified: `2026-02-31` → *couldn't convert string [2026-02-31] to a date using format [yyyy-MM-dd]*,
 `mil` → *non-numeric character found at position 1 for value [mil]*, both with `campos_error` = the field.
@@ -275,7 +290,8 @@ before the dimension load has written anything. Put a Block until steps finish n
 **Deadlock trap**: if the fact branch and the dimension branch come from the same step (Convert types
 copies to both), the waiting step stops reading, its input buffer (`size_rowset`, 10 000 rows) fills, the
 common step blocks and the dimension never finishes. Pattern 06 puts a **Blocking step** with *pass all
-rows* (`BlockingStep`, `pass_all_rows=Y`, spills to disk) before the wait. Simpler alternative: load the
+rows* (`BlockingStep`, `pass_all_rows=Y`, spills to disk) before the wait, and `harden_etl` does the same
+when it detects the shared source (`Buffer for <table>` → `Wait for <table>`). Simpler alternative: load the
 dimensions in an earlier transformation of the job. With `unique_connections=Y` (one transaction) the
 lookup reads the uncommitted rows of the same connection, which is what you want here.
 

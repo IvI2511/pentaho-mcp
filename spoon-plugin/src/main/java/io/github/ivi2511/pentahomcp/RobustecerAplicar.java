@@ -259,6 +259,10 @@ final class RobustecerAplicar {
         StepMeta destino = tm.findStep( c.get( "target" ) );
         StepMeta antes = instantaneaSinErrores( tm, s );
         StepErrorMeta sem = s.getStepErrorMeta();
+        // uno apagado (la persona lo configuró y destildó «Enable») se reusa, pero con los nombres de la cola que se
+        // construyó (motivo, campos_error) y sin sus topes: si conservara desc_error, el Text file output de la cola
+        // no encontraría 'motivo' y la corrida abortaría con la primera fila mala.
+        boolean apagado = sem != null && !sem.isEnabled();
         if ( sem == null ) {
           sem = new StepErrorMeta( tm, s, destino );
         } else {
@@ -267,10 +271,15 @@ final class RobustecerAplicar {
         sem.setSourceStep( s );
         sem.setTargetStep( destino );
         sem.setEnabled( true );
-        if ( c.get( "description_field" ) != null && vacio( sem.getErrorDescriptionsValuename() ) ) {
+        if ( apagado ) {
+          sem.setMaxErrors( "" );
+          sem.setMaxPercentErrors( "" );
+          sem.setMinPercentRows( "" );
+        }
+        if ( c.get( "description_field" ) != null && ( apagado || vacio( sem.getErrorDescriptionsValuename() ) ) ) {
           sem.setErrorDescriptionsValuename( c.get( "description_field" ) );
         }
-        if ( c.get( "fields_field" ) != null && vacio( sem.getErrorFieldsValuename() ) ) {
+        if ( c.get( "fields_field" ) != null && ( apagado || vacio( sem.getErrorFieldsValuename() ) ) ) {
           sem.setErrorFieldsValuename( c.get( "fields_field" ) );
         }
         s.setStepErrorMeta( sem );

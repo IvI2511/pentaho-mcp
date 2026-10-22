@@ -277,6 +277,15 @@ public class PruebaRobustecer {
     noNulo( quitar, "deduplicar antes de la dimensión" );
     igual( "duplicates", quitar.getAttribute( RobustecerAnalisis.GRUPO, RobustecerAnalisis.DROPS ), "declarado" );
     noNulo( tm.findStep( "Esperar dim_cliente" ), "esperar a la dimensión" );
+    // la búsqueda y la dimensión comen de la misma fuente: un Blocking step (todas las filas) va antes de la espera
+    StepMeta acumular = tm.findStep( "Acumular para dim_cliente" );
+    noNulo( acumular, "fuente compartida: Blocking step antes de la espera" );
+    igual( "BlockingStep", acumular.getStepID(), "es un Blocking step" );
+    contiene( acumular.getXML(), "<pass_all_rows>Y</pass_all_rows>", "que pasa todas las filas" );
+    noNulo( tm.findTransHop( tm.findStep( "Convertir tipos" ), acumular ), "fuente -> Acumular" );
+    noNulo( tm.findTransHop( acumular, tm.findStep( "Esperar dim_cliente" ) ), "Acumular -> Esperar" );
+    nulo( tm.findTransHop( tm.findStep( "Convertir tipos" ), tm.findStep( "Esperar dim_cliente" ) ),
+      "la fuente no va directo a la espera" );
     noNulo( tm.findStep( "¿Está en dim_cliente?" ), "el filtro de huérfanos" );
     nulo( tm.findTransHop( tm.findStep( "Leer ventas" ), tm.findStep( "Convertir tipos" ) ), "el hop viejo no está" );
     contiene( tm.findStep( "Leer ventas" ).getXML(), "${Internal.Entry.Current.Directory}/${ARCHIVO_VENTAS}",
@@ -346,6 +355,30 @@ public class PruebaRobustecer {
     contiene( tm.findStep( "Rechazos a mano" ).getXML(), "<name>motivo</name>", "campo motivo declarado" );
   }
 
+  /**
+   * Un manejo de errores apagado con nombres propios (desc_error) y un tope de errores: R01 lo reusa con los nombres
+   * de su cola (motivo, campos_error) y sin tope; si no, la cola no encontraría 'motivo' y abortaría.
+   */
+  public void pruebaManejoApagadoConNombresPropios() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    StepMeta conv = tm.findStep( "Convertir tipos" );
+    StepErrorMeta viejo = new StepErrorMeta( tm, conv, null, "", "desc_error", "campo_mal", "" );
+    viejo.setEnabled( false );
+    viejo.setMaxErrors( "3" );
+    conv.setStepErrorMeta( viejo );
+    RobustecerAnalisis.Pedido p = pedido( "{\"dry_run\":false,\"steps\":[\"Convertir tipos\"]}" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    noNulo( propuesta( plan.propuestas, "harden:rejects_on_error:Convertir tipos" ), "R01: " + keys( plan.propuestas ) );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( plan, p ),
+      UndoGrupo.sinSpoon( tm ), null );
+    igual( "[]", saltados( h ), "nada saltado" );
+    StepErrorMeta em = tm.findStep( "Convertir tipos" ).getStepErrorMeta();
+    cierto( em.isEnabled(), "habilitado" );
+    igual( "motivo", em.getErrorDescriptionsValuename(), "el motivo que espera la cola" );
+    igual( "campos_error", em.getErrorFieldsValuename(), "los campos que espera la cola" );
+    cierto( em.getMaxErrors() == null || em.getMaxErrors().isEmpty(), "sin tope de errores: " + em.getMaxErrors() );
+  }
+
   // ---------------------------------------------------------------- correr con un archivo roto
 
   /**
@@ -408,6 +441,76 @@ public class PruebaRobustecer {
     igual( 4, filas( db, "dim_cliente" ), "las buenas se cargan (C08 también)" );
     igual( 4, filas( db, "fact_venta" ), "ninguna venta rota se cargó y no se duplicó nada" );
     igual( claves, claves( db ).substring( 0, claves.length() ), "las claves existentes no cambian" );
+  }
+
+  /**
+   * R11 con fuente compartida y más filas que el row set (aquí 3, para no necesitar 10000): sin el Blocking step
+   * delante de la espera la carga se colgaría (la fuente se queda en putRow y la dimensión no termina nunca). Con las
+   * recetas por defecto termina, sin errores, y carga todo.
+   */
+  public void pruebaEsperaConFuenteCompartidaNoSeCuelga() throws Exception {
+    File dir = EntornoKettle.salida( "robustecer/espera" );
+    EntornoKettle.borrar( dir.toPath() );
+    dir.mkdirs();
+    File db = new File( dir, "dw.sqlite" );
+    crearTablas( db );
+    StringBuilder csv = new StringBuilder( "id_cliente;nombre;ciudad;fecha;importe\n" );
+    for ( int i = 1; i <= 30; i++ ) {
+      csv.append( String.format( "C%03d;Nombre %d;Ciudad;2021-03-%02d;%d\n", i, i, 1 + i % 28, i ) );
+    }
+    Files.write( new File( dir, "ventas.csv" ).toPath(), csv.toString().getBytes( StandardCharsets.UTF_8 ) );
+    TransMeta tm = antes( db.getAbsolutePath() );
+    tm.setSizeRowset( 3 );
+    RobustecerAnalisis.Pedido p = pedido( "{\"dry_run\":false}" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    Propuesta r11 = propuesta( plan.propuestas, "harden:wait_for_loads:Buscar clave cliente" );
+    noNulo( r11, "R11: " + keys( plan.propuestas ) );
+    igual( Receta.AUTO, r11.nivel, "sigue siendo auto" );
+    contiene( r11.diff(), "Blocking step", "con el Blocking step delante: " + r11.diff() );
+    RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( plan, p ), UndoGrupo.sinSpoon( tm ), null );
+    File f = new File( dir, "carga.ktr" );
+    EntornoKettle.escribir( f, tm.getXML() );
+    Trans t = new Trans( new TransMeta( f.getPath() ) );
+    t.execute( null );
+    long fin = System.currentTimeMillis() + 90000L;
+    while ( !t.isFinished() && System.currentTimeMillis() < fin ) {
+      Thread.sleep( 200 );
+    }
+    boolean termino = t.isFinished();
+    if ( !termino ) {
+      t.stopAll();
+    }
+    cierto( termino, "no se cuelga con la fuente compartida" );
+    igual( 0, t.getErrors(), "sin errores" );
+    igual( 30, filas( db, "dim_cliente" ), "30 clientes" );
+    igual( 30, filas( db, "fact_venta" ), "30 ventas, todas con su clave" );
+
+    // la prueba de que hacía falta: la misma copia sin el Blocking step (otra BD) se cuelga
+    File db2 = new File( dir, "dw_sin.sqlite" );
+    crearTablas( db2 );
+    TransMeta sin = new TransMeta( f.getPath() );
+    sin.findDatabase( "dw" ).setDBName( db2.getAbsolutePath() );
+    StepMeta acu = sin.findStep( "Buffer for dim_cliente" );
+    StepMeta esp = sin.findStep( "Wait for dim_cliente" );
+    StepMeta conv = sin.findStep( "Convertir tipos" );
+    noNulo( acu, "el Blocking step en la copia" );
+    sin.removeTransHop( sin.indexOfTransHop( sin.findTransHop( conv, acu ) ) );
+    sin.removeTransHop( sin.indexOfTransHop( sin.findTransHop( acu, esp ) ) );
+    sin.removeStep( sin.indexOfStep( acu ) );
+    sin.addTransHop( new TransHopMeta( conv, esp ) );
+    Trans t2 = new Trans( sin );
+    t2.execute( null );
+    long fin2 = System.currentTimeMillis() + 8000L;
+    while ( !t2.isFinished() && System.currentTimeMillis() < fin2 ) {
+      Thread.sleep( 200 );
+    }
+    boolean colgada = !t2.isFinished();
+    t2.stopAll();
+    long fin3 = System.currentTimeMillis() + 15000L;
+    while ( !t2.isFinished() && System.currentTimeMillis() < fin3 ) {
+      Thread.sleep( 200 );
+    }
+    cierto( colgada, "sin el Blocking step se cuelga" );
   }
 
   static Trans correr( File ktr, String archivo, boolean conParametro ) throws Exception {

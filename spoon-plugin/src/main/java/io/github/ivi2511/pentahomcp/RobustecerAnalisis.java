@@ -1191,13 +1191,16 @@ final class RobustecerAnalisis {
         continue;
       }
       StepMeta f = ent.get( 0 ).getFromStep();
+      // ¿la búsqueda y la carga que espera comen de la misma fuente? Block until steps finish no lee su entrada hasta
+      // que terminan los esperados: con más filas que el row set (10000) la fuente se queda en putRow, la carga no
+      // termina nunca y la transformación se cuelga. Delante va un Blocking step (pass_all_rows=Y, vuelca a disco) que
+      // se lo traga todo, como en el patrón 06 (Buffer → Wait).
+      boolean comparte = false;
       for ( StepMeta w : faltan ) {
         Set<StepMeta> compartidas = new HashSet<StepMeta>( arriba( w ) );
         compartidas.retainAll( arr );
         if ( !compartidas.isEmpty() ) {
-          x.avisos.add( "'" + w.getName() + "' and '" + l.getName() + "' get rows from the same source: with more "
-            + "rows than the row set size (10000 by default) the wait can stall the source. Split the source or "
-            + "raise the row set size if it happens." );
+          comparte = true;
           break;
         }
       }
@@ -1208,12 +1211,29 @@ final class RobustecerAnalisis {
         pasos.append( "<step>" ).append( XMLHandler.addTagValue( "name", n, false ) ).append( "<CopyNr>0</CopyNr></step>" );
       }
       pasos.append( "</steps>" );
+      String primero = nombre;
+      if ( comparte ) {
+        String buffer = unico( t( "Buffer for ", "Acumular para ", "Acumular para " ) + ( tabla.isEmpty() ? nombres
+          .get( 0 ) : tabla ) );
+        int[] pb = libre( pos[ 0 ] - 60, pos[ 1 ] );
+        Cambio bb = nuevo( buffer, "BlockingStep", "<pass_all_rows>Y</pass_all_rows>"
+          + "<directory>%%java.io.tmpdir%%</directory><prefix>block</prefix><cache_size>5000</cache_size>"
+          + "<compress>Y</compress>", pb, Receta.WAIT_FOR_LOADS );
+        bb.diff = "+ " + buffer + " (Blocking step, all rows, spills to disk: the shared source never waits)";
+        x.cambios.add( bb );
+        x.avisos.add( "'" + l.getName() + "' and the load it waits for get rows from the same source: a Blocking step "
+          + "(all rows, spilling to disk) goes before the wait so the source never stalls." );
+        primero = buffer;
+      }
       Cambio b = nuevo( nombre, "BlockUntilStepsFinish", pasos.toString(), pos, Receta.WAIT_FOR_LOADS );
       b.diff = "+ " + nombre + " (Block until steps finish: " + String.join( ", ", nombres ) + ")";
       x.cambios.add( b );
-      redirigir( f, l, nombre, x );
+      redirigir( f, l, primero, x );
       x.cambios.add( quitarHop( f.getName(), l.getName() ) );
-      x.cambios.add( hop( f.getName(), nombre, false ) );
+      x.cambios.add( hop( f.getName(), primero, false ) );
+      if ( comparte ) {
+        x.cambios.add( hop( primero, nombre, false ) );
+      }
       x.cambios.add( hop( nombre, l.getName(), false ) );
       plan.propuestas.add( x );
     }
