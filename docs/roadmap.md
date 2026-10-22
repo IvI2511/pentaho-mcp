@@ -47,8 +47,18 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   «Revisar calidad». Diseño: `docs/linter-diseno.md`; integración: `docs/linter-integracion.md`.
 - **Corrector de ejercicios** — el docente deja la salida esperada (y opcionalmente reglas); el plugin
   corre la transformación del alumno, compara filas y arma la nota con lo que falló.
-- **Modo clase** — Claude construye despacio y deja una nota en el lienzo junto a cada step
-  explicando qué hace y por qué.
+- **Modo clase** — **hecho** (22-oct-2026, rama `feat/modo-clase`, sin publicar). Claude construye despacio
+  y deja una nota en el lienzo junto a cada step explicando qué hace y por qué. Quedó así: `lesson_start`
+  (guion completo validado y planificado antes de tocar nada), `lesson_next`, `lesson_status` (con
+  `wait_s`), `lesson_control` y `lesson_notes` (66 herramientas); la pestaña «Lección» en el panel de
+  resultados con «Siguiente ▶», «◀ Atrás» (un Ctrl+Z real), pausa y vista previa; ritmos guiado, automático
+  y manual; notas en bandas sin choques (en columnas de 3 o más steps, una nota compacta con el número; las
+  notas lejanas se acercan); glosario de clase en/es/pt (`pentaho://glossary`); la guía para repartir
+  como sección `lesson` de los Informes; el manual `08-modo-clase.md` y tres lecciones probadas (L1-L3,
+  es/en/pt) más la de la demo. Desviación: Spoon 9.4 no llama al gancho `loadTab`, así que la pestaña
+  vuelve con un vigilante mientras el panel está cerrado.
+  Falta: jobs, un botón «Guía…» en la pestaña, reproducir una lección guardada sin IA y que el relayout
+  justo después de una lección no mueva notas de más. Diseño: `docs/modo-clase-diseno.md`.
 
 ## 0.7.0 · Trabajo en equipo y datos
 

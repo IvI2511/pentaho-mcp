@@ -1,0 +1,49 @@
+{
+  "title": "Joining sources (A): Stream lookup",
+  "level": "intermediate",
+  "language": "en",
+  "pace": "guided",
+  "intro": "Every sale with its customer's name, without a database: two CSV files and a Stream lookup (a VLOOKUP in memory). Then, in part B, the same with Merge join.",
+  "steps": [
+    {
+      "type": "CsvInput",
+      "name": "Read sales",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/ventas.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "reads datos/ventas.csv: 10 sales, each with its cliente_id",
+      "why": "it is the main stream: one row per sale"
+    },
+    {
+      "type": "CsvInput",
+      "name": "Read customers",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/clientes.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>nombre</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_alta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>saldo</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>activo</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "reads datos/clientes.csv: 8 customers",
+      "why": "it is the lookup table: id → name"
+    },
+    {
+      "type": "StreamLookup",
+      "name": "Look up customer",
+      "after": "Read sales",
+      "config_xml": "<from>Read customers</from>\n<input_sorted>N</input_sorted>\n<preserve_memory>Y</preserve_memory>\n<sorted_list>N</sorted_list>\n<integer_pair>N</integer_pair>\n<lookup>\n  <key>\n    <name>cliente_id</name>\n    <field>cliente_id</field>\n  </key>\n  <value>\n    <name>nombre</name>\n    <rename>cliente</rename>\n    <default>DESCONOCIDO</default>\n    <type>String</type>\n  </value>\n  <value>\n    <name>ciudad</name>\n    <rename>ciudad</rename>\n    <default>-</default>\n    <type>String</type>\n  </value>\n</lookup>\n",
+      "what": "by cliente_id, adds the name; if not found, DESCONOCIDO (sale 108)",
+      "why": "it does not multiply rows: there are still 10 sales",
+      "watch_out": "C18: <from> must be the exact name of the lookup step, and that hop must exist",
+      "tip": "the whole lookup stream goes to memory: for big tables, Database lookup",
+      "preview_rows": 10
+    },
+    {
+      "type": "TextFileOutput",
+      "name": "Write sales with customer",
+      "after": "Look up customer",
+      "config_xml": "<separator>;</separator>\n<enclosure>\"</enclosure>\n<enclosure_forced>N</enclosure_forced>\n<enclosure_fix_disabled>N</enclosure_fix_disabled>\n<header>Y</header>\n<footer>N</footer>\n<format>UNIX</format>\n<compression>None</compression>\n<encoding>UTF-8</encoding>\n<endedLine/>\n<fileNameInField>N</fileNameInField>\n<fileNameField/>\n<create_parent_folder>Y</create_parent_folder>\n<file>\n  <name>${Internal.Entry.Current.Directory}/salida/04_ventas_con_cliente</name>\n  <servlet_output>N</servlet_output>\n  <do_not_open_new_file_init>Y</do_not_open_new_file_init>\n  <extention>csv</extention>\n  <append>N</append>\n  <split>N</split>\n  <haspartno>N</haspartno>\n  <add_date>N</add_date>\n  <add_time>N</add_time>\n  <SpecifyFormat>N</SpecifyFormat>\n  <date_time_format/>\n  <add_to_result_filenames>Y</add_to_result_filenames>\n  <pad>N</pad>\n  <fast_dump>N</fast_dump>\n  <splitevery>0</splitevery>\n</file>\n<fields>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>fecha_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cliente</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>Number</type>\n    <format>0.00</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n</fields>\n",
+      "what": "writes salida/04_ventas_con_cliente.csv: 10 rows",
+      "why": "the result: every sale with its customer"
+    }
+  ],
+  "hops": [
+    {
+      "from": "Read customers",
+      "to": "Look up customer"
+    }
+  ],
+  "outro": "Exercise: change the default value DESCONOCIDO to SIN CLIENTE and run again. How many rows change?"
+}

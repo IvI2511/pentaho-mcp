@@ -1,0 +1,55 @@
+{
+  "title": "First ETL: filtering customers",
+  "level": "beginner",
+  "language": "en",
+  "pace": "guided",
+  "intro": "A transformation is a chain of steps joined by hops: rows come in on one side, each step changes them and they leave on the other. We will read a CSV of customers, keep the active ones with a balance and write them to another CSV.",
+  "steps": [
+    {
+      "type": "CsvInput",
+      "name": "Read customers",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/clientes.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>9</length>\n    <precision>0</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>nombre</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>50</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>30</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_alta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>saldo</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>12</length>\n    <precision>2</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>activo</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "reads datos/clientes.csv: 8 customers, one row per line, fields by position with their type",
+      "why": "every transformation starts with an input",
+      "watch_out": "C15: a relative path without a variable depends on the folder it is launched from; use ${Internal.Entry.Current.Directory}/datos/...",
+      "preview_rows": 5
+    },
+    {
+      "type": "FilterRows",
+      "name": "Active with balance",
+      "after": "Read customers",
+      "config_xml": "<send_true_to>Choose columns</send_true_to>\n<send_false_to>Discarded</send_false_to>\n<compare>\n  <condition>\n    <negated>N</negated>\n    <conditions>\n      <condition>\n        <negated>N</negated>\n        <leftvalue>saldo</leftvalue>\n        <function>&gt;=</function>\n        <rightvalue/>\n        <value>\n          <name>constant</name>\n          <type>Number</type>\n          <text>1000.0</text>\n          <length>-1</length>\n          <precision>-1</precision>\n          <isnull>N</isnull>\n          <mask/>\n        </value>\n      </condition>\n      <condition>\n        <negated>N</negated>\n        <operator>AND</operator>\n        <leftvalue>activo</leftvalue>\n        <function>=</function>\n        <rightvalue/>\n        <value>\n          <name>constant</name>\n          <type>String</type>\n          <text>S</text>\n          <length>-1</length>\n          <precision>-1</precision>\n          <isnull>N</isnull>\n          <mask/>\n        </value>\n      </condition>\n    </conditions>\n  </condition>\n</compare>\n",
+      "what": "lets through balance >= 1000 AND activo = S; the rest goes to the false branch",
+      "why": "splits what we want from what we do not",
+      "watch_out": "C20: send_true_to / send_false_to need their hop to that step, or the transformation does not start",
+      "preview_rows": 5
+    },
+    {
+      "type": "SelectValues",
+      "name": "Choose columns",
+      "after": "Active with balance",
+      "config_xml": "<fields>\n  <field>\n    <name>cliente_id</name>\n    <rename>id</rename>\n    <length>-2</length>\n    <precision>-2</precision>\n  </field>\n  <field>\n    <name>nombre</name>\n    <rename>cliente</rename>\n    <length>-2</length>\n    <precision>-2</precision>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <rename/>\n    <length>-2</length>\n    <precision>-2</precision>\n  </field>\n  <field>\n    <name>saldo</name>\n    <rename/>\n    <length>-2</length>\n    <precision>-2</precision>\n  </field>\n  <select_unspecified>N</select_unspecified>\n  <meta>\n    <name>saldo</name>\n    <rename>saldo</rename>\n    <type>String</type>\n    <length>-2</length>\n    <precision>-2</precision>\n    <conversion_mask>#,##0.00</conversion_mask>\n    <date_format_lenient>false</date_format_lenient>\n    <date_format_locale/>\n    <date_format_timezone/>\n    <lenient_string_to_number>false</lenient_string_to_number>\n    <encoding/>\n    <decimal_symbol>,</decimal_symbol>\n    <grouping_symbol>.</grouping_symbol>\n    <currency_symbol/>\n    <storage_type/>\n  </meta>\n</fields>\n",
+      "what": "keeps 4 columns, renames cliente_id → id and nombre → cliente and formats the balance",
+      "why": "the output only carries what is useful, with clear names",
+      "watch_out": "C4: a field that does not exist (or is misspelt) makes the step fail",
+      "preview_rows": 5
+    },
+    {
+      "type": "TextFileOutput",
+      "name": "Write filtered",
+      "after": "Choose columns",
+      "config_xml": "<separator>;</separator>\n<enclosure>\"</enclosure>\n<enclosure_forced>N</enclosure_forced>\n<enclosure_fix_disabled>N</enclosure_fix_disabled>\n<header>Y</header>\n<footer>N</footer>\n<format>UNIX</format>\n<compression>None</compression>\n<encoding>UTF-8</encoding>\n<endedLine/>\n<fileNameInField>N</fileNameInField>\n<fileNameField/>\n<create_parent_folder>Y</create_parent_folder>\n<file>\n  <name>${Internal.Entry.Current.Directory}/salida/02_clientes_filtrados</name>\n  <servlet_output>N</servlet_output>\n  <do_not_open_new_file_init>Y</do_not_open_new_file_init>\n  <extention>csv</extention>\n  <append>N</append>\n  <split>N</split>\n  <haspartno>N</haspartno>\n  <add_date>N</add_date>\n  <add_time>N</add_time>\n  <SpecifyFormat>N</SpecifyFormat>\n  <date_time_format/>\n  <add_to_result_filenames>Y</add_to_result_filenames>\n  <pad>N</pad>\n  <fast_dump>N</fast_dump>\n  <splitevery>0</splitevery>\n</file>\n<fields>\n  <field>\n    <name>id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>both</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cliente</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>both</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>both</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>saldo</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>both</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n</fields>\n",
+      "what": "writes salida/02_clientes_filtrados.csv: customers 1, 5, 7 and 8",
+      "why": "it is the result we hand in",
+      "watch_out": "D8: if the Fields tab is empty or misses a field, it is not written and nothing warns"
+    },
+    {
+      "type": "Dummy",
+      "name": "Discarded",
+      "after": "Active with balance",
+      "what": "receives the false branch of the filter: the 4 that do not match",
+      "why": "it does nothing, but the metrics show how many rows we dropped"
+    }
+  ],
+  "outro": "Exercise: change the minimum balance from 1000 to 500 in \"Active with balance\", predict how many rows will come out and check it with run mode=visible (I/O/R/W/E of each step)."
+}

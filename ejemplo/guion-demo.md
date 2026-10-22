@@ -106,3 +106,21 @@ Después, volver a ejecutar el job y regenerar el informe.
 - **¿Se puede usar para corregir prácticas?** El paso siguiente en la hoja de ruta es un corrector:
   el profesor deja la salida esperada (como `datos/resultado_esperado.json`) y el plugin ejecuta la
   ETL del alumno y la compara.
+
+## Parte 4 · Modo clase (5 min, opcional)
+
+Para enseñar que Pentaho Live también sirve para dar clase. Antes: crea una transformación vacía y
+guárdala como `leccion/duplicados_y_rechazos.ktr` (así lee `../datos/ventas_2026_09.csv`).
+
+> Da la lección de `leccion/leccion-duplicados-y-rechazos.es.json` sobre la transformación abierta.
+
+Claude llama a `lesson_start` y en el panel de resultados aparece la pestaña **Lección**. Pulsa
+**«Siguiente ▶»** al ritmo de la explicación: en 8 pasos se lee el CSV, se estandarizan textos, fechas
+y decimales, se ordena, «Eliminar duplicados» manda las repetidas por un **hop de error** a «Marcar
+duplicado» (motivo `DUPLICADO`) y «Escribir rechazos» deja **60** líneas en
+`salida/rechazos_duplicados.csv`; a «Líneas únicas» llegan **2940**. Cada paso trae su nota numerada en el
+lienzo y, en algunos, las primeras filas.
+
+Para cerrar: «◀ Atrás» deshace un paso de verdad, `lesson_notes hide` deja el lienzo limpio para el
+ejercicio y `build_report sections=["lesson"]` genera la guía en PDF o Word. Detalle en
+[leccion/README.md](leccion/README.md).

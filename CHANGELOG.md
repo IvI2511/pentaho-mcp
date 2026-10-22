@@ -45,8 +45,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `pentaho://guide/quality`.
 - `tools/lint-corpus/`: regression harness that runs the linter over PDI's samples, the skill examples and 27
   copies of the examples broken on purpose; it fails if a known error is missed or the counts change.
+- **Class mode**: Claude builds a transformation slowly and explains it on the canvas, for a projected class
+  or for someone learning alone. `lesson_start` takes the whole lesson (steps with `config_xml` plus what/why,
+  watch-out, tip, question and preview rows; beginner or intermediate; en/es/pt), checks it and plans the
+  layout before touching anything, and Spoon then plays it one step at a time. Each step appears in its final
+  place with a numbered note ("N · Name (Type) / What / Why") and, if asked, a watch-out with the manual's
+  error code, a tip, a question and a preview of the rows. Each step is one Ctrl+Z. Paces: `guided` (waits for
+  "Next ▶"), `auto` (every few seconds, with pause) and `manual`. The notes never overlap the steps, hops or
+  other notes (placed in bands above and below the flow); notes the user already had are kept.
+- **Lesson** tab in the transformation's execution results panel: the list of steps, the full text of the
+  current one, its preview rows, and ◀ Back (a real Ctrl+Z of the last step), Pause/Resume, Next ▶, Restart
+  and Finish; A-/A+ change the size of the tab's text. Closing the results panel pauses the lesson; opening it
+  again brings the tab back and resumes it.
+- `lesson_next`, `lesson_status` (with `wait_s`, so Claude can follow the class without spending tokens on
+  every click), `lesson_control` (pause, resume, back, goto, restart, stop) and `lesson_notes` (list, add,
+  hide, show, remove, restyle for a projector, relayout; one Ctrl+Z each, and notes the user wrote are never
+  touched). Hidden notes travel inside the `.ktr`, so hiding is not secret (66 tools).
+- Reports: **Lesson** section (`lesson`, never on by default): the handout of the lesson, with the canvas and
+  its notes, every step with what, why, watch-out, tip, question and glossary entry, the preview rows seen in
+  class, the exercise and a table of the common errors of the step types used. After restarting Spoon it is
+  rebuilt from the notes stored in the `.ktr`, without the rows.
+- Class glossary (`catalogo/glosario-clase.json`, ~45 common steps in en/es/pt: what it does, an analogy and
+  its typical errors) for `watch_out: "auto"`, also as the MCP resource `pentaho://glossary/{lang}/{id}`.
+- Skill: a Class mode section in `SKILL.md`, the guide `manual/08-modo-clase.md` (also the resource
+  `pentaho://guide/class-mode`) and three tested lessons for Big Data 1 in `lecciones/`, in es/en/pt: L1
+  first ETL (filter), L2 Sort rows + Group by, L3 Stream lookup vs Merge join. A plugin test plays each one to
+  the end without Spoon and checks the numbers of the result.
+- Demo: `ejemplo/leccion/`, an 8-step lesson on the "Grano de Oro" sales (standardise, remove duplicates
+  through an error hop, 60 rejects with their reason), and part 4 of `ejemplo/guion-demo.md`.
 
 ### Changed
+
+- With lesson notes in the transformation, `arrange_canvas` and `build_steps` re-place the steps and the
+  lesson notes together with the class rule (same Ctrl+Z), and `get_document` marks the lesson notes instead
+  of returning their whole text.
 
 - `validate` runs its own structural checks through the linter. Its messages now name the step, and the
   report's validation section shows them in the report's language. A step that distributes rows among

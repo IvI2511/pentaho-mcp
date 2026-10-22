@@ -53,6 +53,13 @@ puntaje de calidad técnica de 0 a 100 que muestra de dónde sale cada punto que
 seguros con un solo Ctrl+Z (antes de los que cambian lo que hace el ETL, te pregunta). La misma revisión
 es una sección del informe.
 
+**Modo clase.** Claude también puede *enseñar* un ETL: construye la transformación despacio, un step por
+cada clic en **Siguiente ▶** de una pestaña nueva, **Lección**, y explica cada step con una nota numerada en
+el lienzo (qué hace, por qué está, el error típico), con las primeras filas después de cada paso. Pensado
+para una clase proyectada o para aprender por tu cuenta; al terminar puedes ocultar las notas para el
+ejercicio y convertir la lección en una guía en PDF o Word. La skill trae tres lecciones probadas (filtrar,
+Sort + Group by, Stream lookup frente a Merge join) en español, inglés y portugués.
+
 ¿No tenés Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
 
@@ -67,6 +74,7 @@ Kitchen.
 | *"El lienzo es un lío, ordenalo."* | acomoda los steps de izquierda a derecha, sin líneas cruzadas |
 | *"¿Por qué este `.ktr` falla en Pan?"* | lo lee, encuentra el problema con la lista de errores verificados y lo corrige |
 | *"Revisá las buenas prácticas de esta transformación antes de que la entregue y arreglá lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
+| *"Da la lección de Stream lookup paso a paso, nivel principiante."* | la construye un step por cada clic en Siguiente ▶, con una nota numerada en el lienzo por step y las filas que produce |
 | *"Haceme un informe de esta transformación para el TP, en PDF y PowerPoint, con una conclusión corta."* | arma el informe (linaje, diccionario de datos, métricas…), escribe la conclusión con los datos reales y exporta los dos archivos |
 
 ## Cómo funciona
@@ -176,6 +184,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Campos | Listar los campos que salen de cada step, antes de configurar el siguiente |
 | Controles | Validar; preview de filas reales de cualquier step |
 | Calidad | Revisar buenas prácticas más allá de la validación, con un puntaje de 0 a 100 (y, si lo pedís, leyendo las fuentes para probar un problema); aplicar los arreglos propuestos; silenciar una regla donde es a propósito |
+| Modo clase | Reproducir una lección paso a paso con notas en el lienzo y una pestaña Lección (ritmo guiado, automático o manual), seguirla, volver atrás, ocultar, mostrar o quitar sus notas y convertirla en una guía |
 | Ejecución | Ejecutar una transformación o un job, seguir su estado y su log, detenerlo |
 | Bases de datos | Listar tipos de conexión; agregar, probar y borrar conexiones; ver tablas y columnas; correr consultas SQL (solo lectura salvo que pidas escribir) |
 | Parámetros | Listar, definir y borrar parámetros |
@@ -235,6 +244,8 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   diagramas de linaje y de tablas van como tablas. La vista previa dentro de Spoon usa el motor de
   Internet Explorer que trae PDI, así que no tiene diagramas interactivos: **Abrir en el navegador**
   muestra el informe completo.
+- El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
+  transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
 
 ## Lo nuevo en 0.5.1
 

@@ -134,7 +134,12 @@ final class McpResources {
       "When to run lint_etl and how to read its findings and its 0-100 score, the rules and the Pan/Kitchen error "
         + "each one prevents, the deep mode that reads the sources, applying fixes, silencing a rule, and the "
         + "quality section of the reports. The machine-readable rule catalog is pentaho://lint/rules.",
-      "manual/06-calidad.md" )
+      "manual/06-calidad.md" ),
+    new Doc( "pentaho://guide/class-mode", "class-mode", "Class mode (lesson_start, lesson_notes, the handout)",
+      "How to teach a transformation step by step on the canvas: the lesson script for lesson_start, pace and the "
+        + "Lesson tab, writing good what/why notes, following the class with lesson_status, hiding or removing the "
+        + "notes, the handout (build_report sections=[\"lesson\"]) and the ready lessons L1-L3 of the skill.",
+      "manual/08-modo-clase.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

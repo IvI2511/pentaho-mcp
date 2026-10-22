@@ -1,0 +1,85 @@
+{
+  "title": "Duplicados y rechazos",
+  "level": "intermediate",
+  "language": "es",
+  "pace": "guided",
+  "intro": "3000 líneas de ticket con formatos mezclados y repetidas. Antes de cargar nada: estandarizar, quitar duplicados y guardar lo descartado con su motivo, para poder contarlo.",
+  "steps": [
+    {
+      "type": "CsvInput",
+      "name": "Leer ventas (CSV)",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/../datos/ventas_2026_09.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>id_ticket</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>linea</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>fecha</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>id_tienda</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>codigo_producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>String</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n  <field>\n    <name>metodo_pago</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>none</trim_type>\n  </field>\n</fields>\n",
+      "what": "lee datos/ventas_2026_09.csv: 3000 líneas, todo como texto salvo linea y cantidad",
+      "why": "los datos vienen sucios: mejor leerlos tal cual y limpiar después",
+      "watch_out": "D3: precio_unitario trae 1.80 y 1,80; si se lee como número aquí, uno de los dos sale mal sin avisar",
+      "preview_rows": 5
+    },
+    {
+      "type": "StringOperations",
+      "name": "Estandarizar textos",
+      "after": "Leer ventas (CSV)",
+      "config_xml": "<fields>\n  <field>\n    <in_stream_name>id_tienda</in_stream_name>\n    <out_stream_name/>\n    <trim_type>both</trim_type>\n    <lower_upper>upper</lower_upper>\n    <padding_type>none</padding_type>\n    <pad_char/>\n    <pad_len/>\n    <init_cap>no</init_cap>\n    <mask_xml>none</mask_xml>\n    <digits>none</digits>\n    <remove_special_characters>none</remove_special_characters>\n  </field>\n  <field>\n    <in_stream_name>codigo_producto</in_stream_name>\n    <out_stream_name/>\n    <trim_type>both</trim_type>\n    <lower_upper>upper</lower_upper>\n    <padding_type>none</padding_type>\n    <pad_char/>\n    <pad_len/>\n    <init_cap>no</init_cap>\n    <mask_xml>none</mask_xml>\n    <digits>none</digits>\n    <remove_special_characters>none</remove_special_characters>\n  </field>\n  <field>\n    <in_stream_name>metodo_pago</in_stream_name>\n    <out_stream_name/>\n    <trim_type>both</trim_type>\n    <lower_upper>upper</lower_upper>\n    <padding_type>none</padding_type>\n    <pad_char/>\n    <pad_len/>\n    <init_cap>no</init_cap>\n    <mask_xml>none</mask_xml>\n    <digits>none</digits>\n    <remove_special_characters>none</remove_special_characters>\n  </field>\n</fields>\n",
+      "what": "quita espacios y pasa a mayúsculas id_tienda, código y método de pago",
+      "why": "«  efectivo» y «EFECTIVO» tienen que ser lo mismo"
+    },
+    {
+      "type": "ReplaceString",
+      "name": "Normalizar fecha y precio",
+      "after": "Estandarizar textos",
+      "config_xml": "<fields>\n  <field>\n    <in_stream_name>fecha</in_stream_name>\n    <out_stream_name/>\n    <use_regex>yes</use_regex>\n    <replace_string>^(\\d{2})/(\\d{2})/(\\d{4})$</replace_string>\n    <replace_by_string>$3-$2-$1</replace_by_string>\n    <set_empty_string>N</set_empty_string>\n    <replace_field_by_string/>\n    <whole_word>no</whole_word>\n    <case_sensitive>no</case_sensitive>\n    <is_unicode>no</is_unicode>\n  </field>\n  <field>\n    <in_stream_name>precio_unitario</in_stream_name>\n    <out_stream_name/>\n    <use_regex>no</use_regex>\n    <replace_string>,</replace_string>\n    <replace_by_string>.</replace_by_string>\n    <set_empty_string>N</set_empty_string>\n    <replace_field_by_string/>\n    <whole_word>no</whole_word>\n    <case_sensitive>no</case_sensitive>\n    <is_unicode>no</is_unicode>\n  </field>\n</fields>\n",
+      "what": "dd/mm/aaaa → aaaa-mm-dd y la coma decimal del precio → punto",
+      "why": "dos formatos de fecha y dos de decimal en el mismo archivo",
+      "preview_rows": 5
+    },
+    {
+      "type": "SortRows",
+      "name": "Ordenar por ticket y línea",
+      "after": "Normalizar fecha y precio",
+      "config_xml": "<directory>%%java.io.tmpdir%%</directory>\n<prefix>ventas</prefix>\n<sort_size>1000000</sort_size>\n<free_memory/>\n<compress>N</compress>\n<compress_variable/>\n<unique_rows>N</unique_rows>\n<fields>\n  <field>\n    <name>id_ticket</name>\n    <ascending>Y</ascending>\n    <case_sensitive>N</case_sensitive>\n    <collator_enabled>N</collator_enabled>\n    <collator_strength>0</collator_strength>\n    <presorted>N</presorted>\n  </field>\n  <field>\n    <name>linea</name>\n    <ascending>Y</ascending>\n    <case_sensitive>N</case_sensitive>\n    <collator_enabled>N</collator_enabled>\n    <collator_strength>0</collator_strength>\n    <presorted>N</presorted>\n  </field>\n</fields>\n",
+      "what": "ordena por id_ticket y linea",
+      "why": "Unique rows solo detecta duplicados consecutivos",
+      "watch_out": "D5: sin este orden, Unique rows deja pasar duplicados con exit 0"
+    },
+    {
+      "type": "Unique",
+      "name": "Eliminar duplicados",
+      "after": "Ordenar por ticket y línea",
+      "config_xml": "<count_rows>N</count_rows>\n<count_field/>\n<reject_duplicate_row>Y</reject_duplicate_row>\n<error_description>DUPLICADO</error_description>\n<fields>\n  <field>\n    <name>id_ticket</name>\n    <case_insensitive>N</case_insensitive>\n  </field>\n  <field>\n    <name>linea</name>\n    <case_insensitive>N</case_insensitive>\n  </field>\n</fields>\n",
+      "what": "una fila por (id_ticket, linea); las repetidas se rechazan con la descripción DUPLICADO",
+      "why": "una línea de ticket cargada dos veces duplica el importe"
+    },
+    {
+      "type": "Constant",
+      "name": "Marcar duplicado",
+      "config_xml": "<fields>\n  <field>\n    <name>motivo_rechazo</name>\n    <type>String</type>\n    <format />\n    <currency />\n    <decimal />\n    <group />\n    <nullif>DUPLICADO</nullif>\n    <length>-1</length>\n    <precision>-1</precision>\n    <set_empty_string>N</set_empty_string>\n  </field>\n</fields>\n",
+      "what": "recibe las repetidas por el hop de error (rojo) y les pone motivo_rechazo = DUPLICADO",
+      "why": "un rechazo sin motivo no se puede explicar ni contar",
+      "tip": "el hop de error (error=true en hops) es lo que separa las repetidas del flujo principal; se dibuja en rojo",
+      "preview_rows": 5
+    },
+    {
+      "type": "TextFileOutput",
+      "name": "Escribir rechazos",
+      "after": "Marcar duplicado",
+      "config_xml": "<separator>;</separator>\n<enclosure>\"</enclosure>\n<enclosure_forced>N</enclosure_forced>\n<enclosure_fix_disabled>N</enclosure_fix_disabled>\n<header>Y</header>\n<footer>N</footer>\n<format>UNIX</format>\n<compression>None</compression>\n<encoding>UTF-8</encoding>\n<endedLine/>\n<fileNameInField>N</fileNameInField>\n<fileNameField/>\n<create_parent_folder>Y</create_parent_folder>\n<file>\n  <name>${Internal.Entry.Current.Directory}/../salida/rechazos_duplicados</name>\n  <servlet_output>N</servlet_output>\n  <do_not_open_new_file_init>N</do_not_open_new_file_init>\n  <extention>csv</extention>\n  <append>N</append>\n  <split>N</split>\n  <haspartno>N</haspartno>\n  <add_date>N</add_date>\n  <add_time>N</add_time>\n  <SpecifyFormat>N</SpecifyFormat>\n  <date_time_format/>\n  <add_to_result_filenames>Y</add_to_result_filenames>\n  <pad>N</pad>\n  <fast_dump>N</fast_dump>\n  <splitevery>0</splitevery>\n</file>\n<fields>\n  <field>\n    <name>id_ticket</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>linea</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>fecha</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>id_tienda</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>codigo_producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>String</type>\n    <format></format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>metodo_pago</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>motivo_rechazo</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n</fields>\n",
+      "what": "escribe salida/rechazos_duplicados.csv: 60 líneas con su motivo",
+      "why": "lo descartado se guarda, no se tira: se cuenta y se revisa",
+      "question": "¿Cuántas filas llegan a «Líneas únicas»? (3000 leídas − 60 duplicadas)"
+    },
+    {
+      "type": "Dummy",
+      "name": "Líneas únicas",
+      "after": "Eliminar duplicados",
+      "what": "recibe las 2940 líneas únicas",
+      "why": "aquí seguiría la carga (búsqueda de claves y hechos_ventas)"
+    }
+  ],
+  "hops": [
+    {
+      "from": "Eliminar duplicados",
+      "to": "Marcar duplicado",
+      "error": true
+    }
+  ],
+  "outro": "Ejercicio: añade la regla CANTIDAD_NO_VALIDA (cantidad <= 0) con un Filter rows antes de «Líneas únicas» y envía esas filas a «Escribir rechazos» con su motivo."
+}
