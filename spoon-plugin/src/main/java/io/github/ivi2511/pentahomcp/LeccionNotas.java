@@ -334,8 +334,25 @@ final class LeccionNotas {
     return i == null || i.trim().isEmpty() ? "en" : i.trim();
   }
 
+  /**
+   * La fuente con la que se miden y crean notas de la leccion: la mas comun entre las notas de la leccion del lienzo
+   * (un Ctrl+Z de restyle la devuelve, el atributo no); sin notas, el atributo font_size (-1 = la de Spoon).
+   */
   static int tamFuente( TransMeta tm ) {
-    return entero( attr( tm, K_FUENTE ), -1 );
+    Map<Integer, Integer> cuenta = new HashMap<Integer, Integer>();
+    int mejor = 0;
+    Integer tam = null;
+    for ( NotePadMeta n : reconocer( tm ).keySet() ) {
+      int f = n.getFontSize() > 0 ? n.getFontSize() : -1;
+      Integer c = cuenta.get( f );
+      int v = c == null ? 1 : c + 1;
+      cuenta.put( f, v );
+      if ( v > mejor ) {
+        mejor = v;
+        tam = f;
+      }
+    }
+    return tam != null ? tam : entero( attr( tm, K_FUENTE ), -1 );
   }
 
   // ---------------------------------------------------------------- medidores
@@ -657,15 +674,21 @@ final class LeccionNotas {
   static Resultado quitar( TransMeta tm, boolean purgar, UndoGrupo u ) {
     Resultado r = new Resultado();
     Map<NotePadMeta, Entrada> rec = reconocer( tm );
-    // show deja la copia en hidden (para que un Ctrl+Z del show no las pierda): si todas estan en el lienzo, se va
-    // con ellas, asi una copia sin notas para repartir no las lleva escondidas en el atributo
+    // show deja la copia en hidden (para que un Ctrl+Z del show no las pierda). remove limpia el archivo: la copia se
+    // va siempre, asi una copia sin notas para repartir no las lleva escondidas en el atributo (aunque un restyle o
+    // una edicion hayan cambiado el texto de las del lienzo)
     String guardadas = attr( tm, K_OCULTAS );
-    try {
-      if ( guardadas != null && !guardadas.isEmpty() && !rec.isEmpty() && ocultas( tm ).isEmpty() ) {
-        tm.setAttribute( GRUPO, K_OCULTAS, "" );
+    if ( guardadas != null && !guardadas.isEmpty() ) {
+      int fuera = 0;
+      try {
+        fuera = ocultas( tm ).size();
+      } catch ( ToolError e ) {
+        // XML ilegible: se borra igual
       }
-    } catch ( ToolError e ) {
-      // XML ilegible: queda como estaba
+      tm.setAttribute( GRUPO, K_OCULTAS, "" );
+      if ( fuera > 0 ) {
+        r.avisos.add( fuera + " hidden lesson note(s) were discarded too: Ctrl+Z does not bring them back." );
+      }
     }
     borrar( tm, new ArrayList<NotePadMeta>( rec.keySet() ), u );
     r.notas = rec.size();
@@ -713,16 +736,13 @@ final class LeccionNotas {
     if ( xml == null || xml.trim().isEmpty() ) {
       return r;
     }
-    Map<String, Boolean> enLienzo = new HashMap<String, Boolean>();
-    for ( int i = 0; i < tm.nrNotes(); i++ ) {
-      enLienzo.put( huella( tm.getNote( i ).getNote() ), Boolean.TRUE );
-    }
+    EnLienzo en = new EnLienzo( tm );
     try {
       Document d = XMLHandler.loadXMLString( xml );
       Node raiz = XMLHandler.getSubNode( d, "notepads" );
       for ( Node n : XMLHandler.getNodes( raiz, "notepad" ) ) {
         NotePadMeta nota = new NotePadMeta( n );
-        if ( !enLienzo.containsKey( huella( nota.getNote() ) ) ) {
+        if ( !en.esta( nota ) ) {
           r.add( nota );
         }
       }
@@ -733,23 +753,58 @@ final class LeccionNotas {
   }
 
   /**
+   * Que notas de la leccion estan en el lienzo: por la entrada del registro (K), no por la huella cruda, porque
+   * restyle/relayout vuelven a cortar el texto (otra huella, la misma entrada). Una copia que no reconoce el
+   * registro se compara por huella.
+   */
+  private static final class EnLienzo {
+    private final List<Entrada> reg;
+    private final Map<Integer, Boolean> claves = new HashMap<Integer, Boolean>();
+    private final Map<String, Boolean> huellas = new HashMap<String, Boolean>();
+
+    EnLienzo( TransMeta tm ) {
+      reg = registro( tm );
+      for ( Entrada e : reconocer( tm ).values() ) {
+        claves.put( e.k, Boolean.TRUE );
+      }
+      for ( int i = 0; i < tm.nrNotes(); i++ ) {
+        huellas.put( huella( tm.getNote( i ).getNote() ), Boolean.TRUE );
+      }
+    }
+
+    boolean esta( NotePadMeta n ) {
+      String h = huella( n.getNote() );
+      Entrada e = buscar( reg, h );
+      return e != null ? claves.containsKey( e.k ) : huellas.containsKey( h );
+    }
+
+    /** La anota como presente (show, para no reponer dos copias de la misma entrada). */
+    void poner( NotePadMeta n ) {
+      String h = huella( n.getNote() );
+      Entrada e = buscar( reg, h );
+      if ( e != null ) {
+        claves.put( e.k, Boolean.TRUE );
+      }
+      huellas.put( h, Boolean.TRUE );
+    }
+  }
+
+  /**
    * Repone desde hidden las notas que no esten ya en el lienzo (sin duplicar tras un Ctrl+Z). hidden conserva la
    * copia: si un Ctrl+Z deshace el show, las notas vuelven a estar ocultas y otro show las repone (remove la borra).
    */
   static Resultado mostrar( TransMeta tm, UndoGrupo u ) throws ToolError {
     Resultado r = new Resultado();
     List<NotePadMeta> ocultas = ocultas( tm );
-    Map<String, Boolean> presentes = new HashMap<String, Boolean>();
-    for ( int i = 0; i < tm.nrNotes(); i++ ) {
-      presentes.put( huella( tm.getNote( i ).getNote() ), Boolean.TRUE );
-    }
+    EnLienzo presentes = new EnLienzo( tm );
     List<Object> nuevas = new ArrayList<Object>();
     List<Integer> idx = new ArrayList<Integer>();
     for ( NotePadMeta n : ocultas ) {
-      if ( presentes.put( huella( n.getNote() ), Boolean.TRUE ) != null ) {
+      if ( presentes.esta( n ) ) {
         r.avisos.add( "A hidden note was already on the canvas (a Ctrl+Z undid the hide?): not duplicated." );
         continue;
       }
+      presentes.poner( n );
       tm.addNote( n );
       nuevas.add( n );
       idx.add( tm.indexOfNote( n ) );

@@ -53,6 +53,15 @@ public class PruebaLeccionNotas {
     return LeccionNotas.reconocer( tm ).size();
   }
 
+  /** Las huellas de las notas del lienzo, en orden (sin el registro). */
+  static String huellasCrudas( TransMeta tm ) {
+    StringBuilder sb = new StringBuilder();
+    for ( int i = 0; i < tm.nrNotes(); i++ ) {
+      sb.append( LeccionNotas.huella( tm.getNote( i ).getNote() ) ).append( ',' );
+    }
+    return sb.toString();
+  }
+
   /** Deshace la ultima accion como Spoon (solo los tipos que usan estas pruebas). */
   private static void deshacer( TransMeta tm ) {
     TransAction ta = tm.previousUndo();
@@ -334,7 +343,43 @@ public class PruebaLeccionNotas {
     igual( antes, vuelta.getNote(), "texto de antes" );
     igual( fuente0, vuelta.getFontSize(), "fuente de antes" );
     igual( x0 + "," + y0, vuelta.getLocation().x + "," + vuelta.getLocation().y, "en su sitio tras el Ctrl+Z" );
+    // el atributo sigue en 14 (no entra en el undo), pero la fuente para medir se lee de las notas
+    igual( "14", tm.getAttribute( LeccionNotas.GRUPO, "font_size" ), "el atributo no vuelve" );
+    igual( fuente0 > 0 ? fuente0 : -1, LeccionNotas.tamFuente( tm ), "tras el Ctrl+Z, la fuente de las notas" );
     lanza( ToolError.class, () -> correr( tm, "restyle", args( "restyle" ) ), "restyle sin font_size" );
     lanza( ToolError.class, () -> correr( tm, "restyle", args( "restyle" ).put( "font_size", 99 ) ), "fuera de rango" );
+  }
+
+  public void pruebaMostrarTrasRestyleNoDuplicaYQuitarVaciaHidden() throws Exception {
+    TransMeta tm = ejemplo();
+    String largo = "una explicacion bastante larga para que el corte de lineas cambie al agrandar la fuente del "
+      + "proyector, con otra frase mas para que no quepa entera en seis lineas cuando la letra es grande y haya que "
+      + "cortarla con puntos suspensivos, y una tercera frase por si la nota es ancha";
+    agregar( tm, tm.getStep( 0 ).getName(), "watch_out", largo );
+    agregar( tm, tm.getStep( 1 ).getName(), "tip", "dos" );
+    int total = tm.nrNotes();
+    correr( tm, "hide", args( "hide" ) );
+    correr( tm, "show", args( "show" ) );
+    igual( total, tm.nrNotes(), "show repone" );
+    String huellas0 = huellasCrudas( tm );
+    correr( tm, "restyle", args( "restyle" ).put( "font_size", 16 ) );
+    distinto( huellas0, huellasCrudas( tm ), "el restyle cambio el texto cortado (otra huella)" );
+    igual( 0, LeccionNotas.ocultas( tm ).size(), "tras el restyle ninguna cuenta como oculta" );
+    for ( String[] e : LeccionNotas.listar( tm ) ) {
+      igual( "present", e[ 3 ], "entrada " + e[ 0 ] + " presente" );
+    }
+    ObjectNode s = correr( tm, "show", args( "show" ) );
+    igual( 0, s.get( "notes" ).asInt(), "otro show no repone las copias viejas" );
+    igual( total, tm.nrNotes(), "sin duplicados" );
+    correr( tm, "remove", args( "remove" ) );
+    igual( 0, lecciones( tm ), "sin notas de la leccion" );
+    igual( "", tm.getAttribute( LeccionNotas.GRUPO, "hidden" ), "remove vacia hidden aunque el texto cambio" );
+    // hide y remove: la copia oculta tambien se va (con aviso: no hay Ctrl+Z que la devuelva)
+    TransMeta otra = ejemplo();
+    agregar( otra, otra.getStep( 0 ).getName(), "tip", "uno" );
+    correr( otra, "hide", args( "hide" ) );
+    ObjectNode q = correr( otra, "remove", args( "remove" ) );
+    igual( "", otra.getAttribute( LeccionNotas.GRUPO, "hidden" ), "remove vacia hidden" );
+    contiene( q.path( "warnings" ).toString(), "discarded", "lo avisa" );
   }
 }

@@ -383,6 +383,84 @@ public class PruebaLeccionMotor {
     LeccionMotor.olvidarTodas();
   }
 
+  // ---------------------------------------------------------------- stop, Ctrl+Z y restyle en medio de un paso
+
+  private static ObjectNode sinVistas( ObjectNode g ) {
+    for ( JsonNode p : g.path( "steps" ) ) {
+      ( (ObjectNode) p ).remove( "preview_rows" );
+    }
+    return g;
+  }
+
+  private static void esperarStep( TransMeta tm ) throws Exception {
+    long fin = System.currentTimeMillis() + 5000;
+    while ( tm.nrSteps() == 0 && System.currentTimeMillis() < fin ) {
+      Thread.sleep( 20 );
+    }
+    igual( 1, tm.nrSteps(), "el step ya esta; las notas esperan la pausa" );
+  }
+
+  public void pruebaStopMientrasCorreUnPaso() throws Exception {
+    LeccionMotor.SinSpoon ent = entorno( 1500 );
+    TransMeta tm = nueva( "leccion_stop" );
+    Leccion l = LeccionMotor.empezar( ent, sinVistas( guionL1( "guided" ) ), tm );
+    cierto( LeccionMotor.clic( l ), "el clic arranca el paso 1" );
+    esperarStep( tm );
+    igual( "stopped", LeccionMotor.controlar( ent, l, "stop", null ).path( "state" ).asText(), "parada" );
+    Thread.sleep( 2500 );
+    ObjectNode st = LeccionMotor.estado( ent, l, 0, null );
+    igual( "stopped", st.path( "state" ).asText(), "el final del paso no la revive" );
+    falso( LeccionMotor.clic( l ), "parada: el clic no hace nada" );
+    igual( 1, tm.nrSteps(), "no jugo otro paso" );
+    LeccionMotor.olvidarTodas();
+  }
+
+  public void pruebaCtrlZEnLaPausaNoDejaNotasSueltas() throws Exception {
+    LeccionMotor.SinSpoon ent = entorno( 1500 );
+    TransMeta tm = nueva( "leccion_pausa" );
+    Leccion l = LeccionMotor.empezar( ent, sinVistas( guionL1( "guided" ) ), tm );
+    int notas0 = tm.nrNotes();
+    cierto( LeccionMotor.clic( l ), "el clic arranca el paso 1" );
+    esperarStep( tm );
+    LeccionMotor.deshacerSinSpoon( tm ); // el profesor aprieta Ctrl+Z antes de que salgan las notas
+    long fin = System.currentTimeMillis() + 8000;
+    ObjectNode st = LeccionMotor.estado( ent, l, 0, null );
+    while ( "playing".equals( st.path( "state" ).asText() ) && System.currentTimeMillis() < fin ) {
+      st = LeccionMotor.estado( ent, l, 1, null );
+    }
+    igual( "out_of_sync", st.path( "state" ).asText(), "desincronizada" );
+    igual( "user_undo", st.path( "reason" ).asText(), "por el Ctrl+Z" );
+    igual( 0, st.path( "position" ).asInt(), "el paso no cuenta como jugado" );
+    igual( 0, tm.nrSteps(), "sin el step" );
+    igual( notas0, tm.nrNotes(), "sin notas sueltas del paso deshecho" );
+    ObjectNode re = LeccionMotor.controlar( ent, l, "resume", null );
+    igual( "waiting_next", re.path( "state" ).asText(), "resume vuelve a esperar" );
+    igual( 0, re.path( "position" ).asInt(), "en el paso 0" );
+    LeccionMotor.controlar( ent, l, "stop", null );
+    LeccionMotor.olvidarTodas();
+  }
+
+  public void pruebaRestyleEnMedioNoDesincroniza() throws Exception {
+    LeccionMotor.SinSpoon ent = entorno( 0 );
+    TransMeta tm = nueva( "leccion_restyle" );
+    Leccion l = LeccionMotor.empezar( ent, sinVistas( guionL1( "manual" ) ), tm );
+    siguiente( ent, l );
+    siguiente( ent, l );
+    String huellas0 = PruebaLeccionNotas.huellasCrudas( tm );
+    ObjectNode rs = LessonTools.ejecutar( null, tm, "restyle", Tools.obj().put( "action", "restyle" ).put( "font_size",
+      16 ) );
+    cierto( rs.path( "notes" ).asInt() > 0, "el restyle toco las notas" );
+    cierto( !huellas0.equals( PruebaLeccionNotas.huellasCrudas( tm ) ), "el restyle cambio algun texto cortado" );
+    ObjectNode r = siguiente( ent, l );
+    igual( "waiting_next", r.path( "state" ).asText(), "el restyle no cuenta como un Ctrl+Z: " + r );
+    igual( 3, r.path( "position" ).asInt(), "paso 3" );
+    nulo( LeccionMotor.escritorAntes( tm, "Elegir columnas" ), "nada escribe antes de Elegir columnas" );
+    siguiente( ent, l );
+    igual( "Escribir filtrados", LeccionMotor.escritorAntes( tm, "Escribir filtrados" ), "el output escribe" );
+    LeccionMotor.controlar( ent, l, "stop", null );
+    LeccionMotor.olvidarTodas();
+  }
+
   public void pruebaDocumentoCerradoAlAvanzar() throws Exception {
     LeccionMotor.SinSpoon ent = entorno( 0 );
     TransMeta tm = nueva( "leccion_cerrada" );

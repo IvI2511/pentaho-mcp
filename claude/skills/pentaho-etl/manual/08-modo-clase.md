@@ -87,8 +87,9 @@ undid or deleted something: «Resume» re-plans from what is there), `done`, `st
 - The teacher clicks **«Next ▶»** in the Lesson tab; «◀ Back» is a real Ctrl+Z of the last step (it refuses if
   something else is on top of the undo history). **Pause / Resume**, **Restart**, **Finish** (asks first).
 - **A-/A+ only changes the text size of the tab**, not the notes on the canvas (a restyle in the middle of a
-  lesson would add an undo step that «Back» refuses). For bigger notes use `font_size` in `lesson_start`, or
-  `lesson_notes action=restyle` after the lesson.
+  lesson would add an undo step that «Back» refuses; while a step is playing `lesson_notes` refuses to change
+  notes). For bigger notes use `font_size` in `lesson_start`, or `lesson_notes action=restyle` after the lesson.
+  A Ctrl+Z of a restyle also brings back the old size for later notes: the size is read from the notes.
 - If the results panel is closed, the lesson pauses (`panel_hidden`); when it is opened again the tab comes back
   by itself (a watcher checks every 500 ms while the panel is hidden — Spoon 9.4 never calls the `loadTab` hook)
   and the lesson resumes if that was the only reason for the pause.
@@ -101,7 +102,7 @@ undid or deleted something: «Resume» re-plans from what is there), `done`, `st
 |---|---|
 | A clean canvas for the exercise | `lesson_notes action=hide` (the XML of the notes stays inside the `.ktr`: **hiding is not secret**) |
 | The notes back to correct it | `lesson_notes action=show` (does not duplicate if a Ctrl+Z already brought them back; a Ctrl+Z of the show hides them again and another show brings them back) |
-| Hand out the exercise without explanations | save a **copy** and `lesson_notes action=remove` on it |
+| Hand out the exercise without explanations | save a **copy** and `lesson_notes action=remove` on it (remove also empties the hidden copy, so the `.ktr` carries no lesson notes) |
 | A handout (Word, PDF, Markdown…) | `build_report sections=["lesson"] formats=["pdf","docx"] language=es title="…"` |
 | Notes moved after `arrange_canvas` | nothing: with lesson notes, `arrange_canvas` and `build_steps` re-place steps and notes together |
 
@@ -139,8 +140,8 @@ Sort hop alone does **not** show it: Group by is left without input and fails (�
 | Symptom | Cause / fix |
 |---|---|
 | `lesson_start`: «… has no file: save it first …» | a step previews and reads `${Internal.Entry.Current.Directory}`: save the `.ktr` next to `datos/` first |
-| `lesson_start`: «… already has lesson notes on the canvas» (or hidden ones) | one lesson per document: `lesson_notes action=remove` (after `show` if hidden), or work on a copy |
+| `lesson_start`: «… already has lesson notes on the canvas» (or hidden ones) | one lesson per document: `lesson_notes action=remove` (hidden ones are discarded too, with no Ctrl+Z: `show` them first to keep an undo), or work on a copy |
 | `out_of_sync` | someone pressed Ctrl+Z, deleted or renamed a step: «Resume» re-plans from what is there, or `stop` |
-| A note is no longer recognised (`edited` in `list`) | the user edited its text: it is theirs now and the cleanup leaves it (on purpose) |
+| A note shows as `missing` in `list` but is still on the canvas | the user edited its text: it is theirs now (a user note) and the cleanup leaves it (on purpose). Do not `add` it again or you get two copies |
 | The preview of a Filter rows shows rows of both branches | the preview captures the step's output rowsets; trust the I/O/R/W/E of `run` for counts |
 | The Lesson tab has no icon / the automatic watch-out is in English | known in 0.6.0 (the glossary titles come from the English manual headings) |

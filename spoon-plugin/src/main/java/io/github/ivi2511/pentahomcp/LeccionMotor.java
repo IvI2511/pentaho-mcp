@@ -57,6 +57,8 @@ final class LeccionMotor {
   static final int PAUSA_NOTA_MS = 400;
   static final int ESPERA_MAX_S = 120;
   static final long TIMEOUT_VISTA_MS = 60000L;
+  /** Cada cuanto el hilo de una leccion guided/auto mira si su documento sigue abierto. */
+  static final long REVISAR_ABIERTA_MS = 5000L;
 
   private static final Map<String, Leccion> LECCIONES = new LinkedHashMap<String, Leccion>();
   private static final AtomicInteger SECUENCIA = new AtomicInteger();
@@ -358,9 +360,35 @@ final class LeccionMotor {
       ent.tocado( tm );
       return null;
     } );
+    final List<TransMeta> cerrados = ent.ui( () -> {
+      List<TransMeta> c = new ArrayList<TransMeta>();
+      synchronized ( LECCIONES ) {
+        for ( Leccion o : LECCIONES.values() ) {
+          if ( o.tm != null && o.tm != tm && !ent.abierta( o.tm ) ) {
+            c.add( o.tm );
+          }
+        }
+      }
+      return c;
+    } );
     synchronized ( LECCIONES ) {
       for ( java.util.Iterator<Leccion> it = LECCIONES.values().iterator(); it.hasNext(); ) {
         Leccion o = it.next();
+        boolean cerrado = false;
+        for ( TransMeta c : cerrados ) {
+          cerrado |= c == o.tm;
+        }
+        if ( cerrado ) { // documento cerrado: la leccion se olvida (no retiene el TransMeta ni sus filas)
+          synchronized ( o ) {
+            if ( o.estado != Estado.STOPPED ) {
+              o.estado = Estado.STOPPED;
+              o.motivo = "document_closed";
+              o.cambio();
+            }
+          }
+          it.remove();
+          continue;
+        }
         if ( o.tm == tm ) { // terminada (done/stopped): la nueva la reemplaza
           synchronized ( o ) {
             o.estado = Estado.STOPPED;
@@ -569,6 +597,8 @@ final class LeccionMotor {
     }
     final List<String> hechos = new ArrayList<String>();
     final UndoGrupo[] u = new UndoGrupo[ 1 ];
+    // lo ultimo del historial tras el paso: si cambia durante la pausa, alguien hizo algo en Spoon (Ctrl+Z, mover...)
+    final TransAction[] tope = new TransAction[ 1 ];
     String desfase;
     try {
       desfase = ent.ui( () -> {
@@ -583,12 +613,15 @@ final class LeccionMotor {
         u[ 0 ] = ent.grupo( l.tm );
         aplicarStep( ent, l, p, u[ 0 ], hechos );
         ent.tocado( l.tm );
+        tope[ 0 ] = l.tm.viewThisUndo();
         return null;
       } );
     } catch ( Exception e ) {
       synchronized ( l ) {
-        l.estado = Estado.PAUSED;
-        l.motivo = "error";
+        if ( l.estado != Estado.STOPPED ) { // un stop mientras corria el paso manda
+          l.estado = Estado.PAUSED;
+          l.motivo = "error";
+        }
         l.avisos.add( "Step " + p.n + " failed: " + TransOps.mensaje( e ) + ". One Ctrl+Z in Spoon removes what it "
           + "created; lesson_control resume re-syncs." );
         l.cambio();
@@ -600,7 +633,7 @@ final class LeccionMotor {
         if ( "document_closed".equals( desfase ) ) {
           l.estado = Estado.STOPPED;
           l.motivo = "document_closed";
-        } else {
+        } else if ( l.estado != Estado.STOPPED ) {
           l.estado = Estado.OUT_OF_SYNC;
           l.motivo = desfase;
         }
@@ -617,10 +650,23 @@ final class LeccionMotor {
       }
     }
     final boolean[] cerrada = new boolean[ 1 ];
+    final boolean[] otraAccion = new boolean[ 1 ];
     ent.ui( () -> {
       if ( !ent.abierta( l.tm ) ) {
         cerrada[ 0 ] = true;
         return null;
+      }
+      if ( l.tm.viewThisUndo() != tope[ 0 ] ) {
+        // un Ctrl+Z o un cambio del usuario en la pausa: las notas irian sueltas (otro Ctrl+Z) o sin su step
+        boolean falta = p.crea() && l.tm.findStep( p.step ) == null;
+        if ( falta ) {
+          otraAccion[ 0 ] = true;
+          return null;
+        }
+        synchronized ( l ) {
+          l.avisos.add( "Something changed in Spoon while step " + p.n + " was playing: its notes are a separate "
+            + "Ctrl+Z." );
+        }
       }
       p.huellas.clear();
       notas( l, p.pedidas, u[ 0 ], p.huellas, hechos );
@@ -629,17 +675,27 @@ final class LeccionMotor {
       ent.tocado( l.tm );
       return null;
     } );
-    if ( cerrada[ 0 ] ) {
+    if ( cerrada[ 0 ] || otraAccion[ 0 ] ) {
       synchronized ( l ) {
-        l.estado = Estado.STOPPED;
-        l.motivo = "document_closed";
+        if ( cerrada[ 0 ] ) {
+          l.estado = Estado.STOPPED;
+          l.motivo = "document_closed";
+        } else if ( l.estado != Estado.STOPPED ) {
+          l.estado = Estado.OUT_OF_SYNC; // el paso no cuenta como jugado: resume re-sincroniza
+          l.motivo = "user_undo";
+        }
+        l.pausaPedida = false;
         l.cambio();
       }
       return estadoJson( l, false );
     }
-    // vistas previas (fuera del hilo de UI)
+    boolean parada;
+    synchronized ( l ) {
+      parada = l.estado == Estado.STOPPED;
+    }
+    // vistas previas (fuera del hilo de UI); con la leccion parada en medio del paso, no
     ObjectNode vista = null;
-    for ( String s : p.vistas ) {
+    for ( String s : parada ? new ArrayList<String>() : p.vistas ) {
       ObjectNode v = vistaPrevia( ent, l, s, filasDe( l, s ) );
       synchronized ( l ) {
         l.filas.put( s, v );
@@ -648,14 +704,16 @@ final class LeccionMotor {
       hechos.add( "preview of '" + s + "'" );
     }
     synchronized ( l ) {
-      l.posicion++;
-      l.motivo = l.pausaPedida ? l.motivoPausa : null;
-      l.motivoPausa = null;
-      if ( l.posicion >= l.pasos.size() ) {
-        l.estado = Estado.DONE;
-      } else {
-        l.estado = l.pausaPedida ? Estado.PAUSED : Estado.WAITING;
+      l.posicion++; // el paso quedo en el lienzo
+      if ( l.estado != Estado.STOPPED ) { // un stop pedido mientras corria el paso no se pisa
+        l.motivo = l.pausaPedida ? l.motivoPausa : null;
+        if ( l.posicion >= l.pasos.size() ) {
+          l.estado = Estado.DONE;
+        } else {
+          l.estado = l.pausaPedida ? Estado.PAUSED : Estado.WAITING;
+        }
       }
+      l.motivoPausa = null;
       l.pausaPedida = false;
       l.proximo = System.currentTimeMillis() + l.delayMs;
       l.cambio();
@@ -760,10 +818,19 @@ final class LeccionMotor {
     return true;
   }
 
+  /**
+   * Las huellas de las notas del lienzo. Una nota de la leccion que lesson_notes restyle/relayout (o arrange_canvas)
+   * volvio a cortar tiene otra huella: por el registro cuenta tambien con la original y sus alternativas, asi el
+   * cambio de fuente no se toma como un Ctrl+Z del usuario.
+   */
   private static Set<String> huellas( TransMeta tm ) {
     Set<String> r = new HashSet<String>();
     for ( int i = 0; i < tm.nrNotes(); i++ ) {
       r.add( LeccionNotas.huella( tm.getNote( i ).getNote() ) );
+    }
+    for ( LeccionNotas.Entrada e : LeccionNotas.reconocer( tm ).values() ) {
+      r.add( e.huella );
+      r.addAll( e.alternativas );
     }
     return r;
   }
@@ -771,7 +838,15 @@ final class LeccionMotor {
   /** Vista previa de un step sobre una copia (UI para copiar, la corrida afuera). Nunca lanza: errores en el JSON. */
   private static ObjectNode vistaPrevia( Entorno ent, final Leccion l, final String step, final int filas ) {
     try {
+      final String[] escritor = new String[ 1 ];
       final TransMeta c = ent.ui( () -> {
+        if ( !l.permitirEscritura ) {
+          // lesson_start lo valido con el grafo planeado; el lienzo pudo cambiar despues (un output puesto a mano)
+          escritor[ 0 ] = escritorAntes( l.tm, step );
+          if ( escritor[ 0 ] != null ) {
+            return null;
+          }
+        }
         TransMeta t = (TransMeta) l.tm.realClone( false );
         t.setRepository( ent.repositorio() );
         t.setMetaStore( ent.metaStore() );
@@ -780,6 +855,16 @@ final class LeccionMotor {
         t.setInternalKettleVariables();
         return t;
       } );
+      if ( escritor[ 0 ] != null ) {
+        ObjectNode o = Tools.obj().put( "step", step );
+        String aviso = "Preview of '" + step + "' skipped: it would run '" + escritor[ 0 ] + "', an output step that "
+          + "really writes, and the lesson was started without allow_write.";
+        o.putArray( "warnings" ).add( aviso );
+        synchronized ( l ) {
+          l.avisos.add( aviso );
+        }
+        return o;
+      }
       return RunMotor.preview( c, step, Math.max( 1, filas ), TIMEOUT_VISTA_MS );
     } catch ( Exception e ) {
       ObjectNode o = Tools.obj().put( "step", step );
@@ -788,11 +873,35 @@ final class LeccionMotor {
     }
   }
 
+  /** El primer step que escribe entre 'step' y los que lo alimentan en el lienzo (hops activos e info), o null. */
+  static String escritorAntes( TransMeta tm, String step ) {
+    StepMeta inicio = tm.findStep( step );
+    if ( inicio == null ) {
+      return null;
+    }
+    List<StepMeta> pila = new ArrayList<StepMeta>();
+    Set<StepMeta> visto = new HashSet<StepMeta>();
+    pila.add( inicio );
+    while ( !pila.isEmpty() ) {
+      StepMeta s = pila.remove( pila.size() - 1 );
+      if ( !visto.add( s ) ) {
+        continue;
+      }
+      if ( RunMotor.escribe( s ) ) {
+        return s.getName();
+      }
+      pila.addAll( tm.findPreviousSteps( s, true ) );
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------- hilo (guided / auto)
 
   /** Espera el clic (guided) o el temporizador (auto) y avanza; termina con la leccion stopped o done. */
   private static void bucle( Entorno ent, Leccion l ) {
+    long revisada = System.currentTimeMillis();
     while ( true ) {
+      boolean revisar = false;
       synchronized ( l ) {
         while ( true ) {
           if ( l.terminada() || l.estado == Estado.DONE ) {
@@ -800,6 +909,10 @@ final class LeccionMotor {
             return;
           }
           long ahora = System.currentTimeMillis();
+          if ( ahora - revisada >= REVISAR_ABIERTA_MS ) {
+            revisar = true; // documento cerrado sin «Terminar»: el hilo no queda vivo hasta que se cierre Spoon
+            break;
+          }
           if ( l.pedido ) {
             l.pedido = false;
             if ( l.estado == Estado.WAITING ) {
@@ -818,6 +931,11 @@ final class LeccionMotor {
             return;
           }
         }
+      }
+      if ( revisar ) {
+        revisada = System.currentTimeMillis();
+        revisarAbierta( ent, l );
+        continue;
       }
       try {
         avanzar( ent, l, true );
@@ -1080,8 +1198,9 @@ final class LeccionMotor {
       if ( r[ 1 ] == 1 ) {
         l.estado = Estado.OUT_OF_SYNC;
         l.motivo = "user_redo";
-        avisos.add( "Step '" + l.pasos.get( l.posicion ).step + "' is on the canvas but its lesson step is not: Ctrl+Z "
-          + "or delete it in Spoon, then resume again." );
+        avisos.add( "Step '" + l.pasos.get( l.posicion ).step + "' is on the canvas but its lesson step is not (its "
+          + "notes were edited or deleted, or the step came back with Ctrl+Y): Ctrl+Z the last change in Spoon, or "
+          + "delete that step, then resume again." );
       } else {
         l.estado = l.posicion >= l.pasos.size() ? Estado.DONE : Estado.WAITING;
         l.motivo = null;

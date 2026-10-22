@@ -32,9 +32,10 @@ final class LessonTools {
         + "(present, hidden, missing, step_missing). add {step, kind, text}: one extra note (watch_out, tip or "
         + "question) next to a step, styled and placed with the class rule. hide: takes the lesson notes off the "
         + "canvas and keeps their XML in the .ktr (NOT secret: anyone can read it); show: puts them back without "
-        + "duplicating. remove: deletes them (the registry stays; purge=true deletes it too). restyle {font_size}: "
-        + "bigger or smaller text for a projector. relayout: applies the class rule again (steps and lesson notes). "
-        + "Notes the user wrote or edited are never touched. Every action is one Ctrl+Z in Spoon. Transformations "
+        + "duplicating. remove: deletes them and discards the hidden copy (the registry stays; purge=true deletes it "
+        + "too). restyle {font_size}: bigger or smaller text for a projector. relayout: applies the class rule again "
+        + "(steps and lesson notes). Notes the user wrote or edited are never touched (an edited note is listed as "
+        + "missing). Every action is one Ctrl+Z in Spoon. Refused while a lesson step is playing. Transformations "
         + "only.",
       Tools.schema().document()
         .strEnum( "action", "What to do", true, "list", "add", "hide", "show", "remove", "restyle", "relayout" )
@@ -224,6 +225,15 @@ final class LessonTools {
       throw new ToolError( "'" + tm.getName() + "' has no lesson notes (no lesson registry). Use action=add or "
         + "lesson_start first." );
     }
+    Leccion viva = LeccionMotor.deDocumento( tm );
+    if ( viva != null ) {
+      synchronized ( viva ) {
+        if ( viva.estado == Leccion.Estado.PLAYING ) {
+          throw new ToolError( "Lesson " + viva.id + " is playing a step on '" + tm.getName() + "': call again when "
+            + "it ends (lesson_status wait_s), or pause it first." );
+        }
+      }
+    }
     UndoGrupo u = new UndoGrupo( sp, tm );
     LeccionNotas.Resultado r;
     switch ( accion ) {
@@ -251,13 +261,16 @@ final class LessonTools {
             throw new ToolError( "font_size must be -1 or between 6 and 40" );
           }
           tam = f;
-          tm.setAttribute( LeccionNotas.GRUPO, LeccionNotas.K_FUENTE, Integer.toString( f ) );
         }
         LeccionNotas.MedidorCerrable m = LeccionNotas.medidor( tam );
         try {
           r = LeccionNotas.reacomodar( tm, m, u, "restyle".equals( accion ) ? ( tam > 0 ? tam : -1 ) : -1 );
         } finally {
           m.cerrar();
+        }
+        if ( "restyle".equals( accion ) && r.notas > 0 ) {
+          // solo el valor por defecto: tamFuente lo lee de las notas (un Ctrl+Z del restyle vuelve a la fuente vieja)
+          tm.setAttribute( LeccionNotas.GRUPO, LeccionNotas.K_FUENTE, Integer.toString( tam ) );
         }
         o.put( "steps_moved", r.stepsMovidos );
         break;

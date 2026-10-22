@@ -168,8 +168,10 @@ devolvería notas que nadie reconoce. Por eso el registro **solo crece** y se es
 (si el docente guarda a mitad de clase, el `.ktr` dice lo que hay). `remove` borra notas, no el
 registro (`purge: true` lo borra a propósito: después un Ctrl+Z devuelve notas «del usuario»).
 `hide` guarda el XML en `hidden`; `show` repone solo las que no estén ya (si un Ctrl+Z deshizo el
-`hide`, no se duplican) y vacía `hidden`. `list` da cada entrada como `present`, `missing`, `edited`
-o `step_missing` (step renombrado o borrado).
+`hide`, no se duplican; se comparan por la entrada del registro, no por la huella, así un restyle no las
+duplica) y deja la copia en `hidden` (un Ctrl+Z del `show` no las pierde); `remove` vacía `hidden`. `list` da
+cada entrada como `present`, `hidden`, `missing` (también la que el usuario editó) o `step_missing` (step
+renombrado o borrado).
 
 Si el usuario **edita** el texto de una nota de la lección, deja de reconocerse: pasa a ser suya y la
 limpieza no la toca (a propósito). Una copia exacta (Ctrl+C/Ctrl+V) sí cuenta como de la lección.
@@ -344,7 +346,7 @@ que `lesson_status`.
 
 | action | Hace | Undo |
 |---|---|---|
-| `list` | entradas del registro: n, tipo, step, `present`/`missing`/`edited`/`step_missing` | — |
+| `list` | entradas del registro: n, tipo, step, `present`/`hidden`/`missing`/`step_missing` (una nota editada por el usuario figura como `missing`) | — |
 | `add` | `{step, kind, text}` (kind: `watch_out`, `tip` o `question`): una nota suelta ubicada con la regla (a diferencia de `add_note`: estilo, regla y registro) | 1 Ctrl+Z |
 | `hide` | las saca y guarda su XML en el atributo `hidden` (viaja en el `.ktr`; no es secreto) | 1 Ctrl+Z |
 | `show` | repone desde `hidden` las que no estén ya; vacía `hidden` | 1 Ctrl+Z |
