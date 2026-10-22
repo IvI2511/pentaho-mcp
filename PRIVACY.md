@@ -1,6 +1,6 @@
 # Privacy policy — Pentaho Live (unofficial)
 
-_Last updated: 2026-10-21_
+_Last updated: 2026-10-22_
 
 Pentaho Live is made of a Claude Code plugin (a skill and an MCP connection) and a plugin that runs
 inside Pentaho Data Integration (Spoon) on your own computer. This policy covers both.
@@ -50,6 +50,14 @@ receives any of your data.
   step policy blocks code, network and file-deletion steps unless you enable trust mode in Spoon, but it is
   not a sandbox. What the tools return to Claude (names, values, logs of a submission) becomes part of your
   conversation, like any other content.
+- **Robustness.** `stress_test` runs only when you ask: it runs a copy of the transformation in a separate
+  Java process with its own Kettle settings, on broken copies of your input files inside a temporary folder,
+  and only when every database the transformation uses is a SQLite or H2 file, which it copies first; it
+  never connects to any other database. The temporary folder is deleted afterwards unless you ask to keep
+  it (`keep_sandbox`); with `export_variants` the broken files are written to the folder you choose.
+  `harden_etl` changes the open transformation only when you apply its plan, adding steps that write
+  rejects files (each bad row with its reason), by default in a `rechazos` folder next to the `.ktr`.
+- **Class mode.** Lesson notes and the lesson's state are stored inside the `.ktr`, written when you save it.
 - **Nothing is stored** by the plugins beyond what Spoon itself keeps (your open documents, recent files)
   and your report settings (author, institution, colors and logo), saved in
   `<KETTLE_HOME>\.kettle\pentaho-live\` when you click "Save as default".

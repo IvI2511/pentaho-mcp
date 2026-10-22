@@ -55,6 +55,9 @@ for f in catalogo/INDICE.md catalogo/steps-comunes.md manual/01-formato-ktr.md m
   [ -f "$SKILL/$f" ] || { echo "Falta $SKILL/$f (catálogo de la skill pentaho-etl)"; exit 1; }
   mkdir -p "$CLASES/pentaho-etl/$(dirname "$f")" && cp "$SKILL/$f" "$CLASES/pentaho-etl/$f"
 done
+# glosario del modo clase (pentaho://glossary), como en build.ps1
+[ -f "$SKILL/catalogo/glosario-clase.json" ] || { echo "Falta $SKILL/catalogo/glosario-clase.json (glosario del modo clase)"; exit 1; }
+cp "$SKILL/catalogo/glosario-clase.json" "$CLASES/pentaho-etl/catalogo/"
 for d in catalogo/steps catalogo/job-entries; do
   n=$(find "$SKILL/$d" -maxdepth 1 -type f -name '*.xml' | wc -l | tr -d ' ')
   [ "$n" -gt 0 ] || { echo "No hay .xml en $SKILL/$d"; exit 1; }

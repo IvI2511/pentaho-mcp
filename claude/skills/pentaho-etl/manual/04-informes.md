@@ -88,6 +88,7 @@ Pass `sections` only to leave things out or to add `profile`.
 | `metrics` | both | `last_run` (default) reads the last run made in Spoon; nothing if it never ran |
 | `profile` | transformation | **runs a copy** up to the step(s) in `profile_steps` (up to 10, one run; `profile_step` for one), reading `profile_rows` rows (default 5000) |
 | `narrative` | both | only if you pass `narrative.conclusions` |
+| `lesson` | transformation | none; the handout of the lesson played on this document (`08-modo-clase.md`). Never included by default; `skipped` when the transformation has no lesson |
 
 **Ask before running anything.** `profile_steps` and `metrics: "run_copy"` execute a copy of the
 transformation (or job), and **its output steps write their files and tables** like a normal run. Use

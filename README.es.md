@@ -125,7 +125,7 @@ flowchart LR
 
 ## Instalar
 
-**Lo más fácil: pedíselo a tu agente.** En Claude Code o Codex escribí:
+**Lo más fácil: pídeselo a tu agente.** En Claude Code o Codex escribe:
 
 > instala IvI2511/pentaho-mcp
 
@@ -151,7 +151,7 @@ Después abre Spoon, reinicia Claude Code (o ejecuta `/reload-plugins`) y pídel
 ```
 
 En la app de escritorio de Claude: **Settings → Plugins → Add → marketplace** `IvI2511/pentaho-mcp`, y
-después instalá **Pentaho Live** desde **Discover**.
+después instala **Pentaho Live** desde **Discover**.
 
 **Plugin de Spoon con el script, Windows (PowerShell):**
 
@@ -265,7 +265,7 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   alcanza el tipo de conexión MySQL normal).
 - El PDI 9.4 CE del release no tiene contenedor OSGi (karaf), así que faltan los steps de big data y
   streaming que dependen de él. Los 216 steps del catálogo están todos.
-- Abrí Spoon antes de arrancar el agente; si el agente arrancó primero, reinicialo para que vea las
+- Abre Spoon antes de arrancar el agente; si el agente arrancó primero, reinícialo para que vea las
   herramientas.
 - Corrector: corregir una entrega es ejecutar código escrito por otra persona. El proceso aparte y la
   política de steps (se bloquean los de código, red y borrado de archivos) bajan el riesgo, pero **no es un

@@ -14,10 +14,10 @@ Hitachi Vantara. Pentaho is a trademark of Hitachi Vantara.
   entries with their default XML, an annotated guide to the ~45 most used steps, nine runnable examples
   and the errors Pan/Kitchen give (including the silent ones). It works on its own: without Spoon,
   Claude writes the file and checks it with Pan.
-- **MCP connection `pentaho`**: 66 tools (create/open/save, add/configure/connect steps and job
+- **MCP connection `pentaho`**: 73 tools (create/open/save, add/configure/connect steps and job
   entries, list output fields, validate, preview rows, run, database connections, parameters, a
   quality check, reports: HTML, PDF, Markdown and PowerPoint with lineage, data dictionary, run
-  metrics and technical quality, and an exercise grader).
+  metrics and technical quality, an exercise grader, class mode and robustness).
 
 ## Quality
 
@@ -38,6 +38,24 @@ is compared row by row with the expected one. You get a grade with the failed ch
 typical mistake, feedback for every student without the hidden case's values, and a gradebook for Excel.
 Spoon gets a **Grader** perspective with the same, plus a wizard that builds the pack from the open
 transformation. It is not a real sandbox: for submissions from strangers, use a virtual machine.
+
+## Class mode
+
+Claude can also *teach* an ETL: it builds the transformation slowly, one step per click on **Next ▶**
+in a new **Lesson** tab, and explains every step with a numbered note on the canvas (what it does, why it
+is there, the typical mistake), with the first rows after each step. Made for a projected class or for
+learning alone; afterwards the notes can be hidden for the exercise and the lesson becomes a handout in
+PDF or Word (`build_report` with the `lesson` section). Three tested lessons come with the skill in
+English, Spanish and Portuguese.
+
+## Robustness
+
+Ask Claude to make a load tolerate dirty data. `lint_etl` with `robustness=true` finds what would stop
+the load or lose rows; `harden_etl` shows the plan and applies it as one Ctrl+Z (every bad row goes to a
+rejects file with the reason, plus required-field checks, dedupe and orphans; Claude asks you first about
+the changes that alter the result); `stress_test` proves it: broken copies of your input files run against
+a copy of the transformation in a sandbox, checking that every row read was loaded or rejected with a
+reason and that running it twice duplicates nothing.
 
 ## Requirement: the Spoon-side plugin
 
@@ -64,6 +82,12 @@ claude.ai chat only the skill is useful.
 - The quality check does not run the transformation. Its deep mode, only when asked, reads up to 5000
   rows of the sources through previews limited to read-only steps, and its findings can quote values it
   read.
+- The dirty-data test (`stress_test`) runs only when you ask, on a copy of the transformation in a
+  separate Java process with its own Kettle settings, and only when every database it uses is a SQLite or
+  H2 file (which it copies first). It never connects to any other database and writes only in a temporary
+  folder (or the `export_variants` folder you choose). `harden_etl` adds steps that write rejects files,
+  by default in a `rechazos` folder next to the `.ktr`.
+- Class mode stores the lesson notes inside the `.ktr`, written when you save it.
 - The skill may ask Claude to run Pan or Kitchen (PDI's command-line runners) on your computer to
   verify a file. Claude Code asks for permission before running commands, as usual.
 - Source code of everything, including the Java plugin, is in the
