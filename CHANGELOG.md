@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22
+
+"Calidad y clases" (quality and classes): four new things Claude can do with an ETL, and 73 MCP tools in
+total. The **linter** checks a transformation or job for what Kettle lets through and scores it 0-100.
+The **exercise grader** grades a whole folder of students' transformations against a pack built from the
+teacher's solution. **Class mode** builds a transformation one step at a time with an explanation on the
+canvas. **Robustness** makes a load tolerate dirty data and proves it with broken copies of the inputs.
+
 ### Added
 
 - **ETL linter**, `lint_etl`: checks a transformation or job for what Kettle lets through, beyond `validate`.
@@ -32,7 +40,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Abort, a `${VARIABLE}` for a password) only by key, after asking the person. In a transformation the whole
   call is one Ctrl+Z; in a job, one per change. `dry_run` returns the new score without changing anything.
 - `suppress_lint`: silences a rule on a step, a job entry or the whole document, with a reason. It is stored
-  inside the `.ktr` / `.kjb`, and silenced findings no longer lower the score (61 tools).
+  inside the `.ktr` / `.kjb`, and silenced findings no longer lower the score.
 - MCP resource `pentaho://lint/rules`: the rule catalog (severity, category, what, why and how to fix in
   English, Spanish and Portuguese) and the score formula.
 - Reports: **Technical quality** section (`quality`, right after validation, on by default) with the score,
@@ -64,7 +72,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   names taken from a field, foreign connections, duplicate step names and circular hops block the submission
   before anything runs. Limits per case: timeout, rows and output size. It is not a real sandbox, and the
   documentation says so.
-- MCP tools for the grader (66 tools): `create_exercise_pack` (from the solution open in Spoon or a `.ktr`: runs
+- MCP tools for the grader: `create_exercise_pack` (from the solution open in Spoon or a `.ktr`: runs
   it in a child JVM to write the expected output, detects the inputs, the output step, the columns and a unique
   key, suggests rules and a rubric, checks the solution with the other locale and writes a copy for students
   without the solution or the hidden cases), `validate_exercise_pack` (schema, paths, files, and the solution
@@ -108,7 +116,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `lesson_next`, `lesson_status` (with `wait_s`, so Claude can follow the class without spending tokens on
   every click), `lesson_control` (pause, resume, back, goto, restart, stop) and `lesson_notes` (list, add,
   hide, show, remove, restyle for a projector, relayout; one Ctrl+Z each, and notes the user wrote are never
-  touched). Hidden notes travel inside the `.ktr`, so hiding is not secret (66 tools).
+  touched). Hidden notes travel inside the `.ktr`, so hiding is not secret.
 - Reports: **Lesson** section (`lesson`, never on by default): the handout of the lesson, with the canvas and
   its notes, every step with what, why, watch-out, tip, question and glossary entry, the preview rows seen in
   class, the exercise and a table of the common errors of the step types used. After restarting Spoon it is
@@ -148,7 +156,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     (`not_run`, and `export_variants` writes the broken files to try by hand), never writes next to the
     original files, switches off database logging in the copies, and does not run steps that leave the
     machine or write where it cannot redirect them (HTTP, mail, SFTP, message queues, other output
-    plugins) (63 tools).
+    plugins).
   - Skill: the guide `manual/09-robustez.md` (recipes R01-R14 with the exact XML, also served as
     `pentaho://guide/robustness`) and the pattern `patrones/06_carga_tolerante` (a load with stable keys,
     Insert/Update, orphans and database errors to rejects, proven clean, re-run and broken with Kitchen).
@@ -158,7 +166,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - With lesson notes in the transformation, `arrange_canvas` and `build_steps` re-place the steps and the
   lesson notes together with the class rule (same Ctrl+Z), and `get_document` marks the lesson notes instead
   of returning their whole text.
-
 - `validate` runs its own structural checks through the linter. Its messages now name the step, and the
   report's validation section shows them in the report's language. A step that distributes rows among
   outputs of the same type (deliberate load balancing) is no longer reported, hidden job entries
@@ -482,7 +489,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.0...v0.4.1

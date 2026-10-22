@@ -117,7 +117,7 @@ flowchart LR
 ```
 
 - O **plugin do Spoon** é um plugin de ciclo de vida do Kettle. Quando o Spoon abre, ele sobe um servidor
-  MCP em `127.0.0.1:8765` com 66 ferramentas e aplica cada alteração na thread de interface do
+  MCP em `127.0.0.1:8765` com 73 ferramentas e aplica cada alteração na thread de interface do
   Spoon, com desfazer. O mesmo jar acrescenta as perspectivas **Relatórios** e **Corretor** ao seletor de
   perspectivas do Spoon.
 - O **plugin do Claude Code `pentaho-live`** conecta o Claude a esse servidor e inclui a skill
@@ -278,6 +278,25 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
   relatório completo.
 - O modo aula funciona **só com transformações** (ainda não com jobs), uma lição por transformação; com mais
   de 12 passos avisa e sugere dividi-la. Se a lição mostra linhas, salve antes o `.ktr` junto dos dados.
+
+## Novidades da 0.6.0
+
+«Calidad y clases» (qualidade e aulas), 73 ferramentas MCP no total:
+
+- **Linter** (`lint_etl`, `apply_lint_fixes`, `suppress_lint`): o que o Kettle deixa passar (um Group by
+  sem ordenar antes, o símbolo decimal vazio, caminhos absolutos, senhas no arquivo...) com uma nota de
+  qualidade de 0 a 100, as correções seguras num só Ctrl+Z e uma seção de qualidade nos relatórios.
+- **Corretor de exercícios** (`create_exercise_pack`, `grade_exercise`, `grade_submissions`...): monte um
+  pack a partir da sua solução e corrija uma pasta inteira de entregas, cada uma numa JVM separada, com uma
+  dica por erro típico, o retorno de cada aluno e a planilha para Excel. O Spoon ganha a perspectiva
+  **Corretor**.
+- **Modo aula** (`lesson_start`, `lesson_notes`...): o Claude constrói a transformação um step por clique em
+  **Próximo ▶**, com uma nota numerada no canvas para cada step, e a lição vira uma apostila.
+- **Robustez** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): cada linha ruim vai para um
+  arquivo de rejeitos com o motivo, e cópias quebradas das entradas provam que nenhuma linha se perde e que
+  rodar a carga de novo não duplica nada. Guia: `manual/09-robustez.md`.
+
+Detalhes em [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Novidades da 0.5.1
 

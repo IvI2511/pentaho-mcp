@@ -114,7 +114,7 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with 66 tools, and applies every edit on Spoon's UI thread with undo support.
+  `127.0.0.1:8765` with 73 tools, and applies every edit on Spoon's UI thread with undo support.
   The same jar adds the **Reports** and **Grader** perspectives to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.
@@ -268,6 +268,24 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
   bundles, so it has no interactive diagrams: **Open in browser** shows the full report.
 - Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
   steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
+
+## New in 0.6.0
+
+"Calidad y clases" (quality and classes), 73 MCP tools in total:
+
+- **Linter** (`lint_etl`, `apply_lint_fixes`, `suppress_lint`): what Kettle lets through (unsorted input to
+  a Group by, an empty decimal symbol, absolute paths, passwords in the file...) with a 0-100 quality score,
+  safe fixes in one Ctrl+Z, and a quality section in the reports.
+- **Exercise grader** (`create_exercise_pack`, `grade_exercise`, `grade_submissions`...): build a pack from
+  your solution and grade a whole folder of submissions, each one in a separate JVM, with a hint per typical
+  mistake, feedback for every student and a gradebook for Excel. Spoon gets a **Grader** perspective.
+- **Class mode** (`lesson_start`, `lesson_notes`...): Claude builds a transformation one step per click on
+  **Next ▶**, with a numbered note on the canvas for each step, and the lesson becomes a handout.
+- **Robustness** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): every bad row goes to a rejects
+  file with its reason, and broken copies of the inputs prove that no row is lost and a re-run duplicates
+  nothing. Guide: `manual/09-robustez.md`.
+
+See [`CHANGELOG.md`](CHANGELOG.md).
 
 ## New in 0.5.1
 

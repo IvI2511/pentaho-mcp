@@ -34,13 +34,16 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   «Pentaho Live · IDC Studios» con el símbolo de las celdas como marca de agua. Narrativa opcional
   escrita por Claude vía MCP. Diseño: `docs/informes-diseno.md`.
 
-## 0.6.0 · Calidad y clases
+## 0.6.0 · Calidad y clases — hecha el 22-oct-2026 (rama `feat/0.6.0`, sin publicar)
+
+Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 calidad, 07 corrector,
+08 modo clase y 09 robustez). Lo que cada una dejó para después está en 0.7.0.
 
 - **Linter de ETL** — **hecho** (21-oct-2026, rama `feat/calidad`, sin publicar). Buenas prácticas más
   allá de `validate`: rutas fijas, contraseñas a la vista, Group by / Merge join sin ordenar, steps con
   nombre por defecto, la trampa del decimal con locale español… Con puntaje y cómo arreglar cada cosa.
   Quedó así: `lint_etl` (28 reglas encendidas, puntaje 0-100 y modo profundo que lee las fuentes con
-  previews de solo lectura), `apply_lint_fixes` y `suppress_lint` (61 herramientas), el recurso
+  previews de solo lectura), `apply_lint_fixes` y `suppress_lint`, el recurso
   `pentaho://lint/rules` y la sección «Calidad técnica» de los Informes. Salidas sin manejo de errores
   quedó como regla apagada (para el corrector y el modo clase) y la conversión perezosa se podó (sin daño
   demostrado en 9.4). Falta: clic en un hallazgo de la vista previa para seleccionar el step y un botón
@@ -51,7 +54,7 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   (recetas R01-R14) y el patrón `06_carga_tolerante`; 17 reglas `robustness` del linter (apagadas por
   defecto, con su propio puntaje: `lint_etl robustness=true`); `harden_etl` (plan con diff, un solo
   Ctrl+Z) y `stress_test` (variantes sucias de las entradas en una JVM hija aislada, balance de filas,
-  re-ejecución sobre SQLite) — 63 herramientas. Falta: el diálogo «Robustecer…» en Spoon, las recetas
+  re-ejecución sobre SQLite). Falta: el diálogo «Robustecer…» en Spoon, las recetas
   manuales con aplicación (claves estables, Insert/Update, agregar al grano, partir sin fallar), seguir
   los renombres para deducir los obligatorios y la sección de robustez de los Informes. Diseño:
   `docs/robustez-diseno.md`.
@@ -60,7 +63,7 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   rúbrica); el plugin corre cada entrega en una JVM aparte con una política de steps, compara filas y arma la
   nota con lo que falló, una pista por error típico, la devolución del alumno (sin los valores del caso oculto)
   y la planilla para Excel. Quedó así: `create_exercise_pack`, `validate_exercise_pack`, `grade_exercise`,
-  `grade_submissions` y `get_grading_status` (66 herramientas), la perspectiva **Corrector** en Spoon (plan B:
+  `grade_submissions` y `get_grading_status`, la perspectiva **Corrector** en Spoon (plan B:
   perspectiva propia, porque Informes no tiene pestañas) con el asistente «Crear pack desde esta
   transformación», las devoluciones y el informe del curso con los renderizadores de Informes, la guía
   `manual/07-corrector.md` y el pack de ejemplo de Grano de Oro (`ejemplo/pack-correccion/`). Falta: corregir
@@ -69,7 +72,7 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
 - **Modo clase** — **hecho** (22-oct-2026, rama `feat/modo-clase`, sin publicar). Claude construye despacio
   y deja una nota en el lienzo junto a cada step explicando qué hace y por qué. Quedó así: `lesson_start`
   (guion completo validado y planificado antes de tocar nada), `lesson_next`, `lesson_status` (con
-  `wait_s`), `lesson_control` y `lesson_notes` (66 herramientas); la pestaña «Lección» en el panel de
+  `wait_s`), `lesson_control` y `lesson_notes`; la pestaña «Lección» en el panel de
   resultados con «Siguiente ▶», «◀ Atrás» (un Ctrl+Z real), pausa y vista previa; ritmos guiado, automático
   y manual; notas en bandas sin choques (en columnas de 3 o más steps, una nota compacta con el número; las
   notas lejanas se acercan); glosario de clase en/es/pt (`pentaho://glossary`); la guía para repartir
@@ -90,3 +93,16 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
 - **Catálogo de una carpeta** — qué job llama a qué transformación, qué tablas lee y escribe cada una.
 - **Patrones listos** — carga incremental por fecha, dimensión SCD tipo 2, deduplicación,
   CSV → staging.
+- **Pendiente de 0.6.0**:
+  - Corrector: corregir jobs (`.kjb`); bloquear Execute row SQL script y Dynamic SQL row cuando el pack
+    tiene base (hoy solo avisan `dynamic_sql`, y un `ATTACH` armado con datos de las filas no se frena);
+    revisar las carpetas después de cada corrida (que todo quedó en `salida/` o `tmp/`); el menú
+    «Herramientas › Corrector de ejercicios…» y la pestaña «Corrección» para el alumno; prueba en Spoon real.
+  - Modo clase: jobs; un botón «Guía…» en la pestaña; reproducir una lección guardada sin IA; prueba del
+    salto de vista previa con `allow_write=false`; prueba en Spoon real.
+  - Robustez: el diálogo «Robustecer…» en Spoon; lista blanca completa de steps para `stress_test`
+    (hoy, lista negra más un comodín por nombre); que `confirm=["all"]` no cubra recetas que apartan
+    filas de una carga; la regla `empty_decimal_symbol` también en Select values; las recetas manuales
+    con aplicación (claves estables, Insert/Update, agregar al grano, partir sin fallar); la sección de
+    robustez de los Informes; probar `harden_etl` en Spoon real (simulación, aplicar, Ctrl+Z).
+  - Linter: clic en un hallazgo de la vista previa para seleccionar el step y un botón «Revisar calidad».

@@ -117,7 +117,7 @@ flowchart LR
 ```
 
 - El **plugin de Spoon** es un plugin de ciclo de vida de Kettle. Cuando abre Spoon, levanta un servidor
-  MCP en `127.0.0.1:8765` con 66 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
+  MCP en `127.0.0.1:8765` con 73 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
   con deshacer. El mismo jar agrega las perspectivas **Informes** y **Corrector** al selector de
   perspectivas de Spoon.
 - El **plugin de Claude Code `pentaho-live`** conecta a Claude con ese servidor y suma la skill
@@ -278,6 +278,25 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   muestra el informe completo.
 - El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
   transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
+
+## Lo nuevo en 0.6.0
+
+«Calidad y clases», 73 herramientas MCP en total:
+
+- **Linter** (`lint_etl`, `apply_lint_fixes`, `suppress_lint`): lo que Kettle deja pasar (un Group by sin
+  ordenar antes, el símbolo decimal vacío, rutas absolutas, contraseñas en el archivo...) con una nota de
+  calidad de 0 a 100, los arreglos seguros en un solo Ctrl+Z y una sección de calidad en los informes.
+- **Corrector de ejercicios** (`create_exercise_pack`, `grade_exercise`, `grade_submissions`...): armas un
+  pack desde tu solución y corriges una carpeta entera de entregas, cada una en una JVM aparte, con una pista
+  por error típico, la devolución de cada alumno y la planilla para Excel. Spoon suma la perspectiva
+  **Corrector**.
+- **Modo clase** (`lesson_start`, `lesson_notes`...): Claude construye la transformación un step por cada
+  clic en **Siguiente ▶**, con una nota numerada en el lienzo por step, y la lección se convierte en apuntes.
+- **Robustez** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): cada fila mala va a un archivo de
+  rechazos con su motivo, y copias rotas de las entradas demuestran que no se pierde ninguna fila y que
+  volver a correr la carga no duplica nada. Guía: `manual/09-robustez.md`.
+
+Detalle en [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Lo nuevo en 0.5.1
 

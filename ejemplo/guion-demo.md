@@ -124,3 +124,32 @@ lienzo y, en algunos, las primeras filas.
 Para cerrar: «◀ Atrás» deshace un paso de verdad, `lesson_notes hide` deja el lienzo limpio para el
 ejercicio y `build_report sections=["lesson"]` genera la guía en PDF o Word. Detalle en
 [leccion/README.md](leccion/README.md).
+
+## Parte 5 · Corregir entregas (3 min, opcional)
+
+Para un público de docentes. Las cuatro entregas de `entregas-ejemplo/` tienen los errores típicos de la
+práctica.
+
+> Corrige las entregas de `ejemplo/entregas-ejemplo/` con el pack `ejemplo/pack-correccion/` y deja la
+> planilla en `salida/correccion/`.
+
+Claude llama a `grade_submissions` y sigue el avance con `get_grading_status`: cada entrega corre en una JVM
+aparte, nunca dentro de Spoon. Las notas salen 9,5 (rutas absolutas), 5,3 (sin quitar duplicados), 6,0
+(símbolo decimal vacío) y 5,0 (Group by sin ordenar), cada una con su pista. Abre la perspectiva
+**Corrector** de Spoon para enseñar la tabla, la devolución tal como la ve el alumno (sin los valores del
+caso oculto) y la planilla `notas.xlsx`. Lo que escribió el corrector está en `informes/correccion/`.
+
+## Parte 6 · Que la carga aguante datos sucios (4 min, opcional)
+
+Con `solucion-referencia/04_hechos_ventas.ktr` abierta:
+
+> ¿Qué pasa si mañana llega un CSV roto? Revisa la robustez de esta transformación y propónme cómo
+> arreglarla.
+
+Claude corre `lint_etl` con `robustness=true` (una nota de robustez aparte, que no cambia la de calidad) y
+`harden_etl` en simulación: el plan con cada receta, su diff y la nota antes y después. Aplica solo las
+`auto` y pregunta por las `confirm` (las que apartan filas de la carga). Después `stress_test` prueba copias
+rotas del CSV (campos que faltan, fechas y números mal escritos, líneas cortadas, archivo vacío) sobre una
+copia de la transformación y de la base SQLite: el balance dice, para cada variante, que toda fila leída
+quedó cargada o rechazada con su motivo y que volver a correr la carga no duplica nada. Todo se deshace
+con un Ctrl+Z. La guía para hacerlo a mano es `manual/09-robustez.md` de la skill.
