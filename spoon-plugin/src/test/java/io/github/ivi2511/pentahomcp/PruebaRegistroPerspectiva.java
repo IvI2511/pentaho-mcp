@@ -65,6 +65,7 @@ import org.pentaho.di.ui.spoon.SpoonPluginType;
 public class PruebaRegistroPerspectiva {
 
   static final String CLASE_SPOON = "io.github.ivi2511.pentahomcp.ReportsSpoonPlugin";
+  static final String CLASE_GRADER = "io.github.ivi2511.pentahomcp.GraderSpoonPlugin";
   static final long TOPE_MS = 240000;
 
   private File base;
@@ -222,7 +223,19 @@ public class PruebaRegistroPerspectiva {
     igual( "true", r.get( "meta_activa_null" ), "getActiveMeta null" );
     igual( "true", r.get( "overlays_vacios" ), "sin overlays" );
     igual( "false", r.get( "on_file_close" ), "onFileClose como lo llama Spoon" );
+    corrector( r );
     igual( "true", r.get( "fin" ), "el arnes termino" );
+  }
+
+  /** La perspectiva Corrector (C8): registrada una vez, sin grupo, con el loader del MCP (comparte los lotes). */
+  private static void corrector( Map<String, String> r ) {
+    igual( "true", r.get( "grader_encontrado" ), "@SpoonPlugin del corrector registrado" );
+    igual( "", r.get( "grader_grupo" ), "corrector sin grupo" );
+    igual( "true", r.get( "grader_loader_mismo" ), "el corrector carga con el loader del MCP" );
+    igual( "1", r.get( "grader_registrada_veces" ), "perspectiva pentaho-live-grader, una vez" );
+    igual( "true", r.get( "grader_misma" ), "la registrada es la del plugin" );
+    igual( "Corrector", r.get( "grader_nombre_es" ), "nombre es" );
+    igual( "true", r.get( "grader_lote_compartido" ), "CorrectorLote es la misma clase (grade_submissions y el panel)" );
   }
 
   /** {@code -DPENTAHO_LIVE_REPORTS=off}: el plugin se instancia, pero sin perspectiva; el MCP sigue. */
@@ -244,6 +257,7 @@ public class PruebaRegistroPerspectiva {
     igual( "true", r.get( "perspectiva_null" ), "getPerspective devuelve null" );
     igual( "true", r.get( "perspectiva_misma" ), "y null las dos veces" );
     igual( "false", r.get( "registrada" ), "no hay perspectiva pentaho-live-reports" );
+    corrector( r ); // apagar Informes no apaga el corrector
     igual( "true", r.get( "fin" ), "el arnes termino" );
   }
 
@@ -508,6 +522,32 @@ public class PruebaRegistroPerspectiva {
           && registrada.getEventHandlers() != null && registrada.getEventHandlers().isEmpty() );
         // Spoon.tabCloseSelected: getClass().getMethod("onFileClose").invoke(...) -> Boolean
         r( "on_file_close", registrada.getClass().getMethod( "onFileClose" ).invoke( registrada ) );
+      }
+      // la perspectiva Corrector (C8, plan B): su propio @SpoonPlugin en el mismo jar y el mismo loader
+      PluginInterface gp = reg.findPluginWithId( SpoonPluginType.class, "PentahoLiveGrader" );
+      r( "grader_encontrado", gp != null );
+      r( "grader_grupo", gp == null || gp.getClassLoaderGroup() == null ? "" : gp.getClassLoaderGroup() );
+      SpoonPluginInterface grader = null;
+      for ( SpoonPluginInterface p : SpoonPluginManager.getInstance().getPlugins() ) {
+        if ( p.getClass().getName().equals( CLASE_GRADER ) ) {
+          grader = p;
+        }
+      }
+      r( "grader_loader_mismo", grader != null && grader.getClass().getClassLoader() == cl1 );
+      int vecesGrader = 0;
+      SpoonPerspective pg = null;
+      for ( SpoonPerspective p : SpoonPerspectiveManager.getInstance().getPerspectives() ) {
+        if ( "pentaho-live-grader".equals( p.getId() ) ) {
+          pg = p;
+          vecesGrader++;
+        }
+      }
+      r( "grader_registrada_veces", vecesGrader );
+      r( "grader_misma", pg != null && grader != null && pg == grader.getPerspective() );
+      if ( pg != null ) {
+        r( "grader_nombre_es", pg.getDisplayName( new Locale( "es", "ES" ) ) );
+        r( "grader_lote_compartido", Class.forName( "io.github.ivi2511.pentahomcp.CorrectorLote", false, cl1 )
+          == Class.forName( "io.github.ivi2511.pentahomcp.CorrectorLote", false, pg.getClass().getClassLoader() ) );
       }
       r( "fin", true );
     }

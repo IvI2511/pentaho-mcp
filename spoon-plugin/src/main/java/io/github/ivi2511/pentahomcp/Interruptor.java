@@ -37,16 +37,31 @@ final class Interruptor {
 
   /** true si la perspectiva Informes esta apagada. Nunca lanza. */
   static boolean informesApagados() {
+    return apagadoPor( PROPIEDAD );
+  }
+
+  /**
+   * true si la perspectiva Corrector esta apagada ({@code PENTAHO_LIVE_GRADER=off}, igual que
+   * {@link #PROPIEDAD}; docs/corrector-diseno.md §9, plan B). Las tools MCP del corrector siguen. Nunca lanza.
+   */
+  static boolean correctorApagado() {
+    return apagadoPor( PROPIEDAD_CORRECTOR );
+  }
+
+  /** Nombre de la propiedad que apaga la perspectiva Corrector. */
+  static final String PROPIEDAD_CORRECTOR = "PENTAHO_LIVE_GRADER";
+
+  private static boolean apagadoPor( String propiedad ) {
     try {
       String v = null;
       try {
-        v = EnvUtil.getSystemProperty( PROPIEDAD );
+        v = EnvUtil.getSystemProperty( propiedad );
       } catch ( Throwable ignorada ) {
         // EnvUtil siempre esta en kettle-core; por las dudas, la system property directa
-        v = System.getProperty( PROPIEDAD );
+        v = System.getProperty( propiedad );
       }
       if ( v == null || v.trim().isEmpty() ) {
-        v = System.getenv( PROPIEDAD );
+        v = System.getenv( propiedad );
       }
       return apagado( v );
     } catch ( Throwable t ) {

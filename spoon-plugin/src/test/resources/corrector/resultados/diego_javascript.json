@@ -1,0 +1,102 @@
+{
+  "format": "pentaho-live-grade-result/1",
+  "pack": "ventas-por-producto",
+  "pack_title": "Ejercicio 3 - Ventas por producto",
+  "student": "diego_javascript",
+  "file": "diego_javascript.ktr",
+  "language": "es",
+  "status": "blocked",
+  "reason": "step_not_allowed",
+  "detail": "Not run: it uses step types that the pack does not allow (see blocked_steps)",
+  "grade": 1.5,
+  "scale": 10.0,
+  "capture": "file",
+  "trust_mode": false,
+  "extra_allowed_steps": [],
+  "checks": [
+    {
+      "check": "runs",
+      "points": 1.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "columns",
+      "points": 2.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "row_count",
+      "points": 1.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "values",
+      "points": 4.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "rule:usa_group_by",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "Usa un Group by (o Memory group by): Found: [Totales por producto]"
+    },
+    {
+      "check": "rule:sin_codigo",
+      "points": 0.5,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "No usa JavaScript ni Java: Uses [Calcular importe (ScriptValueMod)]"
+    },
+    {
+      "check": "rule:max_pasos",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "Como mucho 8 steps: 5 steps (max 8)"
+    }
+  ],
+  "blocked_steps": [
+    {
+      "step": "Calcular importe",
+      "type": "ScriptValueMod",
+      "level": "condicional",
+      "reason": "step_not_allowed"
+    }
+  ],
+  "rules": {
+    "usa_group_by": {
+      "label": "Usa un Group by (o Memory group by)",
+      "passed": true,
+      "evaluated": true,
+      "detail": "Found: [Totales por producto]"
+    },
+    "sin_codigo": {
+      "label": "No usa JavaScript ni Java",
+      "passed": false,
+      "evaluated": true,
+      "detail": "Uses [Calcular importe (ScriptValueMod)]"
+    },
+    "max_pasos": {
+      "label": "Como mucho 8 steps",
+      "passed": true,
+      "evaluated": true,
+      "detail": "5 steps (max 8)"
+    }
+  },
+  "lint": {},
+  "cases": [],
+  "hints": [],
+  "warnings": [],
+  "timing": {
+    "kettle_init_s": 6.073
+  }
+}

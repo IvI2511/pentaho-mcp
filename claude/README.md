@@ -14,10 +14,10 @@ Hitachi Vantara. Pentaho is a trademark of Hitachi Vantara.
   entries with their default XML, an annotated guide to the ~45 most used steps, nine runnable examples
   and the errors Pan/Kitchen give (including the silent ones). It works on its own: without Spoon,
   Claude writes the file and checks it with Pan.
-- **MCP connection `pentaho`**: 61 tools (create/open/save, add/configure/connect steps and job
+- **MCP connection `pentaho`**: 66 tools (create/open/save, add/configure/connect steps and job
   entries, list output fields, validate, preview rows, run, database connections, parameters, a
-  quality check, and reports: HTML, PDF, Markdown and PowerPoint with lineage, data dictionary, run
-  metrics and technical quality).
+  quality check, reports: HTML, PDF, Markdown and PowerPoint with lineage, data dictionary, run
+  metrics and technical quality, and an exercise grader).
 
 ## Quality
 
@@ -28,6 +28,16 @@ quality score that shows where every lost point comes from. `apply_lint_fixes` a
 proposes as one Ctrl+Z (Claude asks you first about the ones that change what the ETL does), and
 `suppress_lint` silences a rule where it is on purpose. On request, a deep mode reads the sources to
 prove whether an unsorted input or a decimal symbol really changes the result.
+
+## Grading exercises
+
+For teachers: build an exercise **pack** from your solution (the data of a visible case and a hidden one,
+the expected output, rules and a rubric), then grade a whole folder of submissions. Each submission runs
+in a separate JVM, never inside Spoon, under a step policy that blocks code and network steps; its output
+is compared row by row with the expected one. You get a grade with the failed checks, a hint for each
+typical mistake, feedback for every student without the hidden case's values, and a gradebook for Excel.
+Spoon gets a **Grader** perspective with the same, plus a wizard that builds the pack from the open
+transformation. It is not a real sandbox: for submissions from strangers, use a virtual machine.
 
 ## Requirement: the Spoon-side plugin
 
@@ -48,6 +58,9 @@ claude.ai chat only the skill is useful.
 - The Spoon-side plugin listens on the loopback interface only and rejects browser requests from other
   origins. It edits the documents you have open, writes files only where you ask Claude to save, and
   runs transformations only when asked. Database passwords are never returned to Claude.
+- The grader runs students' transformations only when you ask, each one in a separate process with its
+  own empty Kettle settings, and writes results only to the folder you choose. Trust mode (letting
+  dangerous steps run) can only be turned on in Spoon, never by Claude.
 - The quality check does not run the transformation. Its deep mode, only when asked, reads up to 5000
   rows of the sources through previews limited to read-only steps, and its findings can quote values it
   read.
@@ -62,6 +75,7 @@ claude.ai chat only the skill is useful.
   city and writes a CSV."*
 - *"Why does this .ktr fail in Pan?"*
 - *"Check this transformation for bad practices and fix what's safe."*
+- *"Grade the submissions in C:\TP3\entregas with the pack C:\TP3\pack and tell me who failed and why."*
 - *"Add a Filter rows after the CSV input that keeps rows with saldo > 1000 and preview the result."*
 
 ## Privacy

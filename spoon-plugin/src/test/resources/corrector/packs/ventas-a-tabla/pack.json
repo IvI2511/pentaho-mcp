@@ -1,0 +1,51 @@
+{
+  "format": "pentaho-live-exercise-pack/1",
+  "id": "ventas-a-tabla",
+  "title": "Ejercicio 3b - Totales por producto a una tabla",
+  "language": "es",
+  "statement": "enunciado.md",
+  "kind": "transformation",
+  "solution": "solucion/03_a_tabla.ktr",
+  "inputs": ["ventas.csv"],
+  "cases": [
+    { "id": "visible", "inputs_dir": "datos/visible", "expected": "esperado/visible.csv", "weight": 1 }
+  ],
+  "output": {
+    "capture": "query",
+    "step": "Escribir totales",
+    "columns": [
+      { "name": "producto", "type": "String" },
+      { "name": "unidades", "type": "Integer" },
+      { "name": "importe_total", "type": "Number" },
+      { "name": "num_ventas", "type": "Integer" },
+      { "name": "importe_medio", "type": "Number" },
+      { "name": "ultima_venta", "type": "Date", "format": "yyyy-MM-dd" }
+    ],
+    "expected_csv": { "separator": ";", "enclosure": "\"", "header": true, "encoding": "UTF-8" },
+    "database": { "template": "plantilla/dw.sqlite", "type": "SQLITE" },
+    "sql": "SELECT producto, unidades, ROUND(importe_total, 2) AS importe_total, num_ventas, ROUND(importe_medio, 2) AS importe_medio, date(ultima_venta / 1000, 'unixepoch') AS ultima_venta FROM totales"
+  },
+  "compare": {
+    "key_columns": ["producto"],
+    "numeric_tolerance": 0.01,
+    "max_examples": 5
+  },
+  "rules": [],
+  "rubric": [
+    { "check": "runs", "points": 1 },
+    { "check": "columns", "points": 2 },
+    { "check": "row_count", "points": 1 },
+    { "check": "values", "points": 6 }
+  ],
+  "scale": 10,
+  "policy": {
+    "allow_steps": ["TableOutput", "ExecSQL"],
+    "unknown_steps": "block",
+    "timeout_s": 30,
+    "max_rows": 100000,
+    "max_output_mb": 5,
+    "locale": "es_ES",
+    "timezone": "UTC",
+    "encoding": "UTF-8"
+  }
+}

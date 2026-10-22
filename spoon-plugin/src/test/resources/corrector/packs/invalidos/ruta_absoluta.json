@@ -1,0 +1,190 @@
+{
+  "format": "pentaho-live-exercise-pack/1",
+  "id": "invalido-ruta-absoluta",
+  "title": "Ejercicio 3 - Ventas por producto (un solo JSON, copia para alumnos)",
+  "language": "es",
+  "statement": "enunciado.md",
+  "kind": "transformation",
+  "submission_file": "03_ventas_por_producto.ktr",
+  "inputs": [
+    "ventas.csv"
+  ],
+  "parameters": {
+    "FECHA_CORTE": "2024-05-31"
+  },
+  "cases": [
+    {
+      "id": "visible",
+      "inputs_dir": "datos/visible",
+      "expected": "C:/Users/profe/esperado.csv",
+      "weight": 1
+    }
+  ],
+  "output": {
+    "capture": "step",
+    "step": "Escribir totales",
+    "columns": [
+      {
+        "name": "producto",
+        "type": "String"
+      },
+      {
+        "name": "unidades",
+        "type": "Integer",
+        "format": "0"
+      },
+      {
+        "name": "importe_total",
+        "type": "Number",
+        "format": "0.00"
+      },
+      {
+        "name": "num_ventas",
+        "type": "Integer",
+        "format": "0"
+      },
+      {
+        "name": "importe_medio",
+        "type": "Number",
+        "format": "0.00"
+      },
+      {
+        "name": "ultima_venta",
+        "type": "Date",
+        "format": "yyyy-MM-dd"
+      }
+    ],
+    "expected_csv": {
+      "separator": ";",
+      "enclosure": "\"",
+      "header": true,
+      "encoding": "UTF-8"
+    }
+  },
+  "compare": {
+    "key_columns": [
+      "producto"
+    ],
+    "ignore_column_order": true,
+    "ignore_row_order": false,
+    "numeric_tolerance": 0.01,
+    "relative_tolerance": 0,
+    "trim": true,
+    "case_sensitive": true,
+    "date_formats": [
+      "yyyy-MM-dd",
+      "dd/MM/yyyy"
+    ],
+    "strict_format": false,
+    "extra_columns": "warn",
+    "max_examples": 5
+  },
+  "rules": [
+    {
+      "id": "usa_group_by",
+      "type": "must_use",
+      "steps": [
+        "GroupBy",
+        "MemoryGroupBy"
+      ],
+      "label": "Usa un Group by (o Memory group by)"
+    },
+    {
+      "id": "sin_codigo",
+      "type": "must_not_use",
+      "steps": [
+        "ScriptValueMod",
+        "UserDefinedJavaClass",
+        "Janino"
+      ],
+      "label": "No usa JavaScript ni Java"
+    },
+    {
+      "id": "max_pasos",
+      "type": "max_steps",
+      "value": 8,
+      "label": "Como mucho 8 steps"
+    },
+    {
+      "id": "errores",
+      "type": "error_handling",
+      "steps": [
+        "CsvInput"
+      ],
+      "label": "Maneja los errores al leer"
+    },
+    {
+      "id": "orden",
+      "type": "lint",
+      "rule": "unsorted_input",
+      "label": "Ordena antes de agrupar"
+    }
+  ],
+  "rubric": [
+    {
+      "check": "runs",
+      "points": 1
+    },
+    {
+      "check": "columns",
+      "points": 2
+    },
+    {
+      "check": "row_count",
+      "points": 1
+    },
+    {
+      "check": "values",
+      "points": 4
+    },
+    {
+      "check": "rule:usa_group_by",
+      "points": 1,
+      "requires": [
+        "runs"
+      ]
+    },
+    {
+      "check": "rule:sin_codigo",
+      "points": 0.5
+    },
+    {
+      "check": "rule:max_pasos",
+      "points": 0.5
+    },
+    {
+      "check": "rule:errores",
+      "points": 0.5,
+      "label": "Manejo de errores"
+    },
+    {
+      "check": "rule:orden",
+      "points": 0.5,
+      "requires": [
+        "runs"
+      ]
+    },
+    {
+      "check": "lint:absolute_path",
+      "points": 0.5
+    }
+  ],
+  "scale": 10,
+  "policy": {
+    "allow_steps": [
+      "SetVariable"
+    ],
+    "unknown_steps": "block",
+    "timeout_s": 20,
+    "max_rows": 100000,
+    "max_output_mb": 5,
+    "locale": "es_ES",
+    "timezone": "Europe/Madrid",
+    "encoding": "UTF-8"
+  },
+  "inline": {
+    "enunciado.md": "# Ejercicio 3 · Ventas por producto\n\nLeé `ventas.csv` (separador `;`, decimal `.`, fechas `yyyy-MM-dd`) y escribí un CSV con **una fila por\nproducto** y estas columnas:\n\n| Columna | Qué es |\n|---|---|\n| `producto` | el producto |\n| `unidades` | suma de `cantidad` |\n| `importe_total` | suma de `cantidad × precio_unitario` (2 decimales) |\n| `num_ventas` | cuántas ventas tuvo |\n| `importe_medio` | promedio del importe por venta (2 decimales) |\n| `ultima_venta` | la fecha de la última venta |\n\nReglas: usá un **Group by** (no vale JavaScript) y no más de 8 steps. El orden de las filas no importa.\nLa corrección corre tu transformación con otros datos además de los de ejemplo.\n",
+    "datos/visible/ventas.csv": "venta_id;cliente_id;producto;cantidad;precio_unitario;fecha_venta\n101;1;Café;3;2.50;2024-05-01\n102;2;Té;1;1.80;2024-05-01\n103;1;Café;2;2.50;2024-05-02\n104;3;Medialuna;6;1.20;2024-05-02\n105;5;Café;1;2.50;2024-05-03\n106;4;Té;4;1.80;2024-05-03\n107;7;Medialuna;12;1.20;2024-05-04\n108;9;Café;2;2.50;2024-05-04\n109;5;Tostado;2;4.75;2024-05-05\n110;8;Té;3;1.80;2024-05-05\n",
+    "esperado/visible.csv": "producto;unidades;importe_total;num_ventas;importe_medio;ultima_venta\nCafé;8;20.00;4;5.00;2024-05-04\nMedialuna;18;21.60;2;10.80;2024-05-04\nTostado;2;9.50;1;9.50;2024-05-05\nTé;8;14.40;3;4.80;2024-05-05\n"
+  }
+}

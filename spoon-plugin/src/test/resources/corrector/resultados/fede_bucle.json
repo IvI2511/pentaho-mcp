@@ -1,0 +1,204 @@
+{
+  "format": "pentaho-live-grade-result/1",
+  "pack": "ventas-por-producto",
+  "pack_title": "Ejercicio 3 - Ventas por producto",
+  "student": "fede_bucle",
+  "file": "fede_bucle.ktr",
+  "language": "es",
+  "status": "timeout",
+  "grade": 2.0,
+  "scale": 10.0,
+  "capture": "file",
+  "trust_mode": false,
+  "extra_allowed_steps": [],
+  "checks": [
+    {
+      "check": "runs",
+      "points": 1.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "columns",
+      "points": 2.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "row_count",
+      "points": 1.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "values",
+      "points": 4.0,
+      "earned": 0.0,
+      "passed": false,
+      "detail": "visible 0%, oculto 0%"
+    },
+    {
+      "check": "rule:usa_group_by",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "Usa un Group by (o Memory group by): Found: [Totales por producto]"
+    },
+    {
+      "check": "rule:sin_codigo",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "No usa JavaScript ni Java: OK"
+    },
+    {
+      "check": "rule:max_pasos",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "Como mucho 8 steps: 5 steps (max 8)"
+    }
+  ],
+  "blocked_steps": [],
+  "rules": {
+    "usa_group_by": {
+      "label": "Usa un Group by (o Memory group by)",
+      "passed": true,
+      "evaluated": true,
+      "detail": "Found: [Totales por producto]"
+    },
+    "sin_codigo": {
+      "label": "No usa JavaScript ni Java",
+      "passed": true,
+      "evaluated": true,
+      "detail": "OK"
+    },
+    "max_pasos": {
+      "label": "Como mucho 8 steps",
+      "passed": true,
+      "evaluated": true,
+      "detail": "5 steps (max 8)"
+    }
+  },
+  "lint": {},
+  "cases": [
+    {
+      "id": "visible",
+      "hidden": false,
+      "weight": 1.0,
+      "redirections": [
+        "output 'Escribir totales': ${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto -> salida/03_ventas_por_producto"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "timeout",
+        "detail": "The output file was not written",
+        "seconds": 15.222,
+        "errors": 1,
+        "output_step": "Escribir totales",
+        "output_step_type": "TextFileOutput",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Ordenar por producto",
+            "read": 10,
+            "written": 0,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 0,
+            "written": 0,
+            "output": 0,
+            "errors": 1
+          },
+          {
+            "step": "Escribir totales",
+            "read": 0,
+            "written": 0,
+            "output": 0,
+            "errors": 0
+          }
+        ],
+        "log": "...\n1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:15 - Totales por producto.0 - Procesamiento finalizado (I=0, O=0, R=0, W=0, U=0, E=1)\n2026/10/20 16:01:15 - 03_ventas_por_producto - Transformaci�n detectada \n2026/10/20 16:01:15 - 03_ventas_por_producto - Transformaci�n est� matando los otros pasos!\n2026/10/20 16:01:15 - 03_ventas_por_producto - ERROR (version 9.4.0.0-343, build 0.0 from 2022-11-08 07.50.27 by buildguy) : Errores detectados!\n2026/10/20 16:01:15 - 03_ventas_por_producto - ERROR (version 9.4.0.0-343, build 0.0 from 2022-11-08 07.50.27 by buildguy) : Errores detectados!\n"
+      }
+    },
+    {
+      "id": "oculto",
+      "hidden": true,
+      "weight": 1.0,
+      "redirections": [
+        "output 'Escribir totales': ${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto -> salida/03_ventas_por_producto"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "timeout",
+        "detail": "The output file was not written",
+        "seconds": 15.062,
+        "errors": 1,
+        "output_step": "Escribir totales",
+        "output_step_type": "TextFileOutput",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 12,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Ordenar por producto",
+            "read": 12,
+            "written": 0,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 0,
+            "written": 0,
+            "output": 0,
+            "errors": 1
+          },
+          {
+            "step": "Escribir totales",
+            "read": 0,
+            "written": 0,
+            "output": 0,
+            "errors": 0
+          }
+        ],
+        "log": "...\n1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - \tat org.pentaho.di.trans.TransMeta.getStepFields(TransMeta.java:1836)\n2026/10/20 16:01:30 - Totales por producto.0 - Procesamiento finalizado (I=0, O=0, R=0, W=0, U=0, E=1)\n2026/10/20 16:01:30 - 03_ventas_por_producto - Transformaci�n detectada \n2026/10/20 16:01:30 - 03_ventas_por_producto - Transformaci�n est� matando los otros pasos!\n2026/10/20 16:01:30 - 03_ventas_por_producto - ERROR (version 9.4.0.0-343, build 0.0 from 2022-11-08 07.50.27 by buildguy) : Errores detectados!\n2026/10/20 16:01:30 - 03_ventas_por_producto - ERROR (version 9.4.0.0-343, build 0.0 from 2022-11-08 07.50.27 by buildguy) : Errores detectados!\n"
+      }
+    }
+  ],
+  "hints": [],
+  "warnings": [],
+  "timing": {
+    "kettle_init_s": 5.942
+  }
+}

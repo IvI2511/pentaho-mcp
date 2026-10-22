@@ -98,7 +98,7 @@ public final class ReglasRutas {
     }
   }
 
-  /** C:\…, \\servidor\…, file:///…, /home/…: solo anda en esa máquina. */
+  /** C:\…, \\servidor\…, file:///…, /home/…: solo funciona en esa máquina. */
   static final class RutaAbsoluta extends PorRuta {
 
     RutaAbsoluta() {

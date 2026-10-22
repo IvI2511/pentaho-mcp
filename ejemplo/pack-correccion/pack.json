@@ -1,0 +1,114 @@
+{
+  "format" : "pentaho-live-exercise-pack/1",
+  "id" : "grano-de-oro-ventas-tienda-categoria",
+  "title" : "Grano de Oro · Ventas por tienda y categoría",
+  "language" : "es",
+  "statement" : "enunciado.md",
+  "kind" : "transformation",
+  "solution" : "solucion/06_kpi_desde_ficheros.ktr",
+  "inputs" : [ "productos.xlsx", "tiendas.json", "ventas_2026_09.csv" ],
+  "cases" : [ {
+    "id" : "visible",
+    "inputs_dir" : "datos/visible",
+    "expected" : "esperado/visible.csv",
+    "weight" : 1.0,
+    "hidden" : false
+  }, {
+    "id" : "oculto",
+    "inputs_dir" : "datos/oculto",
+    "expected" : "esperado/oculto.csv",
+    "weight" : 1.0,
+    "hidden" : true
+  } ],
+  "output" : {
+    "capture" : "file",
+    "step" : "Escribir KPI",
+    "columns" : [ {
+      "name" : "tienda",
+      "type" : "String"
+    }, {
+      "name" : "categoria",
+      "type" : "String"
+    }, {
+      "name" : "unidades",
+      "type" : "Integer",
+      "format" : "0"
+    }, {
+      "name" : "importe",
+      "type" : "Number",
+      "format" : "0.00"
+    } ],
+    "expected_csv" : {
+      "separator" : ";",
+      "enclosure" : "\"",
+      "header" : true,
+      "encoding" : "UTF-8"
+    }
+  },
+  "compare" : {
+    "key_columns" : [ "tienda", "categoria" ],
+    "ignore_column_order" : true,
+    "ignore_row_order" : true,
+    "numeric_tolerance" : 0.01,
+    "relative_tolerance" : 0.0,
+    "trim" : true,
+    "case_sensitive" : true,
+    "strict_format" : false,
+    "extra_columns" : "warn",
+    "max_examples" : 5
+  },
+  "rules" : [ {
+    "id" : "usa_group_by",
+    "type" : "must_use",
+    "steps" : [ "GroupBy", "MemoryGroupBy" ],
+    "label" : "Agrupa con un Group by (o Memory group by)"
+  }, {
+    "id" : "quita_duplicados",
+    "type" : "must_use",
+    "steps" : [ "Unique", "UniqueRowsByHashSet" ],
+    "label" : "Quita los duplicados con Unique rows"
+  }, {
+    "id" : "sin_codigo",
+    "type" : "must_not_use",
+    "steps" : [ "ScriptValueMod", "UserDefinedJavaClass", "Janino" ],
+    "label" : "Sin JavaScript ni Java"
+  } ],
+  "rubric" : [ {
+    "check" : "runs",
+    "points" : 1.0
+  }, {
+    "check" : "columns",
+    "points" : 1.0
+  }, {
+    "check" : "row_count",
+    "points" : 1.0
+  }, {
+    "check" : "values",
+    "points" : 4.0
+  }, {
+    "check" : "rule:usa_group_by",
+    "points" : 1.0,
+    "requires" : [ "runs" ]
+  }, {
+    "check" : "rule:quita_duplicados",
+    "points" : 1.0,
+    "requires" : [ "runs" ]
+  }, {
+    "check" : "rule:sin_codigo",
+    "points" : 0.5
+  }, {
+    "check" : "lint:absolute_path",
+    "points" : 0.5,
+    "label" : "Rutas relativas a la transformación"
+  } ],
+  "scale" : 10.0,
+  "policy" : {
+    "unknown_steps" : "block",
+    "timeout_s" : 60,
+    "max_rows" : 100000,
+    "max_output_mb" : 10,
+    "locale" : "es_ES",
+    "timezone" : "Europe/Madrid",
+    "encoding" : "UTF-8"
+  }
+}

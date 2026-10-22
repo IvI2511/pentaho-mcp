@@ -53,6 +53,14 @@ puntaje de calidad técnica de 0 a 100 que muestra de dónde sale cada punto que
 seguros con un solo Ctrl+Z (antes de los que cambian lo que hace el ETL, te pregunta). La misma revisión
 es una sección del informe.
 
+**Corrector.** Para docentes: a partir de la solución se arma un pack de ejercicio (un caso visible y otro
+oculto con otros datos, la salida esperada, reglas y una rúbrica) y se corrige una carpeta entera de
+entregas. Cada una corre en una JVM aparte, nunca dentro de Spoon, y su salida se compara fila a fila con la
+esperada: sale la nota con los criterios que fallaron, una pista para cada error típico (Group by sin ordenar,
+símbolo decimal vacío, duplicados sin quitar, rutas fijas), la devolución de cada alumno sin los valores del
+caso oculto y una planilla para Excel. Spoon suma la perspectiva **Corrector** con lo mismo y un asistente que
+arma el pack desde la transformación abierta.
+
 ¿No tenés Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
 
@@ -68,6 +76,7 @@ Kitchen.
 | *"¿Por qué este `.ktr` falla en Pan?"* | lo lee, encuentra el problema con la lista de errores verificados y lo corrige |
 | *"Revisá las buenas prácticas de esta transformación antes de que la entregue y arreglá lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
 | *"Haceme un informe de esta transformación para el TP, en PDF y PowerPoint, con una conclusión corta."* | arma el informe (linaje, diccionario de datos, métricas…), escribe la conclusión con los datos reales y exporta los dos archivos |
+| *"Con esta solución, un pack de corrección con un caso oculto; y después, las notas de las entregas de `C:\TP3\entregas`."* | corre la solución para sacar la salida esperada, corrige cada entrega en JVMs aparte y resume las notas, quién falló qué y por qué; la planilla y la devolución de cada alumno quedan en la carpeta de resultados |
 
 ## Cómo funciona
 
@@ -92,8 +101,9 @@ flowchart LR
 ```
 
 - El **plugin de Spoon** es un plugin de ciclo de vida de Kettle. Cuando abre Spoon, levanta un servidor
-  MCP en `127.0.0.1:8765` con 61 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
-  con deshacer. El mismo jar agrega la perspectiva **Informes** al selector de perspectivas de Spoon.
+  MCP en `127.0.0.1:8765` con 66 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
+  con deshacer. El mismo jar agrega las perspectivas **Informes** y **Corrector** al selector de
+  perspectivas de Spoon.
 - El **plugin de Claude Code `pentaho-live`** conecta a Claude con ese servidor y suma la skill
   `pentaho-etl`, para que Claude use los ids de step y el XML exactos en vez de adivinarlos.
 
@@ -160,7 +170,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 
 | Pieza | Qué es | Dónde |
 |---|---|---|
-| **Plugin de Spoon** | `@LifecyclePlugin` de Kettle que levanta el servidor MCP al abrir Spoon, y la perspectiva Informes (`@SpoonPlugin`) en el mismo jar (bytecode Java 8, compilado contra PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
+| **Plugin de Spoon** | `@LifecyclePlugin` de Kettle que levanta el servidor MCP al abrir Spoon, y las perspectivas Informes y Corrector (`@SpoonPlugin`) en el mismo jar (bytecode Java 8, compilado contra PDI 9.4) | [`spoon-plugin/`](spoon-plugin/) |
 | **Skill `pentaho-etl`** | Formato `.ktr` / `.kjb`, catálogo de 216 steps y 77 job entries generado desde una instalación real, guía comentada de los steps más usados, ejemplos que corren y los errores que dan de verdad Pan y Kitchen | [`claude/skills/pentaho-etl/`](claude/skills/pentaho-etl/) |
 | **Conexión MCP `pentaho`** | Apunta Claude Code al plugin de Spoon (dirección configurable con `mcp_url`) | [`claude/.mcp.json`](claude/.mcp.json) |
 | **Instaladores** | Encuentran o bajan PDI, instalan el plugin de Spoon y configuran Claude Code y Codex | [`instalar.ps1`](instalar.ps1), [`instalar.sh`](instalar.sh) |
@@ -180,6 +190,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Bases de datos | Listar tipos de conexión; agregar, probar y borrar conexiones; ver tablas y columnas; correr consultas SQL (solo lectura salvo que pidas escribir) |
 | Parámetros | Listar, definir y borrar parámetros |
 | Lienzo | Agregar notas, seleccionar steps, ordenar el lienzo, sacar una imagen del lienzo |
+| Corrector | Armar un pack de ejercicio desde una solución (casos, casos ocultos, salida esperada, reglas, rúbrica, copia para alumnos), validarlo, corregir una entrega o una carpeta entera en JVMs aparte, seguir el lote, y obtener la planilla y la devolución de cada alumno |
 | Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imágenes, JSON), solo o con varios documentos combinados, con linaje, diccionario de datos, métricas, calidad técnica y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
 
 </details>
@@ -202,6 +213,10 @@ Todo corre en tu computadora. No hay servidores, cuentas, analíticas ni telemet
 - La revisión de calidad (`lint_etl`) no ejecuta la transformación. Su modo profundo lee hasta 5000 filas
   de tus fuentes solo cuando lo pedís, con previews limitadas a steps de solo lectura, y sus hallazgos
   pueden citar valores que leyó.
+- El corrector ejecuta la solución y las entregas solo cuando se le pide, cada una en un proceso Java
+  aparte con una configuración de Kettle vacía y sobre copias de los datos; nunca modifica una entrega y
+  escribe los resultados solo en la carpeta elegida. El modo confianza (dejar correr steps peligrosos)
+  existe solo en la perspectiva Corrector de Spoon, nunca por MCP.
 - Lo que devuelven las herramientas (steps, nombres de campos, logs, filas de preview) pasa a ser parte
   de tu conversación con Claude, como cualquier otra cosa que compartas.
 
@@ -230,6 +245,10 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   streaming que dependen de él. Los 216 steps del catálogo están todos.
 - Abrí Spoon antes de arrancar el agente; si el agente arrancó primero, reinicialo para que vea las
   herramientas.
+- Corrector: corregir una entrega es ejecutar código escrito por otra persona. El proceso aparte y la
+  política de steps (se bloquean los de código, red y borrado de archivos) bajan el riesgo, pero **no es un
+  sandbox real**: para entregas de desconocidos, una máquina virtual. Corrige transformaciones (`.ktr`);
+  los jobs todavía no.
 - Informes: el PDF y las imágenes de los diagramas usan **Microsoft Edge o Google Chrome** (Windows trae
   Edge). Sin ninguno de los dos, el PDF sale por el diálogo de impresión del navegador y en PowerPoint los
   diagramas de linaje y de tablas van como tablas. La vista previa dentro de Spoon usa el motor de

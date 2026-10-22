@@ -1,0 +1,155 @@
+{
+  "format": "pentaho-live-grade-result/1",
+  "pack": "ventas-a-tabla",
+  "pack_title": "Ejercicio 3b - Totales por producto a una tabla",
+  "student": "ines_tabla_ok",
+  "file": "ines_tabla_ok.ktr",
+  "language": "es",
+  "status": "graded",
+  "grade": 10.0,
+  "scale": 10.0,
+  "capture": "query",
+  "trust_mode": false,
+  "extra_allowed_steps": [],
+  "checks": [
+    {
+      "check": "runs",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%"
+    },
+    {
+      "check": "columns",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "detail": "visible 100%"
+    },
+    {
+      "check": "row_count",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%"
+    },
+    {
+      "check": "values",
+      "points": 6.0,
+      "earned": 6.0,
+      "passed": true,
+      "detail": "visible 100%"
+    }
+  ],
+  "blocked_steps": [],
+  "rules": {},
+  "lint": {},
+  "cases": [
+    {
+      "id": "visible",
+      "hidden": false,
+      "weight": 1.0,
+      "redirections": [
+        "connection 'dw': D:\\facu\\dw.sqlite -> db/dw.sqlite (copy of the pack's template)"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "finished",
+        "seconds": 0.57,
+        "errors": 0,
+        "output_step": "Escribir totales",
+        "output_step_type": "TableOutput",
+        "captured_from": "query db/dw.sqlite",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Ordenar por producto",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 10,
+            "written": 4,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Escribir totales",
+            "read": 4,
+            "written": 4,
+            "output": 4,
+            "errors": 0
+          }
+        ]
+      },
+      "comparison": {
+        "mode": "key",
+        "key_columns": [
+          "producto"
+        ],
+        "columns": {
+          "expected": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "actual": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "missing": [],
+          "extra": [],
+          "renamed_suggestions": [],
+          "order_differs": false
+        },
+        "rows": {
+          "expected": 4,
+          "actual": 4,
+          "matched": 4,
+          "different": 0,
+          "missing": 0,
+          "extra": 0,
+          "duplicate_keys": 0
+        },
+        "examples": {
+          "different": [],
+          "missing": [],
+          "extra": [],
+          "duplicate_keys": []
+        },
+        "differences_by_column": {},
+        "columns_score": 1.0,
+        "row_count_ok": true,
+        "values_score": 1.0
+      }
+    }
+  ],
+  "hints": [],
+  "warnings": [],
+  "timing": {
+    "kettle_init_s": 6.435
+  }
+}

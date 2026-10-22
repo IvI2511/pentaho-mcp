@@ -1,0 +1,55 @@
+{
+  "cadena": "Grano de Oro",
+  "ciudad": "Madrid",
+  "actualizado": "2026-09-01",
+  "tiendas": [
+    {
+      "id_tienda": "T01",
+      "nombre": "Malasaña",
+      "ubicacion": {
+        "barrio": "Universidad",
+        "distrito": "Centro",
+        "codigo_postal": "28004"
+      },
+      "fecha_apertura": "2017-04-03",
+      "superficie_m2": 95,
+      "plazas": 34
+    },
+    {
+      "id_tienda": "T02",
+      "nombre": "Chamberí",
+      "ubicacion": {
+        "barrio": "Trafalgar",
+        "distrito": "Chamberí",
+        "codigo_postal": "28010"
+      },
+      "fecha_apertura": "2018-10-15",
+      "superficie_m2": 80,
+      "plazas": 28
+    },
+    {
+      "id_tienda": "T03",
+      "nombre": "Salamanca",
+      "ubicacion": {
+        "barrio": "Recoletos",
+        "distrito": "Salamanca",
+        "codigo_postal": "28001"
+      },
+      "fecha_apertura": "2020-02-24",
+      "superficie_m2": 110,
+      "plazas": 40
+    },
+    {
+      "id_tienda": "T04",
+      "nombre": "Retiro",
+      "ubicacion": {
+        "barrio": "Ibiza",
+        "distrito": "Retiro",
+        "codigo_postal": "28009"
+      },
+      "fecha_apertura": "2023-05-08",
+      "superficie_m2": 70,
+      "plazas": 24
+    }
+  ]
+}

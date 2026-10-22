@@ -45,8 +45,17 @@ Salió sin esperar Informes (decidido el 20-oct-2026), junto con el autor «Ivá
   quedó como regla apagada (para el corrector y el modo clase) y la conversión perezosa se podó (sin daño
   demostrado en 9.4). Falta: clic en un hallazgo de la vista previa para seleccionar el step y un botón
   «Revisar calidad». Diseño: `docs/linter-diseno.md`; integración: `docs/linter-integracion.md`.
-- **Corrector de ejercicios** — el docente deja la salida esperada (y opcionalmente reglas); el plugin
-  corre la transformación del alumno, compara filas y arma la nota con lo que falló.
+- **Corrector de ejercicios** — **hecho** (21-oct-2026, rama `feat/corrector`, sin publicar). El docente arma
+  un pack desde su solución (enunciado, datos de un caso visible y de uno oculto, salida esperada, reglas y
+  rúbrica); el plugin corre cada entrega en una JVM aparte con una política de steps, compara filas y arma la
+  nota con lo que falló, una pista por error típico, la devolución del alumno (sin los valores del caso oculto)
+  y la planilla para Excel. Quedó así: `create_exercise_pack`, `validate_exercise_pack`, `grade_exercise`,
+  `grade_submissions` y `get_grading_status` (66 herramientas), la perspectiva **Corrector** en Spoon (plan B:
+  perspectiva propia, porque Informes no tiene pestañas) con el asistente «Crear pack desde esta
+  transformación», las devoluciones y el informe del curso con los renderizadores de Informes, la guía
+  `manual/07-corrector.md` y el pack de ejemplo de Grano de Oro (`ejemplo/pack-correccion/`). Falta: corregir
+  jobs (`.kjb`), el menú «Herramientas › Corrector de ejercicios…», la pestaña «Corrección» junto al lienzo
+  para la autocorrección del alumno y la prueba en Spoon real. Diseño: `docs/corrector-diseno.md`.
 - **Modo clase** — Claude construye despacio y deja una nota en el lienzo junto a cada step
   explicando qué hace y por qué.
 

@@ -1,0 +1,176 @@
+{
+  "format": "pentaho-live-grade-result/1",
+  "pack": "ventas-a-tabla",
+  "pack_title": "Ejercicio 3b - Totales por producto a una tabla",
+  "student": "juan_tabla_max",
+  "file": "juan_tabla_max.ktr",
+  "language": "es",
+  "status": "graded",
+  "grade": 5.5,
+  "scale": 10.0,
+  "capture": "query",
+  "trust_mode": false,
+  "extra_allowed_steps": [],
+  "checks": [
+    {
+      "check": "runs",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%"
+    },
+    {
+      "check": "columns",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "detail": "visible 100%"
+    },
+    {
+      "check": "row_count",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%"
+    },
+    {
+      "check": "values",
+      "points": 6.0,
+      "earned": 1.5,
+      "passed": false,
+      "detail": "visible 25%"
+    }
+  ],
+  "blocked_steps": [],
+  "rules": {},
+  "lint": {},
+  "cases": [
+    {
+      "id": "visible",
+      "hidden": false,
+      "weight": 1.0,
+      "redirections": [
+        "connection 'dw': C:\\Users\\profe\\dw.sqlite -> db/dw.sqlite (copy of the pack's template)"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "finished",
+        "seconds": 0.617,
+        "errors": 0,
+        "output_step": "Escribir totales",
+        "output_step_type": "TableOutput",
+        "captured_from": "query db/dw.sqlite",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Ordenar por producto",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 10,
+            "written": 4,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Escribir totales",
+            "read": 4,
+            "written": 4,
+            "output": 4,
+            "errors": 0
+          }
+        ]
+      },
+      "comparison": {
+        "mode": "key",
+        "key_columns": [
+          "producto"
+        ],
+        "columns": {
+          "expected": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "actual": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "missing": [],
+          "extra": [],
+          "renamed_suggestions": [],
+          "order_differs": false
+        },
+        "rows": {
+          "expected": 4,
+          "actual": 4,
+          "matched": 1,
+          "different": 3,
+          "missing": 0,
+          "extra": 0,
+          "duplicate_keys": 0
+        },
+        "examples": {
+          "different": [
+            {
+              "key": "Café",
+              "column": "importe_medio",
+              "expected": "5.0",
+              "actual": "7.5"
+            },
+            {
+              "key": "Medialuna",
+              "column": "importe_medio",
+              "expected": "10.8",
+              "actual": "14.4"
+            },
+            {
+              "key": "Té",
+              "column": "importe_medio",
+              "expected": "4.8",
+              "actual": "7.2"
+            }
+          ],
+          "missing": [],
+          "extra": [],
+          "duplicate_keys": []
+        },
+        "differences_by_column": {
+          "importe_medio": 3
+        },
+        "columns_score": 1.0,
+        "row_count_ok": true,
+        "values_score": 0.25
+      }
+    }
+  ],
+  "hints": [],
+  "warnings": [],
+  "timing": {
+    "kettle_init_s": 6.898
+  }
+}

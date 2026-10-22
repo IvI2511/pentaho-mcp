@@ -67,12 +67,12 @@ código 0,5, ≤ 8 steps 0,5; escala 10; **sin compuertas**):
 |---|---|---|---|---|
 | ana_orden_distinto | Correcta; Sort descendente (salen Té, Tostado, Medialuna, Café) y rutas de su PC | graded | **10,0** | 4/4 iguales en los dos casos; notas de redirección |
 | bruno_agregado_mal | `importe_medio` con MAX en vez de AVERAGE | graded | **6,5** | values: visible 25 %, oculto 0 %. «Café · importe_medio · esperado 5.00 · tuyo 7.50» y 2 más |
-| carla_falta_columna | Sin `ultima_venta` en el Text file output | graded | **9,7** | columns 5/6. Pista: «Falta la columna ultima_venta: revisá la lista de campos del step de salida» |
+| carla_falta_columna | Sin `ultima_venta` en el Text file output | graded | **9,7** | columns 5/6. Pista: «Falta la columna ultima_venta: revisa la lista de campos del step de salida» |
 | diego_javascript | Importe calculado con Modified JavaScript | blocked | **1,5** | No se ejecutó; falla «sin código»; suman Group by y ≤ 8 steps |
 | elena_sin_ordenar | Group by sin Sort rows (D5) | graded | **5,5** | 10 filas contra 4; claves repetidas Café ×4, Té ×3, Medialuna ×2; pista del Sort rows |
 | fede_bucle | Hop circular (D2) | timeout | **2,0** | Solo los puntos de reglas (ver compuertas, §5) |
 | gabi_renombra (extra) | `importe_medio` → `promedio` | graded | 9,7 | «La columna importe_medio no está, pero promedio tiene los mismos valores: ¿la renombraste?» |
-| hugo_decimal (extra) | `<decimal/>` vacío (D3) | graded | 6,0 | «Algunos importes salen multiplicados por 100: declarale el símbolo decimal» |
+| hugo_decimal (extra) | `<decimal/>` vacío (D3) | graded | 6,0 | «Algunos importes salen multiplicados por 100: declara el símbolo decimal» |
 
 **No probado [NP]:** jobs `.kjb`; pack en `.zip` o `.json` único; nada en Spoon (UI, classpath de la
 hija desde Spoon); las tools MCP; `.xlsx`; comparación sin clave (todas las pruebas usaron clave),
@@ -175,6 +175,11 @@ Todo pasa en la hija, también el análisis estático (calcular campos puede toc
    - **Salidas a archivo**: `file/name` de Text file output [P] y de Excel output, Excel writer, JSON y
      XML output [B] → `${…}/salida/<nombre base>`; si dos chocan, sufijo `_<step>`. **`fileNameInField=Y`
      bloquea** (`unexpected_output`): escribiría donde diga un campo, hasta `output_dir/<alumno>.json`.
+     Lo que Kettle agrega al nombre al correr (`buildFilename`) tampoco puede sacar la salida de `salida/`:
+     la `extention` queda fija y ya sustituida, y sin extensión si no es solo letras, números, `_` o `-`;
+     un `date_time_format` cuya fecha formateada tenga `/` o `\` se vacía (Kettle usa entonces
+     add_date/add_time), y un id de partición con separador pasa a su versión limpia. Cada cambio deja una
+     nota en `redirections`.
    - **Conexiones** [P]: con captura `query`, toda conexión SQLite pasa a `db/<plantilla>`. Una de otro
      tipo bloquea el caso **solo si un step la nombra**; las que no usa nadie se sacan con una nota (P15).
    - **Entradas inesperadas** [NP, **obligatorio**]: toda lectura no redirigida que, con variables
@@ -283,7 +288,7 @@ el JSON y se deduplican entre casos.
 | Columna que falta / otra que sobra con los mismos valores | renombre |
 | Números con coma decimal (aceptados) | aviso sin descuento, salvo `strict_format` [NP] |
 | Claves con `�` o mojibake (`CafÃ©`) | declarar `UTF-8` en el step de salida (P17) [NP] |
-| Step bloqueado / lectura fuera del pack | «no está permitido en este ejercicio» / «leé los datos del enunciado» |
+| Step bloqueado / lectura fuera del pack | «no está permitido en este ejercicio» / «lee solo los datos del ejercicio» |
 | `hasLoop` / nombres repetidos | D2 / D1, sin ejecutar [NP] |
 | Merge join con claves perdidas | D6: ordenar las dos entradas [NP] |
 
@@ -324,6 +329,11 @@ el que tiene todos sus hops deshabilitados.
   y `output_too_big`. `-Djava.io.tmpdir` = `tmp/` del worker: los temporales de Sort rows se cuentan.
 - **SQLite del pack**: `ATTACH DATABASE` y `VACUUM INTO` crean archivos en cualquier ruta; con
   ExecSQL/ExecSQLRow/TableInput habilitados se rechaza el SQL que los use (o `load_extension`) [NP].
+  El sandbox lo mira también con las variables sustituidas (`${A}ACH` con `A=ATT` en un parámetro →
+  `forbidden_sql`), y la copia que corre no lleva el SQL al conectar (`SQL_CONNECT`), igual que la de
+  análisis. Lo que no se puede mirar antes: el SQL que Execute row SQL y Dynamic SQL row arman con los
+  datos de la fila (solo aviso `dynamic_sql`); el sqlite-jdbc 3.27 de PDI 9.4 no tiene `limit_attached`
+  para cortarlo en el motor.
 - **Casos ocultos** contra la salida dibujada (un Data grid con las 4 filas pasa el visible y no el
   oculto); `must_use` exige el step conectado; `salida/` se borra apenas se captura.
 - **Zip slip y bombas**: cada entrada del zip (pack o entrega) queda dentro de la carpeta destino, con
@@ -351,6 +361,17 @@ propio; las que ejecutan lanzan workers y nunca abren diálogos. `document` se r
 y el modo confianza solo se activa en la UI.
 
 ## 9. En Spoon
+
+**Estado (C8, 21-oct-2026).** Hecho con el **plan B**: Informes 0.5.0 sigue sin pestañas, así que el corrector
+es la perspectiva `pentaho-live-grader` (`GraderSpoonPlugin` + `GraderPerspective`, sin `classLoaderGroup`,
+`PENTAHO_LIVE_GRADER=off` la apaga), con `PanelCorrector` y `AsistentePack` en la raíz del paquete. «Ajustar
+nota» es un campo del detalle y no una celda editable; «Volver a corregir con…» es `CorrectorLote.recorregir`.
+Quedan pendientes el menú por overlay XUL y la pestaña «Corrección» en `TransGraph.extraViewTabFolder`.
+
+**Estado (C10, 21-oct-2026).** Fusionado con `feat/0.6.0` (Informes 0.5.1 y linter): las devoluciones de
+`grade_exercise` salen también en Word y Excel (`report_formats`: `docx`, `xlsx`), por el mismo
+`InformeServicio.exportar`. Las pistas en español están en tú (sin voseo). Las pruebas de ventanas del corrector
+abren su Shell fuera de la pantalla y capturan con `Control.print(GC)`, como `PruebaPanelSwt`.
 
 **Dónde.** Una pestaña **Corrector** en la perspectiva de Informes. Hoy **no hay dónde**: su panel
 0.5.0 es un `GridLayout` con un `SashForm` (§5.1 de su diseño), sin pestañas. Hace falta que el dueño de
@@ -462,7 +483,7 @@ en el plan B). Textos: `informes/textos/corrector_{en,es,pt}.properties`, área 
 | **C7** | MCP | `CorrectorTools.java` (5 tools); *mod* `McpLifecycleListener.java` (registro + una línea de instrucciones), `PruebaMcpCorrector.java` | Esquemas válidos; `grade_exercise` de punta a punta; sin modo confianza por MCP |
 | **C8** | Spoon | `informes/ui/PanelCorrector.java`, `informes/ui/AsistentePack.java`; plan B `GraderSpoonPlugin.java` + `GraderPerspective.java` | Pestaña en el *harness* SWT de Informes; prueba en Spoon real (Iván) |
 | **C9** | Puente con Informes | `CorreccionAInforme.java` | El resultado de bruno en HTML, HTML liviano (IE11), PDF y PPTX con los renderizadores de Informes |
-| **C10** | Docs y skill | *mod* `README*.md`, `CHANGELOG.md`, `docs/roadmap.md`, `claude/skills/pentaho-etl/SKILL.md`; nuevo `manual/0N-corrector.md` (número al fusionar) y un pack de ejemplo en `manual/ejemplos/`; subir `version` de `claude/.claude-plugin/plugin.json` | Revisión de Iván |
+| **C10** | Docs y skill | *mod* `README*.md`, `CHANGELOG.md`, `docs/roadmap.md`, `claude/skills/pentaho-etl/SKILL.md`; nuevo `manual/07-corrector.md` y el pack de ejemplo `ejemplo/pack-correccion/` con sus entregas de ejemplo (la `version` de `plugin.json` la sube el release) | Revisión de Iván |
 
 **Dependencias:**
 

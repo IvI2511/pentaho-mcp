@@ -1,0 +1,344 @@
+{
+  "format": "pentaho-live-grade-result/1",
+  "pack": "ventas-por-producto",
+  "pack_title": "Ejercicio 3 - Ventas por producto",
+  "student": "bruno_agregado_mal",
+  "file": "bruno_agregado_mal.ktr",
+  "language": "es",
+  "status": "graded",
+  "grade": 6.5,
+  "scale": 10.0,
+  "capture": "file",
+  "trust_mode": false,
+  "extra_allowed_steps": [],
+  "checks": [
+    {
+      "check": "runs",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%, oculto 100%"
+    },
+    {
+      "check": "columns",
+      "points": 2.0,
+      "earned": 2.0,
+      "passed": true,
+      "detail": "visible 100%, oculto 100%"
+    },
+    {
+      "check": "row_count",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "visible 100%, oculto 100%"
+    },
+    {
+      "check": "values",
+      "points": 4.0,
+      "earned": 0.5,
+      "passed": false,
+      "detail": "visible 25%, oculto 0%"
+    },
+    {
+      "check": "rule:usa_group_by",
+      "points": 1.0,
+      "earned": 1.0,
+      "passed": true,
+      "detail": "Usa un Group by (o Memory group by): Found: [Totales por producto]"
+    },
+    {
+      "check": "rule:sin_codigo",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "No usa JavaScript ni Java: OK"
+    },
+    {
+      "check": "rule:max_pasos",
+      "points": 0.5,
+      "earned": 0.5,
+      "passed": true,
+      "detail": "Como mucho 8 steps: 5 steps (max 8)"
+    }
+  ],
+  "blocked_steps": [],
+  "rules": {
+    "usa_group_by": {
+      "label": "Usa un Group by (o Memory group by)",
+      "passed": true,
+      "evaluated": true,
+      "detail": "Found: [Totales por producto]"
+    },
+    "sin_codigo": {
+      "label": "No usa JavaScript ni Java",
+      "passed": true,
+      "evaluated": true,
+      "detail": "OK"
+    },
+    "max_pasos": {
+      "label": "Como mucho 8 steps",
+      "passed": true,
+      "evaluated": true,
+      "detail": "5 steps (max 8)"
+    }
+  },
+  "lint": {},
+  "cases": [
+    {
+      "id": "visible",
+      "hidden": false,
+      "weight": 1.0,
+      "redirections": [
+        "output 'Escribir totales': ${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto -> salida/03_ventas_por_producto"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "finished",
+        "seconds": 0.274,
+        "errors": 0,
+        "output_step": "Escribir totales",
+        "output_step_type": "TextFileOutput",
+        "captured_from": "file salida/03_ventas_por_producto.csv",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Ordenar por producto",
+            "read": 10,
+            "written": 10,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 10,
+            "written": 4,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Escribir totales",
+            "read": 4,
+            "written": 4,
+            "output": 5,
+            "errors": 0
+          }
+        ]
+      },
+      "comparison": {
+        "mode": "key",
+        "key_columns": [
+          "producto"
+        ],
+        "columns": {
+          "expected": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "actual": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "missing": [],
+          "extra": [],
+          "renamed_suggestions": [],
+          "order_differs": false
+        },
+        "rows": {
+          "expected": 4,
+          "actual": 4,
+          "matched": 1,
+          "different": 3,
+          "missing": 0,
+          "extra": 0,
+          "duplicate_keys": 0
+        },
+        "examples": {
+          "different": [
+            {
+              "key": "Café",
+              "column": "importe_medio",
+              "expected": "5.00",
+              "actual": "7.50"
+            },
+            {
+              "key": "Medialuna",
+              "column": "importe_medio",
+              "expected": "10.80",
+              "actual": "14.40"
+            },
+            {
+              "key": "Té",
+              "column": "importe_medio",
+              "expected": "4.80",
+              "actual": "7.20"
+            }
+          ],
+          "missing": [],
+          "extra": [],
+          "duplicate_keys": []
+        },
+        "differences_by_column": {
+          "importe_medio": 3
+        },
+        "columns_score": 1.0,
+        "row_count_ok": true,
+        "values_score": 0.25
+      }
+    },
+    {
+      "id": "oculto",
+      "hidden": true,
+      "weight": 1.0,
+      "redirections": [
+        "output 'Escribir totales': ${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto -> salida/03_ventas_por_producto"
+      ],
+      "warnings": [],
+      "run": {
+        "state": "finished",
+        "seconds": 0.205,
+        "errors": 0,
+        "output_step": "Escribir totales",
+        "output_step_type": "TextFileOutput",
+        "captured_from": "file salida/03_ventas_por_producto.csv",
+        "metrics": [
+          {
+            "step": "Leer ventas",
+            "read": 0,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Calcular importe",
+            "read": 12,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Ordenar por producto",
+            "read": 12,
+            "written": 12,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Totales por producto",
+            "read": 12,
+            "written": 4,
+            "output": 0,
+            "errors": 0
+          },
+          {
+            "step": "Escribir totales",
+            "read": 4,
+            "written": 4,
+            "output": 5,
+            "errors": 0
+          }
+        ]
+      },
+      "comparison": {
+        "mode": "key",
+        "key_columns": [
+          "producto"
+        ],
+        "columns": {
+          "expected": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "actual": [
+            "producto",
+            "unidades",
+            "importe_total",
+            "num_ventas",
+            "importe_medio",
+            "ultima_venta"
+          ],
+          "missing": [],
+          "extra": [],
+          "renamed_suggestions": [],
+          "order_differs": false
+        },
+        "rows": {
+          "expected": 4,
+          "actual": 4,
+          "matched": 0,
+          "different": 4,
+          "missing": 0,
+          "extra": 0,
+          "duplicate_keys": 0
+        },
+        "examples": {
+          "different": [
+            {
+              "key": "Café",
+              "column": "importe_medio",
+              "expected": "7.50",
+              "actual": "12.50"
+            },
+            {
+              "key": "Jugo",
+              "column": "importe_medio",
+              "expected": "7.23",
+              "actual": "12.40"
+            },
+            {
+              "key": "Medialuna",
+              "column": "importe_medio",
+              "expected": "6.60",
+              "actual": "12.00"
+            },
+            {
+              "key": "Tostado",
+              "column": "importe_medio",
+              "expected": "9.50",
+              "actual": "14.25"
+            }
+          ],
+          "missing": [],
+          "extra": [],
+          "duplicate_keys": []
+        },
+        "differences_by_column": {
+          "importe_medio": 4
+        },
+        "columns_score": 1.0,
+        "row_count_ok": true,
+        "values_score": 0.0
+      }
+    }
+  ],
+  "hints": [],
+  "warnings": [],
+  "timing": {
+    "kettle_init_s": 6.214
+  }
+}
