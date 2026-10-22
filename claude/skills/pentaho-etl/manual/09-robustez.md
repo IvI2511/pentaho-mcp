@@ -404,5 +404,11 @@ rejected by CHECK, 1 duplicate dropped (declared), 12 fact rows, keys 1-5 unchan
 | `bad_rows_rejected` | a broken value got through: a missing check (R03) or a lenient conversion (R04) |
 | `encoding` | set the encoding of the input to the file's real one |
 
+| `environment_problem` (verdict `not_run`) | not a robustness failure: the database file or a table it reads or loads does not exist. Run the job that creates it first, or point the test at a prepared copy |
+
 The robustness score uses the same formula as the main one (25 / 8 / 2 per error / warning / info, capped
 per rule) over these rules only; pattern 06 scores 100.
+
+**In reports** (`build_report`, `04-informes.md`) robustness findings live inside the `quality` section,
+next to the other linter findings: there is no separate robustness section. The robustness sub-score and
+the whole family come from `lint_etl robustness=true`.

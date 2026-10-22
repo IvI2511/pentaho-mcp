@@ -139,7 +139,8 @@ canvas. **Robustness** makes a load tolerate dirty data and proves it with broke
     fact not grouped to its key, a lookup that reads a table before its load finishes, a fixed input file.
     `lint_etl` with `robustness: true` adds a separate robustness score and never changes the main one. A
     step can declare a deliberate drop (duplicates, a filter) and is then not flagged. Each finding names
-    the recipe that fixes it.
+    the recipe that fixes it. In reports, robustness findings live inside the «quality» section (there is
+    no separate robustness section).
   - `harden_etl` ("Harden"): a plan of recipes with a text diff for each change, applied as **one Ctrl+Z**.
     `auto` recipes (error hop to a rejects file on loads, conversions and file inputs that read a field
     as a number or date, a reason for each rejected row, wait for the dimension loads before the lookups,
@@ -147,12 +148,18 @@ canvas. **Robustness** makes a load tolerate dirty data and proves it with broke
     parameter, strict conversions, dedupe before a dimension, orphans to rejects) only with their key;
     `manual` ones (safe split, stable surrogate keys, Insert/Update instead of Table output, aggregate to
     the fact's grain) return the steps to follow. `dry_run` (the default) simulates the whole apply on a
-    copy and returns the robustness score before and after.
+    copy and returns the robustness score before and after. The steps it adds go to free space (a lane
+    below their source step, spaced like the canvas layout, clear of other steps, notes and hops) and are
+    named in the document's language, detected from its step names and notes (Spanish: «Limpiar motivo
+    …», «Escribir rechazos …»); `language` overrides it.
   - `stress_test`: generates broken variants of the file inputs (missing fields, bad dates and numbers,
     duplicates, truncated lines, too long text, out of range numbers, empty file, header only...), runs a
     copy of the transformation on each one in a separate sandboxed JVM, and checks that it does not abort,
     that every row read is loaded, rejected with a reason or dropped on purpose, and, on a SQLite or H2
-    database, that a re-run duplicates nothing and keeps the keys. It never connects to other databases
+    database, that a re-run duplicates nothing and keeps the keys. If the run stops because the database
+    file or a table it reads or loads does not exist, it reports an `environment_problem` (run the job
+    that creates it first, or point the test at a prepared copy) and verdict `not_run`, not a robustness
+    failure. It never connects to other databases
     (`not_run`, and `export_variants` writes the broken files to try by hand), never writes next to the
     original files, switches off database logging in the copies, and does not run steps that leave the
     machine or write where it cannot redirect them (HTTP, mail, SFTP, message queues, other output

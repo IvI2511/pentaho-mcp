@@ -56,7 +56,8 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
   Ctrl+Z) y `stress_test` (variantes sucias de las entradas en una JVM hija aislada, balance de filas,
   re-ejecución sobre SQLite). Falta: el diálogo «Robustecer…» en Spoon, las recetas
   manuales con aplicación (claves estables, Insert/Update, agregar al grano, partir sin fallar), seguir
-  los renombres para deducir los obligatorios y la sección de robustez de los Informes. Diseño:
+  los renombres para deducir los obligatorios. En los Informes, los hallazgos de robustez van dentro de la
+  sección «calidad» (no hay una sección de robustez aparte). Diseño:
   `docs/robustez-diseno.md`.
 - **Corrector de ejercicios** — **hecho** (21-oct-2026, rama `feat/corrector`, sin publicar). El docente arma
   un pack desde su solución (enunciado, datos de un caso visible y de uno oculto, salida esperada, reglas y

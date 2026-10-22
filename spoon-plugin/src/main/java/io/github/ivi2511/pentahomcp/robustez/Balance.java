@@ -2,12 +2,15 @@ package io.github.ivi2511.pentahomcp.robustez;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -134,9 +137,14 @@ public final class Balance {
 
     /** La corrida abortó: el resumen lo dice en vez de cuadrar filas. */
     public boolean abortada;
+    /** Abortó por el entorno (falta la BD o una tabla), no por una fila: el motivo; si no, null. */
+    public String entorno;
 
     /** «31 read = 17 loaded + 12 rejected + 2 dropped (declared) + 0 lost». */
     public String resumen() {
+      if ( entorno != null ) {
+        return "not evaluated (environment problem): " + entorno;
+      }
       if ( abortada ) {
         return "aborted after " + leidas + " rows read (" + cargadas + " loaded, " + rechazadas + " rejected before "
           + "the stop)";
@@ -176,6 +184,9 @@ public final class Balance {
           ne.add( s );
         }
       }
+      if ( entorno != null ) {
+        b.put( "environment_problem", entorno );
+      }
       b.put( "summary", resumen() );
       return b;
     }
@@ -188,7 +199,38 @@ public final class Balance {
    */
   public static Informe evaluar( List<Nodo> nodos, Corrida c, Map<String, Integer> lineas, int debenRechazarse,
                                  List<Rechazo> rechazos, Corrida segunda ) {
+    return evaluar( nodos, c, lineas, debenRechazarse, rechazos, segunda, null );
+  }
+
+  /**
+   * Como {@link #evaluar(List, Corrida, Map, int, List, Corrida)}; {@code bdsQueFaltan}: los archivos de BD que no
+   * existían antes de la prueba. Si la corrida abortó porque falta la BD o una tabla, es un problema del entorno: las
+   * comprobaciones quedan not_evaluated (no es una falla de robustez) y el informe lo dice.
+   */
+  public static Informe evaluar( List<Nodo> nodos, Corrida c, Map<String, Integer> lineas, int debenRechazarse,
+                                 List<Rechazo> rechazos, Corrida segunda, Collection<String> bdsQueFaltan ) {
     Informe inf = new Informe();
+    String entorno = problemaDeEntorno( c, bdsQueFaltan );
+    if ( entorno != null ) {
+      inf.abortada = true;
+      inf.entorno = entorno;
+      Comprobacion k = new Comprobacion( "no_abort", EstresResultado.NO_EVALUADA, "environment problem, not a "
+        + "robustness failure: " + entorno );
+      if ( c.mensajeError != null ) {
+        k.detalles.add( "error: " + recortar( c.mensajeError ) );
+      }
+      inf.comprobaciones.add( k );
+      for ( String id : new String[] { "input_complete", "no_silent_loss", "rejects_have_reason",
+        "bad_rows_rejected" } ) {
+        inf.comprobaciones.add( new Comprobacion( id, EstresResultado.NO_EVALUADA, "environment problem: "
+          + entorno ) );
+      }
+      if ( segunda != null ) {
+        inf.comprobaciones.add( new Comprobacion( "idempotent", EstresResultado.NO_EVALUADA, "environment problem: "
+          + entorno ) );
+      }
+      return inf;
+    }
     Map<String, PasoCuenta> cuentas = c.porPaso();
     Map<String, Nodo> porNombre = new LinkedHashMap<String, Nodo>();
     for ( Nodo n : nodos ) {
@@ -378,14 +420,77 @@ public final class Balance {
     return inf;
   }
 
-  /** Veredicto de varias variantes: robust (ninguna falla ni aviso), fragile (alguna). */
+  /**
+   * Veredicto de varias variantes: fragile (alguna falla o aviso), not_run (ninguna, pero alguna no se pudo evaluar por
+   * el entorno: falta la BD o una tabla), robust (el resto).
+   */
   public static String veredicto( List<Informe> informes ) {
+    boolean entorno = false;
     for ( Informe i : informes ) {
       if ( i.cuenta( EstresResultado.FALLA ) > 0 || i.cuenta( EstresResultado.AVISO ) > 0 ) {
         return "fragile";
       }
+      entorno |= i.entorno != null;
     }
-    return "robust";
+    return entorno ? "not_run" : "robust";
+  }
+
+  /** Lo que se pide para arreglar el entorno. */
+  static final String ARREGLO_ENTORNO = ": run the job that creates it first, or point the test at a prepared copy";
+
+  /** Tabla que no existe, por motor: SQLite, H2, MySQL/MariaDB, PostgreSQL, Oracle, SQL Server. */
+  private static final Pattern[] SIN_TABLA = {
+    Pattern.compile( "(?i)no such table:?\\s*([\\w.$\"`\\[\\]]+)" ),
+    Pattern.compile( "(?i)Table \"?([\\w.$]+)\"? not found" ),
+    Pattern.compile( "(?i)Table '([^']+)' doesn't exist" ),
+    Pattern.compile( "(?i)relation \"([^\"]+)\" does not exist" ),
+    Pattern.compile( "(?i)Invalid object name '([^']+)'" ),
+    Pattern.compile( "(?i)ORA-00942()" ) };
+  /** Archivo de BD que no existe o no se puede abrir (SQLite, H2). */
+  private static final Pattern[] SIN_BD = {
+    Pattern.compile( "(?i)path to '([^']+)'[^\\n]*does not exist" ),
+    Pattern.compile( "(?i)Database \"([^\"]+)\" not found" ),
+    Pattern.compile( "(?i)unable to open database file()" ),
+    Pattern.compile( "(?i)SQLITE_CANTOPEN()" ) };
+
+  /**
+   * Si la corrida abortó porque falta la BD o una tabla (no por una fila mala), el motivo para la persona; si no, null.
+   * Mira el mensaje de error y la cola del log de la hija; {@code bdsQueFaltan}: archivos de BD que no existían antes
+   * de la prueba (el motivo los nombra).
+   */
+  public static String problemaDeEntorno( Corrida c, Collection<String> bdsQueFaltan ) {
+    if ( c == null || c.vencida || ( c.terminada && c.errores == 0 ) ) {
+      return null;
+    }
+    String texto = ( c.mensajeError == null ? "" : c.mensajeError ) + "\n" + ( c.colaLog == null ? "" : c.colaLog );
+    String bd = null;
+    for ( Pattern p : SIN_BD ) {
+      Matcher m = p.matcher( texto );
+      if ( m.find() ) {
+        bd = m.group( 1 ).isEmpty() ? "file" : m.group( 1 );
+        break;
+      }
+    }
+    String tabla = null;
+    for ( Pattern p : SIN_TABLA ) {
+      Matcher m = p.matcher( texto );
+      if ( m.find() ) {
+        tabla = m.group( 1 ).replaceAll( "[\"`\\[\\]]", "" );
+        break;
+      }
+    }
+    if ( bd == null && tabla == null ) {
+      return null;
+    }
+    if ( bdsQueFaltan != null && !bdsQueFaltan.isEmpty() ) {
+      return "the database file " + String.join( ", ", bdsQueFaltan ) + " does not exist"
+        + ( tabla != null && !tabla.isEmpty() ? " (so neither does the table " + tabla + ")" : "" ) + ARREGLO_ENTORNO;
+    }
+    if ( bd != null ) {
+      return "the database " + bd + " does not exist" + ARREGLO_ENTORNO;
+    }
+    return "the database or table " + ( tabla.isEmpty() ? "it reads or loads" : tabla ) + " does not exist"
+      + ARREGLO_ENTORNO;
   }
 
   /** ¿La columna parece un motivo de rechazo? */

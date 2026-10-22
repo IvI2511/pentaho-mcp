@@ -283,7 +283,8 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
   **Next ▶**, with a numbered note on the canvas for each step, and the lesson becomes a handout.
 - **Robustness** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): every bad row goes to a rejects
   file with its reason, and broken copies of the inputs prove that no row is lost and a re-run duplicates
-  nothing. Guide: `manual/09-robustez.md`.
+  nothing. In reports, robustness findings live inside the «quality» section (there is no separate
+  robustness section). Guide: `manual/09-robustez.md`.
 
 See [`CHANGELOG.md`](CHANGELOG.md).
 

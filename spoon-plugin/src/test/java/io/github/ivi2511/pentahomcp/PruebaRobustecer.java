@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.pentaho.di.core.NotePadMeta;
 import org.pentaho.di.core.database.DatabaseMeta;
 import org.pentaho.di.core.undo.TransAction;
 import org.pentaho.di.trans.Trans;
@@ -461,7 +462,7 @@ public class PruebaRobustecer {
     Files.write( new File( dir, "ventas.csv" ).toPath(), csv.toString().getBytes( StandardCharsets.UTF_8 ) );
     TransMeta tm = antes( db.getAbsolutePath() );
     tm.setSizeRowset( 3 );
-    RobustecerAnalisis.Pedido p = pedido( "{\"dry_run\":false}" );
+    RobustecerAnalisis.Pedido p = pedido( "{\"dry_run\":false,\"language\":\"en\"}" );
     RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
     Propuesta r11 = propuesta( plan.propuestas, "harden:wait_for_loads:Buscar clave cliente" );
     noNulo( r11, "R11: " + keys( plan.propuestas ) );
@@ -867,5 +868,102 @@ public class PruebaRobustecer {
     }
     contiene( o.path( "next" ).asText(), "confirm=[keys]", "pide confirmar" );
     cierto( o.has( "robustness_before" ), "robustness_before (null hasta que la herramienta lo completa)" );
+  }
+  // ---------------------------------------------------------------- idioma y lugar de los steps nuevos
+
+  /** Sin language: el idioma de los nombres y notas del documento; language manda. */
+  public void pruebaIdiomaDelDocumento() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    igual( "es", RobustecerAnalisis.idiomaDe( tm ), "nombres en español" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, pedido( "{\"recipes\":[\"all\"]}" ) );
+    String todo = diffs( plan );
+    contiene( todo, "Limpiar motivo ventas", "por defecto, en el idioma del documento" );
+    contiene( todo, "Escribir rechazos ventas", "por defecto, en el idioma del documento" );
+    noContiene( todo, "Clean reason", "nada en inglés" );
+    plan = RobustecerAnalisis.analizar( antes( "dw.sqlite" ), pedido( "{\"recipes\":[\"all\"],"
+      + "\"language\":\"en\"}" ) );
+    todo = diffs( plan );
+    contiene( todo, "Clean reason ventas", "language manda" );
+    contiene( todo, "Write rejects ventas", "language manda" );
+
+    TransMeta en = new TransMeta();
+    TransOps.agregarStep( en, "Dummy", "Read sales file", null, 100, 100, null, null, null );
+    TransOps.agregarStep( en, "Dummy", "Filter rows", null, 270, 100, "Read sales file", null, null );
+    igual( "en", RobustecerAnalisis.idiomaDe( en ), "inglés" );
+    TransMeta pt = new TransMeta();
+    TransOps.agregarStep( pt, "Dummy", "Ler vendas", null, 100, 100, null, null, null );
+    TransOps.agregarStep( pt, "Dummy", "Gravar dados da tabela", null, 270, 100, "Ler vendas", null, null );
+    igual( "pt", RobustecerAnalisis.idiomaDe( pt ), "portugués" );
+    TransMeta nota = new TransMeta();
+    TransOps.agregarStep( nota, "Dummy", "X1", null, 100, 100, null, null, null );
+    nulo( RobustecerAnalisis.idiomaDe( nota ), "sin palabras: no se nota" );
+    nota.addNote( new NotePadMeta( "Esta transformación carga las ventas del día", 100, 200, 300, 40 ) );
+    igual( "es", RobustecerAnalisis.idiomaDe( nota ), "por la nota" );
+  }
+
+  private static String diffs( RobustecerAnalisis.Plan plan ) {
+    StringBuilder b = new StringBuilder();
+    for ( Propuesta x : plan.propuestas ) {
+      b.append( x.diff() ).append( '\n' );
+    }
+    return b.toString();
+  }
+
+  /** Ícono de 32 px y el rótulo debajo (estimación propia de la prueba, más chica que la del análisis). */
+  private static int[] cajaPrueba( StepMeta s ) {
+    int w = Math.max( 32, s.getName().length() * 6 );
+    int cx = s.getLocation().x + 16;
+    return new int[] { cx - w / 2, s.getLocation().y, cx + w / 2, s.getLocation().y + 50 };
+  }
+
+  /**
+   * Las colas de rechazo (limpiar -> escribir) van a un sitio libre: un carril debajo de su origen, con los rótulos sin
+   * pisarse, sin caer sobre otros steps, notas ni hops que ya estaban.
+   */
+  public void pruebaColasEnLugarLibre() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    // una nota justo debajo de la conversión, donde caería la cola
+    NotePadMeta nota = new NotePadMeta( "Las filas malas van a rechazos", 230, 290, 230, 50 );
+    tm.addNote( nota );
+    int[] cajaNota = { 230, 290, 460, 340 };
+    List<int[]> hopsAntes = new ArrayList<int[]>();
+    for ( TransHopMeta h : tm.getTransHops() ) {
+      hopsAntes.add( new int[] { h.getFromStep().getLocation().x + 16, h.getFromStep().getLocation().y + 16,
+        h.getToStep().getLocation().x + 16, h.getToStep().getLocation().y + 16 } );
+    }
+    RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"all\"],\"confirm\":[\"all\"],\"dry_run\":false}" );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( RobustecerAnalisis.analizar(
+      tm, p ), p ), UndoGrupo.sinSpoon( tm ), null );
+    igual( "[]", saltados( h ), "nada saltado" );
+    List<StepMeta> cola = new ArrayList<StepMeta>();
+    for ( StepMeta s : tm.getSteps() ) {
+      if ( s.getName().startsWith( "Limpiar motivo " ) || s.getName().startsWith( "Escribir rechazos " ) ) {
+        cola.add( s );
+      }
+    }
+    cierto( cola.size() >= 6, "tres colas en español: " + cola );
+    for ( StepMeta q : cola ) {
+      int[] k = cajaPrueba( q );
+      for ( StepMeta s : tm.getSteps() ) {
+        if ( s != q ) {
+          falso( RobustecerAnalisis.choca( k, cajaPrueba( s ) ), q.getName() + " " + q.getLocation() + " pisa a "
+            + s.getName() + " " + s.getLocation() );
+        }
+      }
+      falso( RobustecerAnalisis.choca( k, cajaNota ), q.getName() + " " + q.getLocation() + " sobre la nota" );
+      for ( int[] sg : hopsAntes ) {
+        falso( RobustecerAnalisis.cruza( sg, k ), q.getName() + " " + q.getLocation() + " sobre el hop "
+          + Arrays.toString( sg ) );
+      }
+    }
+    StepMeta l = tm.findStep( "Limpiar motivo ventas" );
+    StepMeta e = tm.findStep( "Escribir rechazos ventas" );
+    noNulo( l, "la primera cola" );
+    noNulo( e, "la primera cola" );
+    igual( l.getLocation().y, e.getLocation().y, "limpiar y escribir en el mismo carril" );
+    cierto( e.getLocation().x - l.getLocation().x >= TransLayout.DX, "separados como la grilla: " + l.getLocation()
+      + " " + e.getLocation() );
+    cierto( RobustecerAnalisis.cruza( new int[] { 0, 0, 100, 100 }, new int[] { 40, 40, 60, 60 } ), "cruza: diagonal" );
+    falso( RobustecerAnalisis.cruza( new int[] { 0, 0, 100, 0 }, new int[] { 40, 10, 60, 60 } ), "cruza: por fuera" );
   }
 }

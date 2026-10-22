@@ -563,6 +563,9 @@ perdidas**». `verdict`: `robust` (ninguna E ni W), `fragile` (alguna), `not_run
 
 ### 5.5 Informes
 
+> **Estado en la 0.6.0:** esta sección no se construyó. En los informes, los hallazgos de robustez van dentro
+> de la sección `quality` (no hay una sección de robustez aparte); lo que sigue queda como diseño.
+
 Sección `robustness` (después de `quality`; id nuevo en `SeccionId`, títulos en `secciones_*`): bloque
 **Indicadores** (sub-puntaje de robustez, veredicto de la última prueba, filas perdidas, rechazos sin
 motivo), **Tabla** de comprobaciones por variante y **Tabla** de recetas sugeridas. Las reglas corren
@@ -647,7 +650,8 @@ Si no da el tiempo, queda fuera de la 0.6.0: todo se puede hacer por MCP.
   las dos hijas se unifiquen.
 - **Modo clase**: una lección «Robustecer» puede mostrar el plan de `harden_etl` como notas y aplicar
   receta por receta (`steps`); no hay contrato nuevo.
-- **Informes**: §5.5. `quality` no muestra la familia (la muestra `robustness`).
+- **Informes**: §5.5 (no construida en la 0.6.0: los hallazgos de robustez van dentro de `quality`, sin
+  sección aparte).
 
 ## 9. Riesgos y preguntas abiertas
 

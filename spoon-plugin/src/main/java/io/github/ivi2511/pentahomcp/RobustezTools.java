@@ -16,6 +16,7 @@ import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.ui.spoon.Spoon;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
+import io.github.ivi2511.pentahomcp.informes.tema.Ajustes;
 import io.github.ivi2511.pentahomcp.lint.LintMotor;
 import io.github.ivi2511.pentahomcp.lint.Opciones;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
@@ -66,8 +67,10 @@ final class RobustezTools {
         .strList( "confirm", "Keys of confirm proposals the person accepted (or [\"all\"]): only these are applied",
           false )
         .bool( "dry_run", "Only return the plan and what would be applied; change nothing (default true)", false )
-        .strEnum( "language", "Language of the names of the steps it creates and of the reasons in the rejects "
-          + "(default en)", false, "en", "es", "pt" ).build(),
+        .strEnum( "language", "Language of the names of the steps it creates and of the reasons in the rejects. "
+          + "Default: the document's language, detected from its step names and notes (Spanish names give "
+          + "'Limpiar motivo ...', 'Escribir rechazos ...'); if it cannot tell, the Reports language", false, "en",
+          "es", "pt" ).build(),
       a -> robustecer( a ) ) );
   }
 
@@ -109,8 +112,8 @@ final class RobustezTools {
       }
     }
     p.ensayo = Tools.optBool( a, "dry_run", true );
-    p.lang = Tools.optStr( a, "language", "en" );
-    if ( !"en".equals( p.lang ) && !"es".equals( p.lang ) && !"pt".equals( p.lang ) ) {
+    p.lang = Tools.optStr( a, "language", null );
+    if ( p.lang != null && !"en".equals( p.lang ) && !"es".equals( p.lang ) && !"pt".equals( p.lang ) ) {
       throw new ToolError( "'language' must be en, es or pt, got: " + p.lang );
     }
     return p;
@@ -185,6 +188,16 @@ final class RobustezTools {
     return m;
   }
 
+  /** El idioma de los informes (sus ajustes, si no el de Spoon): para un documento cuyo idioma no se nota. */
+  static String idiomaInformes() {
+    try {
+      String l = ReportTools.idiomaPorDefecto( Ajustes.cargar() );
+      return "es".equals( l ) || "pt".equals( l ) ? l : "en";
+    } catch ( Throwable t ) {
+      return "en";
+    }
+  }
+
   /** harden_etl. */
   static Object robustecer( JsonNode a ) throws Exception {
     final RobustecerAnalisis.Pedido p = pedido( a );
@@ -204,6 +217,10 @@ final class RobustezTools {
     final TransMeta clon = (TransMeta) copia[ 1 ];
     final int huella = (Integer) copia[ 2 ];
     final boolean sinGuardar = (Boolean) copia[ 3 ];
+    if ( p.lang == null ) {
+      String d = RobustecerAnalisis.idiomaDe( clon );
+      p.lang = d != null ? d : idiomaInformes();
+    }
     final ObjectNode antes = RunMotor.enSegundoPlano( () -> puntaje( clon, p.lang, sinGuardar ), MS_ANALISIS, null,
       "The lint" );
     final RobustecerAnalisis.Plan plan = RunMotor.enSegundoPlano( () -> RobustecerAnalisis.analizar( clon, p ),
@@ -239,6 +256,7 @@ final class RobustezTools {
       } );
     }
     ObjectNode o = respuesta( id, plan, p, elegidas, h );
+    o.put( "language", p.lang );
     if ( antes != null ) {
       o.set( "robustness_before", antes );
     }

@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.pentaho.di.core.NotePadMeta;
+import org.pentaho.di.core.gui.Point;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.core.row.value.ValueMetaString;
@@ -86,7 +88,8 @@ final class RobustecerAnalisis {
     Set<String> confirmar = new HashSet<String>();
     boolean confirmarTodo;
     boolean ensayo = true;
-    String lang = "en";
+    /** null = el idioma del documento (sus nombres de steps y notas); si no se nota, en. */
+    String lang;
 
     boolean pideReceta( String id ) {
       if ( todas ) {
@@ -123,13 +126,32 @@ final class RobustecerAnalisis {
   private final Map<String, Integer> flujosUsados = new HashMap<String, Integer>();
   private final Set<String> tomados = new HashSet<String>();
   private final List<int[]> ocupados = new ArrayList<int[]>();
+  /** Lo que ya ocupa el lienzo: cajas {x1, y1, x2, y2} (steps con su rótulo, notas, steps nuevos de las colas). */
+  private final List<int[]> cajas = new ArrayList<int[]>();
+  /** Las cajas de los steps nuevos de las colas (los demás steps nuevos las esquivan). */
+  private final List<int[]> cajasCola = new ArrayList<int[]>();
+  /** Los hops del lienzo: segmentos {x1, y1, x2, y2} de centro a centro. */
+  private final List<int[]> segmentos = new ArrayList<int[]>();
+  private final String lang;
 
   private RobustecerAnalisis( TransMeta tm, Pedido p ) {
     this.tm = tm;
     this.p = p;
+    String d = p.lang != null ? p.lang : idiomaDe( tm );
+    this.lang = d == null ? "en" : d;
     for ( StepMeta s : tm.getSteps() ) {
       tomados.add( s.getName().toLowerCase( Locale.ROOT ) );
       ocupados.add( new int[] { s.getLocation().x, s.getLocation().y } );
+      cajas.add( caja( s.getLocation().x, s.getLocation().y, s.getName() ) );
+    }
+    for ( NotePadMeta n : tm.getNotes() ) {
+      cajas.add( cajaNota( n ) );
+    }
+    for ( TransHopMeta h : tm.getTransHops() ) {
+      if ( h.getFromStep() != null && h.getToStep() != null ) {
+        segmentos.add( new int[] { h.getFromStep().getLocation().x + ICONO / 2, h.getFromStep().getLocation().y
+          + ICONO / 2, h.getToStep().getLocation().x + ICONO / 2, h.getToStep().getLocation().y + ICONO / 2 } );
+      }
     }
   }
 
@@ -335,7 +357,7 @@ final class RobustecerAnalisis {
   // ---------------------------------------------------------------- nombres y posiciones
 
   private String t( String en, String es, String pt ) {
-    return "es".equals( p.lang ) ? es : "pt".equals( p.lang ) ? pt : en;
+    return "es".equals( lang ) ? es : "pt".equals( lang ) ? pt : en;
   }
 
   private String unico( String nombre ) {
@@ -360,7 +382,249 @@ final class RobustecerAnalisis {
         return true;
       }
     }
+    int[] k = caja( r[ 0 ], r[ 1 ], null );
+    for ( int[] c : cajasCola ) {
+      if ( choca( k, c ) ) {
+        return true;
+      }
+    }
     return false;
+  }
+
+  // ---------------------------------------------------------------- geometría del lienzo (como lo dibuja Spoon)
+
+  /** Lado del ícono de un step en Spoon. */
+  static final int ICONO = 32;
+  /** Ancho medio de un carácter del rótulo (la fuente por defecto de Spoon). */
+  static final int PX_LETRA = 7;
+  private static final int MARGEN = 8;
+
+  /** El ancho del rótulo de un step (centrado bajo el ícono); sin nombre, uno típico. */
+  static int anchoRotulo( String nombre ) {
+    return nombre == null ? 140 : Math.max( ICONO, nombre.length() * PX_LETRA );
+  }
+
+  /** La caja de un step en (x, y): el ícono y su rótulo debajo, con un margen. */
+  static int[] caja( int x, int y, String nombre ) {
+    int cx = x + ICONO / 2;
+    int w = anchoRotulo( nombre );
+    return new int[] { cx - w / 2 - MARGEN, y - MARGEN, cx + w / 2 + MARGEN, y + ICONO + 22 + MARGEN };
+  }
+
+  private static int[] cajaNota( NotePadMeta n ) {
+    int w = n.getWidth();
+    int h = n.getHeight();
+    if ( w <= 0 || h <= 0 ) {
+      String[] lineas = ( n.getNote() == null ? "" : n.getNote() ).split( "\\r?\\n" );
+      int largo = 0;
+      for ( String l : lineas ) {
+        largo = Math.max( largo, l.length() );
+      }
+      w = Math.max( w, largo * PX_LETRA + 20 );
+      h = Math.max( h, lineas.length * 16 + 20 );
+    }
+    Point q = n.getLocation();
+    return new int[] { q.x - MARGEN, q.y - MARGEN, q.x + w + MARGEN, q.y + h + MARGEN };
+  }
+
+  static boolean choca( int[] a, int[] b ) {
+    return a[ 0 ] < b[ 2 ] && b[ 0 ] < a[ 2 ] && a[ 1 ] < b[ 3 ] && b[ 1 ] < a[ 3 ];
+  }
+
+  /** ¿El segmento {x1, y1, x2, y2} toca la caja? (recorte de Liang-Barsky) */
+  static boolean cruza( int[] s, int[] k ) {
+    double x0 = s[ 0 ];
+    double y0 = s[ 1 ];
+    double dx = s[ 2 ] - x0;
+    double dy = s[ 3 ] - y0;
+    double t0 = 0;
+    double t1 = 1;
+    double[] pp = { -dx, dx, -dy, dy };
+    double[] qq = { x0 - k[ 0 ], k[ 2 ] - x0, y0 - k[ 1 ], k[ 3 ] - y0 };
+    for ( int i = 0; i < 4; i++ ) {
+      if ( pp[ i ] == 0 ) {
+        if ( qq[ i ] < 0 ) {
+          return false;
+        }
+      } else {
+        double r = qq[ i ] / pp[ i ];
+        if ( pp[ i ] < 0 ) {
+          t0 = Math.max( t0, r );
+        } else {
+          t1 = Math.min( t1, r );
+        }
+        if ( t0 > t1 ) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private boolean libreDeTodo( int[] k ) {
+    for ( int[] c : cajas ) {
+      if ( choca( k, c ) ) {
+        return false;
+      }
+    }
+    for ( int[] o : ocupados ) {
+      if ( choca( k, caja( o[ 0 ], o[ 1 ], null ) ) ) {
+        return false;
+      }
+    }
+    for ( int[] sg : segmentos ) {
+      if ( cruza( sg, k ) ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** ¿El hop de 'a' a 'b' (de centro a centro) pasa por encima de algo que no sean sus dos steps? */
+  private boolean hopLibre( int[] a, int[] b, int[] cajaA, int[] cajaB ) {
+    int[] sg = { a[ 0 ] + ICONO / 2, a[ 1 ] + ICONO / 2, b[ 0 ] + ICONO / 2, b[ 1 ] + ICONO / 2 };
+    for ( int[] c : cajas ) {
+      if ( !Arrays.equals( c, cajaA ) && !Arrays.equals( c, cajaB ) && cruza( sg, c ) ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * El lugar de los dos steps de una cola (limpiar → escribir): un carril debajo de su step de origen, separados como
+   * la grilla de TransLayout y lo justo para que sus rótulos no se pisen, sin tocar steps, notas ni hops; si debajo no
+   * hay sitio, más abajo o a los lados, y como último recurso debajo de todo.
+   */
+  private int[][] carril( StepMeta ancla, String limpiar, String escribir ) {
+    int ax = ancla.getLocation().x;
+    int ay = ancla.getLocation().y;
+    int[] cajaAncla = caja( ax, ay, ancla.getName() );
+    int dx = Math.max( TransLayout.DX, ( anchoRotulo( limpiar ) + anchoRotulo( escribir ) ) / 2 + 2 * MARGEN + 16 );
+    int[] corrimientos = { 0, TransLayout.DX, -TransLayout.DX, 2 * TransLayout.DX, -2 * TransLayout.DX };
+    for ( int k = 1; k <= 25; k++ ) {
+      int y = ay + k * TransLayout.DY;
+      for ( int c : corrimientos ) {
+        int x1 = ax + c;
+        if ( x1 + ICONO / 2 - anchoRotulo( limpiar ) / 2 < 0 ) {
+          continue;
+        }
+        int[] p1 = { x1, y };
+        int[] p2 = { x1 + dx, y };
+        int[] k1 = caja( p1[ 0 ], p1[ 1 ], limpiar );
+        int[] k2 = caja( p2[ 0 ], p2[ 1 ], escribir );
+        if ( libreDeTodo( k1 ) && libreDeTodo( k2 ) && hopLibre( new int[] { ax, ay }, p1, cajaAncla, k1 ) ) {
+          return ocupar( p1, p2, k1, k2, ax, ay );
+        }
+      }
+    }
+    int fondo = ay;
+    for ( int[] c : cajas ) {
+      fondo = Math.max( fondo, c[ 3 ] );
+    }
+    int[] p1 = { Math.max( 32, ax ), fondo + TransLayout.DY / 2 };
+    int[] p2 = { p1[ 0 ] + dx, p1[ 1 ] };
+    return ocupar( p1, p2, caja( p1[ 0 ], p1[ 1 ], limpiar ), caja( p2[ 0 ], p2[ 1 ], escribir ), ax, ay );
+  }
+
+  private int[][] ocupar( int[] p1, int[] p2, int[] k1, int[] k2, int ax, int ay ) {
+    cajas.add( k1 );
+    cajas.add( k2 );
+    cajasCola.add( k1 );
+    cajasCola.add( k2 );
+    ocupados.add( p1 );
+    ocupados.add( p2 );
+    segmentos.add( new int[] { ax + ICONO / 2, ay + ICONO / 2, p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2 } );
+    segmentos.add( new int[] { p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2, p2[ 0 ] + ICONO / 2, p2[ 1 ] + ICONO / 2 } );
+    return new int[][] { p1, p2 };
+  }
+
+  // ---------------------------------------------------------------- el idioma del documento
+
+  private static final Set<String> PALABRAS_ES = new HashSet<String>( Arrays.asList( "leer", "escribir", "filtrar",
+    "limpiar", "ordenar", "agrupar", "cargar", "carga", "unir", "insertar", "actualizar", "seleccionar", "datos",
+    "ventas", "clientes", "cliente", "productos", "producto", "salida", "tabla", "fichero", "archivo", "fecha", "del",
+    "la", "las", "los", "el", "por", "con", "y", "sin", "rechazos", "nuevo", "generar", "quitar", "repetidos",
+    "hechos", "dimension", "dimensión", "convertir", "clave", "obligatorios", "filas", "año", "día", "ciudad",
+    "nombre", "importe", "sumar", "una", "transformación", "transformacion", "paso", "pasos", "nota" ) );
+  private static final Set<String> PALABRAS_PT = new HashSet<String>( Arrays.asList( "ler", "gravar", "limpar",
+    "dados", "vendas", "produtos", "arquivo", "tabela", "da", "do", "dos", "das", "e", "não", "nao", "saída",
+    "carregar", "juntar", "inserir", "atualizar", "selecionar", "rejeitados", "novo", "gerar", "remover", "fatos",
+    "dimensão", "converter", "chave", "obrigatórios", "linhas", "mês", "cidade", "nome", "somar", "uma", "um",
+    "transformação", "passo", "em", "no", "na", "ao" ) );
+  private static final Set<String> PALABRAS_EN = new HashSet<String>( Arrays.asList( "read", "write", "filter",
+    "clean", "sort", "group", "load", "calculate", "join", "lookup", "insert", "update", "select", "values", "data",
+    "sales", "customers", "customer", "products", "product", "input", "output", "table", "file", "date", "the", "of",
+    "by", "with", "and", "without", "rejects", "reason", "new", "orders", "generate", "remove", "duplicates", "fact",
+    "facts", "dimension", "convert", "types", "key", "fields", "required", "rows", "row", "year", "month", "day",
+    "text", "city", "name", "amount", "sum", "count", "wait", "for", "to", "from", "is", "add", "get", "set", "step",
+    "transformation" ) );
+
+  /**
+   * El idioma del documento por sus nombres de steps y sus notas: es, pt o en; null si no se nota (sin texto o en
+   * empate). Las palabras propias de cada idioma suman; ñ, «ción», ¿ y ¡ son de español; ã, õ y ç, de portugués.
+   */
+  static String idiomaDe( TransMeta tm ) {
+    StringBuilder b = new StringBuilder();
+    for ( StepMeta s : tm.getSteps() ) {
+      b.append( s.getName() ).append( '\n' );
+    }
+    for ( NotePadMeta n : tm.getNotes() ) {
+      b.append( n.getNote() ).append( '\n' );
+    }
+    String texto = b.toString().toLowerCase( Locale.ROOT );
+    int es = 0;
+    int pt = 0;
+    int en = 0;
+    for ( String w : texto.split( "[^\\p{L}]+" ) ) {
+      if ( w.isEmpty() ) {
+        continue;
+      }
+      boolean e = PALABRAS_ES.contains( w );
+      boolean p = PALABRAS_PT.contains( w );
+      if ( e && !p ) {
+        es += 2;
+      } else if ( p && !e ) {
+        pt += 2;
+      } else if ( e ) {
+        es++;
+        pt++;
+      }
+      if ( PALABRAS_EN.contains( w ) ) {
+        en += 2;
+      }
+      if ( w.indexOf( 'ñ' ) >= 0 || w.endsWith( "ción" ) || w.endsWith( "ciones" ) ) {
+        es += 2;
+      }
+      if ( w.indexOf( 'ã' ) >= 0 || w.indexOf( 'õ' ) >= 0 || w.indexOf( 'ç' ) >= 0 ) {
+        pt += 2;
+      }
+    }
+    es += 2 * ( contar( texto, '¿' ) + contar( texto, '¡' ) );
+    int max = Math.max( es, Math.max( pt, en ) );
+    if ( max == 0 ) {
+      return null;
+    }
+    if ( es == max && pt < max && en < max ) {
+      return "es";
+    }
+    if ( pt == max && es < max && en < max ) {
+      return "pt";
+    }
+    if ( en == max && es < max && pt < max ) {
+      return "en";
+    }
+    return null;
+  }
+
+  private static int contar( String s, char c ) {
+    int n = 0;
+    for ( int i = 0; i < s.length(); i++ ) {
+      if ( s.charAt( i ) == c ) {
+        n++;
+      }
+    }
+    return n;
   }
 
   /** El nombre del flujo: el archivo que lee la entrada (sin extensión) o su nombre, en minúsculas sin tildes. */
@@ -426,8 +690,9 @@ final class RobustecerAnalisis {
     String archivo = n == null ? fl : fl + "_" + ( n + 1 );
     c.limpiar = unico( t( "Clean reason ", "Limpiar motivo ", "Limpar motivo " ) + archivo );
     c.escribir = unico( t( "Write rejects ", "Escribir rechazos ", "Gravar rejeitados " ) + archivo );
-    int[] pl = libre( ancla.getLocation().x, ancla.getLocation().y + 120 );
-    int[] pe = libre( pl[ 0 ] + 160, pl[ 1 ] );
+    int[][] lugar = carril( ancla, c.limpiar, c.escribir );
+    int[] pl = lugar[ 0 ];
+    int[] pe = lugar[ 1 ];
 
     StringBuilder r = new StringBuilder( "<fields>" );
     r.append( regla( MOTIVO, "^\\s+|\\s+$", "" ) ).append( regla( MOTIVO, "\\s*[\\r\\n]+\\s*", " | " ) )

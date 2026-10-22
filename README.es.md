@@ -294,7 +294,8 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   clic en **Siguiente ▶**, con una nota numerada en el lienzo por step, y la lección se convierte en apuntes.
 - **Robustez** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): cada fila mala va a un archivo de
   rechazos con su motivo, y copias rotas de las entradas demuestran que no se pierde ninguna fila y que
-  volver a correr la carga no duplica nada. Guía: `manual/09-robustez.md`.
+  volver a correr la carga no duplica nada. En los informes, los hallazgos de robustez van dentro de la
+  sección «calidad» (`quality`): no hay una sección de robustez aparte. Guía: `manual/09-robustez.md`.
 
 Detalle en [`CHANGELOG.md`](CHANGELOG.md).
 

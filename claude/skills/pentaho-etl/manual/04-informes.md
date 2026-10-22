@@ -84,7 +84,7 @@ Pass `sections` only to leave things out or to add `profile`.
 | `lineage`, `dictionary` | transformation | computes the fields of every step; database steps may connect |
 | `target_model` | transformation with Table output or Insert/Update | none; with `query_database=true` it connects to read primary and foreign keys (read-only) |
 | `validation` | both | runs Spoon's check; database steps may connect |
-| `quality` | both | the `lint_etl` score and findings (`06-calidad.md` §9); computes fields like `lineage`. With `quality_deep: true` it also reads up to 5000 rows of the sources through read-only previews (never writes) |
+| `quality` | both | the `lint_etl` score and findings (`06-calidad.md` §9), robustness findings included: there is no separate robustness section (`09-robustez.md`); computes fields like `lineage`. With `quality_deep: true` it also reads up to 5000 rows of the sources through read-only previews (never writes) |
 | `metrics` | both | `last_run` (default) reads the last run made in Spoon; nothing if it never ran |
 | `profile` | transformation | **runs a copy** up to the step(s) in `profile_steps` (up to 10, one run; `profile_step` for one), reading `profile_rows` rows (default 5000) |
 | `narrative` | both | only if you pass `narrative.conclusions` |

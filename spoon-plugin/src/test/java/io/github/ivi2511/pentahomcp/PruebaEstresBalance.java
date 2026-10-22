@@ -155,6 +155,48 @@ public class PruebaEstresBalance {
     igual( EstresResultado.AVISO, estado( i2, "input_complete" ), "la entrada se comió 2 líneas" );
   }
 
+  /** Falta la tabla o la BD: es el entorno, no una fila mala; no cuenta como falla de robustez. */
+  public void pruebaAbortoPorEntornoNoEsFalla() throws Exception {
+    Corrida c = corrida( false, new Object[] { "Read", "CsvInput", 0, 0, 0 }, new Object[] { "Check", "FilterRows", 0,
+      0, 0 }, new Object[] { "Write", "TextFileOutput", 0, 0, 0, 0, 1 } );
+    c.mensajeError = "Look up customer key - Error looking up row in database | org.sqlite.SQLiteException: "
+      + "[SQLITE_ERROR] SQL error or missing database (no such table: dim_cliente)";
+    Balance.Informe i = Balance.evaluar( lineal( null ), c, Collections.singletonMap( "Read", 10 ), 3, null, c );
+    igual( EstresResultado.NO_EVALUADA, estado( i, "no_abort" ), "no es una falla de robustez" );
+    contiene( i.comprobacion( "no_abort" ).mensaje, "the database or table dim_cliente does not exist: run the job "
+      + "that creates it first, or point the test at a prepared copy", "dice qué falta y qué hacer" );
+    cierto( !i.comprobacion( "no_abort" ).mensaje.contains( "bad row" ), "no culpa a una fila" );
+    igual( EstresResultado.NO_EVALUADA, estado( i, "idempotent" ), "la 2ª corrida tampoco cuenta" );
+    igual( 0, i.cuenta( EstresResultado.FALLA ), "ninguna falla" );
+    igual( 0, i.cuenta( EstresResultado.AVISO ), "ningún aviso" );
+    igual( "not_run", Balance.veredicto( Arrays.asList( i ) ), "veredicto: no se pudo correr" );
+    contiene( i.json( OM ).path( "environment_problem" ).asText(), "dim_cliente", "en el JSON" );
+    contiene( i.resumen(), "environment problem", "el resumen" );
+
+    // el archivo de la BD no existe: lo nombra
+    Corrida c2 = corrida( false, new Object[] { "Read", "CsvInput", 0, 0, 0 } );
+    c2.mensajeError = "Table output - no such table: fact_venta";
+    Balance.Informe i2 = Balance.evaluar( lineal( null ), c2, null, 0, null, null, Arrays.asList(
+      "dw.sqlite (connection dw)" ) );
+    contiene( i2.entorno, "the database file dw.sqlite (connection dw) does not exist", "nombra el archivo" );
+
+    // H2, PostgreSQL y una BD que no se puede abrir
+    c2.mensajeError = "Table \"DIM_CLIENTE\" not found; SQL statement: SELECT 1";
+    contiene( Balance.problemaDeEntorno( c2, null ), "table DIM_CLIENTE does not exist", "H2" );
+    c2.mensajeError = "ERROR: relation \"public.ventas\" does not exist";
+    contiene( Balance.problemaDeEntorno( c2, null ), "table public.ventas does not exist", "PostgreSQL" );
+    c2.mensajeError = "path to 'C:/no/está/dw.sqlite': 'C:\\no\\está' does not exist";
+    contiene( Balance.problemaDeEntorno( c2, null ), "the database C:/no/está/dw.sqlite does not exist", "SQLite" );
+
+    // una fila mala sigue siendo una falla, y una variante frágil manda sobre una de entorno
+    Corrida mala = corrida( false, new Object[] { "Read", "CsvInput", 0, 4, 0 } );
+    Balance.Informe im = Balance.evaluar( lineal( null ), mala, null, 0, null, null );
+    igual( null, im.entorno, "no es el entorno" );
+    igual( EstresResultado.FALLA, estado( im, "no_abort" ), "falla" );
+    contiene( im.comprobacion( "no_abort" ).mensaje, "a bad row stopped the load", "culpa a la fila" );
+    igual( "fragile", Balance.veredicto( Arrays.asList( i, im ) ), "frágil manda" );
+  }
+
   public void pruebaRerunDuplica() throws Exception {
     Corrida c = corrida( true, new Object[] { "Read", "CsvInput", 0, 3, 0 } );
     Corrida c2 = corrida( true, new Object[] { "Read", "CsvInput", 0, 3, 0 } );
