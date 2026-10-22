@@ -71,7 +71,8 @@ undid or deleted something: «Resume» re-plans from what is there), `done`, `st
 
 - **What** = what this step does with *these* data, with a number when there is one («8 customers», «ids 1, 5,
   7 and 8»). **Why** = why it is here, one idea. Short: a step note shows about 6 lines of 220 px; anything
-  longer is cut on the canvas and stays whole in the Lesson tab and the handout.
+  longer is cut on the canvas (the longest paragraph, usually **What**, loses its last lines, so **Why** stays
+  visible) and stays whole in the Lesson tab and the handout.
 - Beginners: simple words and Excel/SQL analogies («a VLOOKUP in memory», «a GROUP BY»). Intermediate: how
   (`<from>`, order, keys) and the alternatives.
 - In a column of the layout with 3 or more steps (many inputs or branches stacked one under another), each step
@@ -99,7 +100,7 @@ undid or deleted something: «Resume» re-plans from what is there), `done`, `st
 | Want | Do |
 |---|---|
 | A clean canvas for the exercise | `lesson_notes action=hide` (the XML of the notes stays inside the `.ktr`: **hiding is not secret**) |
-| The notes back to correct it | `lesson_notes action=show` (does not duplicate if a Ctrl+Z already brought them back) |
+| The notes back to correct it | `lesson_notes action=show` (does not duplicate if a Ctrl+Z already brought them back; a Ctrl+Z of the show hides them again and another show brings them back) |
 | Hand out the exercise without explanations | save a **copy** and `lesson_notes action=remove` on it |
 | A handout (Word, PDF, Markdown…) | `build_report sections=["lesson"] formats=["pdf","docx"] language=es title="…"` |
 | Notes moved after `arrange_canvas` | nothing: with lesson notes, `arrange_canvas` and `build_steps` re-place steps and notes together |

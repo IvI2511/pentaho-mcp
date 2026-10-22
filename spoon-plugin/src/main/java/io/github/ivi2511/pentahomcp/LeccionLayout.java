@@ -889,7 +889,7 @@ final class LeccionLayout {
   private static void medir( Ubicada u, Medidor m, int ancho, boolean negrita, int maxLineas ) {
     List<String> lineas = envolver( m, u.pedida.texto, negrita, ancho - 2 * MARGEN - 2 );
     if ( lineas.size() > maxLineas ) {
-      lineas = recortar( m, lineas, maxLineas, negrita, ancho - 2 * MARGEN - 2 );
+      lineas = recortarParrafos( m, u.pedida.texto, lineas, maxLineas, negrita, ancho - 2 * MARGEN - 2 );
       u.recortada = true;
     }
     u.texto = String.join( "\n", lineas );
@@ -954,15 +954,63 @@ final class LeccionLayout {
     return entra;
   }
 
+  /**
+   * Corte a maxLineas sin perder ningun parrafo (la cabecera, «Qué:», «Por qué:»): quita lineas del final del
+   * parrafo mas largo (el primero si empatan) hasta que entre y termina cada parrafo cortado en "...". Antes se
+   * cortaba por abajo y el «Por qué» de casi todas las notas de paso quedaba fuera del lienzo. Con mas parrafos que
+   * lineas, las primeras maxLineas.
+   */
+  private static List<String> recortarParrafos( Medidor m, String texto, List<String> lineas, int maxLineas,
+    boolean negrita, int ancho ) {
+    String t = texto == null ? "" : texto.replace( "\r\n", "\n" ).replace( '\r', '\n' );
+    List<List<String>> ps = new ArrayList<List<String>>();
+    int total = 0;
+    for ( String parrafo : t.split( "\n" ) ) {
+      List<String> l = envolver( m, parrafo, negrita, ancho );
+      ps.add( l );
+      total += l.size();
+    }
+    if ( ps.size() > maxLineas || total <= maxLineas ) {
+      return recortar( m, lineas, maxLineas, negrita, ancho );
+    }
+    boolean[] cortado = new boolean[ ps.size() ];
+    while ( total > maxLineas ) {
+      int mayor = 0;
+      for ( int i = 1; i < ps.size(); i++ ) {
+        if ( ps.get( i ).size() > ps.get( mayor ).size() ) {
+          mayor = i;
+        }
+      }
+      List<String> l = ps.get( mayor );
+      l.remove( l.size() - 1 );
+      cortado[ mayor ] = true;
+      total--;
+    }
+    List<String> r = new ArrayList<String>();
+    for ( int i = 0; i < ps.size(); i++ ) {
+      List<String> l = ps.get( i );
+      if ( cortado[ i ] ) {
+        l.set( l.size() - 1, conPuntos( m, l.get( l.size() - 1 ), negrita, ancho ) );
+      }
+      r.addAll( l );
+    }
+    return r;
+  }
+
   /** Las primeras maxLineas, la ultima terminada en "..." (una sola letra) y que entre en el ancho. */
   private static List<String> recortar( Medidor m, List<String> lineas, int maxLineas, boolean negrita, int ancho ) {
     List<String> r = new ArrayList<String>( lineas.subList( 0, maxLineas ) );
-    String ultima = r.get( maxLineas - 1 ).replaceAll( "\\s+$", "" );
+    r.set( maxLineas - 1, conPuntos( m, r.get( maxLineas - 1 ), negrita, ancho ) );
+    return r;
+  }
+
+  /** La linea terminada en "..." (una sola letra), quitandole letras del final hasta que entre en el ancho. */
+  private static String conPuntos( Medidor m, String linea, boolean negrita, int ancho ) {
+    String ultima = linea.replaceAll( "\\s+$", "" );
     while ( !ultima.isEmpty() && m.texto( ultima + PUNTOS, negrita ).x > ancho ) {
       ultima = ultima.substring( 0, ultima.length() - 1 ).replaceAll( "\\s+$", "" );
     }
-    r.set( maxLineas - 1, ultima + PUNTOS );
-    return r;
+    return ultima + PUNTOS;
   }
 
   // ---------------------------------------------------------------- geometria

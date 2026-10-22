@@ -70,6 +70,12 @@ public class PruebaLeccionNotas {
           tm.removeNote( idx[ i ] );
         }
         break;
+      case TransAction.TYPE_ACTION_CHANGE_NOTE: // como Spoon.undoTransformationAction
+        for ( int i = 0; i < idx.length; i++ ) {
+          tm.removeNote( idx[ i ] );
+          tm.addNote( idx[ i ], (NotePadMeta) ( (NotePadMeta) ta.getPrevious()[ i ] ).clone() );
+        }
+        break;
       default:
         throw new IllegalStateException( "tipo de undo no simulado: " + ta.getType() );
     }
@@ -190,7 +196,18 @@ public class PruebaLeccionNotas {
     igual( 2, s.get( "notes" ).asInt(), "show repone 2" );
     igual( total, re.nrNotes(), "todas de vuelta" );
     igual( 2, lecciones( re ), "reconocidas" );
-    igual( "", re.getAttribute( LeccionNotas.GRUPO, "hidden" ), "hidden vacio" );
+    igual( 0, LeccionNotas.ocultas( re ).size(), "ninguna oculta: todas en el lienzo" );
+    // Ctrl+Z del show: vuelven a estar ocultas (hidden guarda la copia) y otro show las repone
+    deshacer( re );
+    igual( total - 2, re.nrNotes(), "el Ctrl+Z del show las saca" );
+    for ( String[] e : LeccionNotas.listar( re ) ) {
+      igual( "hidden", e[ 3 ], "otra vez oculta" );
+    }
+    igual( 2, correr( re, "show", args( "show" ) ).get( "notes" ).asInt(), "show otra vez" );
+    // remove con todas en el lienzo vacia hidden: la copia para repartir no las lleva escondidas
+    correr( re, "remove", args( "remove" ) );
+    igual( 0, lecciones( re ), "fuera del lienzo" );
+    igual( "", re.getAttribute( LeccionNotas.GRUPO, "hidden" ), "hidden vacio tras remove" );
     // Ctrl+Z del hide en el original: las notas vuelven, pero hidden sigue lleno (los atributos no entran en el undo)
     deshacer( tm );
     igual( total, tm.nrNotes(), "el Ctrl+Z repuso las notas" );
@@ -298,12 +315,25 @@ public class PruebaLeccionNotas {
       "una explicacion bastante larga para que el corte de lineas cambie al agrandar la fuente del proyector" );
     NotePadMeta n = LeccionNotas.reconocer( tm ).keySet().iterator().next();
     String antes = n.getNote();
+    n.setLocation( n.getLocation().x + 333, n.getLocation().y + 333 ); // fuera de su sitio: el restyle la mueve
+    int x0 = n.getLocation().x;
+    int y0 = n.getLocation().y;
+    int fuente0 = n.getFontSize();
+    int idx = tm.indexOfNote( n );
+    tm.clearUndo();
     ObjectNode r = correr( tm, "restyle", args( "restyle" ).put( "font_size", 14 ) );
     igual( 1, lecciones( tm ), "sigue reconocida" );
     igual( 14, n.getFontSize(), "fuente 14" );
     distinto( antes, n.getNote(), "otro corte de lineas" );
     igual( "14", tm.getAttribute( LeccionNotas.GRUPO, "font_size" ), "font_size en el registro" );
     igual( 1, r.get( "notes" ).asInt(), "una nota" );
+    cierto( n.getLocation().x != x0 || n.getLocation().y != y0, "el restyle la volvio a ubicar" );
+    // el Ctrl+Z la devuelve tambien a su sitio (clone() de NotePadMeta comparte el Point de la ubicacion)
+    deshacer( tm );
+    NotePadMeta vuelta = tm.getNote( idx );
+    igual( antes, vuelta.getNote(), "texto de antes" );
+    igual( fuente0, vuelta.getFontSize(), "fuente de antes" );
+    igual( x0 + "," + y0, vuelta.getLocation().x + "," + vuelta.getLocation().y, "en su sitio tras el Ctrl+Z" );
     lanza( ToolError.class, () -> correr( tm, "restyle", args( "restyle" ) ), "restyle sin font_size" );
     lanza( ToolError.class, () -> correr( tm, "restyle", args( "restyle" ).put( "font_size", 99 ) ), "fuera de rango" );
   }

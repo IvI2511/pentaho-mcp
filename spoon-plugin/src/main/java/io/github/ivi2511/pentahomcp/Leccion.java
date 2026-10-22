@@ -125,6 +125,8 @@ final class Leccion {
   Pedida pedidaTitulo;
   String textoTitulo;
   final List<String> avisos = new ArrayList<String>();
+  /** Cuantos de los avisos son del plan (para Claude, en ingles): la pestana solo muestra los que llegan despues. */
+  int avisosDelPlan;
 
   // ---------------------------------------------------------------- estado (monitor de la leccion)
   int posicion;
@@ -431,12 +433,16 @@ final class Leccion {
     return problemas;
   }
 
-  /** Nombre visible de un tipo de step («Stream lookup»), o el id. */
+  /**
+   * Nombre visible de un tipo de step («Stream lookup»), o el id. Sin el parentesis final de algunos («Dummy (do
+   * nothing)» → «Dummy»): la cabecera de la nota ya lo pone entre parentesis.
+   */
   static String nombreTipo( String id ) {
     try {
       PluginInterface p = TransOps.plugin( id );
-      String n = p.getName();
-      return n == null || n.trim().isEmpty() ? id : n.trim();
+      String n = p.getName() == null ? "" : p.getName().trim();
+      String corto = n.replaceAll( "\\s*\\([^()]*\\)$", "" );
+      return n.isEmpty() ? id : corto.isEmpty() ? n : corto;
     } catch ( Exception e ) {
       return id;
     }
@@ -681,6 +687,7 @@ final class Leccion {
         avisos.add( "The preview of '" + p.step + "' runs at step " + k + ", when all its target steps exist." );
       }
     }
+    avisosDelPlan = avisos.size();
   }
 
   /** Los steps que un step nombra como destino (send_true_to, Switch/case...), por nombre. */

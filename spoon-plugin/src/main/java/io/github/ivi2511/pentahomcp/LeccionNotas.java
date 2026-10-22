@@ -554,7 +554,7 @@ final class LeccionNotas {
         r.avisos.add( "Lesson note " + en.k + " is in a dense column (" + ub.banda.json + "): left where it was." );
         continue;
       }
-      NotePadMeta antesN = (NotePadMeta) n.clone();
+      NotePadMeta antesN = copiaNota( n );
       Point loc = n.getLocation();
       boolean igual = ub.texto.equals( n.getNote() ) && loc != null && loc.x == ub.x && loc.y == ub.y
         && n.getWidth() == ub.ancho && n.getHeight() == ub.alto && ( tamFuente <= 0 || n.getFontSize() == tamFuente );
@@ -619,6 +619,19 @@ final class LeccionNotas {
     return r;
   }
 
+  /**
+   * Copia independiente de una nota para el «antes» de un undo. NotePadMeta.clone() de Kettle 9.4 es superficial:
+   * comparte el Point de la ubicacion y setLocation lo modifica, asi que mover la nota movia tambien la copia y el
+   * Ctrl+Z devolvia el texto y la fuente pero no el sitio (las notas quedaban encima de los steps).
+   */
+  static NotePadMeta copiaNota( NotePadMeta n ) {
+    try {
+      return new NotePadMeta( XMLHandler.getSubNode( XMLHandler.loadXMLString( n.getXML() ), "notepad" ) );
+    } catch ( Exception e ) {
+      return (NotePadMeta) n.clone(); // no deberia pasar: el XML lo genera la propia nota
+    }
+  }
+
   // ---------------------------------------------------------------- hide / show / remove
 
   /** Borra las notas dadas: de atras para adelante, una accion DELETE_NOTE con los indices ascendentes. (UI) */
@@ -644,6 +657,16 @@ final class LeccionNotas {
   static Resultado quitar( TransMeta tm, boolean purgar, UndoGrupo u ) {
     Resultado r = new Resultado();
     Map<NotePadMeta, Entrada> rec = reconocer( tm );
+    // show deja la copia en hidden (para que un Ctrl+Z del show no las pierda): si todas estan en el lienzo, se va
+    // con ellas, asi una copia sin notas para repartir no las lleva escondidas en el atributo
+    String guardadas = attr( tm, K_OCULTAS );
+    try {
+      if ( guardadas != null && !guardadas.isEmpty() && !rec.isEmpty() && ocultas( tm ).isEmpty() ) {
+        tm.setAttribute( GRUPO, K_OCULTAS, "" );
+      }
+    } catch ( ToolError e ) {
+      // XML ilegible: queda como estaba
+    }
     borrar( tm, new ArrayList<NotePadMeta>( rec.keySet() ), u );
     r.notas = rec.size();
     r.notasUsuario = tm.nrNotes();
@@ -680,18 +703,28 @@ final class LeccionNotas {
     return r;
   }
 
-  /** Las notas guardadas en hidden (vacio si no hay). */
+  /**
+   * Las notas guardadas en hidden que no estan en el lienzo (vacio si no hay). show deja la copia en hidden: las que
+   * ya volvieron al lienzo no cuentan como ocultas.
+   */
   static List<NotePadMeta> ocultas( TransMeta tm ) throws ToolError {
     List<NotePadMeta> r = new ArrayList<NotePadMeta>();
     String xml = attr( tm, K_OCULTAS );
     if ( xml == null || xml.trim().isEmpty() ) {
       return r;
     }
+    Map<String, Boolean> enLienzo = new HashMap<String, Boolean>();
+    for ( int i = 0; i < tm.nrNotes(); i++ ) {
+      enLienzo.put( huella( tm.getNote( i ).getNote() ), Boolean.TRUE );
+    }
     try {
       Document d = XMLHandler.loadXMLString( xml );
       Node raiz = XMLHandler.getSubNode( d, "notepads" );
       for ( Node n : XMLHandler.getNodes( raiz, "notepad" ) ) {
-        r.add( new NotePadMeta( n ) );
+        NotePadMeta nota = new NotePadMeta( n );
+        if ( !enLienzo.containsKey( huella( nota.getNote() ) ) ) {
+          r.add( nota );
+        }
       }
     } catch ( Exception e ) {
       throw new ToolError( "The hidden lesson notes of '" + tm.getName() + "' could not be read: " + e.getMessage() );
@@ -699,7 +732,10 @@ final class LeccionNotas {
     return r;
   }
 
-  /** Repone desde hidden las notas que no esten ya en el lienzo (sin duplicar tras un Ctrl+Z) y vacia hidden. */
+  /**
+   * Repone desde hidden las notas que no esten ya en el lienzo (sin duplicar tras un Ctrl+Z). hidden conserva la
+   * copia: si un Ctrl+Z deshace el show, las notas vuelven a estar ocultas y otro show las repone (remove la borra).
+   */
   static Resultado mostrar( TransMeta tm, UndoGrupo u ) throws ToolError {
     Resultado r = new Resultado();
     List<NotePadMeta> ocultas = ocultas( tm );
@@ -720,9 +756,6 @@ final class LeccionNotas {
     }
     if ( u != null && !nuevas.isEmpty() ) {
       u.nuevo( nuevas.toArray(), enteros( idx ) );
-    }
-    if ( attr( tm, K_OCULTAS ) != null ) {
-      tm.setAttribute( GRUPO, K_OCULTAS, "" );
     }
     r.notas = nuevas.size();
     r.notasUsuario = notasUsuario( tm, reconocer( tm ) );

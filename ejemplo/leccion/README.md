@@ -26,6 +26,24 @@ Los números están comprobados: la prueba `PruebaLeccionesListas` del plugin re
 Spoon, ejecuta la transformación que queda y cuenta 60 rechazos `DUPLICADO` y 2940 líneas únicas
 (3000 − 60), los mismos que la solución de referencia.
 
+## Cómo se ve
+
+En el paso 3, con la pestaña **Lección** abierta: la lista de pasos, el texto completo del paso actual, las filas
+de su vista previa y los botones «◀ Atrás», «Pausa» y «Siguiente ▶». En el lienzo, cada step tiene su nota encima
+(«Qué» y «Por qué», cortados a 6 líneas; el texto entero está en la pestaña y en la guía) y los «¡Ojo!» en rojo.
+
+![Spoon en el paso 3 de la lección, con la pestaña Lección](capturas/01-pestana-leccion.png)
+
+Al terminar, el lienzo entero: el hop de error de «Eliminar duplicados» a «Marcar duplicado» va en rojo, y la
+rama de «Líneas únicas» lleva su nota debajo.
+
+![El lienzo con los 8 pasos y sus notas](capturas/02-lienzo-terminado.png)
+
+La guía para repartir (`build_report sections=["lesson"]`), aquí en PDF: la imagen del lienzo y, para cada paso,
+el qué, el por qué, el aviso con su código del manual, la entrada del glosario y las filas que se vieron en clase.
+
+![Página de la guía en PDF](capturas/03-guia-pdf.png)
+
 ## Cómo darla
 
 1. Abre Spoon con Pentaho Live (0.6.0 o posterior) y Claude conectado.

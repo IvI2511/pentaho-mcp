@@ -580,6 +580,22 @@ public class PruebaLeccionLayout {
     e2.nota( Tipo.PASO, "Leer", 1, "a\nb\nc\nd\ne\nabcdefghijklmnopqrstuvwxyzabc\ng" );
     Ubicada u2 = nota( LeccionLayout.calcular( e2, m ), Tipo.PASO, "Leer" );
     igual( "abcdefghijklmnopqrstuvwxyzab\u2026", u2.texto.split( "\n" )[ 5 ], "recorta la ultima para los puntos" );
+
+    // pocos parrafos: se acorta el mas largo (el \u00abQu\u00e9\u00bb) y el \u00abPor qu\u00e9\u00bb sigue entero en el lienzo
+    Entrada e3 = nueva( 32 );
+    e3.step( "Leer", null );
+    StringBuilder que = new StringBuilder( "Qu\u00e9:" );
+    for ( int i = 0; i < 30; i++ ) {
+      que.append( " palabra" );
+    }
+    e3.nota( Tipo.PASO, "Leer", 1, "1 \u00b7 Leer\n" + que + "\nPor qu\u00e9: es la entrada" );
+    Ubicada u3 = nota( LeccionLayout.calcular( e3, m ), Tipo.PASO, "Leer" );
+    String[] l3 = u3.texto.split( "\n", -1 );
+    igual( 6, l3.length, "6 lineas" );
+    cierto( u3.recortada, "recortada" );
+    igual( "1 \u00b7 Leer", l3[ 0 ], "la cabecera" );
+    cierto( l3[ 4 ].endsWith( "\u2026" ), "el qu\u00e9 cortado con sus puntos: " + l3[ 4 ] );
+    igual( "Por qu\u00e9: es la entrada", l3[ 5 ], "el por qu\u00e9 entero" );
   }
 
   // ---------------------------------------------------------------- medidor, adaptador y errores

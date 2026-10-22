@@ -290,9 +290,10 @@ public class PruebaLeccionGuia {
     }
     cierto( tm.nrNotes() > 0 && tm.getNote( 1 ).getNote().contains( "\n" ), "notas cortadas en lineas" );
     Seccion s2 = new SecLeccion().armar( new ContextoPrueba( c, pedido( "es" ), new Tema() ) );
-    contiene( items( s2, "lesson-paso-1" ), "**Qué:** lee datos/clientes.csv, una fila por cliente con su saldo y "
-      + "si esta activo", "que de la nota cortada, con las lineas unidas" );
-    // la nota del lienzo puede estar recortada (unas 6 lineas, §4.2): sale tal cual, con su «…»
+    contiene( items( s2, "lesson-paso-1" ), "**Qué:** lee datos/clientes.csv, una fila por cliente",
+      "que de la nota cortada, con las lineas unidas" );
+    // la nota del lienzo puede estar recortada (unas 6 lineas, §4.2): sale tal cual, con su «…»; el corte acorta el
+    // parrafo mas largo (aqui el «Qué») y el «Por qué» queda entero
     contiene( items( s2, "lesson-paso-1" ), "**Por qué:** es la entrada", "por que de la nota" );
     LeccionNotas.ocultar( tm, new LeccionMotor.SinSpoon( 0 ).grupo( tm ) );
     igual( 0, LeccionNotas.reconocer( tm ).size(), "notas ocultas" );

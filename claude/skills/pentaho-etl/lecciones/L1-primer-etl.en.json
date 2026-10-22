@@ -51,5 +51,5 @@
       "why": "it does nothing, but the metrics show how many rows we dropped"
     }
   ],
-  "outro": "Exercise: change the minimum balance from 1000 to 500 in \"Active with balance\", predict how many rows will come out and check it with run mode=visible (I/O/R/W/E of each step)."
+  "outro": "Exercise: change the minimum balance from 1000 to 500 in \"Active with balance\", predict how many rows will come out and check it by running it: the Step Metrics tab gives the rows read and written by each step (I/O/R/W/E)."
 }

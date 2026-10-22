@@ -72,11 +72,13 @@ L1 = {
         "escrevê-los noutro CSV."),
     "outro": T(
         "Ejercicio: cambia el saldo mínimo de 1000 a 500 en «Activos con saldo», predice cuántas filas saldrán "
-        "y compruébalo con run mode=visible (I/O/R/W/E de cada step).",
+        "y compruébalo ejecutándola: la pestaña Step Metrics da las filas leídas y escritas de cada step "
+        "(I/O/R/W/E).",
         "Exercise: change the minimum balance from 1000 to 500 in \"Active with balance\", predict how many rows "
-        "will come out and check it with run mode=visible (I/O/R/W/E of each step).",
+        "will come out and check it by running it: the Step Metrics tab gives the rows read and written by each "
+        "step (I/O/R/W/E).",
         "Exercício: muda o saldo mínimo de 1000 para 500 em «Ativos com saldo», prevê quantas linhas vão sair e "
-        "confirma com run mode=visible (I/O/R/W/E de cada step)."),
+        "confirma executando-a: o separador Step Metrics dá as linhas lidas e escritas de cada step (I/O/R/W/E)."),
     "nombres": {
         "Leer clientes": T("Leer clientes", "Read customers", "Ler clientes"),
         "Activos con saldo": T("Activos con saldo", "Active with balance", "Ativos com saldo"),

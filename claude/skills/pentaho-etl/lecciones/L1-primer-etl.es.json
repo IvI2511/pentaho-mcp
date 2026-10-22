@@ -51,5 +51,5 @@
       "why": "no hace nada, pero en las métricas se ve cuántas filas descartamos"
     }
   ],
-  "outro": "Ejercicio: cambia el saldo mínimo de 1000 a 500 en «Activos con saldo», predice cuántas filas saldrán y compruébalo con run mode=visible (I/O/R/W/E de cada step)."
+  "outro": "Ejercicio: cambia el saldo mínimo de 1000 a 500 en «Activos con saldo», predice cuántas filas saldrán y compruébalo ejecutándola: la pestaña Step Metrics da las filas leídas y escritas de cada step (I/O/R/W/E)."
 }

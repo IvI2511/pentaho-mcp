@@ -592,7 +592,9 @@ final class LeccionPanel {
       sb.append( "\n\n" ).append( r.f( "upcoming", q.n, q.step ) );
     }
     v.ahora = sb.toString().replace( "\r\n", "\n" ).replace( "\n", Text.DELIMITER );
-    v.aviso = l.avisos.isEmpty() ? null : l.avisos.get( l.avisos.size() - 1 );
+    // los avisos del plan (cortes de notas, vistas previas que esperan...) son para Claude y van en ingles: la
+    // pestana, que se proyecta en clase, solo muestra los que llegan despues (un paso que falla, una vista previa)
+    v.aviso = l.avisos.size() <= l.avisosDelPlan ? null : l.avisos.get( l.avisos.size() - 1 );
     return v;
   }
 

@@ -51,5 +51,5 @@
       "why": "não faz nada, mas nas métricas vê-se quantas linhas descartámos"
     }
   ],
-  "outro": "Exercício: muda o saldo mínimo de 1000 para 500 em «Ativos com saldo», prevê quantas linhas vão sair e confirma com run mode=visible (I/O/R/W/E de cada step)."
+  "outro": "Exercício: muda o saldo mínimo de 1000 para 500 em «Ativos com saldo», prevê quantas linhas vão sair e confirma executando-a: o separador Step Metrics dá as linhas lidas e escritas de cada step (I/O/R/W/E)."
 }
