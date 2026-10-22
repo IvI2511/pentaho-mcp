@@ -44,6 +44,7 @@ final class CapturaUi {
     c.sinGuardar = vivo.hasChanged();
 
     AbstractMeta copia = ReportTools.clonar( vivo );
+    LeccionGuia.copiarRegistro( vivo, copia ); // realClone no copia los atributos: la guia lee el registro
     if ( sp != null ) {
       copia.setRepository( sp.getRepository() );
       copia.setMetaStore( sp.getMetaStore() );

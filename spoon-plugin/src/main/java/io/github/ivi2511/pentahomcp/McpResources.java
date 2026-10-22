@@ -9,14 +9,18 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +40,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * resources/list trae solo los documentos (indice, steps comunes y las guias) y el catalogo del linter
  * (pentaho://lint/rules, JSON armado en el momento: no es un archivo del classpath); los ~300 XML por
  * step / entrada van por plantilla (pentaho://catalog/steps/{id}), para no gastar tokens listandolos.
+ * El glosario del modo clase (catalogo/glosario-clase.json) va entero en pentaho://glossary y por step e
+ * idioma en pentaho://glossary/{lang}/{id}, con los titulos de sus codigos de 03-errores-comunes.md.
  */
 final class McpResources {
 
@@ -58,6 +64,19 @@ final class McpResources {
   private static final String CARPETA_STEPS = "catalogo/steps/";
   private static final String CARPETA_ENTRADAS = "catalogo/job-entries/";
   private static final String INDICE = "catalogo/INDICE.md";
+
+  /**
+   * El glosario del modo clase (docs/modo-clase-diseno.md §7): el archivo entero en resources/list y, por
+   * plantilla, un step en un idioma con los titulos de sus codigos del manual de errores ya resueltos.
+   */
+  static final String GLOSARIO = "pentaho://glossary";
+  static final String PLANTILLA_GLOSARIO = "pentaho://glossary/{lang}/{id}";
+  private static final String PREFIJO_GLOSARIO = "pentaho://glossary/";
+  private static final String RUTA_GLOSARIO = "catalogo/glosario-clase.json";
+  private static final String RUTA_ERRORES = "manual/03-errores-comunes.md";
+  private static final String[] IDIOMAS_GLOSARIO = { "en", "es", "pt" };
+  /** Encabezado de un error del manual: "### C18. Stream lookup with ..." (grupo 1 el codigo, 2 el titulo). */
+  private static final Pattern CODIGO_ERROR = Pattern.compile( "(?m)^### ([A-E]\\d+)\\. (.+?)\\s*$" );
 
   /** Items por pagina en resources/list y resources/templates/list (cursor = posicion). */
   private static final int PAGINA = 100;
@@ -121,7 +140,12 @@ final class McpResources {
       "How the exercise grader works: the pack (cases, hidden cases, expected output, rules, rubric, policy), creating "
         + "and validating one from a solution, grading one submission or a whole folder in separate JVMs, reading a "
         + "result (statuses, checks, hints, the two readers), the gradebook, the Grader perspective in Spoon and the "
-        + "security policy.", "manual/07-corrector.md" )
+        + "security policy.", "manual/07-corrector.md" ),
+    new Doc( "pentaho://guide/class-mode", "class-mode", "Class mode (lesson_start, lesson_notes, the handout)",
+      "How to teach a transformation step by step on the canvas: the lesson script for lesson_start, pace and the "
+        + "Lesson tab, writing good what/why notes, following the class with lesson_status, hiding or removing the "
+        + "notes, the handout (build_report sections=[\"lesson\"]) and the ready lessons L1-L3 of the skill.",
+      "manual/08-modo-clase.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */
@@ -174,6 +198,19 @@ final class McpResources {
       o.put( "size", reglas.getBytes( StandardCharsets.UTF_8 ).length );
       items.add( o );
     }
+    String glosario = cargar( RUTA_GLOSARIO );
+    if ( glosario != null ) {
+      ObjectNode o = McpHttpServer.JSON.createObjectNode();
+      o.put( "uri", GLOSARIO );
+      o.put( "name", "class-glossary" );
+      o.put( "title", "Class glossary (steps for beginners)" );
+      o.put( "description", "For ~50 common step types: a one-line what, the typical why and an Excel/SQL analogy in "
+        + "en, es and pt, plus the codes of pentaho://guide/common-errors each step typically triggers (watch_out). "
+        + "One step in one language, with the error titles: pentaho://glossary/{lang}/{id}." );
+      o.put( "mimeType", JSON );
+      o.put( "size", glosario.getBytes( StandardCharsets.UTF_8 ).length );
+      items.add( o );
+    }
     return pagina( items, cursor, "resources" );
   }
 
@@ -190,6 +227,12 @@ final class McpResources {
           + "plugin id (case-sensitive) from pentaho://catalog/index or list_entry_types, e.g. TRANS, JOB, "
           + "SQL, WRITE_TO_LOG. START and DUMMY have no XML of their own: they are SPECIAL." ) );
     }
+    if ( cargar( RUTA_GLOSARIO ) != null ) {
+      items.add( plantilla( PLANTILLA_GLOSARIO, "class-glossary-step", "Class glossary entry",
+        "One step type explained for a class: what, why and an Excel/SQL analogy in {lang} (en, es or pt), and "
+          + "watch_out with the code and title of each typical error of pentaho://guide/common-errors. {id} is "
+          + "the plugin id, e.g. CsvInput, FilterRows, StreamLookup, GroupBy.", JSON ) );
+    }
     return pagina( items, cursor, "resourceTemplates" );
   }
 
@@ -205,6 +248,28 @@ final class McpResources {
         c.put( "mimeType", "text/plain" ).put( "text", "The lint rule catalog could not be built: "
           + errorLint );
       }
+      return res;
+    }
+    if ( GLOSARIO.equals( uri ) || uri.startsWith( PREFIJO_GLOSARIO ) ) {
+      String texto;
+      String canonicaGlosario = uri;
+      if ( GLOSARIO.equals( uri ) ) {
+        texto = cargar( RUTA_GLOSARIO );
+      } else {
+        String resto = uri.substring( PREFIJO_GLOSARIO.length() );
+        int barra = resto.indexOf( '/' );
+        ObjectNode e = barra < 0 ? null : glosario( resto.substring( 0, barra ), resto.substring( barra + 1 ) );
+        if ( e == null ) {
+          return null;
+        }
+        texto = e.toString();
+        canonicaGlosario = PREFIJO_GLOSARIO + e.path( "lang" ).asText() + "/" + e.path( "id" ).asText();
+      }
+      if ( texto == null ) {
+        return null;
+      }
+      ObjectNode res = McpHttpServer.JSON.createObjectNode();
+      res.putArray( "contents" ).addObject().put( "uri", canonicaGlosario ).put( "mimeType", JSON ).put( "text", texto );
       return res;
     }
     String ruta = null;
@@ -253,19 +318,28 @@ final class McpResources {
     JsonNode ref = params.path( "ref" );
     JsonNode arg = params.path( "argument" );
     String carpeta = null;
-    if ( "ref/resource".equals( ref.path( "type" ).asText() ) && "id".equals( arg.path( "name" ).asText() ) ) {
+    List<String> candidatos = null;
+    if ( "ref/resource".equals( ref.path( "type" ).asText() ) ) {
       String uri = ref.path( "uri" ).asText();
-      if ( PLANTILLA_STEPS.equals( uri ) ) {
+      String nombre = arg.path( "name" ).asText();
+      if ( "id".equals( nombre ) && PLANTILLA_STEPS.equals( uri ) ) {
         carpeta = CARPETA_STEPS;
-      } else if ( PLANTILLA_ENTRADAS.equals( uri ) ) {
+      } else if ( "id".equals( nombre ) && PLANTILLA_ENTRADAS.equals( uri ) ) {
         carpeta = CARPETA_ENTRADAS;
+      } else if ( PLANTILLA_GLOSARIO.equals( uri ) && "lang".equals( nombre ) ) {
+        candidatos = Arrays.asList( IDIOMAS_GLOSARIO );
+      } else if ( PLANTILLA_GLOSARIO.equals( uri ) && "id".equals( nombre ) ) {
+        candidatos = idsGlosario();
       }
     }
-    List<String> encontrados = new ArrayList<String>();
     if ( carpeta != null ) {
+      candidatos = ids( carpeta );
+    }
+    List<String> encontrados = new ArrayList<String>();
+    if ( candidatos != null ) {
       String valor = arg.path( "value" ).asText( "" ).toLowerCase( Locale.ROOT );
       List<String> contienen = new ArrayList<String>();
-      for ( String id : ids( carpeta ) ) {
+      for ( String id : candidatos ) {
         String b = id.toLowerCase( Locale.ROOT );
         if ( b.startsWith( valor ) ) {
           encontrados.add( id );
@@ -287,13 +361,113 @@ final class McpResources {
   }
 
   private static ObjectNode plantilla( String uriTemplate, String nombre, String titulo, String descripcion ) {
+    return plantilla( uriTemplate, nombre, titulo, descripcion, XML );
+  }
+
+  private static ObjectNode plantilla( String uriTemplate, String nombre, String titulo, String descripcion,
+                                       String mime ) {
     ObjectNode o = McpHttpServer.JSON.createObjectNode();
     o.put( "uriTemplate", uriTemplate );
     o.put( "name", nombre );
     o.put( "title", titulo );
     o.put( "description", descripcion );
-    o.put( "mimeType", XML );
+    o.put( "mimeType", mime );
     return o;
+  }
+
+  // ---------------------------------------------------------------- glosario del modo clase
+
+  /**
+   * Una entrada del glosario en un idioma: {id, lang, what, why, analogy, watch_out: [{code, title}], errors_guide};
+   * null si el idioma no es en/es/pt, el id no esta en el glosario o el jar no lo trae. Idioma e id ignoran
+   * mayusculas (devuelve los canonicos). Lo usa resources/read y lo usara watch_out "auto" de las lecciones.
+   */
+  ObjectNode glosario( String idioma, String id ) {
+    JsonNode raiz = arbolGlosario();
+    if ( raiz == null || idioma == null || id == null ) {
+      return null;
+    }
+    String lang = null;
+    for ( String l : IDIOMAS_GLOSARIO ) {
+      if ( l.equalsIgnoreCase( idioma ) ) {
+        lang = l;
+      }
+    }
+    String canonico = null;
+    for ( String s : idsGlosario() ) {
+      if ( s.equals( id ) || ( canonico == null && s.equalsIgnoreCase( id ) ) ) {
+        canonico = s;
+      }
+    }
+    if ( lang == null || canonico == null ) {
+      return null;
+    }
+    JsonNode e = raiz.path( "steps" ).path( canonico );
+    JsonNode t = e.path( lang );
+    if ( !t.isObject() ) {
+      return null;
+    }
+    Map<String, String> titulos = titulosErrores();
+    ObjectNode r = McpHttpServer.JSON.createObjectNode();
+    r.put( "id", canonico ).put( "lang", lang );
+    r.put( "what", t.path( "what" ).asText() );
+    r.put( "why", t.path( "why" ).asText() );
+    r.put( "analogy", t.path( "analogy" ).asText() );
+    ArrayNode ojo = r.putArray( "watch_out" );
+    for ( JsonNode c : e.path( "watch_out" ) ) {
+      ObjectNode x = ojo.addObject().put( "code", c.asText() );
+      String titulo = titulos.get( c.asText() );
+      if ( titulo != null ) {
+        x.put( "title", titulo );
+      }
+    }
+    r.put( "errors_guide", "pentaho://guide/common-errors" );
+    return r;
+  }
+
+  /** Ids del glosario, ordenados; vacia si el jar no lo trae. */
+  List<String> idsGlosario() {
+    List<String> r = new ArrayList<String>();
+    JsonNode raiz = arbolGlosario();
+    if ( raiz != null ) {
+      for ( Iterator<String> it = raiz.path( "steps" ).fieldNames(); it.hasNext(); ) {
+        r.add( it.next() );
+      }
+    }
+    Collections.sort( r, String.CASE_INSENSITIVE_ORDER );
+    return r;
+  }
+
+  private volatile JsonNode glosarioArbol;
+
+  private JsonNode arbolGlosario() {
+    JsonNode a = glosarioArbol;
+    if ( a == null ) {
+      String t = cargar( RUTA_GLOSARIO );
+      if ( t == null ) {
+        return null;
+      }
+      try {
+        a = McpHttpServer.JSON.readTree( t );
+      } catch ( IOException e ) {
+        return null;
+      }
+      glosarioArbol = a;
+    }
+    return a;
+  }
+
+  /** Codigo -> titulo de los encabezados de 03-errores-comunes.md ("C18" -> "Stream lookup with a ..."). */
+  private Map<String, String> titulosErrores() {
+    Map<String, String> m = new HashMap<String, String>();
+    String manual = cargar( RUTA_ERRORES );
+    if ( manual != null ) {
+      Matcher x = CODIGO_ERROR.matcher( manual );
+      while ( x.find() ) {
+        m.put( x.group( 1 ), x.group( 2 ) );
+      }
+    }
+    return m;
   }
 
   /** Una pagina de items; el cursor es la posicion desde la que seguir (opaco para el cliente). */

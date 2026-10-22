@@ -59,6 +59,13 @@ duplicates left in, hardcoded paths), feedback for every student without the hid
 gradebook for Excel. Spoon gets a **Grader** perspective with the same, plus a wizard that builds the pack
 from the open transformation.
 
+**Class mode.** Claude can also *teach* an ETL: it builds the transformation slowly, one step per click
+on **Next ▶** in a new **Lesson** tab, and explains every step with a numbered note on the canvas (what it
+does, why it is there, the typical mistake), with the first rows after each step. Made for a projected
+class or for learning alone; afterwards the notes can be hidden for the exercise and the lesson becomes a
+handout in PDF or Word. Three tested lessons (filter, Sort + Group by, Stream lookup vs Merge join) come
+with the skill in English, Spanish and Portuguese.
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 
@@ -73,6 +80,7 @@ Kitchen.
 | *"The canvas is a mess, tidy it up."* | lays out the steps left to right, with no crossed lines |
 | *"Why does this `.ktr` fail in Pan?"* | reads it, finds the problem with the verified error list and fixes it |
 | *"Check this transformation for bad practices before I hand it in, and fix what's safe."* | runs the quality check, explains each finding, applies the safe fixes in one Ctrl+Z and asks before the rest |
+| *"Teach the Stream lookup lesson step by step, beginner level, in Spanish."* | builds it one step per click on Next ▶, with a numbered note on the canvas for every step and the rows it produces |
 | *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
 | *"Make a grading pack from this solution with a hidden case, then grade the submissions in `C:\TP3\entregas`."* | runs the solution to get the expected output, grades every submission in separate JVMs and tells you the grades, who failed what and why; the gradebook and each student's feedback are in the results folder |
 
@@ -183,6 +191,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Fields | List the fields each step outputs, before configuring the next one |
 | Checks | Validate, preview real rows from any step |
 | Quality | Check good practices beyond validation with a 0-100 score (optionally reading the sources to prove a problem), apply the proposed fixes, silence a rule where it is deliberate |
+| Class mode | Play a lesson step by step with notes on the canvas and a Lesson tab (guided, automatic or manual pace), follow it, go back, hide, show or remove its notes, and turn it into a handout |
 | Running | Run a transformation or job, follow its status and logs, stop it |
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
@@ -246,6 +255,8 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
   Without either, the PDF falls back to the browser's print dialog and PowerPoint shows the lineage and
   table diagrams as tables. The preview inside Spoon uses the old Internet Explorer engine that PDI
   bundles, so it has no interactive diagrams: **Open in browser** shows the full report.
+- Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
+  steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
 
 ## New in 0.5.1
 

@@ -283,13 +283,7 @@ final class DocumentTools {
         }
       }
     }
-    if ( m.nrNotes() > 0 ) {
-      ArrayNode notas = o.putArray( "notes" );
-      for ( int i = 0; i < m.nrNotes(); i++ ) {
-        NotePadMeta n = m.getNote( i );
-        notas.addObject().put( "text", n.getNote() ).put( "x", n.getLocation().x ).put( "y", n.getLocation().y );
-      }
-    }
+    notas( m, o );
     if ( !m.getDatabases().isEmpty() ) {
       ArrayNode cons = o.putArray( "connections" );
       for ( DatabaseMeta d : m.getDatabases() ) {
@@ -306,5 +300,32 @@ final class DocumentTools {
       }
     }
     return o;
+  }
+
+  /**
+   * "notes" de get_document: las notas de la leccion (modo clase, LeccionNotas) van marcadas con su numero de
+   * registro, tipo y step, sin todo su texto; las demas, con su texto.
+   */
+  static void notas( AbstractMeta m, ObjectNode o ) {
+    if ( m.nrNotes() == 0 ) {
+      return;
+    }
+    ArrayNode notas = o.putArray( "notes" );
+    java.util.Map<NotePadMeta, LeccionNotas.Entrada> leccion = m instanceof TransMeta
+      ? LeccionNotas.reconocer( (TransMeta) m )
+      : java.util.Collections.<NotePadMeta, LeccionNotas.Entrada>emptyMap();
+    for ( int i = 0; i < m.nrNotes(); i++ ) {
+      NotePadMeta n = m.getNote( i );
+      LeccionNotas.Entrada le = leccion.get( n );
+      if ( le != null ) {
+        ObjectNode x = notas.addObject().put( "lesson", le.k ).put( "kind", le.tipo.json );
+        if ( !le.step.isEmpty() ) {
+          x.put( "step", le.step );
+        }
+        x.put( "x", n.getLocation().x ).put( "y", n.getLocation().y );
+        continue;
+      }
+      notas.addObject().put( "text", n.getNote() ).put( "x", n.getLocation().x ).put( "y", n.getLocation().y );
+    }
   }
 }

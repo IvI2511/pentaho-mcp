@@ -503,7 +503,15 @@ final class TransLote {
       TransOps.resolverReferencias( tm );
     }
     e.previos.registrar( e.undo, tm ); // antes que las posiciones: ver UndoGrupo / el orden del undo
-    if ( completo && l.arrange ) {
+    if ( completo && l.arrange && !LeccionNotas.reconocer( tm ).isEmpty() ) {
+      // documento con notas de leccion (modo clase): la regla de clase, steps y notas en el mismo grupo de undo
+      LeccionNotas.MedidorCerrable med = LeccionNotas.medidor( LeccionNotas.tamFuente( tm ) );
+      try {
+        mov = LeccionNotas.reacomodar( tm, med, e.undo, -1 ).movimientos;
+      } finally {
+        med.cerrar();
+      }
+    } else if ( completo && l.arrange ) {
       mov = TransLayout.ordenar( tm );
       if ( !mov.objetos.isEmpty() ) {
         e.undo.posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );

@@ -1,8 +1,10 @@
 # Modo clase (0.6.0) — diseño
 
 Claude arma una transformación **despacio** y la explica en el lienzo de Spoon, para una clase
-proyectada o para quien aprende solo. Estado: **diseño + prototipo headless**; nada implementado
-todavía. Fecha: 20-oct-2026. Parte de la fase 0.6.0 «Calidad y clases» de `roadmap.md` (el linter y
+proyectada o para quien aprende solo. Estado (22-oct-2026): **implementado** en `feat/modo-clase`
+(WP1-WP8; sin publicar). Desviaciones respecto de este diseño: el gancho `loadTab` no se llama en Spoon 9.4 y
+la pestaña vuelve con un vigilante (§6); «A-/A+» solo cambia la letra de la pestaña; el manual es
+`manual/08-modo-clase.md` (no `04-`); L3 son dos guiones (parte A y parte B). Diseño original: 20-oct-2026. Parte de la fase 0.6.0 «Calidad y clases» de `roadmap.md` (el linter y
 el corrector de ejercicios son otros diseños; acá solo se nombran los puntos de contacto).
 
 ## 0. Decisiones en una lista
@@ -166,8 +168,10 @@ devolvería notas que nadie reconoce. Por eso el registro **solo crece** y se es
 (si el docente guarda a mitad de clase, el `.ktr` dice lo que hay). `remove` borra notas, no el
 registro (`purge: true` lo borra a propósito: después un Ctrl+Z devuelve notas «del usuario»).
 `hide` guarda el XML en `hidden`; `show` repone solo las que no estén ya (si un Ctrl+Z deshizo el
-`hide`, no se duplican) y vacía `hidden`. `list` da cada entrada como `present`, `missing`, `edited`
-o `step_missing` (step renombrado o borrado).
+`hide`, no se duplican; se comparan por la entrada del registro, no por la huella, así un restyle no las
+duplica) y deja la copia en `hidden` (un Ctrl+Z del `show` no las pierde); `remove` vacía `hidden`. `list` da
+cada entrada como `present`, `hidden`, `missing` (también la que el usuario editó) o `step_missing` (step
+renombrado o borrado).
 
 Si el usuario **edita** el texto de una nota de la lección, deja de reconocerse: pasa a ser suya y la
 limpieza no la toca (a propósito). Una copia exacta (Ctrl+C/Ctrl+V) sí cuenta como de la lección.
@@ -226,7 +230,9 @@ perspectiva porque el lienzo tiene que seguir a la vista.
 +--------------------------------------------------------------------------------------+
 ```
 
-- «A-/A+» cambia la fuente de las notas de la lección y de la pestaña (proyector).
+- «A-/A+» cambia la fuente de la pestaña (proyector). **Implementado así:** solo la pestaña; las notas del
+  lienzo crecen con `font_size` de `lesson_start` o `lesson_notes restyle` (un restyle a mitad de clase
+  re-ubicaría notas de pasos que aún no existen y dejaría un Ctrl+Z encima que «◀ Atrás» rechaza).
 - Las filas se muestran en una tabla propia de la pestaña (no se toca la de Preview data, que
   pisan las ejecuciones). La API pública `addPreviewData` queda como alternativa.
 - **Abrir:** `if (!isExecutionResultsPaneVisible()) showExecutionResults()` (es un toggle: con el
@@ -236,6 +242,10 @@ perspectiva porque el lienzo tiene que seguir a la vista.
   abrir el panel, un `@SpoonUiExtenderPlugin` para `TransGraph` + `loadTab` repone la pestaña (lo
   llama `addAllTabs`; idempotente). Mismo jar, como el `@SpoonPlugin` de Informes; si el escaneo no
   lo levanta, registro en `onStart`. A probar en el esqueleto de WP4.
+  **Resultado de WP4:** Spoon 9.4 nunca registra `SpoonUiExtenderPluginType`, así que `loadTab` no llega.
+  `LeccionPanel.vigilar` comprueba cada 500 ms, solo mientras el panel está oculto, si se volvió a abrir y
+  repone la pestaña; la lección se reanuda si la pausa era solo `panel_hidden`. El extensor queda por si
+  otro Spoon sí registra el tipo (añadir la pestaña dos veces no hace nada).
 - **Perspectiva «Reports» (0.5.0, de otro equipo):** no se toca su código en este diseño. Contrato
   `LessonHandout` (JSON: título, nivel, idioma, pasos `{n, step, type, what, why, watch_out[],
   glossary, preview{fields, rows}}`, PNG del lienzo con notas) que un recolector `SecLeccion` pasa a
@@ -336,7 +346,7 @@ que `lesson_status`.
 
 | action | Hace | Undo |
 |---|---|---|
-| `list` | entradas del registro: n, tipo, step, `present`/`missing`/`edited`/`step_missing` | — |
+| `list` | entradas del registro: n, tipo, step, `present`/`hidden`/`missing`/`step_missing` (una nota editada por el usuario figura como `missing`) | — |
 | `add` | `{step, kind, text}` (kind: `watch_out`, `tip` o `question`): una nota suelta ubicada con la regla (a diferencia de `add_note`: estilo, regla y registro) | 1 Ctrl+Z |
 | `hide` | las saca y guarda su XML en el atributo `hidden` (viaja en el `.ktr`; no es secreto) | 1 Ctrl+Z |
 | `show` | repone desde `hidden` las que no estén ya; vacía `hidden` | 1 Ctrl+Z |
@@ -351,7 +361,7 @@ mueven steps a columnas de 170 y **no mueven notas**: tras una lección dejaría
 encima de los steps. Con notas de lección en el documento, reacomodan con la regla de clase (steps y
 notas, mismo Ctrl+Z) y lo dicen. `get_document` marca las notas de la lección (`"lesson": n`) en vez
 de devolver todo su texto; `generate_report` las sigue listando como cualquier nota. La skill suma
-`manual/04-modo-clase.md` (buen qué/por qué, largos, qué ritmo usar) y una línea en `SKILL.md`.
+`manual/08-modo-clase.md` (buen qué/por qué, largos, qué ritmo usar) y una línea en `SKILL.md`.
 
 ## 9. Limpieza y guía para entregar
 
@@ -441,7 +451,7 @@ Siguiente candidata: jobs y parámetros (`06`, `10`, `11`), cuando haya leccione
 | Reacomodar mueve steps y notas del usuario (las que rotulan un step pierden la referencia) | un Ctrl+Z; aviso en `warnings`; `existing_notes: keep`; anotar sin reacomodar (no probado) |
 | «Ocultar» se toma como secreto | la descripción de `hide` y el manual lo dicen; para repartir, `remove` en una copia |
 | Traducciones del glosario | se generan una vez y se revisan; el texto en clase lo escribe Claude |
-| Más herramientas (+5, 62 con Informes) = más contexto | descripciones cortas; el detalle va a `04-modo-clase.md` |
+| Más herramientas (+5, 62 con Informes) = más contexto | descripciones cortas; el detalle va a `08-modo-clase.md` |
 
 ## 13. Paquetes de trabajo
 
@@ -453,7 +463,7 @@ Siguiente candidata: jobs y parámetros (`06`, `10`, `11`), cuando haya leccione
 | 4 | Pestaña «Lección» en `extraViewTabFolder`: lista, texto actual, tabla de filas, botones, A-/A+, textos en/es/pt (si ya está `Rotulos` de Informes, un área `leccion` de ese mecanismo); `DisposeListener` → pausa; extensor `loadTab`. **Probar primero en Spoon real** con un esqueleto | nuevos `LeccionPanel.java`, `LeccionTextos.java`, `LeccionTabExtender.java` (`@SpoonUiExtenderPlugin`) | 3 |
 | 5 | Glosario y errores por step en en/es/pt, generador y recurso MCP | `claude/skills/pentaho-etl/catalogo/glosario-clase.json`, `tools/generador-catalogo/glosario.py`, `McpResources.java`, `spoon-plugin/build.ps1` (hace falta: copia una lista fija de archivos) | — |
 | 6 | Guía: recolector `SecLeccion` → `Seccion` `lesson` del modelo de Informes + contrato `LessonHandout`; plan B `lesson_notes action=handout` en Markdown. `ReportTools`/`ReportMotor` no se tocan | nuevos `LeccionGuia.java`, `SecLeccion.java`; registro de la sección, a acordar con Informes | 2, 3, Informes 0.5.0 |
-| 7 | Skill y lecciones listas: manual, guiones L1–L3 probados con Pan y con la prueba de solapamientos; la skill copia `datos/` junto al `.ktr` | `claude/skills/pentaho-etl/manual/04-modo-clase.md`, `SKILL.md`, `lecciones/*.json`. La versión **no** se sube acá: `VERSION` manda y `build.ps1` falla si `plugin.json` no coincide; lo hace el release | 3, 5 |
+| 7 | Skill y lecciones listas: manual, guiones L1–L3 probados con Pan y con la prueba de solapamientos; la skill copia `datos/` junto al `.ktr` | `claude/skills/pentaho-etl/manual/08-modo-clase.md`, `SKILL.md`, `lecciones/*.json`. La versión **no** se sube acá: `VERSION` manda y `build.ps1` falla si `plugin.json` no coincide; lo hace el release | 3, 5 |
 | 8 | Pruebas headless (no van al jar): ubicación sobre los samples de PDI y los ejemplos (0 choques **y** distancia nota ↔ step), nota compacta, íconos de 48 px, undo de notas y desfase con el registro, ocultar/mostrar, Pan sobre los `.ktr` anotados | `tools/pruebas-clase/` (a partir de `ProtoModoClase` y `ProtoLote`) | 1, 2 |
 
 Archivos compartidos con otros equipos: `McpLifecycleListener.java` y `DocumentTools.java` también

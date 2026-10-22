@@ -1,0 +1,49 @@
+{
+  "title": "Unir fuentes (A): Stream lookup",
+  "level": "intermediate",
+  "language": "es",
+  "pace": "guided",
+  "intro": "Cada venta con el nombre de su cliente, sin base de datos: dos CSV y un Stream lookup (un BUSCARV en memoria). Después, en la parte B, lo mismo con Merge join.",
+  "steps": [
+    {
+      "type": "CsvInput",
+      "name": "Leer ventas",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/ventas.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "lee datos/ventas.csv: 10 ventas, cada una con su cliente_id",
+      "why": "es el flujo principal: una fila por venta"
+    },
+    {
+      "type": "CsvInput",
+      "name": "Leer clientes",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/clientes.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>nombre</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_alta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>saldo</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>activo</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "lee datos/clientes.csv: 8 clientes",
+      "why": "es la tabla de búsqueda: id → nombre"
+    },
+    {
+      "type": "StreamLookup",
+      "name": "Buscar cliente",
+      "after": "Leer ventas",
+      "config_xml": "<from>Leer clientes</from>\n<input_sorted>N</input_sorted>\n<preserve_memory>Y</preserve_memory>\n<sorted_list>N</sorted_list>\n<integer_pair>N</integer_pair>\n<lookup>\n  <key>\n    <name>cliente_id</name>\n    <field>cliente_id</field>\n  </key>\n  <value>\n    <name>nombre</name>\n    <rename>cliente</rename>\n    <default>DESCONOCIDO</default>\n    <type>String</type>\n  </value>\n  <value>\n    <name>ciudad</name>\n    <rename>ciudad</rename>\n    <default>-</default>\n    <type>String</type>\n  </value>\n</lookup>\n",
+      "what": "por cliente_id, añade el nombre; si no lo encuentra, DESCONOCIDO (venta 108)",
+      "why": "no multiplica filas: sigue habiendo 10 ventas",
+      "watch_out": "C18: <from> tiene que ser el nombre exacto del step de búsqueda, y ese hop debe existir",
+      "tip": "el flujo de búsqueda entero va a memoria: para tablas grandes, Database lookup",
+      "preview_rows": 10
+    },
+    {
+      "type": "TextFileOutput",
+      "name": "Escribir ventas con cliente",
+      "after": "Buscar cliente",
+      "config_xml": "<separator>;</separator>\n<enclosure>\"</enclosure>\n<enclosure_forced>N</enclosure_forced>\n<enclosure_fix_disabled>N</enclosure_fix_disabled>\n<header>Y</header>\n<footer>N</footer>\n<format>UNIX</format>\n<compression>None</compression>\n<encoding>UTF-8</encoding>\n<endedLine/>\n<fileNameInField>N</fileNameInField>\n<fileNameField/>\n<create_parent_folder>Y</create_parent_folder>\n<file>\n  <name>${Internal.Entry.Current.Directory}/salida/04_ventas_con_cliente</name>\n  <servlet_output>N</servlet_output>\n  <do_not_open_new_file_init>Y</do_not_open_new_file_init>\n  <extention>csv</extention>\n  <append>N</append>\n  <split>N</split>\n  <haspartno>N</haspartno>\n  <add_date>N</add_date>\n  <add_time>N</add_time>\n  <SpecifyFormat>N</SpecifyFormat>\n  <date_time_format/>\n  <add_to_result_filenames>Y</add_to_result_filenames>\n  <pad>N</pad>\n  <fast_dump>N</fast_dump>\n  <splitevery>0</splitevery>\n</file>\n<fields>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>fecha_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cliente</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>Number</type>\n    <format>0.00</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n</fields>\n",
+      "what": "escribe salida/04_ventas_con_cliente.csv: 10 filas",
+      "why": "el resultado: cada venta con su cliente"
+    }
+  ],
+  "hops": [
+    {
+      "from": "Leer clientes",
+      "to": "Buscar cliente"
+    }
+  ],
+  "outro": "Ejercicio: cambia el valor por defecto DESCONOCIDO por SIN CLIENTE y vuelve a ejecutar. ¿Cuántas filas cambian?"
+}

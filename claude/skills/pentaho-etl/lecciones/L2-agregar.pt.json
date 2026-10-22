@@ -1,0 +1,56 @@
+{
+  "title": "Agregar sem mentir: Sort rows + Group by",
+  "level": "intermediate",
+  "language": "pt",
+  "pace": "guided",
+  "intro": "Totais por produto a partir das linhas de venda: montante = quantidade × preço, ordenar e agrupar. O Group by só junta linhas consecutivas: sem ordenar, o resultado sai com exit 0 e errado.",
+  "steps": [
+    {
+      "type": "CsvInput",
+      "name": "Ler vendas",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/ventas.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "lê datos/ventas.csv: 10 vendas com produto, quantidade e preço",
+      "why": "as linhas de venda são o grão do cálculo",
+      "watch_out": "D3: preço com decimal vazio num Windows em espanhol lê-se ×100 (2.50 → 250); declara o decimal «.»"
+    },
+    {
+      "type": "Calculator",
+      "name": "Calcular montante",
+      "after": "Ler vendas",
+      "config_xml": "<failIfNoFile>Y</failIfNoFile>\n<calculation>\n  <field_name>importe</field_name>\n  <calc_type>MULTIPLY</calc_type>\n  <field_a>precio_unitario</field_a>\n  <field_b>cantidad</field_b>\n  <field_c/>\n  <value_type>Number</value_type>\n  <value_length>12</value_length>\n  <value_precision>2</value_precision>\n  <remove>N</remove>\n  <conversion_mask/>\n  <decimal_symbol/>\n  <grouping_symbol/>\n  <currency_symbol/>\n</calculation>\n",
+      "what": "importe = preço × quantidade (MULTIPLY)",
+      "why": "temos de somar montantes, não preços",
+      "watch_out": "D4: Integer × Number arredonda para o tipo do primeiro campo; o decimal vai em field_a",
+      "preview_rows": 5
+    },
+    {
+      "type": "SortRows",
+      "name": "Ordenar por produto",
+      "after": "Calcular montante",
+      "config_xml": "<directory>%%java.io.tmpdir%%</directory>\n<prefix>out</prefix>\n<sort_size>1000000</sort_size>\n<free_memory/>\n<compress>N</compress>\n<compress_variable/>\n<unique_rows>N</unique_rows>\n<fields>\n  <field>\n    <name>producto</name>\n    <ascending>Y</ascending>\n    <case_sensitive>N</case_sensitive>\n    <collator_enabled>N</collator_enabled>\n    <collator_strength>0</collator_strength>\n    <presorted>N</presorted>\n  </field>\n</fields>\n",
+      "what": "ordena por produto",
+      "why": "o Group by precisa das linhas do mesmo produto juntas",
+      "tip": "ordena em memória até sort_size linhas; com mais, usa ficheiros temporários (mais lento)"
+    },
+    {
+      "type": "GroupBy",
+      "name": "Totais por produto",
+      "after": "Ordenar por produto",
+      "config_xml": "<all_rows>N</all_rows>\n<ignore_aggregate>N</ignore_aggregate>\n<field_ignore/>\n<directory>%%java.io.tmpdir%%</directory>\n<prefix>grp</prefix>\n<add_linenr>N</add_linenr>\n<linenr_fieldname/>\n<give_back_row>N</give_back_row>\n<group>\n  <field>\n    <name>producto</name>\n  </field>\n</group>\n<fields>\n  <field>\n    <aggregate>unidades</aggregate>\n    <subject>cantidad</subject>\n    <type>SUM</type>\n    <valuefield/>\n  </field>\n  <field>\n    <aggregate>importe_total</aggregate>\n    <subject>importe</subject>\n    <type>SUM</type>\n    <valuefield/>\n  </field>\n  <field>\n    <aggregate>num_ventas</aggregate>\n    <subject>venta_id</subject>\n    <type>COUNT_ALL</type>\n    <valuefield/>\n  </field>\n  <field>\n    <aggregate>importe_medio</aggregate>\n    <subject>importe</subject>\n    <type>AVERAGE</type>\n    <valuefield/>\n  </field>\n  <field>\n    <aggregate>ultima_venta</aggregate>\n    <subject>fecha_venta</subject>\n    <type>MAX</type>\n    <valuefield/>\n  </field>\n</fields>\n",
+      "what": "por produto: SUM do montante, COUNT_ALL, AVERAGE e MAX",
+      "why": "4 produtos: Café 20.00, Medialuna 21.60, Té 14.40, Tostado 9.50",
+      "watch_out": "D5: sem ordenar antes não falha: dá um grupo por cada mudança de produto",
+      "question": "O que acontece se o Group by não receber as linhas ordenadas? Quantos grupos saem?",
+      "preview_rows": 5
+    },
+    {
+      "type": "TextFileOutput",
+      "name": "Escrever totais",
+      "after": "Totais por produto",
+      "config_xml": "<separator>;</separator>\n<enclosure>\"</enclosure>\n<enclosure_forced>N</enclosure_forced>\n<enclosure_fix_disabled>N</enclosure_fix_disabled>\n<header>Y</header>\n<footer>N</footer>\n<format>UNIX</format>\n<compression>None</compression>\n<encoding>UTF-8</encoding>\n<endedLine/>\n<fileNameInField>N</fileNameInField>\n<fileNameField/>\n<create_parent_folder>Y</create_parent_folder>\n<file>\n  <name>${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto</name>\n  <servlet_output>N</servlet_output>\n  <do_not_open_new_file_init>Y</do_not_open_new_file_init>\n  <extention>csv</extention>\n  <append>N</append>\n  <split>N</split>\n  <haspartno>N</haspartno>\n  <add_date>N</add_date>\n  <add_time>N</add_time>\n  <SpecifyFormat>N</SpecifyFormat>\n  <date_time_format/>\n  <add_to_result_filenames>Y</add_to_result_filenames>\n  <pad>N</pad>\n  <fast_dump>N</fast_dump>\n  <splitevery>0</splitevery>\n</file>\n<fields>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>unidades</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>importe_total</name>\n    <type>Number</type>\n    <format>0.00</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>num_ventas</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>importe_medio</name>\n    <type>Number</type>\n    <format>0.00</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>ultima_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n</fields>\n",
+      "what": "escreve salida/03_ventas_por_producto.csv",
+      "why": "o relatório que se entrega: uma linha por produto"
+    }
+  ],
+  "outro": "Exercício: troca o Group by por um Memory group by (sem o Sort) e compara os totais."
+}

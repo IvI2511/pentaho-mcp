@@ -55,7 +55,8 @@ public class PruebaMarkdown {
     igual( "a \\_b\\_ c_d", RenderMarkdown.esc( "a _b_ c_d" ), "_ en el borde de una palabra se escapa" );
     contiene( t, "\n## Linaje de campos\n", "secciones como ##" );
     noContiene( t, "## Flujo del job", "la omitida no tiene seccion" );
-    contiene( t, "Secciones omitidas: Flujo del job (Solo para jobs).", "omitida con motivo" );
+    contiene( t, "Secciones omitidas: Flujo del job (Solo para jobs)", "omitida con motivo" );
+    contiene( t, "Guía de la lección (Este documento no tiene una lección)", "la guia de la muestra, omitida" );
     // mermaid: tres bloques con el mismo texto del modelo
     igual( 3, PruebaHtml.cuenta( t, "```mermaid\n" ), "tres bloques mermaid" );
     for ( Diagrama d : ModeloMuestra.diagramas( inf ) ) {

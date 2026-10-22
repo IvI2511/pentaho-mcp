@@ -1,6 +1,6 @@
 ---
 name: pentaho-etl
-description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), grade students' exercises against an expected output (exercise packs, rubric, gradebook), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
+description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), grade students' exercises against an expected output (exercise packs, rubric, gradebook), teach it step by step on the canvas (class mode, lessons), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
 ---
 
 # Pentaho Data Integration 9.4 — ETLs
@@ -125,6 +125,22 @@ pack, run the grader and explain results.
 
 Pack format, statuses, the gradebook, the Grader perspective and troubleshooting: `manual/07-corrector.md`.
 
+## Class mode: teaching an ETL step by step
+
+When someone wants to **teach or learn** a transformation («prepara una lección de Stream lookup», «explain it step
+by step on the canvas», a class, a demo): `lesson_start` with the whole script (steps with `config_xml`
+plus `what`/`why`, optional `watch_out`, `tip`, `question`, `preview_rows`). Spoon plays it one step at a
+time with «Next ▶» in a **Lesson** tab, each step with its numbered note; nothing is spent while the class
+runs. Follow it with `lesson_status wait_s=60`, steer it with `lesson_control`, and afterwards
+`lesson_notes hide|show|remove` (hiding is not secret) and the handout `build_report sections=["lesson"]`.
+
+- The `.ktr` must be **saved** next to its `datos/` before `lesson_start` if any step previews.
+- Ready, tested lessons for Big Data 1 (es/en/pt): `lecciones/` — L1 filter, L2 Sort + Group by, L3 Stream
+  lookup vs Merge join. Copy `manual/ejemplos/datos/` next to a new saved transformation and pass the script.
+- Numbers in the notes only after checking them (Pan or `preview_step`). Transformations only; keep a lesson to 12 steps or fewer.
+
+Script format, pace, good notes, the handout and troubleshooting: `manual/08-modo-clase.md`.
+
 ## Where everything is
 
 | I need… | Read |
@@ -135,6 +151,7 @@ Pack format, statuses, the gradebook, the Grader perspective and troubleshooting
 | Reports (`build_report`, formats, sections) and writing the narrative | `manual/04-informes.md` |
 | Quality: `lint_etl`, the score, the deep mode, `apply_lint_fixes`, `suppress_lint`, every rule | `manual/06-calidad.md` |
 | Grading exercises: packs, `grade_exercise`, `grade_submissions`, the gradebook, the Grader perspective | `manual/07-corrector.md` |
+| Class mode: `lesson_start`, the Lesson tab, notes, the handout, ready lessons | `manual/08-modo-clase.md`, `lecciones/` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

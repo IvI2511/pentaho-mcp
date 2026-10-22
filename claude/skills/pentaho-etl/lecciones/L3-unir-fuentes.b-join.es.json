@@ -1,0 +1,72 @@
+{
+  "title": "Unir fuentes (B): Merge join",
+  "level": "intermediate",
+  "language": "es",
+  "pace": "guided",
+  "intro": "Ahora al revés: cada cliente con sus ventas, también los que no compraron. Merge join es un JOIN de SQL entre dos flujos ordenados por la clave.",
+  "steps": [
+    {
+      "type": "CsvInput",
+      "name": "Leer clientes",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/clientes.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>nombre</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_alta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>saldo</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>activo</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "lee datos/clientes.csv (8 clientes)",
+      "why": "es el lado izquierdo del JOIN"
+    },
+    {
+      "type": "CsvInput",
+      "name": "Leer ventas",
+      "config_xml": "<filename>${Internal.Entry.Current.Directory}/datos/ventas.csv</filename>\n<filename_field/>\n<rownum_field/>\n<include_filename>N</include_filename>\n<separator>;</separator>\n<enclosure>\"</enclosure>\n<header>Y</header>\n<buffer_size>50000</buffer_size>\n<lazy_conversion>N</lazy_conversion>\n<add_filename_result>N</add_filename_result>\n<parallel>N</parallel>\n<newline_possible>N</newline_possible>\n<encoding>UTF-8</encoding>\n<fields>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>#</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>precio_unitario</name>\n    <type>Number</type>\n    <format>#.##</format>\n    <currency/>\n    <decimal>.</decimal>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n  <field>\n    <name>fecha_venta</name>\n    <type>Date</type>\n    <format>yyyy-MM-dd</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <length>-1</length>\n    <precision>-1</precision>\n    <trim_type>both</trim_type>\n  </field>\n</fields>\n",
+      "what": "lee datos/ventas.csv (10 ventas)",
+      "why": "es el lado derecho"
+    },
+    {
+      "type": "SortRows",
+      "name": "Ordenar clientes",
+      "after": "Leer clientes",
+      "config_xml": "<directory>%%java.io.tmpdir%%</directory>\n<prefix>out</prefix>\n<sort_size>1000000</sort_size>\n<free_memory/>\n<compress>N</compress>\n<compress_variable/>\n<unique_rows>N</unique_rows>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <ascending>Y</ascending>\n    <case_sensitive>N</case_sensitive>\n    <collator_enabled>N</collator_enabled>\n    <collator_strength>0</collator_strength>\n    <presorted>N</presorted>\n  </field>\n</fields>\n",
+      "what": "ordena por cliente_id",
+      "why": "Merge join exige las dos entradas ordenadas por la clave"
+    },
+    {
+      "type": "SortRows",
+      "name": "Ordenar ventas",
+      "after": "Leer ventas",
+      "config_xml": "<directory>%%java.io.tmpdir%%</directory>\n<prefix>out</prefix>\n<sort_size>1000000</sort_size>\n<free_memory/>\n<compress>N</compress>\n<compress_variable/>\n<unique_rows>N</unique_rows>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <ascending>Y</ascending>\n    <case_sensitive>N</case_sensitive>\n    <collator_enabled>N</collator_enabled>\n    <collator_strength>0</collator_strength>\n    <presorted>N</presorted>\n  </field>\n</fields>\n",
+      "what": "ordena por cliente_id",
+      "why": "el mismo orden y la misma clave que el otro lado"
+    },
+    {
+      "type": "MergeJoin",
+      "name": "Unir clientes y ventas",
+      "after": "Ordenar clientes",
+      "config_xml": "<join_type>LEFT OUTER</join_type>\n<step1>Ordenar clientes</step1>\n<step2>Ordenar ventas</step2>\n<keys_1>\n  <key>cliente_id</key>\n</keys_1>\n<keys_2>\n  <key>cliente_id</key>\n</keys_2>\n",
+      "what": "LEFT OUTER por cliente_id: cada cliente con cada una de sus ventas",
+      "why": "un cliente con 3 ventas da 3 filas; uno sin ventas, 1 fila con la venta vacía",
+      "watch_out": "C19: step1/step2 tienen que ser los nombres exactos de los dos steps con hop. D6: sin ordenar no falla, pierde filas",
+      "preview_rows": 10
+    },
+    {
+      "type": "SelectValues",
+      "name": "Quitar clave duplicada",
+      "after": "Unir clientes y ventas",
+      "config_xml": "<fields>\n  <select_unspecified>N</select_unspecified>\n  <remove>\n    <name>cliente_id_1</name>\n  </remove>\n</fields>\n",
+      "what": "quita cliente_id_1, la clave repetida del lado derecho",
+      "why": "Merge join copia los campos de los dos lados"
+    },
+    {
+      "type": "TextFileOutput",
+      "name": "Escribir clientes con ventas",
+      "after": "Quitar clave duplicada",
+      "config_xml": "<separator>;</separator>\n<enclosure>\"</enclosure>\n<enclosure_forced>N</enclosure_forced>\n<enclosure_fix_disabled>N</enclosure_fix_disabled>\n<header>Y</header>\n<footer>N</footer>\n<format>UNIX</format>\n<compression>None</compression>\n<encoding>UTF-8</encoding>\n<endedLine/>\n<fileNameInField>N</fileNameInField>\n<fileNameField/>\n<create_parent_folder>Y</create_parent_folder>\n<file>\n  <name>${Internal.Entry.Current.Directory}/salida/05_clientes_con_ventas</name>\n  <servlet_output>N</servlet_output>\n  <do_not_open_new_file_init>Y</do_not_open_new_file_init>\n  <extention>csv</extention>\n  <append>N</append>\n  <split>N</split>\n  <haspartno>N</haspartno>\n  <add_date>N</add_date>\n  <add_time>N</add_time>\n  <SpecifyFormat>N</SpecifyFormat>\n  <date_time_format/>\n  <add_to_result_filenames>Y</add_to_result_filenames>\n  <pad>N</pad>\n  <fast_dump>N</fast_dump>\n  <splitevery>0</splitevery>\n</file>\n<fields>\n  <field>\n    <name>cliente_id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>nombre</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>ciudad</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>venta_id</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>producto</name>\n    <type>String</type>\n    <format/>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n  <field>\n    <name>cantidad</name>\n    <type>Integer</type>\n    <format>0</format>\n    <currency/>\n    <decimal/>\n    <group/>\n    <nullif/>\n    <trim_type>none</trim_type>\n    <length>-1</length>\n    <precision>-1</precision>\n  </field>\n</fields>\n",
+      "what": "escribe salida/05_clientes_con_ventas.csv: 10 filas, Fabián sin ventas",
+      "why": "el resultado del JOIN"
+    }
+  ],
+  "hops": [
+    {
+      "from": "Ordenar ventas",
+      "to": "Unir clientes y ventas"
+    }
+  ],
+  "outro": "Para comparar: Stream lookup = flujo de búsqueda en memoria, sin ordenar, nunca multiplica filas. Merge join = dos flujos ordenados, INNER/LEFT/RIGHT/FULL, puede multiplicar. En base de datos: Database lookup o Database join. Ejercicio: cambia LEFT OUTER por INNER y cuenta las filas."
+}

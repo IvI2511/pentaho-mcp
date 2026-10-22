@@ -549,7 +549,8 @@ final class TransTools {
     s.add( Tools.tool( "arrange_canvas",
       "Automatically arranges the canvas of a transformation or a job from left to right following the hops "
         + "(each level in a column, branches one below the other; in jobs START goes on the left). Use it when you "
-        + "finish building or when the drawing got messy. Notes are not moved. Undo with Ctrl+Z.",
+        + "finish building or when the drawing got messy. Notes are not moved, except in a transformation with "
+        + "lesson notes (class mode): then the class rule moves the steps and the lesson notes. Undo with Ctrl+Z.",
       Tools.schema().document().build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();

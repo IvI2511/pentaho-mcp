@@ -61,6 +61,13 @@ símbolo decimal vazio, duplicados não removidos, caminhos fixos), a devolutiva
 do caso oculto e uma planilha para o Excel. O Spoon ganha a perspectiva **Corretor** com o mesmo e um
 assistente que monta o pacote a partir da transformação aberta.
 
+**Modo aula.** O Claude também pode *ensinar* um ETL: monta a transformação devagar, um step a cada
+clique em **Próximo ▶** numa nova aba **Lição**, e explica cada step com uma nota numerada no canvas (o que
+faz, por que está ali, o erro típico), com as primeiras linhas depois de cada passo. Feito para uma aula
+projetada ou para aprender sozinho; no fim, as notas podem ser ocultadas para o exercício e a lição vira
+uma apostila em PDF ou Word. A skill traz três lições testadas (filtrar, Sort + Group by, Stream lookup vs
+Merge join) em português, inglês e espanhol.
+
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
 
@@ -75,6 +82,7 @@ Kitchen.
 | *"O canvas está uma bagunça, organize."* | alinha os steps da esquerda para a direita, sem linhas cruzadas |
 | *"Por que este `.ktr` falha no Pan?"* | lê o arquivo, encontra o problema na lista de erros verificados e corrige |
 | *"Revise as boas práticas desta transformação antes de eu entregar e corrija o que for seguro."* | roda a revisão de qualidade, explica cada achado, aplica as correções seguras com um Ctrl+Z e pergunta antes do resto |
+| *"Dê a lição de Stream lookup passo a passo, nível iniciante, em português."* | monta um step a cada clique em Próximo ▶, com uma nota numerada no canvas por step e as linhas que ele produz |
 | *"Faça um relatório desta transformação para o trabalho, em PDF e PowerPoint, com uma conclusão curta."* | monta o relatório (linhagem, dicionário de dados, métricas…), escreve a conclusão com os dados reais e exporta os dois arquivos |
 | *"Monte um pacote de correção a partir desta solução, com um caso oculto, e depois corrija as entregas de `C:\TP3\entregas`."* | roda a solução para obter a saída esperada, corrige cada entrega em JVMs à parte e resume as notas, quem errou o quê e por quê; a planilha e a devolutiva de cada aluno ficam na pasta de resultados |
 
@@ -186,6 +194,7 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Campos | Listar os campos que saem de cada step, antes de configurar o próximo |
 | Verificações | Validar; preview de linhas reais de qualquer step |
 | Qualidade | Revisar boas práticas além da validação, com uma pontuação de 0 a 100 (e, se você pedir, lendo as fontes para provar um problema); aplicar as correções propostas; silenciar uma regra onde ela é proposital |
+| Modo aula | Reproduzir uma lição passo a passo com notas no canvas e uma aba Lição (ritmo guiado, automático ou manual), acompanhá-la, voltar, ocultar, mostrar ou remover as notas e transformá-la numa apostila |
 | Execução | Executar uma transformação ou um job, acompanhar o status e o log, parar |
 | Bancos de dados | Listar tipos de conexão; criar, testar e excluir conexões; ver tabelas e colunas; rodar consultas SQL (somente leitura, a menos que você peça escrita) |
 | Parâmetros | Listar, definir e excluir parâmetros |
@@ -254,6 +263,8 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
   diagramas de linhagem e de tabelas viram tabelas. A pré-visualização dentro do Spoon usa o motor do
   Internet Explorer que vem com o PDI, então não tem diagramas interativos: **Abrir no navegador** mostra o
   relatório completo.
+- O modo aula funciona **só com transformações** (ainda não com jobs), uma lição por transformação; com mais
+  de 12 passos avisa e sugere dividi-la. Se a lição mostra linhas, salve antes o `.ktr` junto dos dados.
 
 ## Novidades da 0.5.1
 
