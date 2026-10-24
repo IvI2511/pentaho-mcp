@@ -35,6 +35,7 @@ import io.github.ivi2511.pentahomcp.lint.NoEvaluado;
 import io.github.ivi2511.pentahomcp.lint.Opciones;
 import io.github.ivi2511.pentahomcp.lint.Penalidad;
 import io.github.ivi2511.pentahomcp.lint.Puntaje;
+import io.github.ivi2511.pentahomcp.lint.Regla;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
 import io.github.ivi2511.pentahomcp.lint.Sev;
 import io.github.ivi2511.pentahomcp.lint.Sondas;
@@ -99,6 +100,7 @@ final class SecCalidad implements Recolector {
     final Opciones op = new Opciones();
     op.lang = ctx.idioma();
     op.sinGuardar = c.sinGuardar;
+    op.robustez = true; // la familia robustness va en la seccion, con su sub-puntaje (en un job no corre ninguna)
     final EntornoInforme env = new EntornoInforme( ctx, copia, tope );
     op.entorno = env;
     boolean profundo = ctx.pedido().calidadProfunda;
@@ -131,15 +133,20 @@ final class SecCalidad implements Recolector {
     }
 
     Textos tx = Textos.de( op.lang );
-    int errores = cuenta( res, Sev.ERROR );
-    int advertencias = cuenta( res, Sev.WARNING );
-    int sugerencias = cuenta( res, Sev.INFO );
+    // los contadores de la calidad tecnica sin la familia robustness, que tiene su propio sub-puntaje
+    Resultado rb = res.robustez;
+    int errores = cuenta( res, Sev.ERROR ) - cuenta( rb, Sev.ERROR );
+    int advertencias = cuenta( res, Sev.WARNING ) - cuenta( rb, Sev.WARNING );
+    int sugerencias = cuenta( res, Sev.INFO ) - cuenta( rb, Sev.INFO );
 
     // lo que la validacion ya muestra: sus reglas, con warning o error (las info no las da validate)
     List<Hallazgo> enTabla = new ArrayList<Hallazgo>();
     List<Hallazgo> yaEnValidacion = new ArrayList<Hallazgo>();
+    List<Hallazgo> deRobustez = new ArrayList<Hallazgo>();
     for ( Hallazgo h : res.findings ) {
-      if ( conValidacion && enValidacion( h ) ) {
+      if ( esRobustez( h ) ) {
+        deRobustez.add( h );
+      } else if ( conValidacion && enValidacion( h ) ) {
         yaEnValidacion.add( h );
       } else {
         enTabla.add( h );
@@ -151,8 +158,9 @@ final class SecCalidad implements Recolector {
       s.con( parrafoProfundo( r, res ) );
     }
     avisos( s, r, tx, enTabla );
-    tablaHallazgos( s, r, tx, res, enTabla, yaEnValidacion, profundo );
+    tablaHallazgos( s, r, tx, enTabla, yaEnValidacion, profundo, !deRobustez.isEmpty() );
     tablaPuntos( s, r, tx, res );
+    tablaRobustez( s, r, tx, rb, deRobustez );
     tablaNoEvaluado( s, r, tx, res );
 
     s.resumen = resumen( r, tx, res, errores, advertencias, sugerencias );
@@ -186,6 +194,10 @@ final class SecCalidad implements Recolector {
     ind.con( new Indicador( r.s( "ind.advertencias" ), entero( r, advertencias ), null, advertencias > 0
       ? Indicador.WARN : Indicador.OK ) );
     ind.con( new Indicador( r.s( "ind.sugerencias" ), entero( r, sugerencias ) ) );
+    if ( res.robustez != null ) {
+      ind.con( new Indicador( r.s( "ind.robustez" ), r.f( "ind.puntaje.valor", res.robustez.score ), r.f(
+        "ind.puntaje.detalle", res.robustez.grade ), nivelBanda( res.robustez.grade ) ) );
+    }
     if ( !res.suppressed.isEmpty() ) {
       ind.con( new Indicador( r.s( "ind.silenciados" ), entero( r, res.suppressed.size() ), r.s(
         "ind.silenciados.detalle" ), null ) );
@@ -243,8 +255,8 @@ final class SecCalidad implements Recolector {
     }
   }
 
-  private static void tablaHallazgos( Seccion s, Rotulos r, Textos tx, Resultado res, List<Hallazgo> enTabla,
-                                      List<Hallazgo> yaEnValidacion, boolean profundo ) {
+  private static void tablaHallazgos( Seccion s, Rotulos r, Textos tx, List<Hallazgo> enTabla,
+                                      List<Hallazgo> yaEnValidacion, boolean profundo, boolean hayRobustez ) {
     List<String> notas = new ArrayList<String>();
     if ( !yaEnValidacion.isEmpty() ) {
       notas.add( Txt.n( r, "nota.validacion", yaEnValidacion.size() ) );
@@ -253,7 +265,8 @@ final class SecCalidad implements Recolector {
       notas.add( r.s( "nota.sin_profundo" ) );
     }
     if ( enTabla.isEmpty() ) {
-      Parrafo p = new Parrafo( res.findings.isEmpty() ? r.s( "sin_hallazgos" ) : r.s( "todos_en_validacion" ) );
+      Parrafo p = new Parrafo( !yaEnValidacion.isEmpty() ? r.s( "todos_en_validacion" ) : hayRobustez ? r.s(
+        "sin_hallazgos.calidad" ) : r.s( "sin_hallazgos" ) );
       p.id = "quality-sin-hallazgos";
       s.con( p );
       return;
@@ -300,6 +313,41 @@ final class SecCalidad implements Recolector {
     s.con( t );
   }
 
+  /**
+   * La familia robustness: sus hallazgos (las filas malas que pararian la carga o se perderian) en una tabla aparte,
+   * con de donde salen los puntos que le faltan a su sub-puntaje. No restan de la calidad tecnica.
+   */
+  private static void tablaRobustez( Seccion s, Rotulos r, Textos tx, Resultado rb, List<Hallazgo> deRobustez ) {
+    if ( rb == null || deRobustez.isEmpty() ) {
+      return;
+    }
+    Tabla t = new Tabla( r.s( "col.severidad" ), r.s( "col.regla" ), r.s( "col.donde" ), r.s( "col.que" ), r.s(
+      "col.arreglo" ) );
+    t.id = "quality-robustez";
+    t.titulo = r.s( "tabla.robustez" );
+    for ( int i = 0; i < deRobustez.size() && i < MAX_FILAS; i++ ) {
+      Hallazgo h = deRobustez.get( i );
+      t.fila( severidad( r, h.severity ), tx.t( h.rule + ".title" ), donde( r, h ), que( r, h ), arreglo( r, h ) );
+    }
+    if ( deRobustez.size() > MAX_FILAS ) {
+      t.pie = Txt.n( r, "pie.mas", deRobustez.size() - MAX_FILAS );
+    }
+    t.nota = r.s( "nota.robustez" );
+    s.con( t );
+    if ( rb.penalties.isEmpty() ) {
+      return;
+    }
+    Tabla p = new Tabla( r.s( "col.regla" ), r.s( "col.severidad" ), r.s( "col.veces" ), r.s( "col.puntos" ) );
+    p.id = "quality-puntos-robustez";
+    p.titulo = r.s( "tabla.puntos_robustez" );
+    p.alineacion = new ArrayList<String>( Arrays.asList( "l", "l", "r", "r" ) );
+    for ( Penalidad x : rb.penalties ) {
+      p.fila( tx.t( x.rule + ".title" ), severidad( r, x.severity ), entero( r, x.hits ), r.f( "puntos", x.points ) );
+    }
+    p.nota = r.s( "nota.formula_robustez" );
+    s.con( p );
+  }
+
   private static void tablaNoEvaluado( Seccion s, Rotulos r, Textos tx, Resultado res ) {
     if ( res.notEvaluated.isEmpty() ) {
       return;
@@ -330,8 +378,12 @@ final class SecCalidad implements Recolector {
 
   private static String resumen( Rotulos r, Textos tx, Resultado res, int errores, int advertencias,
                                  int sugerencias ) {
+    String robustez = resumenRobustez( r, res.robustez );
     if ( errores + advertencias + sugerencias == 0 ) {
-      return r.f( "resumen.limpio", res.score, res.grade );
+      if ( robustez == null ) {
+        return r.f( "resumen.limpio", res.score, res.grade );
+      }
+      return r.f( "resumen.limpio.calidad", res.score, res.grade ) + " " + robustez;
     }
     List<String> partes = new ArrayList<String>();
     if ( errores > 0 ) {
@@ -351,7 +403,34 @@ final class SecCalidad implements Recolector {
       Penalidad p = res.penalties.get( 0 );
       sb.append( ' ' ).append( r.f( "resumen.peor", tx.t( p.rule + ".title" ), Txt.n( r, "n.punto", p.points ) ) );
     }
+    if ( robustez != null ) {
+      sb.append( ' ' ).append( robustez );
+    }
     return sb.toString();
+  }
+
+  /** El sub-puntaje de robustez en una frase; null si la familia no corrio (un job). */
+  private static String resumenRobustez( Rotulos r, Resultado rb ) {
+    if ( rb == null ) {
+      return null;
+    }
+    List<String> partes = new ArrayList<String>();
+    int e = cuenta( rb, Sev.ERROR );
+    int w = cuenta( rb, Sev.WARNING );
+    int i = cuenta( rb, Sev.INFO );
+    if ( e > 0 ) {
+      partes.add( Txt.n( r, "n.error", e ) );
+    }
+    if ( w > 0 ) {
+      partes.add( Txt.n( r, "n.adv", w ) );
+    }
+    if ( i > 0 ) {
+      partes.add( Txt.n( r, "n.sug", i ) );
+    }
+    if ( partes.isEmpty() ) {
+      return r.f( "resumen.robustez.limpio", rb.score, rb.grade );
+    }
+    return r.f( "resumen.robustez", rb.score, rb.grade, Txt.lista( r, partes ) );
   }
 
   // ---------------------------------------------------------------- celdas
@@ -425,7 +504,15 @@ final class SecCalidad implements Recolector {
     return false;
   }
 
+  /** De la familia robustness (va en su propia tabla y en su sub-puntaje, no en la calidad tecnica). */
+  static boolean esRobustez( Hallazgo h ) {
+    return Regla.ROBUSTNESS.equals( h.category );
+  }
+
   private static int cuenta( Resultado res, Sev s ) {
+    if ( res == null ) {
+      return 0;
+    }
     Integer n = res.counts.get( s.codigo() );
     return n == null ? 0 : n;
   }

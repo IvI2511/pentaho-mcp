@@ -64,7 +64,7 @@ final class RobustecerAnalisis {
   static final Set<String> ESCRIBEN_TABLA = new HashSet<String>( Arrays.asList( "TableOutput", "InsertUpdate",
     "Update", "Delete", "SynchronizeAfterMerge", "DimensionLookup", "CombinationLookup" ) );
   static final Set<String> ENTRADAS_ARCHIVO = new HashSet<String>( Arrays.asList( "CsvInput", "TextFileInput" ) );
-  static final Set<String> QUITAN_REPETIDOS = new HashSet<String>( Arrays.asList( "UniqueRows", "UniqueRowsByHashSet",
+  static final Set<String> QUITAN_REPETIDOS = new HashSet<String>( Arrays.asList( "Unique", "UniqueRows", "UniqueRowsByHashSet",
     "GroupBy", "MemoryGroupBy" ) );
   static final Set<String> AGRUPAN = new HashSet<String>( Arrays.asList( "GroupBy", "MemoryGroupBy" ) );
   static final Set<String> CONVERTIDOS = new HashSet<String>( Arrays.asList( "Date", "Number", "Integer", "BigNumber",
@@ -115,6 +115,11 @@ final class RobustecerAnalisis {
     String limpiar;
     String escribir;
     final List<Cambio> cambios = new ArrayList<Cambio>();
+    /** Los steps que le mandan filas (por un hop de error o normal), en el orden en que se planearon. */
+    final List<String> fuentes = new ArrayList<String>();
+    Lugar lugar;
+    Cambio cambioLimpiar;
+    Cambio cambioEscribir;
   }
 
   private final TransMeta tm;
@@ -132,6 +137,12 @@ final class RobustecerAnalisis {
   private final List<int[]> cajasCola = new ArrayList<int[]>();
   /** Los hops del lienzo: segmentos {x1, y1, x2, y2} de centro a centro. */
   private final List<int[]> segmentos = new ArrayList<int[]>();
+  /** Las cajas de las notas (las demás cajas son de steps: ícono y rótulo). */
+  private final List<int[]> notas = new ArrayList<int[]>();
+  /** Las cajas de los demás steps nuevos del plan (filtros, motivos...): los hops de las colas no las atraviesan. */
+  private final List<int[]> cajasNuevas = new ArrayList<int[]>();
+  /** Los steps nuevos del plan que no son de una cola: {posición, caja} por nombre (pueden ser fuentes de una cola). */
+  private final Map<String, int[][]> posNuevos = new HashMap<String, int[][]>();
   private final String lang;
 
   private RobustecerAnalisis( TransMeta tm, Pedido p ) {
@@ -145,7 +156,9 @@ final class RobustecerAnalisis {
       cajas.add( caja( s.getLocation().x, s.getLocation().y, s.getName() ) );
     }
     for ( NotePadMeta n : tm.getNotes() ) {
-      cajas.add( cajaNota( n ) );
+      int[] kn = cajaNota( n );
+      cajas.add( kn );
+      notas.add( kn );
     }
     for ( TransHopMeta h : tm.getTransHops() ) {
       if ( h.getFromStep() != null && h.getToStep() != null ) {
@@ -166,6 +179,7 @@ final class RobustecerAnalisis {
     a.repetidos();
     a.esperas();
     a.manuales();
+    a.recolocarColas();
     final Pedido pp = p;
     Collections.sort( a.plan.propuestas, new Comparator<Propuesta>() {
       @Override
@@ -480,26 +494,26 @@ final class RobustecerAnalisis {
     return true;
   }
 
-  /** ¿El hop de 'a' a 'b' (de centro a centro) pasa por encima de algo que no sean sus dos steps? */
-  private boolean hopLibre( int[] a, int[] b, int[] cajaA, int[] cajaB ) {
-    int[] sg = { a[ 0 ] + ICONO / 2, a[ 1 ] + ICONO / 2, b[ 0 ] + ICONO / 2, b[ 1 ] + ICONO / 2 };
-    for ( int[] c : cajas ) {
-      if ( !Arrays.equals( c, cajaA ) && !Arrays.equals( c, cajaB ) && cruza( sg, c ) ) {
-        return false;
-      }
-    }
-    return true;
+  /** Dónde quedó una cola: sus dos steps, sus cajas y los hops que se dibujaron por ella (para recolocarla). */
+  private static final class Lugar {
+    int[] p1;
+    int[] p2;
+    int[] k1;
+    int[] k2;
+    final List<int[]> segs = new ArrayList<int[]>();
   }
 
   /**
-   * El lugar de los dos steps de una cola (limpiar → escribir): un carril debajo de su step de origen, separados como
-   * la grilla de TransLayout y lo justo para que sus rótulos no se pisen, sin tocar steps, notas ni hops; si debajo no
-   * hay sitio, más abajo o a los lados, y como último recurso debajo de todo.
+   * El lugar de los dos steps de una cola (limpiar → escribir) para sus fuentes (cada una {posición, caja}: los steps
+   * que le mandan filas). Un carril debajo de la primera fuente, separados como la grilla de TransLayout y lo justo
+   * para que sus rótulos no se pisen, sin tocar steps, notas ni hops, y con sus hops nuevos (cada fuente → limpiar,
+   * limpiar → escribir) sin pasar por encima de ningún step ni nota. Si debajo no hay sitio, más abajo o a los lados;
+   * si tampoco, el sitio libre de todo el lienzo (debajo de todo incluido) más cerca de las fuentes cuyos hops no
+   * crucen nada, y si no lo hay, el que crucen menos cajas.
    */
-  private int[][] carril( StepMeta ancla, String limpiar, String escribir ) {
-    int ax = ancla.getLocation().x;
-    int ay = ancla.getLocation().y;
-    int[] cajaAncla = caja( ax, ay, ancla.getName() );
+  private Lugar carril( List<int[][]> fuentes, String limpiar, String escribir ) {
+    int ax = fuentes.get( 0 )[ 0 ][ 0 ];
+    int ay = fuentes.get( 0 )[ 0 ][ 1 ];
     int dx = Math.max( TransLayout.DX, ( anchoRotulo( limpiar ) + anchoRotulo( escribir ) ) / 2 + 2 * MARGEN + 16 );
     int[] corrimientos = { 0, TransLayout.DX, -TransLayout.DX, 2 * TransLayout.DX, -2 * TransLayout.DX };
     for ( int k = 1; k <= 25; k++ ) {
@@ -513,30 +527,217 @@ final class RobustecerAnalisis {
         int[] p2 = { x1 + dx, y };
         int[] k1 = caja( p1[ 0 ], p1[ 1 ], limpiar );
         int[] k2 = caja( p2[ 0 ], p2[ 1 ], escribir );
-        if ( libreDeTodo( k1 ) && libreDeTodo( k2 ) && hopLibre( new int[] { ax, ay }, p1, cajaAncla, k1 ) ) {
-          return ocupar( p1, p2, k1, k2, ax, ay );
+        if ( libreDeTodo( k1 ) && libreDeTodo( k2 ) && cruces( fuentes, p1, p2, k1, k2 ) == 0 ) {
+          return ocupar( p1, p2, k1, k2, fuentes );
         }
       }
     }
+    // todo el lienzo, una fila más abajo de todo incluida: sin cruces y lo más cerca posible; si no, menos cruces
     int fondo = ay;
-    for ( int[] c : cajas ) {
+    int derecha = ax;
+    for ( int[] c : obstaculos() ) {
       fondo = Math.max( fondo, c[ 3 ] );
+      derecha = Math.max( derecha, c[ 2 ] );
     }
-    int[] p1 = { Math.max( 32, ax ), fondo + TransLayout.DY / 2 };
-    int[] p2 = { p1[ 0 ] + dx, p1[ 1 ] };
-    return ocupar( p1, p2, caja( p1[ 0 ], p1[ 1 ], limpiar ), caja( p2[ 0 ], p2[ 1 ], escribir ), ax, ay );
+    long cx = 0;
+    long cy = 0;
+    for ( int[][] f : fuentes ) {
+      cx += f[ 0 ][ 0 ];
+      cy += f[ 0 ][ 1 ];
+    }
+    cx /= fuentes.size();
+    cy /= fuentes.size();
+    int[] mejor = null;
+    long mejorCosto = Long.MAX_VALUE;
+    int pasoX = TransLayout.DX / 2;
+    int pasoY = TransLayout.DY / 2;
+    for ( int y = 32; y <= fondo + TransLayout.DY / 2; y += pasoY ) {
+      for ( int x1 = 32; x1 <= derecha + TransLayout.DX; x1 += pasoX ) {
+        if ( x1 + ICONO / 2 - anchoRotulo( limpiar ) / 2 < 0 ) {
+          continue;
+        }
+        int[] p1 = { x1, y };
+        int[] p2 = { x1 + dx, y };
+        int[] k1 = caja( p1[ 0 ], p1[ 1 ], limpiar );
+        int[] k2 = caja( p2[ 0 ], p2[ 1 ], escribir );
+        if ( !libreDeTodo( k1 ) || !libreDeTodo( k2 ) ) {
+          continue;
+        }
+        long dist = ( x1 - cx ) * ( x1 - cx ) + ( y - cy ) * ( y - cy );
+        long costo = cruces( fuentes, p1, p2, k1, k2 ) * 1000000000000L + dist;
+        if ( costo < mejorCosto ) {
+          mejorCosto = costo;
+          mejor = p1;
+        }
+      }
+    }
+    if ( mejor == null ) { // no debería pasar (debajo de todo siempre hay sitio)
+      mejor = new int[] { Math.max( 32, ax ), fondo + TransLayout.DY / 2 };
+    }
+    int[] p2 = { mejor[ 0 ] + dx, mejor[ 1 ] };
+    return ocupar( mejor, p2, caja( mejor[ 0 ], mejor[ 1 ], limpiar ), caja( p2[ 0 ], p2[ 1 ], escribir ), fuentes );
   }
 
-  private int[][] ocupar( int[] p1, int[] p2, int[] k1, int[] k2, int ax, int ay ) {
+  /** Lo que un hop nuevo no debe atravesar: steps con su rótulo, notas, colas y los demás steps nuevos. */
+  private List<int[]> obstaculos() {
+    List<int[]> l = new ArrayList<int[]>( cajas );
+    l.addAll( cajasNuevas );
+    return l;
+  }
+
+  /**
+   * Cuántas cajas (steps con su rótulo, notas, colas, steps nuevos) cruzan los hops nuevos de una cola: de cada fuente
+   * a limpiar (p1) y de limpiar a escribir (p2). No cuentan las cajas de los extremos de cada hop.
+   */
+  private int cruces( List<int[][]> fuentes, int[] p1, int[] p2, int[] k1, int[] k2 ) {
+    int[] s2 = { p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2, p2[ 0 ] + ICONO / 2, p2[ 1 ] + ICONO / 2 };
+    int n = 0;
+    for ( int[] c : obstaculos() ) {
+      if ( Arrays.equals( c, k1 ) ) {
+        continue;
+      }
+      for ( int[][] f : fuentes ) {
+        int[] s1 = { f[ 0 ][ 0 ] + ICONO / 2, f[ 0 ][ 1 ] + ICONO / 2, p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2 };
+        if ( !Arrays.equals( c, f[ 1 ] ) && atraviesa( s1, c ) ) {
+          n++;
+        }
+      }
+      if ( !Arrays.equals( c, k2 ) && atraviesa( s2, c ) ) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /**
+   * ¿El hop pasa por encima de lo que se ve de esa caja? Una nota, entera; un step, su ícono o su rótulo (no las
+   * esquinas vacías de su caja junto al ícono, por donde un hop pasa sin tocar nada).
+   */
+  private boolean atraviesa( int[] sg, int[] c ) {
+    for ( int[] n : notas ) {
+      if ( n == c ) {
+        return cruza( sg, c );
+      }
+    }
+    int cx = ( c[ 0 ] + c[ 2 ] ) / 2;
+    int y = c[ 1 ] + MARGEN;
+    int[] icono = { cx - ICONO / 2 - MARGEN / 2, y - MARGEN / 2, cx + ICONO / 2 + MARGEN / 2, y + ICONO + MARGEN / 2 };
+    int[] rotulo = { c[ 0 ], y + ICONO + 2, c[ 2 ], c[ 3 ] };
+    return cruza( sg, icono ) || cruza( sg, rotulo );
+  }
+
+  private Lugar ocupar( int[] p1, int[] p2, int[] k1, int[] k2, List<int[][]> fuentes ) {
+    Lugar l = new Lugar();
+    l.p1 = p1;
+    l.p2 = p2;
+    l.k1 = k1;
+    l.k2 = k2;
     cajas.add( k1 );
     cajas.add( k2 );
     cajasCola.add( k1 );
     cajasCola.add( k2 );
     ocupados.add( p1 );
     ocupados.add( p2 );
-    segmentos.add( new int[] { ax + ICONO / 2, ay + ICONO / 2, p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2 } );
-    segmentos.add( new int[] { p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2, p2[ 0 ] + ICONO / 2, p2[ 1 ] + ICONO / 2 } );
-    return new int[][] { p1, p2 };
+    for ( int[][] f : fuentes ) {
+      l.segs.add( new int[] { f[ 0 ][ 0 ] + ICONO / 2, f[ 0 ][ 1 ] + ICONO / 2, p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO
+        / 2 } );
+    }
+    l.segs.add( new int[] { p1[ 0 ] + ICONO / 2, p1[ 1 ] + ICONO / 2, p2[ 0 ] + ICONO / 2, p2[ 1 ] + ICONO / 2 } );
+    segmentos.addAll( l.segs );
+    return l;
+  }
+
+  /** Saca una cola del lienzo (sus cajas, sus lugares y sus hops) para volver a colocarla. */
+  private void soltar( Lugar l ) {
+    cajas.remove( l.k1 );
+    cajas.remove( l.k2 );
+    cajasCola.remove( l.k1 );
+    cajasCola.remove( l.k2 );
+    ocupados.remove( l.p1 );
+    ocupados.remove( l.p2 );
+    for ( int[] sg : l.segs ) {
+      segmentos.remove( sg );
+    }
+  }
+
+  /** Una fuente de una cola: {posición, caja}; un step del documento o uno nuevo del plan (null si no está). */
+  private int[][] fuente( String nombre ) {
+    StepMeta s = tm.findStep( nombre );
+    if ( s != null ) {
+      return new int[][] { { s.getLocation().x, s.getLocation().y }, caja( s.getLocation().x, s.getLocation().y,
+        s.getName() ) };
+    }
+    return posNuevos.get( nombre );
+  }
+
+  /** ¿Esta propuesta se aplicará con el pedido? Lo mismo que visibles + elegir + el filtro de steps de analizar. */
+  private boolean seAplica( Propuesta x ) {
+    if ( !( p.pideReceta( x.receta ) || p.confirmar.contains( x.key ) ) || !x.aplicable() ) {
+      return false;
+    }
+    if ( p.steps != null && !contieneSinMayusculas( p.steps, x.step ) ) {
+      return false;
+    }
+    return Receta.AUTO.equals( x.nivel ) || p.confirmarTodo || p.confirmar.contains( x.key );
+  }
+
+  /** El hop de 'de' a la limpieza de la cola, anotando a 'de' como fuente (la cola se coloca para todas). */
+  private Cambio alimentar( Cola c, String de, boolean error ) {
+    if ( !c.fuentes.contains( de ) ) {
+      c.fuentes.add( de );
+    }
+    return hop( de, c.limpiar, error );
+  }
+
+  /**
+   * Con el plan entero, cada cola mira los hops de TODAS sus fuentes (varias entradas con el mismo formato de fila, o
+   * el motivo de R03/R08, comparten la cola): si alguno pasa por encima de un step, la cola se vuelve a colocar para
+   * todas, y sus dos steps nuevos cambian de sitio.
+   */
+  private void recolocarColas() {
+    // las fuentes que de verdad se van a aplicar con este pedido (las de propuestas que no se eligen no dibujan hop)
+    Set<String> aplicadas = new HashSet<String>();
+    for ( Propuesta x : plan.propuestas ) {
+      if ( seAplica( x ) ) {
+        for ( Cambio k : x.cambios ) {
+          if ( Cambio.ADD_HOP.equals( k.op ) ) {
+            aplicadas.add( k.get( "from" ) + "\n" + k.get( "to" ) );
+          }
+        }
+      }
+    }
+    for ( Cola c : colas.values() ) {
+      List<int[][]> fs = new ArrayList<int[][]>();
+      for ( String n : c.fuentes ) {
+        int[][] f = fuente( n );
+        if ( f != null && aplicadas.contains( n + "\n" + c.limpiar ) ) {
+          fs.add( f );
+        }
+      }
+      if ( fs.isEmpty() ) { // ninguna se aplica (un plan para mirar): para todas
+        for ( String n : c.fuentes ) {
+          int[][] f = fuente( n );
+          if ( f != null ) {
+            fs.add( f );
+          }
+        }
+      }
+      if ( fs.isEmpty() || c.lugar == null ) {
+        continue;
+      }
+      Lugar viejo = c.lugar;
+      soltar( viejo );
+      if ( libreDeTodo( viejo.k1 ) && libreDeTodo( viejo.k2 ) && cruces( fs, viejo.p1, viejo.p2, viejo.k1,
+        viejo.k2 ) == 0 ) {
+        c.lugar = ocupar( viejo.p1, viejo.p2, viejo.k1, viejo.k2, fs );
+      } else {
+        c.lugar = carril( fs, c.limpiar, c.escribir );
+      }
+      c.cambioLimpiar.x = c.lugar.p1[ 0 ];
+      c.cambioLimpiar.y = c.lugar.p1[ 1 ];
+      c.cambioEscribir.x = c.lugar.p2[ 0 ];
+      c.cambioEscribir.y = c.lugar.p2[ 1 ];
+    }
   }
 
   // ---------------------------------------------------------------- el idioma del documento
@@ -690,15 +891,18 @@ final class RobustecerAnalisis {
     String archivo = n == null ? fl : fl + "_" + ( n + 1 );
     c.limpiar = unico( t( "Clean reason ", "Limpiar motivo ", "Limpar motivo " ) + archivo );
     c.escribir = unico( t( "Write rejects ", "Escribir rechazos ", "Gravar rejeitados " ) + archivo );
-    int[][] lugar = carril( ancla, c.limpiar, c.escribir );
-    int[] pl = lugar[ 0 ];
-    int[] pe = lugar[ 1 ];
+    List<int[][]> primera = new ArrayList<int[][]>();
+    primera.add( fuente( ancla.getName() ) );
+    c.lugar = carril( primera, c.limpiar, c.escribir );
+    int[] pl = c.lugar.p1;
+    int[] pe = c.lugar.p2;
 
     StringBuilder r = new StringBuilder( "<fields>" );
     r.append( regla( MOTIVO, "^\\s+|\\s+$", "" ) ).append( regla( MOTIVO, "\\s*[\\r\\n]+\\s*", " | " ) )
       .append( regla( MOTIVO, "^([A-Za-z_$][\\w$]*\\.)+[A-Za-z_$][\\w$]*Exception:\\s*(\\|\\s*)?", "" ) )
       .append( regla( MOTIVO, ",\\s*$", "" ) ).append( regla( CAMPOS_ERROR, ",\\s*$", "" ) ).append( "</fields>" );
     Cambio limpiar = nuevo( c.limpiar, "ReplaceString", r.toString(), pl, "rejects tail" );
+    c.cambioLimpiar = limpiar;
     limpiar.diff = "+ " + c.limpiar + " (Replace in string: one line, no blanks at the edges)";
     c.cambios.add( limpiar );
 
@@ -718,6 +922,7 @@ final class RobustecerAnalisis {
       + "<SpecifyFormat>N</SpecifyFormat><date_time_format/><add_to_result_filenames>Y</add_to_result_filenames>"
       + "<pad>N</pad><fast_dump>N</fast_dump><splitevery/></file>" + LintArreglos.camposDeSalida( campos );
     Cambio escribir = nuevo( c.escribir, "TextFileOutput", salida, pe, "rejects tail" );
+    c.cambioEscribir = escribir;
     escribir.p.put( "file", ruta + ( ext.isEmpty() ? "" : "." + ext ) );
     escribir.diff = "+ " + c.escribir + " (Text file output) " + escribir.p.get( "file" ) + " [" + campos.size()
       + " fields, created even when empty]";
@@ -741,6 +946,11 @@ final class RobustecerAnalisis {
     c.x = pos[ 0 ];
     c.y = pos[ 1 ];
     c.atributos.put( ADDED_BY, "harden_etl:" + receta );
+    if ( !"rejects tail".equals( receta ) ) { // los de las colas ya están en cajas
+      int[] k = caja( pos[ 0 ], pos[ 1 ], nombre );
+      cajasNuevas.add( k );
+      posNuevos.put( nombre, new int[][] { pos, k } );
+    }
     return c;
   }
 
@@ -813,7 +1023,7 @@ final class RobustecerAnalisis {
     }
     Cola c = cola( conMotivo( prev ), s );
     List<Cambio> l = new ArrayList<Cambio>( c.cambios );
-    l.add( hop( s.getName(), c.limpiar, true ) );
+    l.add( alimentar( c, s.getName(), true ) );
     Cambio e = new Cambio( Cambio.SET_ERROR_HANDLING ).con( "step", s.getName() ).con( "target", c.limpiar )
       .con( "description_field", MOTIVO ).con( "fields_field", CAMPOS_ERROR );
     e.diff = "~ " + s.getName() + ": error handling -> " + c.limpiar + " (" + MOTIVO + ", " + CAMPOS_ERROR + ")";
@@ -1115,7 +1325,7 @@ final class RobustecerAnalisis {
       }
       x.cambios.add( hop( filtro, motivo, false ) );
       x.cambios.addAll( c.cambios );
-      x.cambios.add( hop( motivo, c.limpiar, false ) );
+      x.cambios.add( alimentar( c, motivo, false ) );
       if ( MANDAN_POR_NOMBRE.contains( in.getStepID() ) ) {
         x.nivel = Receta.MANUAL;
         x.cambios.clear();
@@ -1600,7 +1810,7 @@ final class RobustecerAnalisis {
     pr.cambios.add( hop( filtro, siguiente.getName(), false ) );
     pr.cambios.add( hop( filtro, motivo, false ) );
     pr.cambios.addAll( c.cambios );
-    pr.cambios.add( hop( motivo, c.limpiar, false ) );
+    pr.cambios.add( alimentar( c, motivo, false ) );
     pr.avisos.add( "If the source SQL joins with an INNER JOIN, the orphans disappear before this filter: make it a "
       + "LEFT JOIN (by hand)." );
   }
@@ -1618,7 +1828,7 @@ final class RobustecerAnalisis {
       }
       String id = s.getStepID();
       Element x = xml( s );
-      if ( "FieldSplitter".equals( id ) && s.getStepErrorMeta() == null ) {
+      if ( "FieldSplitter".equals( id ) && RobustecerAplicar.manejoDeErrores( s ) == null ) {
         boolean deArchivo = false;
         for ( StepMeta a : arriba( s ) ) {
           deArchivo |= ENTRADAS_ARCHIVO.contains( a.getStepID() );

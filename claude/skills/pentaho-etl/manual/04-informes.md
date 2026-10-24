@@ -84,7 +84,7 @@ Pass `sections` only to leave things out or to add `profile`.
 | `lineage`, `dictionary` | transformation | computes the fields of every step; database steps may connect |
 | `target_model` | transformation with Table output or Insert/Update | none; with `query_database=true` it connects to read primary and foreign keys (read-only) |
 | `validation` | both | runs Spoon's check; database steps may connect |
-| `quality` | both | the `lint_etl` score and findings (`06-calidad.md` §9), robustness findings included: there is no separate robustness section (`09-robustez.md`); computes fields like `lineage`. With `quality_deep: true` it also reads up to 5000 rows of the sources through read-only previews (never writes) |
+| `quality` | both | the `lint_etl` score and findings (`06-calidad.md` §9) and, for a transformation, the robustness rules too (`lint_etl` runs them only with `robustness: true`): their findings in a table of their own and their separate robustness score (`09-robustez.md` §9); there is no separate robustness section. Computes fields like `lineage`. With `quality_deep: true` it also reads up to 5000 rows of the sources through read-only previews (never writes) |
 | `metrics` | both | `last_run` (default) reads the last run made in Spoon; nothing if it never ran |
 | `profile` | transformation | **runs a copy** up to the step(s) in `profile_steps` (up to 10, one run; `profile_step` for one), reading `profile_rows` rows (default 5000) |
 | `narrative` | both | only if you pass `narrative.conclusions` |
@@ -141,6 +141,7 @@ No headings, tables, links, images, code blocks or HTML (it is escaped and would
 | Keys and target columns | `target_model` → `data` (tables, columns, primary and foreign keys) |
 | Errors and warnings | `validation` → indicators and table |
 | Good practices, the technical quality score | `quality` → `data` (the `lint_etl` result: `score`, `grade`, `penalties`, `findings`); call it technical quality, not the mark of the work |
+| Fault tolerance (bad rows that stop the load or vanish) | `quality` → `data.robustness` (`score`, `grade`, `penalties`) and the `findings` of category `robustness` |
 
 `get_report_data` cuts long tables to `max_rows` (default 50); `rows_total` gives the full length.
 

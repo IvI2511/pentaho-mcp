@@ -147,17 +147,47 @@ final class RobustecerAplicar {
   /**
    * El «antes» de un step al que se le pone manejo de errores. StepMeta.replaceMeta (lo que hace Ctrl+Z en Spoon) solo
    * copia el StepErrorMeta si el de antes no es null: con null, deshacer dejaría el manejo de errores habilitado hacia
-   * un step que ya no está (y la transformación fallaría al correr). Por eso, si no tenía, el «antes» lleva uno
-   * deshabilitado y sin destino: tras Ctrl+Z el step corre como antes (el .ktr guarda un &lt;error&gt; apagado).
+   * un step que ya no está (y la transformación fallaría al correr). Kettle no deja volver a null, así que si no tenía,
+   * el «antes» lleva un {@link SinManejoDeErrores}: apagado, sin destino y que no se escribe en el .ktr. Tras Ctrl+Z el
+   * step corre como antes y guardar da el mismo XML que antes de harden_etl.
    */
   static StepMeta instantaneaSinErrores( TransMeta tm, StepMeta s ) {
     StepMeta c = instantanea( s );
     if ( c.getStepErrorMeta() == null ) {
-      StepErrorMeta apagado = new StepErrorMeta( tm, c );
-      apagado.setEnabled( false );
-      c.setStepErrorMeta( apagado );
+      c.setStepErrorMeta( new SinManejoDeErrores( tm, c ) );
     }
     return c;
+  }
+
+  /**
+   * «Este step no tenía manejo de errores», en el lugar del null que Ctrl+Z no sabe restaurar: apagado, sin destino y
+   * con getXML vacío mientras siga así (TransMeta.getXML no escribe nada más por él, ni un salto de línea), así que el
+   * .ktr guardado después de deshacer es idéntico al de antes. StepErrorMeta.clone es Object.clone: las copias de
+   * replaceMeta siguen siendo de esta clase. Si alguien lo habilita o le pone destino (el diálogo de Spoon edita este
+   * mismo objeto), se guarda como cualquier otro.
+   */
+  static final class SinManejoDeErrores extends StepErrorMeta {
+
+    SinManejoDeErrores( TransMeta tm, StepMeta s ) {
+      super( tm, s );
+      setEnabled( false );
+    }
+
+    /** Sigue sin decir nada: apagado y sin destino. */
+    boolean vacio() {
+      return !isEnabled() && getTargetStep() == null;
+    }
+
+    @Override
+    public String getXML() {
+      return vacio() ? "" : super.getXML();
+    }
+  }
+
+  /** El manejo de errores del step, o null si no tiene (o solo el «no tenía» que deja Ctrl+Z). */
+  static StepErrorMeta manejoDeErrores( StepMeta s ) {
+    StepErrorMeta m = s.getStepErrorMeta();
+    return m instanceof SinManejoDeErrores && ( (SinManejoDeErrores) m ).vacio() ? null : m;
   }
 
   private static void ejecutar( TransMeta tm, List<Cambio> cambios, UndoGrupo undo, IMetaStore ms, Hecho h )
@@ -258,7 +288,7 @@ final class RobustecerAplicar {
         StepMeta s = tm.findStep( c.get( "step" ) );
         StepMeta destino = tm.findStep( c.get( "target" ) );
         StepMeta antes = instantaneaSinErrores( tm, s );
-        StepErrorMeta sem = s.getStepErrorMeta();
+        StepErrorMeta sem = manejoDeErrores( s );
         // uno apagado (la persona lo configuró y destildó «Enable») se reusa, pero con los nombres de la cola que se
         // construyó (motivo, campos_error) y sin sus topes: si conservara desc_error, el Text file output de la cola
         // no encontraría 'motivo' y la corrida abortaría con la primera fila mala.

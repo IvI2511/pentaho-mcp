@@ -197,6 +197,89 @@ public class PruebaEstresBalance {
     igual( "fragile", Balance.veredicto( Arrays.asList( i, im ) ), "frágil manda" );
   }
 
+  /**
+   * 0.6.1: falta una tabla (la búsqueda) y además una fila mala aborta otro step (la conversión). Antes el entorno
+   * tapaba la fila mala (not_run); ahora se dicen los dos: environment_problem y no_abort en falla con el step de la
+   * fila, y el veredicto es fragile. Con solo el entorno, o sin mensaje propio del step, sigue siendo not_run.
+   */
+  public void pruebaEntornoYFilaMala() throws Exception {
+    Balance.Nodo in = nodo( "Read", "CsvInput" );
+    in.previos.clear();
+    in.entradaArchivo = true;
+    Balance.Nodo conv = nodo( "Convert", "SelectValues", "Read" );
+    Balance.Nodo lk = nodo( "Lookup", "DBLookup", "Convert" );
+    Balance.Nodo w = nodo( "Write", "TextFileOutput", "Lookup" );
+    w.carga = true;
+    List<Balance.Nodo> nodos = Arrays.asList( in, conv, lk, w );
+    String log = "2026/10/24 10:00:01 - Lookup.0 - ERROR (version 9.4.0.0-343, build 0.0) : Error looking up row "
+      + "in database\n"
+      + "2026/10/24 10:00:01 - Lookup.0 - ERROR (version 9.4.0.0-343, build 0.0) : "
+      + "org.sqlite.SQLiteException: [SQLITE_ERROR] SQL error or missing database (no such table: dim_cliente)\n"
+      + "2026/10/24 10:00:01 - Convert.0 - ERROR (version 9.4.0.0-343, build 0.0) : Unexpected error\n"
+      + "2026/10/24 10:00:01 - Convert.0 - ERROR (version 9.4.0.0-343, build 0.0) : "
+      + "org.pentaho.di.core.exception.KettleConversionException: \n"
+      + "fecha String : couldn't convert string [31/02/2021] to a date using format [yyyy-MM-dd]\n"
+      + "\tat org.pentaho.di.core.row.value.ValueMetaBase.convertData(ValueMetaBase.java:1)\n"
+      + "2026/10/24 10:00:01 - Read.0 - Finished processing (I=20, O=0, R=0, W=20, U=0, E=0)\n";
+    // el log por step
+    java.util.Map<String, String> pp = Balance.erroresPorPaso( log );
+    contiene( pp.get( "Lookup" ), "no such table: dim_cliente", "el error de la búsqueda" );
+    contiene( pp.get( "Convert" ), "couldn't convert string [31/02/2021]", "y el de la conversión, con su causa" );
+    cierto( !pp.get( "Convert" ).contains( "ValueMetaBase.java" ), "sin la pila" );
+    cierto( !pp.containsKey( "Read" ), "sin los que no fallaron" );
+
+    // la hija trae el mensaje de cada step (EstresMain lo saca del log entero)
+    Corrida c = corrida( false, new Object[] { "Read", "CsvInput", 0, 6, 0 }, new Object[] { "Convert",
+      "SelectValues", 6, 4, 0, 0, 1 }, new Object[] { "Lookup", "DBLookup", 4, 0, 0, 0, 1 }, new Object[] { "Write",
+        "TextFileOutput", 0, 0, 0, 0 } );
+    c.mensajeError = pp.get( "Lookup" );
+    for ( EstresResultado.PasoCuenta p : c.pasos ) {
+      p.mensaje = pp.get( p.nombre );
+    }
+    // y viaja en el JSON de la hija
+    Corrida ida = Corrida.desde( c.json( OM ) );
+    Balance.Informe i = Balance.evaluar( nodos, ida, Collections.singletonMap( "Read", 10 ), 3, null, null );
+    contiene( i.entorno, "dim_cliente", "el problema de entorno se informa" );
+    igual( EstresResultado.FALLA, estado( i, "no_abort" ), "la fila mala sigue siendo una falla" );
+    contiene( i.comprobacion( "no_abort" ).mensaje, "a bad row stopped the load", "culpa a la fila" );
+    contiene( i.comprobacion( "no_abort" ).mensaje, "environment problem", "y nombra el entorno" );
+    igual( 1, i.comprobacion( "no_abort" ).detalles.size(), "un step abortó por una fila: "
+      + i.comprobacion( "no_abort" ).detalles );
+    contiene( i.comprobacion( "no_abort" ).detalles.get( 0 ), "step 'Convert' (SelectValues) failed with 1 error(s)",
+      "el step de la fila" );
+    contiene( i.comprobacion( "no_abort" ).detalles.get( 0 ), "couldn't convert string", "con su mensaje" );
+    igual( "fragile", Balance.veredicto( Arrays.asList( i ) ), "frágil, no not_run" );
+    contiene( i.json( OM ).path( "environment_problem" ).asText(), "dim_cliente", "environment_problem en el JSON" );
+    contiene( i.resumen(), "bad row", "el resumen dice la fila" );
+    contiene( i.resumen(), "environment problem", "y el entorno" );
+
+    // sin el mensaje de la hija (JSON de antes): sale de la cola del log
+    Corrida sinMensajes = corrida( false, new Object[] { "Read", "CsvInput", 0, 6, 0 }, new Object[] { "Convert",
+      "SelectValues", 6, 4, 0, 0, 1 }, new Object[] { "Lookup", "DBLookup", 4, 0, 0, 0, 1 } );
+    sinMensajes.mensajeError = pp.get( "Lookup" );
+    sinMensajes.colaLog = log;
+    Balance.Informe i2 = Balance.evaluar( nodos, sinMensajes, null, 0, null, null );
+    igual( EstresResultado.FALLA, estado( i2, "no_abort" ), "también con la cola del log" );
+    igual( "fragile", Balance.veredicto( Arrays.asList( i2 ) ), "frágil" );
+
+    // solo el entorno (la conversión no falló): not_run como antes
+    Corrida soloEntorno = corrida( false, new Object[] { "Read", "CsvInput", 0, 6, 0 }, new Object[] { "Lookup",
+      "DBLookup", 4, 0, 0, 0, 1 } );
+    soloEntorno.mensajeError = pp.get( "Lookup" );
+    soloEntorno.colaLog = log.replaceAll( "(?m)^.*Convert\\.0.*$\\n?", "" ).replaceAll( "(?m)^fecha String.*$\\n?", "" );
+    Balance.Informe i3 = Balance.evaluar( nodos, soloEntorno, null, 0, null, null );
+    igual( EstresResultado.NO_EVALUADA, estado( i3, "no_abort" ), "solo el entorno: no es una falla" );
+    igual( "not_run", Balance.veredicto( Arrays.asList( i3 ) ), "not_run" );
+
+    // la corrida no pasó de la inicialización: ninguna fila se procesó, aunque un step diga otra cosa
+    Corrida sinArrancar = Corrida.desde( c.json( OM ) );
+    sinArrancar.iniciada = false;
+    Balance.Informe i4 = Balance.evaluar( nodos, sinArrancar, null, 0, null, null );
+    igual( EstresResultado.NO_EVALUADA, estado( i4, "no_abort" ), "sin arrancar: solo el entorno" );
+    igual( "not_run", Balance.veredicto( Arrays.asList( i4 ) ), "not_run" );
+    cierto( Corrida.desde( OM.readTree( "{\"variant\":\"x\"}" ) ).iniciada, "un JSON de antes: iniciada" );
+  }
+
   public void pruebaRerunDuplica() throws Exception {
     Corrida c = corrida( true, new Object[] { "Read", "CsvInput", 0, 3, 0 } );
     Corrida c2 = corrida( true, new Object[] { "Read", "CsvInput", 0, 3, 0 } );

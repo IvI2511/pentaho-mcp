@@ -7,6 +7,7 @@ import static io.github.ivi2511.pentahomcp.Verificador.igual;
 import static io.github.ivi2511.pentahomcp.Verificador.lanza;
 import static io.github.ivi2511.pentahomcp.Verificador.noContiene;
 import static io.github.ivi2511.pentahomcp.Verificador.noNulo;
+import static io.github.ivi2511.pentahomcp.Verificador.nulo;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -85,8 +86,15 @@ public class PruebaCalidad {
     falso( s.datos.path( "deep_requested" ).asBoolean(), "sin revision profunda" );
     cierto( s.datos.has( "findings" ) && s.datos.has( "penalties" ) && s.datos.has( "not_evaluated" ),
       "la forma de lint_etl: " + s.datos );
-    igual( lint.findings.size(), s.datos.path( "findings" ).size(), "los mismos hallazgos" );
+    // la seccion corre tambien la familia robustness (lint_etl robustness=true): mismo puntaje general
+    io.github.ivi2511.pentahomcp.lint.Opciones conR = new io.github.ivi2511.pentahomcp.lint.Opciones();
+    conR.robustez = true;
+    io.github.ivi2511.pentahomcp.lint.Resultado lintR = PruebaProfundo.analizar( c.copia, conR );
+    igual( lint.score, lintR.score, "robustness no cambia el puntaje general" );
+    igual( lintR.findings.size(), s.datos.path( "findings" ).size(), "los mismos hallazgos que lint_etl robustness=true" );
+    igual( lintR.robustez.score, s.datos.path( "robustness" ).path( "score" ).asInt(), "datos.robustness.score" );
     contiene( s.resumen, "Puntaje " + lint.score + "/100 (" + lint.grade + ")", "resumen con el puntaje" );
+    contiene( s.resumen, "Robustez " + lintR.robustez.score + "/100", "resumen con la robustez: " + s.resumen );
     if ( !lint.findings.isEmpty() ) {
       Tabla t = tabla( s, "quality-hallazgos" );
       noNulo( t, "tabla de hallazgos" );
@@ -97,6 +105,68 @@ public class PruebaCalidad {
       contiene( p.nota, "no es una nota", "la formula avisa que no es una nota" );
       contiene( p.nota, "100 − puntos", "la formula" );
     }
+  }
+
+  /**
+   * 0.6.1: la seccion incluye la familia robustness (antes solo con lint_etl robustness=true): su indicador, su tabla
+   * aparte, de donde salen sus puntos y el sub-puntaje en datos, sin cambiar el puntaje ni los contadores generales.
+   * El patron 06 (carga tolerante) da robustez 100 sin hallazgos; en un job no aparece.
+   */
+  public void pruebaRobustez() throws Exception {
+    File antes = new File( new File( EntornoKettle.recursos(), "robustez" ), "antes.ktr" );
+    TransMeta tm = new TransMeta( antes.getAbsolutePath() );
+    io.github.ivi2511.pentahomcp.lint.Resultado sin = PruebaProfundo.estatico( tm );
+    io.github.ivi2511.pentahomcp.lint.Opciones conR = new io.github.ivi2511.pentahomcp.lint.Opciones();
+    conR.robustez = true;
+    io.github.ivi2511.pentahomcp.lint.Resultado con = PruebaProfundo.analizar( tm, conR );
+    noNulo( con.robustez, "sub-puntaje de robustez de antes.ktr" );
+    for ( String idioma : new String[] { "en", "es", "pt" } ) {
+      Seccion s = new SecCalidad().armar( ctx( captura( tm, "antes.ktr" ), idioma, false ) );
+      mostrar( "antes." + idioma, s );
+      igual( Seccion.OK, s.estado, "estado " + idioma + ": " + s.motivo );
+      Indicadores ind = bloques( s, Indicadores.class ).get( 0 );
+      igual( sin.score + "/100", ind.items.get( 0 ).valor, "el puntaje general no cambia " + idioma );
+      Indicador rob = ind.items.get( 4 );
+      igual( idioma.equals( "en" ) ? "Robustness" : "Robustez", rob.etiqueta, "indicador de robustez " + idioma );
+      igual( con.robustez.score + "/100", rob.valor, "el sub-puntaje de lint_etl robustness=true " + idioma );
+      igual( SecCalidad.nivelBanda( con.robustez.grade ), rob.nivel, "color de la banda de robustez" );
+      // los contadores generales sin la familia (sus avisos van en su tabla)
+      int w = sin.counts.get( "warning" );
+      igual( String.valueOf( w ), ind.items.get( 2 ).valor, "advertencias de calidad sin las de robustez " + idioma );
+      Tabla t = tabla( s, "quality-robustez" );
+      noNulo( t, "tabla de robustez " + idioma );
+      int deRobustez = 0;
+      for ( Hallazgo h : con.findings ) {
+        deRobustez += SecCalidad.esRobustez( h ) ? 1 : 0;
+      }
+      igual( deRobustez, t.filas.size(), "una fila por hallazgo de robustez " + idioma );
+      cierto( deRobustez >= 17, "las 17 reglas aparecen en antes.ktr: " + deRobustez );
+      noNulo( t.nota, "nota de robustez" );
+      Tabla h = tabla( s, "quality-hallazgos" );
+      igual( sin.findings.size(), h == null ? 0 : h.filas.size(), "la tabla general sin las de robustez " + idioma );
+      Tabla p = tabla( s, "quality-puntos-robustez" );
+      noNulo( p, "de donde salen los puntos de robustez " + idioma );
+      igual( con.robustez.penalties.size(), p.filas.size(), "una fila por regla que resta " + idioma );
+      Tabla pg = tabla( s, "quality-puntos" );
+      igual( sin.penalties.size(), pg == null ? 0 : pg.filas.size(), "las penalidades generales no cambian" );
+      igual( con.robustez.score, s.datos.path( "robustness" ).path( "score" ).asInt(), "datos.robustness" );
+      contiene( s.resumen, ( idioma.equals( "en" ) ? "Robustness " : "Robustez " ) + con.robustez.score + "/100",
+        "resumen con la robustez: " + s.resumen );
+    }
+    // el patron 06: robustez 100, sin tabla de robustez
+    File repo = EntornoKettle.recursos().getAbsoluteFile().getParentFile().getParentFile().getParentFile()
+      .getParentFile();
+    TransMeta p06 = new TransMeta( new File( repo,
+      "claude/skills/pentaho-etl/patrones/06_carga_tolerante/06_carga_tolerante.ktr" ).getAbsolutePath() );
+    Seccion s06 = new SecCalidad().armar( ctx( captura( p06, "06_carga_tolerante.ktr" ), "es", false ) );
+    mostrar( "patron 06", s06 );
+    nulo( tabla( s06, "quality-robustez" ), "el patron 06 no tiene hallazgos de robustez" );
+    igual( "100/100", bloques( s06, Indicadores.class ).get( 0 ).items.get( 4 ).valor, "robustez 100" );
+    contiene( s06.resumen, "Robustez 100/100 (A): sin hallazgos.", "resumen del patron 06: " + s06.resumen );
+    // un job: la familia no corre, sin indicador ni frase
+    Seccion job = new SecCalidad().armar( ctx( EntornoKettle.captura( "10" ), "es", false ) );
+    falso( job.datos.has( "robustness" ), "un job no tiene sub-puntaje de robustez" );
+    noContiene( job.resumen, "Robustez", "un job no habla de robustez" );
   }
 
   /** Una transformacion con problemas: avisos de error, celdas, propuestas de nombre y los tres idiomas. */

@@ -269,6 +269,13 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
   steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
 
+## New in 0.6.1
+
+Bug fixes for robustness: the reports' «quality» section now includes the robustness findings and their
+separate score; `harden_etl` no longer draws an error hop through another step on a crowded canvas, and
+Ctrl+Z after it leaves the `.ktr` exactly as it was; `stress_test` reports a bad row even when a missing
+table also stopped the run. See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## New in 0.6.0
 
 "Calidad y clases" (quality and classes), 73 MCP tools in total:
@@ -283,8 +290,8 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
   **Next ▶**, with a numbered note on the canvas for each step, and the lesson becomes a handout.
 - **Robustness** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): every bad row goes to a rejects
   file with its reason, and broken copies of the inputs prove that no row is lost and a re-run duplicates
-  nothing. In reports, robustness findings live inside the «quality» section (there is no separate
-  robustness section). Guide: `manual/09-robustez.md`.
+  nothing. In reports, the «quality» section includes the robustness findings with their separate score
+  (there is no separate robustness section). Guide: `manual/09-robustez.md`.
 
 See [`CHANGELOG.md`](CHANGELOG.md).
 

@@ -563,8 +563,11 @@ perdidas**». `verdict`: `robust` (ninguna E ni W), `fragile` (alguna), `not_run
 
 ### 5.5 Informes
 
-> **Estado en la 0.6.0:** esta sección no se construyó. En los informes, los hallazgos de robustez van dentro
-> de la sección `quality` (no hay una sección de robustez aparte); lo que sigue queda como diseño.
+> **Estado en la 0.6.1:** esta sección no se construyó. Desde la 0.6.1 la sección `quality` (SecCalidad) corre
+> siempre la familia robustness: indicador «Robustez» con el sub-puntaje, sus hallazgos en una tabla aparte
+> (`quality-robustez`), de dónde salen sus puntos (`quality-puntos-robustez`) y el bloque `robustness` en los
+> datos; el puntaje y los contadores de calidad técnica no la incluyen. En la 0.6.0 la sección no la corría
+> (solo `lint_etl robustness=true`). No hay una sección de robustez aparte; lo que sigue queda como diseño.
 
 Sección `robustness` (después de `quality`; id nuevo en `SeccionId`, títulos en `secciones_*`): bloque
 **Indicadores** (sub-puntaje de robustez, veredicto de la última prueba, filas perdidas, rechazos sin
@@ -650,8 +653,8 @@ Si no da el tiempo, queda fuera de la 0.6.0: todo se puede hacer por MCP.
   las dos hijas se unifiquen.
 - **Modo clase**: una lección «Robustecer» puede mostrar el plan de `harden_etl` como notas y aplicar
   receta por receta (`steps`); no hay contrato nuevo.
-- **Informes**: §5.5 (no construida en la 0.6.0: los hallazgos de robustez van dentro de `quality`, sin
-  sección aparte).
+- **Informes**: §5.5 (no construida: desde la 0.6.1 los hallazgos y el sub-puntaje de robustez van dentro de
+  `quality`, sin sección aparte).
 
 ## 9. Riesgos y preguntas abiertas
 

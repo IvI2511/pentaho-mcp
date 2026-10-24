@@ -135,6 +135,47 @@ public class PruebaLintRobustez {
     igual( "aggregate", ReglasRobustez.declaracion( tm.findStep( "Aggregate to grain" ) ), "declarado" );
   }
 
+  /**
+   * 0.6.1, sin falsos positivos en los ejemplos de la skill y del proyecto (ahora la sección de calidad de los informes
+   * corre siempre la familia): un Unique rows (id «Unique») ya deduplica (patrón 02a y la carga de hechos de
+   * ejemplo/construido-en-vivo); leer un modelo estrella con JOIN a dimensiones no pierde huérfanos (el KPI); una carga
+   * sin clave no dice «los repetidos de  ».
+   */
+  public void pruebaSinFalsosPositivosEnEjemplos() throws Exception {
+    File repo = EntornoKettle.recursos().getAbsoluteFile().getParentFile().getParentFile().getParentFile()
+      .getParentFile();
+    Resultado r02 = lint( cargar( new File( repo,
+      "claude/skills/pentaho-etl/patrones/02_deduplicacion/02a_ordenar_y_unique.ktr" ) ), "{\"robustness\":true}" );
+    nulo( primero( r02, "no_dedupe_before_load" ), "02a ordena y quita repetidos con Unique rows" );
+    Resultado r04 = lint( cargar( new File( repo, "ejemplo/construido-en-vivo/04_hechos_ventas.ktr" ) ),
+      "{\"robustness\":true}" );
+    nulo( primero( r04, "no_dedupe_before_load" ), "la carga de hechos tiene «Eliminar duplicados» (Unique rows)" );
+    Resultado r05 = lint( cargar( new File( repo, "ejemplo/construido-en-vivo/05_kpi_ventas.ktr" ) ),
+      "{\"robustness\":true}" );
+    nulo( primero( r05, "inner_join_in_source" ), "leer el modelo estrella (JOIN a dim_tienda y dim_producto)" );
+    Resultado r01 = lint( cargar( new File( repo, "ejemplo/construido-en-vivo/01_dim_tienda.ktr" ) ),
+      "{\"robustness\":true,\"language\":\"es\"}" );
+    Hallazgo d = primero( r01, "no_dedupe_before_load" );
+    noNulo( d, "la dimensión sin deduplicar sigue avisando" );
+    falso( d.message.contains( "  " ) || d.message.contains( " de ." ), "sin clave vacía en el mensaje: " + d.message );
+    // las consultas: JOIN a dimensiones no, a otras tablas sí, y un LEFT JOIN nunca cuenta
+    cierto( ReglasRobustez.soloDimensiones( "SELECT * FROM hechos h JOIN dim_tienda t ON t.sk = h.sk "
+      + "INNER JOIN \"public\".\"dim_producto\" p ON p.sk = h.sk2 LEFT JOIN otra o ON o.id = h.id" ), "a dimensiones" );
+    falso( ReglasRobustez.soloDimensiones( "SELECT * FROM products p JOIN categories c ON c.id = p.cat" ),
+      "a otra tabla" );
+    falso( ReglasRobustez.soloDimensiones( "SELECT * FROM a LEFT JOIN dim_x d ON d.k = a.k" ), "sin JOIN interno" );
+    cierto( ReglasRobustez.soloDimensiones( "select * from ventas v join cliente_dim c on c.sk = v.sk" ), "x_dim" );
+  }
+
+  private static Hallazgo primero( Resultado r, String regla ) {
+    for ( Hallazgo h : r.findings ) {
+      if ( regla.equals( h.rule ) ) {
+        return h;
+      }
+    }
+    return null;
+  }
+
   /** Apagada por defecto: lint_etl sin robustness no la corre; con robustness, el puntaje general es el mismo. */
   public void pruebaApagadaPorDefecto() throws Exception {
     TransMeta tm = EntornoKettle.trans( "03" );

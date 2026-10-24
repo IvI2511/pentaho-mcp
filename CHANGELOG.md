@@ -7,6 +7,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-24
+
+Bug fixes for the robustness tools.
+
+### Fixed
+
+- Reports: the «quality» section now runs the robustness rules too (until now only `lint_etl` with
+  `robustness: true` did). Their findings go in a table of their own with their separate 0-100 robustness
+  score and the points each rule takes away; the technical quality score and its error, warning and
+  suggestion counts do not change. Jobs have no robustness rules and show nothing new.
+- Robustness rules: a Unique rows step (the sorted one) now counts as removing duplicates, so
+  `no_dedupe_before_load` no longer flags a load that already has one and `harden_etl` no longer proposes a
+  second one. A source query whose inner joins only go to dimension tables (`dim_…`, `…_dim`), the usual
+  way to read a star schema, is no longer flagged by `inner_join_in_source`. A Table output (which has no
+  key) no longer gets "the duplicates of  first" with an empty key list.
+- `harden_etl` on a crowded canvas: when there was no room below a step, its rejects steps went below
+  everything and the error hop could run straight through other steps. The steps now go to the nearest free
+  place whose new hops (from every step that sends rows to that rejects file) cross no step icon, label or
+  note, or, if there is no such place, the fewest.
+- `harden_etl` then Ctrl+Z: the saved `.ktr` is now identical to the original. Before, every step that got
+  an error hop kept a disabled `<error>` block with no target after the undo.
+- `stress_test`: when a run stops because a database or table is missing **and** a bad row also aborts
+  another step, both are reported: `environment_problem` and the failed `no_abort` check naming the step
+  and the row's error. The verdict is `fragile` (a bad row is a robustness failure whatever the
+  environment); `not_run` is only for runs where the environment is the only problem.
+
 ## [0.6.0] - 2026-10-22
 
 "Calidad y clases" (quality and classes): four new things Claude can do with an ETL, and 73 MCP tools in
@@ -496,7 +522,8 @@ canvas. **Robustness** makes a load tolerate dirty data and proves it with broke
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.4.2...v0.5.0

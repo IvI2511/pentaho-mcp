@@ -36,9 +36,10 @@ means *rejected with a reason, in a file that someone reads*.
 
 ## 3. The fast path (live, with the MCP)
 
-1. `lint_etl` with `robustness: true`. Besides the normal result it returns `robustness: {score, grade,
-   counts, penalties}` and findings of category `robustness`; each one names in `evidence.recipe` the
-   `harden_etl` recipe that fixes it and in `evidence.anchor` the step. The main score does not change.
+1. `lint_etl` with `robustness: true` (the reports' `quality` section runs them always, §9). Besides the
+   normal result it returns `robustness: {score, grade, counts, penalties}` and findings of category
+   `robustness`; each one names in `evidence.recipe` the `harden_etl` recipe that fixes it and in
+   `evidence.anchor` the step. The main score does not change.
 2. `harden_etl` (dry run by default): one proposal per planned recipe and step, with `level` and a text
    diff. By default it plans **only the `auto` recipes**; `recipes: ["all"]` plans every recipe (the
    `other_recipes` hint in the result says when there are more).
@@ -403,12 +404,20 @@ rejected by CHECK, 1 duplicate dropped (declared), 12 fact rows, keys 1-5 unchan
 | `rejects_have_reason` | R02 on the error hop or the filter that feeds that file |
 | `bad_rows_rejected` | a broken value got through: a missing check (R03) or a lenient conversion (R04) |
 | `encoding` | set the encoding of the input to the file's real one |
+| `environment_problem` | the database file or a table it reads or loads does not exist. Run the job that creates it first, or point the test at a prepared copy. Alone it is not a robustness failure (`no_abort` is `not_evaluated`) |
+| `environment_problem` **and** `no_abort` failed | both happened in the same run: a table is missing **and** a bad row aborted another step (the detail names it with the row's error). Fix both: the bad row as in `no_abort` above, the environment as in the row before |
 
-| `environment_problem` (verdict `not_run`) | not a robustness failure: the database file or a table it reads or loads does not exist. Run the job that creates it first, or point the test at a prepared copy |
+**Verdict** (over all the variants): `fragile` if any check failed or warned, also when the same run had an
+environment problem (a bad row is a robustness failure whatever the environment); `not_run` if nothing
+failed or warned but some variant could not be judged because of the environment (or no variant ran);
+`robust` otherwise. With `fragile` and `environment_problem` at the top, report both: first the bad row,
+then what is missing to judge the rest.
 
 The robustness score uses the same formula as the main one (25 / 8 / 2 per error / warning / info, capped
 per rule) over these rules only; pattern 06 scores 100.
 
-**In reports** (`build_report`, `04-informes.md`) robustness findings live inside the `quality` section,
-next to the other linter findings: there is no separate robustness section. The robustness sub-score and
-the whole family come from `lint_etl robustness=true`.
+**In reports** (`build_report`, `04-informes.md`) the `quality` section always runs this family too (no
+argument needed; `lint_etl` only with `robustness: true`): a **Robustness** indicator with the sub-score, the
+robustness findings in a table of their own, where their missing points come from, and in its data the same
+`robustness` block as `lint_etl`. The technical quality score and its counts do not include them. There is
+no separate robustness section, and a job shows nothing of this.

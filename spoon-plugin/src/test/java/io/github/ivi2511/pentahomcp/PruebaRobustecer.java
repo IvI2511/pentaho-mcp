@@ -311,9 +311,9 @@ public class PruebaRobustecer {
     for ( String n : new String[] { "Convertir tipos", "Cargar clientes", "Cargar ventas" } ) {
       StepErrorMeta em = tm.findStep( n ).getStepErrorMeta();
       cierto( em == null || !em.isEnabled(), "tras deshacer, sin manejo de errores en " + n );
+      nulo( RobustecerAplicar.manejoDeErrores( tm.findStep( n ) ), "tras deshacer, como antes: ninguno en " + n );
     }
-    igual( xmlAntes, sinErroresApagados( deshecho ), "deshacer devuelve el XML de antes (salvo el parámetro y los "
-      + "manejos de errores apagados)" );
+    igual( xmlAntes, deshecho, "deshacer devuelve el XML de antes (salvo el parámetro, fuera del undo)" );
     // guardado y vuelto a abrir: ningún manejo de errores habilitado apunta a un step que ya no está
     File fd = new File( dir, "deshecho.ktr" );
     EntornoKettle.escribir( fd, tm.getXML() );
@@ -321,8 +321,79 @@ public class PruebaRobustecer {
     nulo( vuelta.findStep( "Limpiar motivo ventas" ), "la cola ya no está" );
     for ( StepMeta s : vuelta.getSteps() ) {
       falso( s.isDoingErrorHandling(), "sin manejo de errores al volver a abrir: " + s.getName() );
+      nulo( s.getStepErrorMeta(), "ni un <error> apagado al volver a abrir: " + s.getName() );
     }
     // otra pasada: el plan ya no propone lo aplicado (idempotente)
+  }
+
+  /**
+   * 0.6.1: aplicar (las recetas auto: colas de rechazo con motivo) y deshacer deja el XML idéntico byte a byte, sin los
+   * dos &lt;error&gt; apagados y sin destino que dejaba 0.6.0. Rehacer vuelve a lo aplicado, y deshacer otra vez al
+   * original; un manejo de errores apagado que la persona ya tenía se conserva tal cual.
+   */
+  public void pruebaDeshacerIdentico() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    // uno apagado de la persona en Cargar ventas: Ctrl+Z lo devuelve igual
+    StepErrorMeta suyo = new StepErrorMeta( tm, tm.findStep( "Cargar ventas" ) );
+    suyo.setEnabled( false );
+    suyo.setMaxErrors( "7" );
+    tm.findStep( "Cargar ventas" ).setStepErrorMeta( suyo );
+    String original = tm.getXML();
+    RobustecerAnalisis.Pedido p = pedido( "{\"dry_run\":false}" );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( RobustecerAnalisis.analizar(
+      tm, p ), p ), UndoGrupo.sinSpoon( tm ), null );
+    igual( "[]", saltados( h ), "nada saltado" );
+    cierto( h.aplicados.size() >= 2, "colas aplicadas: " + h.aplicados );
+    String aplicado = tm.getXML();
+    cierto( !aplicado.equals( original ), "aplicar cambia el XML" );
+    deshacer( tm );
+    String deshecho = tm.getXML();
+    File dir = EntornoKettle.salida( "robustecer-deshacer" );
+    EntornoKettle.escribir( new File( dir, "original.ktr" ), original );
+    EntornoKettle.escribir( new File( dir, "deshecho.ktr" ), deshecho );
+    igual( original, deshecho, "deshacer devuelve el XML idéntico (sin <error> apagados de más)" );
+    contiene( deshecho, "<max_errors>7</max_errors>", "el apagado de la persona sigue" );
+    igual( 1, deshecho.split( "<is_enabled>N</is_enabled>", -1 ).length - 1, "solo el <error> apagado de la persona" );
+    nulo( RobustecerAplicar.manejoDeErrores( tm.findStep( "Convertir tipos" ) ), "Convertir tipos: como antes" );
+    // rehacer (como Spoon: replaceMeta con el después) y deshacer otra vez
+    for ( TransAction ta = tm.nextUndo(); ta != null; ta = tm.nextUndo() ) {
+      int[] idx = ta.getCurrentIndex();
+      if ( ta.getType() == TransAction.TYPE_ACTION_NEW_STEP ) {
+        for ( int i = 0; i < idx.length; i++ ) {
+          tm.addStep( idx[ i ], (StepMeta) ta.getCurrent()[ i ] );
+        }
+      } else if ( ta.getType() == TransAction.TYPE_ACTION_NEW_HOP ) {
+        for ( int i = 0; i < idx.length; i++ ) {
+          tm.addTransHop( idx[ i ], (TransHopMeta) ta.getCurrent()[ i ] );
+        }
+      } else if ( ta.getType() == TransAction.TYPE_ACTION_DELETE_HOP ) {
+        for ( int i = idx.length - 1; i >= 0; i-- ) {
+          tm.removeTransHop( idx[ i ] );
+        }
+      } else if ( ta.getType() == TransAction.TYPE_ACTION_CHANGE_STEP ) {
+        for ( int i = 0; i < idx.length; i++ ) {
+          tm.getStep( idx[ i ] ).replaceMeta( (StepMeta) ( (StepMeta) ta.getCurrent()[ i ] ).clone() );
+        }
+      } else {
+        Verificador.falla( "acción de rehacer inesperada: " + ta.getType() );
+      }
+      TransAction sig = tm.viewNextUndo();
+      if ( sig == null || !sig.getNextAlso() ) {
+        break;
+      }
+    }
+    TransOps.resolverReferencias( tm );
+    cierto( tm.findStep( "Convertir tipos" ).isDoingErrorHandling(), "rehacer vuelve a poner el manejo de errores" );
+    contiene( tm.getXML(), "<descriptions_valuename>motivo</descriptions_valuename>", "y se guarda" );
+    deshacer( tm );
+    EntornoKettle.escribir( new File( dir, "deshecho2.ktr" ), tm.getXML() );
+    igual( original, tm.getXML(), "deshacer otra vez: el XML original" );
+    // si la persona habilita después el «no tenía» (el diálogo de Spoon edita ese mismo objeto), se guarda
+    StepErrorMeta em = tm.findStep( "Convertir tipos" ).getStepErrorMeta();
+    noNulo( em, "el «no tenía» que deja Ctrl+Z" );
+    em.setTargetStep( tm.findStep( "Cargar ventas" ) );
+    em.setEnabled( true );
+    contiene( tm.getXML(), "<target_step>Cargar ventas</target_step>", "habilitado a mano: se guarda" );
   }
 
   /** Aplicar dos veces no duplica nada: la segunda pasada no propone lo que ya está. */
@@ -610,12 +681,6 @@ public class PruebaRobustecer {
     return l.toString();
   }
 
-  /** Los manejos de errores apagados y sin destino que deja Ctrl+Z (ver RobustecerAplicar.instantaneaSinErrores). */
-  private static String sinErroresApagados( String xml ) {
-    return xml.replaceAll( "(?s)\\s*<error>\\s*<source_step>[^<]*</source_step>\\s*<target_step\\s*/>\\s*"
-      + "<is_enabled>N</is_enabled>.*?</error>", "" );
-  }
-
   private static String sinParametros( String xml ) {
     return xml.replaceAll( "(?s)<parameters>.*?</parameters>", "<parameters/>" );
   }
@@ -676,7 +741,7 @@ public class PruebaRobustecer {
       igual( 1, h.pasosDeshacer, nombre + ": un Ctrl+Z" );
       deshacer( tm );
     }
-    igual( xmlAntes, sinErroresApagados( sinParametros( tm.getXML() ) ), nombre + ": deshacer devuelve el XML" );
+    igual( xmlAntes, sinParametros( tm.getXML() ), nombre + ": deshacer devuelve el XML" );
     return h;
   }
 
@@ -909,6 +974,18 @@ public class PruebaRobustecer {
     return b.toString();
   }
 
+  /** El ícono de 32 px de un step. */
+  private static int[] iconoPrueba( StepMeta s ) {
+    return new int[] { s.getLocation().x, s.getLocation().y, s.getLocation().x + 32, s.getLocation().y + 32 };
+  }
+
+  /** El rótulo centrado debajo del ícono (estimación propia de la prueba). */
+  private static int[] rotuloPrueba( StepMeta s ) {
+    int w = Math.max( 32, s.getName().length() * 6 );
+    int cx = s.getLocation().x + 16;
+    return new int[] { cx - w / 2, s.getLocation().y + 34, cx + w / 2, s.getLocation().y + 48 };
+  }
+
   /** Ícono de 32 px y el rótulo debajo (estimación propia de la prueba, más chica que la del análisis). */
   private static int[] cajaPrueba( StepMeta s ) {
     int w = Math.max( 32, s.getName().length() * 6 );
@@ -965,5 +1042,124 @@ public class PruebaRobustecer {
       + " " + e.getLocation() );
     cierto( RobustecerAnalisis.cruza( new int[] { 0, 0, 100, 100 }, new int[] { 40, 40, 60, 60 } ), "cruza: diagonal" );
     falso( RobustecerAnalisis.cruza( new int[] { 0, 0, 100, 0 }, new int[] { 40, 10, 60, 60 } ), "cruza: por fuera" );
+  }
+
+  /**
+   * 0.6.1: con el lienzo lleno debajo del origen (tres hops verticales largos tapan los cinco carriles de debajo), el
+   * último recurso ponía la cola «debajo de todo» y el hop de error bajaba en vertical atravesando los steps de debajo.
+   * Ahora la cola va al sitio libre más cercano cuyos hops (origen → limpiar, limpiar → escribir) no pasan por encima de
+   * ningún step ni nota.
+   */
+  public void pruebaColasSinCruzarSteps() throws Exception {
+    EntornoKettle.iniciar();
+    TransMeta tm = new TransMeta();
+    tm.setName( "lleno" );
+    TransOps.agregarStep( tm, "CsvInput", "Leer ventas", "<filename>${Internal.Entry.Current.Directory}/ventas.csv"
+      + "</filename><separator>;</separator><enclosure>\"</enclosure><header>Y</header><lazy_conversion>N"
+      + "</lazy_conversion><encoding>UTF-8</encoding><fields><field><name>id</name><type>String</type><format/>"
+      + "<currency/><decimal/><group/><length>-1</length><precision>-1</precision><trim_type>both</trim_type></field>"
+      + "<field><name>importe</name><type>Number</type><format>#.##</format><currency/><decimal>.</decimal><group/>"
+      + "<length>-1</length><precision>-1</precision><trim_type>both</trim_type></field></fields>", 96, 128, null, null,
+      null );
+    String previo = "Leer ventas";
+    for ( int c = 0; c < 3; c++ ) {
+      int x = 96 + 170 * c;
+      TransOps.agregarStep( tm, "Dummy", "Arriba " + c, "", x, 200, c == 0 ? previo : null, null, null );
+      TransOps.agregarStep( tm, "Dummy", "Abajo " + c, "", x, 3000, "Arriba " + c, null, null );
+    }
+    TransOps.resolverReferencias( tm );
+    String[] mal = cruzanCola( tm, pedido( "{\"dry_run\":false,\"language\":\"es\"}" ), 1 );
+    igual( "", mal[ 0 ], "ningún hop de la cola pasa por encima de un step" );
+    StepMeta l = tm.findStep( "Limpiar motivo ventas" );
+    noNulo( l, "la cola" );
+    cierto( l.getLocation().y < 3000, "no se fue debajo de todo: " + l.getLocation().x + "," + l.getLocation().y );
+  }
+
+  /**
+   * 0.6.1, el lienzo de verdad: la carga de hechos de ejemplo/construido-en-vivo (un hop largo en diagonal, dos notas,
+   * steps en tres filas) con más steps debajo. La cola de las ventas la comparten varias fuentes (la entrada, la
+   * conversión del precio y el motivo de obligatorios). Con las recetas auto (lo que se vio en Spoon: el hop de error
+   * de la entrada bajaba por «Eliminar duplicados») ningún hop pasa por encima de un step; con todas, el filtro de
+   * obligatorios encierra a la entrada y la cola va donde menos cruces hay.
+   */
+  public void pruebaColasEnLienzoLleno() throws Exception {
+    EntornoKettle.iniciar();
+    File repo = EntornoKettle.recursos().getAbsoluteFile().getParentFile().getParentFile().getParentFile()
+      .getParentFile();
+    // una copia en la carpeta de la prueba: su base (../salida/…) cae ahí y nunca junto al ejemplo
+    File dir = new File( EntornoKettle.salida( "robustecer-lleno" ), "construido" );
+    dir.mkdirs();
+    File ktr = new File( dir, "04_hechos_ventas.ktr" );
+    Files.copy( new File( repo, "ejemplo/construido-en-vivo/04_hechos_ventas.ktr" ).toPath(), ktr.toPath(),
+      java.nio.file.StandardCopyOption.REPLACE_EXISTING );
+    for ( int vuelta = 0; vuelta < 4; vuelta++ ) {
+      String json = vuelta % 2 == 0 ? "{\"dry_run\":false}" : "{\"recipes\":[\"all\"],\"confirm\":[\"all\"],"
+        + "\"dry_run\":false}";
+      TransMeta tm = new TransMeta( ktr.getAbsolutePath() );
+      for ( int i = 0; i < ( vuelta < 2 ? 0 : 8 ); i++ ) { // tal cual, y con una fila más de steps debajo
+        StepMeta d = new StepMeta( "Relleno " + i, new org.pentaho.di.trans.steps.dummytrans.DummyTransMeta() );
+        d.setLocation( 96 + i * 208, 640 );
+        d.setDraw( true );
+        tm.addStep( d );
+      }
+      String[] mal = cruzanCola( tm, pedido( json ), 2 );
+      System.out.println( "  lleno " + vuelta + " " + json + ": " + ( mal[ 0 ].isEmpty() ? "sin cruces" : mal[ 0 ] ) );
+      if ( json.equals( "{\"dry_run\":false}" ) ) {
+        igual( "", mal[ 0 ], "recetas auto: ningún hop de la cola pasa por encima de un step" );
+      } else {
+        // con todas, el filtro de obligatorios nuevo encierra a la entrada: algún cruce no se puede evitar; los menos
+        cierto( mal[ 0 ].split( "\n" ).length <= 2, "todas las recetas: como mucho dos cruces: " + mal[ 0 ] );
+      }
+    }
+  }
+
+  /**
+   * Aplica harden_etl y devuelve {los hops de las colas que pasan por encima de un step, uno por línea}; comprueba que
+   * hay al menos 'minimo' hops hacia las colas y que sus steps no pisan a ningún otro.
+   */
+  private static String[] cruzanCola( TransMeta tm, RobustecerAnalisis.Pedido p, int minimo ) throws Exception {
+    List<String> originales = new ArrayList<String>();
+    for ( StepMeta s : tm.getSteps() ) {
+      originales.add( s.getName() );
+    }
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( tm, RobustecerAnalisis.elegir( plan, p ), UndoGrupo
+      .sinSpoon( tm ), null );
+    for ( String[] x : h.saltados ) {
+      falso( x[ 1 ].startsWith( "failed" ), x[ 0 ] + " " + x[ 1 ] );
+    }
+    int hacia = 0;
+    StringBuilder malos = new StringBuilder();
+    for ( TransHopMeta hop : tm.getTransHops() ) {
+      StepMeta de = hop.getFromStep();
+      StepMeta a = hop.getToStep();
+      if ( !a.getName().startsWith( "Limpiar motivo " ) && !de.getName().startsWith( "Limpiar motivo " ) ) {
+        continue;
+      }
+      hacia += a.getName().startsWith( "Limpiar motivo " ) ? 1 : 0;
+      int[] sg = { de.getLocation().x + 16, de.getLocation().y + 16, a.getLocation().x + 16, a.getLocation().y + 16 };
+      for ( StepMeta s : tm.getSteps() ) {
+        if ( s != de && s != a && ( RobustecerAnalisis.cruza( sg, iconoPrueba( s ) ) || RobustecerAnalisis.cruza( sg,
+          rotuloPrueba( s ) ) ) ) {
+          malos.append( de.getName() ).append( " (" ).append( de.getLocation().x ).append( ',' ).append( de
+            .getLocation().y ).append( ") -> " ).append( a.getName() ).append( " (" ).append( a.getLocation().x )
+            .append( ',' ).append( a.getLocation().y ).append( ") pasa por " ).append( s.getName() ).append( '\n' );
+        }
+      }
+    }
+    cierto( hacia >= minimo, "hops hacia las colas: " + hacia + "\n" + diffs( plan ) );
+    for ( StepMeta q : tm.getSteps() ) {
+      if ( originales.contains( q.getName() ) || !q.getName().startsWith( "Limpiar motivo " ) && !q.getName()
+        .startsWith( "Escribir rechazos " ) ) {
+        continue;
+      }
+      for ( StepMeta s : tm.getSteps() ) {
+        if ( s != q ) {
+          falso( RobustecerAnalisis.choca( cajaPrueba( q ), cajaPrueba( s ) ), q.getName() + " " + q.getLocation()
+            + " pisa a " + s.getName() + " " + s.getLocation() );
+        }
+      }
+    }
+    return new String[] { malos.toString() };
   }
 }

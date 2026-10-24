@@ -34,6 +34,7 @@ import org.pentaho.di.trans.step.RowListener;
 import org.pentaho.di.trans.step.StepInterface;
 import org.pentaho.di.trans.step.StepMetaDataCombi;
 
+import io.github.ivi2511.pentahomcp.robustez.Balance;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.Corrida;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.PasoCuenta;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.TablaCuenta;
@@ -94,6 +95,7 @@ public final class EstresMain {
     Corrida c = new Corrida();
     c.variante = v.path( "id" ).asText();
     c.vuelta = vuelta;
+    c.iniciada = false; // hasta que los steps arranquen
     long t0 = System.currentTimeMillis();
     Trans t = null;
     List<Contador> contadores = new ArrayList<Contador>();
@@ -122,6 +124,7 @@ public final class EstresMain {
         contadores.add( k );
       }
       t.startThreads();
+      c.iniciada = true;
       long fin = t0 + timeoutMs;
       while ( !t.isFinished() && System.currentTimeMillis() < fin ) {
         Thread.sleep( 50 );
@@ -167,6 +170,13 @@ public final class EstresMain {
       }
       String log = log( t );
       c.colaLog = log.length() > 3000 ? log.substring( log.length() - 3000 ) : log;
+      // el mensaje de cada step que falló, del log entero: el padre separa una fila mala de una BD que falta
+      Map<String, String> porPaso = Balance.erroresPorPaso( log );
+      for ( PasoCuenta p : c.pasos ) {
+        if ( p.errores > 0 ) {
+          p.mensaje = porPaso.get( p.nombre );
+        }
+      }
       if ( c.errores > 0 && c.mensajeError == null ) {
         c.mensajeError = primerError( log );
       }

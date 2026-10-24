@@ -132,7 +132,7 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
 | `parameter_without_default` | I | Parameter without a default (credentials excluded) | by hand | — |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
-| the robustness family (below) | W / I | **Off by default**: `robustness: true` runs them with a score of their own | `harden_etl` | `09-robustez.md` |
+| the robustness family (below) | W / I | **Off by default** in `lint_etl`: `robustness: true` runs them with a score of their own (the reports' `quality` section always does, §9) | `harden_etl` | `09-robustez.md` |
 | `kettle_check` | E / W | What Spoon's Verify says (`include_kettle_checks`), listed apart | — | — |
 
 The full catalog (title, why and fix in en/es/pt, whether a rule is off, depends on the computer or needs the
@@ -142,8 +142,8 @@ saved file) is the `pentaho://lint/rules` resource.
 
 A family of its own, **off by default** and outside the main score: with `robustness: true` they run and
 `lint_etl` adds `robustness: {score, grade, counts, penalties}` (same formula). Each finding names in
-`evidence.recipe` the `harden_etl` recipe that fixes it. How to make a load tolerant, recipe by recipe:
-`09-robustez.md`.
+`evidence.recipe` the `harden_etl` recipe that fixes it. The reports' `quality` section always runs them (§9).
+How to make a load tolerant, recipe by recipe: `09-robustez.md`.
 
 | Rule | Sev | What it catches |
 |---|---|---|
@@ -154,11 +154,11 @@ A family of its own, **off by default** and outside the main score: with `robust
 | `silent_filter_drop` | I | Filter rows without false branch (Switch / case without default) before a load; silence it = declare it |
 | `lookup_drops_rows` | W | Database lookup that eats the row on failure, INNER Merge join before a load |
 | `unchecked_lookup` | W | Lookup key without default that reaches a load with no null check |
-| `inner_join_in_source` | I | Table input with an inner JOIN feeding a load |
+| `inner_join_in_source` | I | Table input with an inner JOIN feeding a load (not when every inner join goes to a dimension table, `dim_…` or `…_dim`: reading a star schema) |
 | `no_required_check` | I | File input that reaches a load or lookup by key with no null check |
 | `lenient_conversion` | W | Select values converting dates or numbers in lenient mode |
 | `fragile_split` | I | Field splitter on file data without error handling |
-| `no_dedupe_before_load` | I | Load fed by a file or several sources without dedupe |
+| `no_dedupe_before_load` | I | Load fed by a file or several sources without a Unique rows, Unique rows (HashSet) or Group by before it |
 | `counter_as_surrogate_key` | W | Add sequence counter loaded as a key: keys change between runs |
 | `insert_only_load` | I | Table output without truncate to a non-staging table |
 | `fact_not_grouped` | I | Load with 2+ keys without a Group by before it |
@@ -248,7 +248,10 @@ document) and a `reason`. `remove: true` undoes it.
 `build_report`, `get_report_data` and `show_report` have a `quality` section (*Technical quality* / *Calidad
 técnica* / *Qualidade técnica*), right after `validation` and on by default. It runs the same lint, in the
 report's language: the score with its grade, one notice per error, the findings table (with the proposals),
-where the missing points come from and what could not be checked.
+where the missing points come from and what could not be checked. In a transformation it also runs the
+robustness family (§ Robustness rules, `09-robustez.md`): a **Robustness** indicator with its separate score,
+its findings in a table of their own and where its missing points come from; the technical quality score and
+its counts do not include them.
 
 - `quality_deep: true` adds the deep mode (§6) to that section (and adds the section if `sections` did not name
   it). In Spoon's Reports panel it is the **Deep check (reads data)** box under the section, off for every new
@@ -257,8 +260,8 @@ where the missing points come from and what could not be checked.
   shows (it says so); the score counts them anyway.
 - The automatic light preview in Spoon leaves quality out (it computes fields); the full preview and the exports
   include it.
-- For the narrative, the data of `get_report_data` → `quality` is the `lint_etl` JSON plus `deep_requested` and
-  `keys_shown_in_validation`. Talk about the score as technical quality, never as the mark of the work.
+- For the narrative, the data of `get_report_data` → `quality` is the `lint_etl` JSON (with `robustness: true`, so
+  it has the `robustness` block) plus `deep_requested` and `keys_shown_in_validation`. Talk about the score as technical quality, never as the mark of the work.
 
 ## 10. When something goes wrong
 

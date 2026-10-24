@@ -279,6 +279,13 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
 - O modo aula funciona **só com transformações** (ainda não com jobs), uma lição por transformação; com mais
   de 12 passos avisa e sugere dividi-la. Se a lição mostra linhas, salve antes o `.ktr` junto dos dados.
 
+## Novidades da 0.6.1
+
+Correções de robustez: a seção «qualidade» dos relatórios agora inclui os achados de robustez com a sua
+pontuação à parte; o `harden_etl` não traça mais um hop de erro por cima de outro step num canvas cheio, e
+um Ctrl+Z depois deixa o `.ktr` exatamente como estava; o `stress_test` informa uma linha ruim mesmo quando
+uma tabela que falta também parou a execução. Detalhes em [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Novidades da 0.6.0
 
 «Calidad y clases» (qualidade e aulas), 73 ferramentas MCP no total:
@@ -294,8 +301,9 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
   **Próximo ▶**, com uma nota numerada no canvas para cada step, e a lição vira uma apostila.
 - **Robustez** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): cada linha ruim vai para um
   arquivo de rejeitos com o motivo, e cópias quebradas das entradas provam que nenhuma linha se perde e que
-  rodar a carga de novo não duplica nada. Nos relatórios, os achados de robustez ficam dentro da seção
-  «qualidade» (`quality`): não há uma seção de robustez à parte. Guia: `manual/09-robustez.md`.
+  rodar a carga de novo não duplica nada. Nos relatórios, a seção «qualidade» (`quality`) inclui os achados
+  de robustez com a sua pontuação à parte: não há uma seção de robustez à parte. Guia:
+  `manual/09-robustez.md`.
 
 Detalhes em [`CHANGELOG.md`](CHANGELOG.md).
 

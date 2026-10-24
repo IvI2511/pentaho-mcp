@@ -137,13 +137,16 @@ public final class Balance {
 
     /** La corrida abortó: el resumen lo dice en vez de cuadrar filas. */
     public boolean abortada;
-    /** Abortó por el entorno (falta la BD o una tabla), no por una fila: el motivo; si no, null. */
+    /** Abortó por el entorno (falta la BD o una tabla): el motivo; si no, null. */
     public String entorno;
+    /** Con {@link #entorno}: además, otro step abortó por una fila mala (no_abort falla). */
+    public boolean porFila;
 
     /** «31 read = 17 loaded + 12 rejected + 2 dropped (declared) + 0 lost». */
     public String resumen() {
       if ( entorno != null ) {
-        return "not evaluated (environment problem): " + entorno;
+        return porFila ? "aborted: a bad row stopped the load (and there is an environment problem: " + entorno + ")"
+          : "not evaluated (environment problem): " + entorno;
       }
       if ( abortada ) {
         return "aborted after " + leidas + " rows read (" + cargadas + " loaded, " + rechazadas + " rejected before "
@@ -214,16 +217,29 @@ public final class Balance {
     if ( entorno != null ) {
       inf.abortada = true;
       inf.entorno = entorno;
-      Comprobacion k = new Comprobacion( "no_abort", EstresResultado.NO_EVALUADA, "environment problem, not a "
-        + "robustness failure: " + entorno );
-      if ( c.mensajeError != null ) {
-        k.detalles.add( "error: " + recortar( c.mensajeError ) );
+      // el entorno no tapa una fila mala: si otro step abortó por una fila, eso es una falla de robustez igual
+      List<PasoCuenta> porFila = abortosPorFila( c );
+      Comprobacion k;
+      if ( porFila.isEmpty() ) {
+        k = new Comprobacion( "no_abort", EstresResultado.NO_EVALUADA, "environment problem, not a robustness failure: "
+          + entorno );
+        if ( c.mensajeError != null ) {
+          k.detalles.add( "error: " + recortar( c.mensajeError ) );
+        }
+      } else {
+        inf.porFila = true;
+        k = new Comprobacion( "no_abort", EstresResultado.FALLA, "a bad row stopped the load (besides the environment "
+          + "problem: " + entorno + ")" );
+        for ( PasoCuenta p : porFila ) {
+          k.detalles.add( "step '" + p.nombre + "' (" + p.tipo + ") failed with " + p.errores + " error(s): "
+            + recortar( p.mensaje ) );
+        }
       }
       inf.comprobaciones.add( k );
       for ( String id : new String[] { "input_complete", "no_silent_loss", "rejects_have_reason",
         "bad_rows_rejected" } ) {
-        inf.comprobaciones.add( new Comprobacion( id, EstresResultado.NO_EVALUADA, "environment problem: "
-          + entorno ) );
+        inf.comprobaciones.add( new Comprobacion( id, EstresResultado.NO_EVALUADA, ( inf.porFila ? "the run "
+          + "aborted; " : "" ) + "environment problem: " + entorno ) );
       }
       if ( segunda != null ) {
         inf.comprobaciones.add( new Comprobacion( "idempotent", EstresResultado.NO_EVALUADA, "environment problem: "
@@ -421,8 +437,9 @@ public final class Balance {
   }
 
   /**
-   * Veredicto de varias variantes: fragile (alguna falla o aviso), not_run (ninguna, pero alguna no se pudo evaluar por
-   * el entorno: falta la BD o una tabla), robust (el resto).
+   * Veredicto de varias variantes: fragile (alguna falla o aviso, también una fila mala en una corrida que además tuvo un
+   * problema de entorno), not_run (ninguna, pero alguna no se pudo evaluar por el entorno: falta la BD o una tabla),
+   * robust (el resto).
    */
   public static String veredicto( List<Informe> informes ) {
     boolean entorno = false;
@@ -491,6 +508,108 @@ public final class Balance {
     }
     return "the database or table " + ( tabla.isEmpty() ? "it reads or loads" : tabla ) + " does not exist"
       + ARREGLO_ENTORNO;
+  }
+
+  /** ¿El mensaje habla de una BD o una tabla que no existe? */
+  static boolean deEntorno( String texto ) {
+    if ( texto == null ) {
+      return false;
+    }
+    for ( Pattern p : SIN_BD ) {
+      if ( p.matcher( texto ).find() ) {
+        return true;
+      }
+    }
+    for ( Pattern p : SIN_TABLA ) {
+      if ( p.matcher( texto ).find() ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Los steps que abortaron por una fila, no por el entorno: con errores y un mensaje propio (el de la hija o, si no lo
+   * trae, sus líneas ERROR en la cola del log) que no habla de una BD ni una tabla que falta. Un step con errores pero
+   * sin mensaje no cuenta (no se inventa una fila mala), y si la corrida no pasó de la inicialización no se procesó
+   * ninguna fila.
+   */
+  public static List<PasoCuenta> abortosPorFila( Corrida c ) {
+    List<PasoCuenta> l = new ArrayList<PasoCuenta>();
+    if ( c == null || !c.iniciada ) {
+      return l;
+    }
+    Map<String, String> delLog = erroresPorPaso( c.colaLog );
+    for ( PasoCuenta p : c.porPaso().values() ) {
+      if ( p.errores <= 0 ) {
+        continue;
+      }
+      String m = p.mensaje != null ? p.mensaje : delLog.get( p.nombre );
+      if ( m == null || deEntorno( m ) ) {
+        continue;
+      }
+      p.mensaje = m;
+      l.add( p );
+    }
+    return l;
+  }
+
+  /**
+   * Los mensajes de ERROR del log de Kettle por step («2026/10/22 00:03:01 - Convert types.0 - ERROR (version …) :
+   * mensaje», sin la copia), con la primera línea de detalle tras una excepción y sin la pila, unidos con " | " (como
+   * mucho 5 por step).
+   */
+  public static Map<String, String> erroresPorPaso( String log ) {
+    Map<String, List<String>> m = new LinkedHashMap<String, List<String>>();
+    if ( log == null ) {
+      return new LinkedHashMap<String, String>();
+    }
+    String ultimo = null;
+    boolean tras = false;
+    for ( String x : log.split( "\r?\n" ) ) {
+      String resto = x.replaceFirst( "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2} - ", "" );
+      boolean conFecha = !resto.equals( x );
+      String paso = null;
+      if ( conFecha ) {
+        int g = resto.indexOf( " - " );
+        if ( g >= 0 ) {
+          paso = resto.substring( 0, g ).trim().replaceFirst( "\\.\\d+$", "" );
+          resto = resto.substring( g + 3 );
+        }
+      }
+      String t = resto.trim();
+      if ( conFecha && t.startsWith( "ERROR" ) && paso != null ) {
+        int dos = t.indexOf( ") : " );
+        String msg = dos >= 0 ? t.substring( dos + 4 ).trim() : t.substring( 5 ).trim();
+        tras = msg.isEmpty() || msg.endsWith( ":" ) || msg.endsWith( "Exception" );
+        ultimo = paso;
+        agregarA( m, paso, msg );
+      } else if ( conFecha ) {
+        tras = false;
+        ultimo = null;
+      } else if ( tras && ultimo != null && !t.isEmpty() && !t.startsWith( "at " ) && !t.startsWith( "..." ) ) {
+        agregarA( m, ultimo, t );
+        tras = false;
+      }
+    }
+    Map<String, String> r = new LinkedHashMap<String, String>();
+    for ( Map.Entry<String, List<String>> e : m.entrySet() ) {
+      if ( !e.getValue().isEmpty() ) {
+        r.put( e.getKey(), String.join( " | ", e.getValue() ) );
+      }
+    }
+    return r;
+  }
+
+  private static void agregarA( Map<String, List<String>> m, String paso, String t ) {
+    List<String> l = m.get( paso );
+    if ( l == null ) {
+      l = new ArrayList<String>();
+      m.put( paso, l );
+    }
+    if ( t != null && !t.isEmpty() && !l.contains( t ) && l.size() < 5 ) {
+      l.add( t );
+    }
   }
 
   /** ¿La columna parece un motivo de rechazo? */

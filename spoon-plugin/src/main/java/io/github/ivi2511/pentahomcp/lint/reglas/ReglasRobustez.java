@@ -59,7 +59,9 @@ public final class ReglasRobustez {
     "JsonOutput", "XMLOutput", "TableOutput", "InsertUpdate", "Update", "SynchronizeAfterMerge", "WriteToLog",
     "AccessOutput", "SQLFileOutput", "PropertyOutput", "CubeOutput", "MongoDbOutput", "TextFileOutputLegacy" );
   /** Quitan o juntan filas por diseño: deduplicar o agregar ya es una decisión, no una pérdida. */
-  static final Set<String> DEDUPLICAN = conjunto( "UniqueRows", "UniqueRowsByHashSet", "GroupBy", "MemoryGroupBy" );
+  /** Quitan repetidos: Unique rows (id «Unique»), Unique rows (HashSet) y los Group by. */
+  static final Set<String> DEDUPLICAN = conjunto( "Unique", "UniqueRows", "UniqueRowsByHashSet", "GroupBy",
+    "MemoryGroupBy" );
   static final Set<String> AGRUPAN = conjunto( "GroupBy", "MemoryGroupBy" );
   /** Tags del XML de una carga que nombran un campo del flujo (no banderas como update = N). */
   static final Set<String> TAGS_CAMPO = conjunto( "name", "rename", "field", "stream_name", "name2", "field_name",
@@ -72,6 +74,10 @@ public final class ReglasRobustez {
   private static final Pattern STAGING = Pattern.compile( "(?i)(^|[._])(stg|tmp|temp|staging)(_|$)|staging" );
   private static final Pattern COMENTARIOS = Pattern.compile( "(?s)/\\*.*?\\*/|--[^\\r\\n]*" );
   private static final Pattern JOIN = Pattern.compile( "(?i)\\b(\\w+)\\s+join\\b|(^|[^\\w])join\\b" );
+  /** «[tipo] JOIN tabla»: el tipo (si hay) y la tabla unida. */
+  private static final Pattern TABLA_UNIDA = Pattern.compile(
+    "(?i)(?:\\b(\\w+)\\s+)?\\bjoin\\s+([\\w.$\"`\\[\\]]+)" );
+  private static final Pattern DIMENSION = Pattern.compile( "^(dim|d)_|_dim$|^dimension_|^dim[a-z]" );
   private static final Pattern VARIABLE = Pattern.compile( "\\$\\{([^}]+)\\}|%%([^%]+)%%" );
 
   private ReglasRobustez() {
@@ -537,7 +543,7 @@ public final class ReglasRobustez {
           continue;
         }
         String sql = COMENTARIOS.matcher( Nodos.txt( ctx.xml( s ), "sql" ) ).replaceAll( " " );
-        if ( joinInterno( sql ) && g.llegaA( s, CARGAS, null ) != null ) {
+        if ( joinInterno( sql ) && !soloDimensiones( sql ) && g.llegaA( s, CARGAS, null ) != null ) {
           out.add( hallazgo( ctx, Sev.INFO, s, "sql", "orphans_to_rejects", "inner_join_in_source.msg" ) );
         }
       }
@@ -652,8 +658,9 @@ public final class ReglasRobustez {
         if ( !( contieneTipo( arriba, ENTRADAS_ARCHIVO ) || variasFuentes ) || contieneTipo( arriba, DEDUPLICAN ) ) {
           continue;
         }
-        out.add( hallazgo( ctx, Sev.INFO, s, "keys", "dedupe_before_load", "no_dedupe_before_load.msg", "keys",
-          unir( clavesDe( ctx, s ) ) ) );
+        String claves = unir( clavesDe( ctx, s ) );
+        out.add( hallazgo( ctx, Sev.INFO, s, "keys", "dedupe_before_load", claves.trim().isEmpty()
+          ? "no_dedupe_before_load.msg.nokeys" : "no_dedupe_before_load.msg", "keys", claves ) );
       }
     }
   }
@@ -993,6 +1000,28 @@ public final class ReglasRobustez {
       }
     }
     return false;
+  }
+
+  /**
+   * Los JOIN internos de la consulta van todos a tablas de dimensión (dim_x, x_dim, d_x): leer un modelo estrella por
+   * sus claves subrogadas no pierde filas (cada hecho tiene su dimensión, aunque sea el miembro «desconocido»).
+   */
+  public static boolean soloDimensiones( String sql ) {
+    Matcher m = TABLA_UNIDA.matcher( sql );
+    boolean alguna = false;
+    while ( m.find() ) {
+      String antes = m.group( 1 ) == null ? "" : m.group( 1 ).toUpperCase( Locale.ROOT );
+      if ( Arrays.asList( "LEFT", "RIGHT", "FULL", "OUTER", "CROSS", "NATURAL" ).contains( antes ) ) {
+        continue;
+      }
+      String t = m.group( 2 ).replaceAll( "[\"`\\[\\]]", "" ).toLowerCase( Locale.ROOT );
+      t = t.substring( t.lastIndexOf( '.' ) + 1 );
+      if ( !DIMENSION.matcher( t ).find() ) {
+        return false;
+      }
+      alguna = true;
+    }
+    return alguna;
   }
 
   /** Usa una variable o parámetro propio (no solo las Internal.*, que dicen dónde está el archivo). */

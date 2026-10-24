@@ -48,6 +48,8 @@ public final class EstresResultado {
     public long puestasError;
     /** rowReadEvent: filas que leyó de otros steps. */
     public long recibidas;
+    /** Los mensajes de ERROR de este step en el log (sin la pila), o null si no falló o no hay. */
+    public String mensaje;
 
     public ObjectNode json( ObjectMapper om ) {
       ObjectNode o = om.createObjectNode();
@@ -55,6 +57,9 @@ public final class EstresResultado {
         .put( "written", escritas ).put( "output", salida ).put( "updated", actualizadas )
         .put( "rejected", rechazadas ).put( "errors", errores ).put( "put", puestas ).put( "put_error", puestasError )
         .put( "received", recibidas );
+      if ( mensaje != null ) {
+        o.put( "error_message", mensaje );
+      }
       return o;
     }
 
@@ -73,6 +78,7 @@ public final class EstresResultado {
       p.puestas = o.path( "put" ).asLong();
       p.puestasError = o.path( "put_error" ).asLong();
       p.recibidas = o.path( "received" ).asLong();
+      p.mensaje = o.hasNonNull( "error_message" ) ? o.get( "error_message" ).asText() : null;
       return p;
     }
 
@@ -88,6 +94,9 @@ public final class EstresResultado {
       puestas += x.puestas;
       puestasError += x.puestasError;
       recibidas += x.recibidas;
+      if ( mensaje == null ) {
+        mensaje = x.mensaje;
+      }
     }
   }
 
@@ -123,6 +132,11 @@ public final class EstresResultado {
     /** Número de corrida dentro de la variante (rerun corre dos veces: 1 y 2). */
     public int vuelta = 1;
     public boolean terminada;
+    /**
+     * Los steps llegaron a arrancar (pasó la inicialización). Si no, ninguna fila se procesó y un aborto no puede ser
+     * por una fila mala. Sin el dato (un JSON de antes de 0.6.1), true.
+     */
+    public boolean iniciada = true;
     public long errores;
     public boolean vencida;
     public long ms;
@@ -133,7 +147,7 @@ public final class EstresResultado {
 
     public ObjectNode json( ObjectMapper om ) {
       ObjectNode o = om.createObjectNode();
-      o.put( "variant", variante ).put( "round", vuelta ).put( "finished", terminada ).put( "errors", errores )
+      o.put( "variant", variante ).put( "round", vuelta ).put( "finished", terminada ).put( "started", iniciada ).put( "errors", errores )
         .put( "timed_out", vencida ).put( "ms", ms ).put( "error_message", mensajeError ).put( "log_tail", colaLog );
       ArrayNode a = o.putArray( "steps" );
       for ( PasoCuenta p : pasos ) {
@@ -151,6 +165,7 @@ public final class EstresResultado {
       c.variante = o.path( "variant" ).asText();
       c.vuelta = o.path( "round" ).asInt( 1 );
       c.terminada = o.path( "finished" ).asBoolean();
+      c.iniciada = o.path( "started" ).asBoolean( true );
       c.errores = o.path( "errors" ).asLong();
       c.vencida = o.path( "timed_out" ).asBoolean();
       c.ms = o.path( "ms" ).asLong();

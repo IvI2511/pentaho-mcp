@@ -279,6 +279,13 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
 - El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
   transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
 
+## Lo nuevo en 0.6.1
+
+Correcciones de robustez: la sección «calidad» de los informes ya incluye los hallazgos de robustez con su
+puntuación aparte; `harden_etl` ya no traza un hop de error por encima de otro step en un lienzo lleno, y
+Ctrl+Z después deja el `.ktr` exactamente como estaba; `stress_test` informa de una fila mala aunque una
+tabla que falta también haya parado la corrida. Detalle en [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Lo nuevo en 0.6.0
 
 «Calidad y clases», 73 herramientas MCP en total:
@@ -294,8 +301,9 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   clic en **Siguiente ▶**, con una nota numerada en el lienzo por step, y la lección se convierte en apuntes.
 - **Robustez** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): cada fila mala va a un archivo de
   rechazos con su motivo, y copias rotas de las entradas demuestran que no se pierde ninguna fila y que
-  volver a correr la carga no duplica nada. En los informes, los hallazgos de robustez van dentro de la
-  sección «calidad» (`quality`): no hay una sección de robustez aparte. Guía: `manual/09-robustez.md`.
+  volver a correr la carga no duplica nada. En los informes, la sección «calidad» (`quality`) incluye los
+  hallazgos de robustez con su puntuación aparte: no hay una sección de robustez aparte. Guía:
+  `manual/09-robustez.md`.
 
 Detalle en [`CHANGELOG.md`](CHANGELOG.md).
 
