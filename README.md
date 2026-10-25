@@ -80,6 +80,16 @@ deliberate, optional deep check that reads data), **Harden…** (the plan with c
 and the dirty-data test with its verdict), **Arrange canvas**, **Lesson**, the switch to Data Integration,
 Reports or Grader, and **About Pentaho Live**.
 
+**Team projects.** A project or a course shares its conventions in one file, `.pentaho-live/lint.yaml`: which
+quality rules run and how severe they are, the minimum score, a prefix per step category (`IN_`, `OUT_`, `LKP_`,
+`FLT_`…), a description on every step, `${DIR_DATOS}` and `${DB_HOST}` instead of paths and hosts written by hand,
+and the team's own rules as patterns. Claude, **Check quality…** ("Profile: Course (…) · minimum 75: met"), the
+reports and the grader use it on their own, and renaming to the convention is one Ctrl+Z.
+`pentaho-live init` (or **IDC > Prepare project…**, or asking Claude) creates only what is missing for a team
+repository: `etl/`, `datasets/`, `tests/`, `contracts/`, `env/`, `.gitignore`, `.gitattributes`, that profile, a
+README with the conventions and a GitHub Actions workflow that installs PDI with Pentaho Live (cached) and fails the
+pull request when a `.ktr` is below the minimum score (`pentaho-live lint etl`).
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 
@@ -96,6 +106,7 @@ Kitchen.
 | *"Check this transformation for bad practices before I hand it in, and fix what's safe."* | runs the quality check, explains each finding, applies the safe fixes in one Ctrl+Z and asks before the rest |
 | *"Teach the Stream lookup lesson step by step, beginner level, in Spanish."* | builds it one step per click on Next ▶, with a numbered note on the canvas for every step and the rows it produces |
 | *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
+| *"Set up `C:\proyectos\ventas` as a team project with our course conventions."* | creates only what is missing (folders, `.gitignore`, the lint profile, README, CI) and tells you what it created; then `lint_etl` checks every ETL against the profile |
 | *"Make a grading pack from this solution with a hidden case, then grade the submissions in `C:\TP3\entregas`."* | runs the solution to get the expected output, grades every submission in separate JVMs and tells you the grades, who failed what and why; the gradebook and each student's feedback are in the results folder |
 
 ## How it works

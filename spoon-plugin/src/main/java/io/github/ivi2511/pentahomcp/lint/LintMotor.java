@@ -34,12 +34,24 @@ public final class LintMotor {
     }
     long t0 = System.currentTimeMillis();
     boolean trans = copia instanceof TransMeta;
-    List<Regla> reglas = Catalogo.seleccionar( op.rules, op.kettleChecks, op.robustez );
-    boolean cicloVisible = op.rules == null || op.rules.isEmpty() || contiene( op.rules, Catalogo.CYCLE );
+    PerfilEquipo pf = op.perfil;
+    boolean explicitas = op.rules != null && !op.rules.isEmpty();
+    List<Regla> reglas = Catalogo.seleccionar( op.rules, op.kettleChecks, op.robustez || ( pf != null && pf.robustez ) );
+    if ( pf != null && !explicitas ) {
+      reglas = pf.ajustar( reglas ); // el perfil del proyecto apaga y enciende reglas (E5)
+    }
+    boolean cicloVisible = ( !explicitas || contiene( op.rules, Catalogo.CYCLE ) )
+      && !( pf != null && !explicitas && pf.apaga( Catalogo.CYCLE ) );
     Ctx ctx = new Ctx( copia, op );
+    for ( Regla r : reglas ) {
+      ctx.corren.add( r.id() );
+    }
     Map<Hallazgo, Regla> deRegla = new LinkedHashMap<Hallazgo, Regla>();
     for ( Regla r : reglas ) {
       if ( trans ? !r.paraTrans() : !r.paraJobs() ) {
+        continue;
+      }
+      if ( op.sinEntorno && r.env() ) {
         continue;
       }
       ctx.regla( r );
@@ -67,8 +79,12 @@ public final class LintMotor {
           continue;
         }
       }
+      Sev fija = pf == null ? null : pf.gravedad( r.id() );
       for ( Hallazgo h : out ) {
         completar( ctx, r, h );
+        if ( fija != null ) {
+          h.severity = fija; // la gravedad que pide el perfil
+        }
         deRegla.put( h, r );
       }
     }
@@ -95,11 +111,16 @@ public final class LintMotor {
         continue;
       }
       visibles.add( h );
-      if ( r.puntua() ) {
+      if ( r.puntua() || cuentaPorPerfil( pf, r ) ) {
         cuentan.add( h );
       }
     }
     Puntaje.calcular( cuentan, res );
+    if ( pf != null ) {
+      res.perfil = pf;
+      res.minScore = pf.minScore;
+      res.pasaMinimo = pf.minScore == null ? null : res.score >= pf.minScore;
+    }
     res.robustez = robustez( reglas, trans, visibles, deRegla );
     res.counts.put( Sev.ERROR.codigo(), 0 );
     res.counts.put( Sev.WARNING.codigo(), 0 );
@@ -192,6 +213,15 @@ public final class LintMotor {
     }
     Puntaje.calcular( suyos, sub );
     return sub;
+  }
+
+  /**
+   * Una regla apagada por defecto que el perfil enciende resta (es la convención del proyecto o del curso); nunca
+   * kettle_check ni la familia robustness, que tiene su sub-puntaje.
+   */
+  private static boolean cuentaPorPerfil( PerfilEquipo pf, Regla r ) {
+    return pf != null && pf.enciende( r ) && !Catalogo.KETTLE_CHECK.equals( r.id() )
+      && !Regla.ROBUSTNESS.equals( r.categoria() );
   }
 
   private static boolean contiene( Set<String> ids, String id ) {

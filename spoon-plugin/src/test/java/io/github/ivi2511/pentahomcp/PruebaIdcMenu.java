@@ -63,7 +63,7 @@ public class PruebaIdcMenu {
   public void pruebaA_Transformacion() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( IdcMenu.TRANSFORMACION, false, "001-spoon-jobs",
       "001-spoon-jobs", "Data Integration", "pentaho-live-reports", "Informes", "pentaho-live-grader", "Corrector" ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "perspective:001-spoon-jobs",
+    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "project", "---", "perspective:001-spoon-jobs",
       "perspective:pentaho-live-reports", "perspective:pentaho-live-grader", "---", "about" ), ids( l ),
       "orden del menú" );
     for ( Entrada e : l ) {
@@ -97,7 +97,7 @@ public class PruebaIdcMenu {
   /** Nada abierto: solo Lección, perspectivas y Acerca habilitadas. Sin perspectivas, un solo separador. */
   public void pruebaC_SinDocumento() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( null, false, null ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "about" ), ids( l ),
+    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "project", "---", "about" ), ids( l ),
       "sin perspectivas no hay bloque ni separador de más" );
     falso( de( l, "quality" ).habilitada, "calidad" );
     falso( de( l, "harden" ).habilitada, "robustecer" );

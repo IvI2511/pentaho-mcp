@@ -103,6 +103,13 @@ nothing and opens no dialogs.
 Rules, result format, fixes and troubleshooting: `manual/06-calidad.md`; the machine-readable catalog is
 the resource `pentaho://lint/rules`.
 
+**Team conventions (0.7)**: if the project has `.pentaho-live/lint.yaml`, `lint_etl` uses it on its own and
+says `profile: {name, min_score, passed}`: follow its naming prefixes (`IN_`, `OUT_`…), required variables and
+team rules when you build. `lint_profile` shows it; `project_init` (or `pentaho-live init` in a terminal) prepares
+a team project: folders, `.gitignore`, the profile, a README and a GitHub Actions workflow that lints `etl/` with
+the profile's minimum score. Never overwrites anything; ask before creating files in a folder the person did not
+name. Everything: `manual/13-proyecto.md`.
+
 ## Grading exercises: `grade_exercise`, `grade_submissions`
 
 The plugin grades students' transformations against a **pack** (statement, the data of one or more cases,
@@ -174,6 +181,7 @@ in silence, re-running changes nothing and a broken input file proves it.
 | Grading exercises: packs, `grade_exercise`, `grade_submissions`, the gradebook, the Grader perspective | `manual/07-corrector.md` |
 | Class mode: `lesson_start`, the Lesson tab, notes, the handout, ready lessons | `manual/08-modo-clase.md`, `lecciones/` |
 | Robustness: rejects with a reason, stable keys, re-runnable loads, `harden_etl`, `stress_test`, the recipes by hand | `manual/09-robustez.md` |
+| Team projects: the lint profile `.pentaho-live/lint.yaml`, `lint_profile`, `project_init` / `pentaho-live init`, `pentaho-live lint`, CI | `manual/13-proyecto.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

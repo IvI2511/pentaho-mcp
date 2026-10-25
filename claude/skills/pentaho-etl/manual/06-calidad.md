@@ -140,11 +140,21 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
 | `parameter_without_default` | I | Parameter without a default (credentials excluded) | value: the default | — |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
+| `naming_convention`, `step_without_description`, `required_variable`, `team_pattern` | I / W / per rule | **Off without a project profile** (0.7): `.pentaho-live/lint.yaml` turns them on and then they count. Prefix per step or entry category, a description on every step, `${DIR_DATOS}` / `${DB_HOST}` instead of literal paths and hosts, the team's own pattern rules | rename (one Ctrl+Z) / path value | `13-proyecto.md` |
 | the robustness family (below) | W / I | **Off by default** in `lint_etl`: `robustness: true` runs them with a score of their own (the reports' `quality` section always does, §9) | `harden_etl` | `09-robustez.md` |
 | `kettle_check` | E / W | What Spoon's Verify says (`include_kettle_checks`), listed apart | — | — |
 
 The full catalog (title, why and fix in en/es/pt, whether a rule is off, depends on the computer or needs the
 saved file) is the `pentaho://lint/rules` resource.
+
+### The project's profile (`.pentaho-live/lint.yaml`, 0.7)
+
+A project or a course can share its conventions in a **lint profile**: `lint_etl`, `apply_lint_fixes`, the IDC
+dialog, the `quality` section and `pentaho-live lint` find it on their own, going up the folders from the
+document's folder. It turns rules off or on, sets their severity, adds a `min_score` and its own rules (the four
+above). The result says it in `profile: {name, path, min_score, passed}`; `lint_profile` shows the whole effective
+profile; `profile: "none"` checks with the default rules only. A profile that cannot be read does not stop the
+check: `profile.error` says why. Format, `pentaho-live init` and CI: `13-proyecto.md`.
 
 ### Robustness rules (`robustness: true`)
 

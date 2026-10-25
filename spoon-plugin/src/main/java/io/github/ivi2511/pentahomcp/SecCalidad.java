@@ -34,6 +34,7 @@ import io.github.ivi2511.pentahomcp.lint.LintMotor;
 import io.github.ivi2511.pentahomcp.lint.NoEvaluado;
 import io.github.ivi2511.pentahomcp.lint.Opciones;
 import io.github.ivi2511.pentahomcp.lint.Penalidad;
+import io.github.ivi2511.pentahomcp.lint.PerfilEquipo;
 import io.github.ivi2511.pentahomcp.lint.Puntaje;
 import io.github.ivi2511.pentahomcp.lint.Regla;
 import io.github.ivi2511.pentahomcp.lint.Resultado;
@@ -103,6 +104,10 @@ final class SecCalidad implements Recolector {
     op.robustez = true; // la familia robustness va en la seccion, con su sub-puntaje (en un job no corre ninguna)
     final EntornoInforme env = new EntornoInforme( ctx, copia, tope );
     op.entorno = env;
+    // el perfil del proyecto o del curso (.pentaho-live/lint.yaml), como lint_etl (E5)
+    java.io.File carpeta = PerfilEquipo.carpetaDe( copia.getFilename() );
+    final PerfilEquipo.Busqueda perfil = carpeta == null ? null : PerfilEquipo.buscar( carpeta );
+    op.perfil = perfil == null ? null : perfil.perfil;
     boolean profundo = ctx.pedido().calidadProfunda;
     if ( profundo ) {
       op.deep = true;
@@ -154,6 +159,11 @@ final class SecCalidad implements Recolector {
     }
 
     s.con( indicadores( r, res, errores, advertencias, sugerencias ) );
+    LintTools.anotarPerfil( res, perfil );
+    Parrafo pp = parrafoPerfil( r, res );
+    if ( pp != null ) {
+      s.con( pp );
+    }
     if ( profundo ) {
       s.con( parrafoProfundo( r, res ) );
     }
@@ -217,6 +227,27 @@ final class SecCalidad implements Recolector {
       return Indicador.ERROR;
     }
     return null;
+  }
+
+  /** «Perfil del proyecto: Curso (.pentaho-live/lint.yaml) · mínimo 75: lo cumple», o null sin perfil. */
+  static Parrafo parrafoPerfil( Rotulos r, Resultado res ) {
+    String texto;
+    if ( res.perfil != null ) {
+      String archivo = res.perfil.archivo == null ? PerfilEquipo.CARPETA : PerfilEquipo.CARPETA + "/"
+        + res.perfil.archivo.getName();
+      texto = r.f( "perfil.con", res.perfil.nombre, archivo );
+      if ( res.minScore != null ) {
+        texto += " " + r.f( Boolean.TRUE.equals( res.pasaMinimo ) ? "perfil.minimo.ok" : "perfil.minimo.ko",
+          res.minScore );
+      }
+    } else if ( res.perfilError != null ) {
+      texto = r.f( "perfil.error", res.perfilError );
+    } else {
+      return null;
+    }
+    Parrafo p = new Parrafo( texto );
+    p.id = "quality-perfil";
+    return p;
   }
 
   private static Parrafo parrafoProfundo( Rotulos r, Resultado res ) {

@@ -1,0 +1,42 @@
+# {{NAME}}
+
+Proyecto de ETL con Pentaho Data Integration 9.4 y [Pentaho Live](https://github.com/IvI2511/pentaho-mcp). Lo preparó `pentaho-live init` (Pentaho Live {{VERSION}}).
+
+## Carpetas
+
+| Carpeta | Qué va |
+|---|---|
+| `etl/` | Las transformaciones (`.ktr`) y los jobs (`.kjb`). |
+| `datasets/` | Datos de entrada pequeños para desarrollar y probar (CSV, Excel, SQLite de prueba). |
+| `tests/` | Pruebas con datos de entrada fijos y su salida esperada. |
+| `contracts/` | Contratos de datos de las salidas (columnas, tipos, reglas). |
+| `env/` | Variables por entorno: `dev.properties` es el ejemplo compartido; tus valores y contraseñas, en `env/local.properties` (no se sube). |
+| `.pentaho-live/` | El perfil del linter (`lint.yaml`) y su esquema. |
+| `.github/workflows/` | La integración continua: el linter en cada pull request. |
+
+## Convenciones
+
+Las fija `.pentaho-live/lint.yaml` y las comprueban, sin configurar nada, Claude (`lint_etl`), «Revisar calidad…» del menú IDC de Spoon, la sección Calidad de los informes, el corrector y la CI:
+
+- **Puntaje mínimo**: cada `.ktr`/`.kjb` tiene que llegar al `min_score` del perfil.
+- **Nombres**: cada step empieza con el prefijo de su categoría (`IN_` entradas, `OUT_` salidas, `LKP_` búsquedas, `FLT_` filtros…). «Revisar calidad…» lo arregla solo: renombra y se deshace con un Ctrl+Z.
+- **Nada de rutas ni hosts escritos a mano**: las rutas empiezan por `${DIR_DATOS}` o `${Internal.Entry.Current.Directory}`, y los hosts de las conexiones usan `${DB_HOST}`.
+- **Contraseñas** nunca en el `.ktr`: en `env/local.properties` o en variables del entorno.
+- **Reglas del equipo**: patrones en `team_rules` (por ejemplo, nada en carpetas temporales).
+
+## Comprobarlo en tu ordenador
+
+```sh
+pentaho-live lint etl              # usa .pentaho-live/lint.yaml; sale con 1 si alguno no llega al mínimo
+pentaho-live lint etl --format json
+```
+
+En Spoon: menú **IDC > Revisar calidad…** muestra «Perfil: {{NAME}}» y los hallazgos de las convenciones con su arreglo.
+
+## Integración continua
+
+`.github/workflows/pentaho-live.yml` instala PDI CE 9.4 con Pentaho Live (con caché) y pasa el linter con el perfil a todo `etl/` en cada pull request. Los pasos marcados `TODO` (pruebas con datos dorados y diff semántico) llegan con próximas versiones de Pentaho Live.
+
+## Diff legible en git
+
+Con Pentaho Live 0.7 o posterior, `pentaho-live git-setup` imprime las líneas para que `git diff` muestre los cambios de un `.ktr` por step y no como XML (ver `.gitattributes`).

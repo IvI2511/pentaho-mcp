@@ -2086,6 +2086,9 @@ public final class CorrectorPack implements Closeable {
   }
 
   private boolean lintExiste( String id ) {
+    if ( id != null && CorrectorPerfil.ID.equals( id.trim().toLowerCase( java.util.Locale.ROOT ) ) ) {
+      return true; // lint:profile: el perfil del linter del pack (.pentaho-live/lint.yaml)
+    }
     try {
       return Catalogo.buscar( id ) != null;
     } catch ( Throwable t ) {

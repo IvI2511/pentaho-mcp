@@ -125,6 +125,18 @@ public final class Rutas {
     return new String[] { "${" + PARAM_DATOS + "}" + ( archivo.isEmpty() ? "" : "/" + archivo ), PARAM_DATOS, carpeta };
   }
 
+  /**
+   * Propuesta con la variable que pide el perfil del proyecto (required_variables.paths): ${VAR}/<archivo>, con VAR =
+   * la carpeta del valor como default. Devuelve {valor nuevo, default}.
+   */
+  public static String[] propuestaConVariable( String valor, String variable ) {
+    String v = normalizar( valor );
+    int b = v.lastIndexOf( '/' );
+    String carpeta = b > 0 ? v.substring( 0, b ) : v;
+    String archivo = b > 0 ? v.substring( b + 1 ) : "";
+    return new String[] { "${" + variable + "}" + ( archivo.isEmpty() ? "" : "/" + archivo ), carpeta };
+  }
+
   /** Quita file:, une las barras y deja / como separador. */
   static String normalizar( String p ) {
     String s = p.trim().replace( '\\', '/' );

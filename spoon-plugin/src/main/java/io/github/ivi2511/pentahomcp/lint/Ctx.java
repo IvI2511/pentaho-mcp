@@ -46,6 +46,8 @@ public final class Ctx {
   private Object crudo;
   private Regla actual;
   boolean ciclo;
+  /** Los ids de las reglas que corren en este análisis (LintMotor). */
+  java.util.Set<String> corren = new java.util.HashSet<String>();
 
   Ctx( AbstractMeta meta, Opciones op ) {
     this.meta = meta;
@@ -70,6 +72,11 @@ public final class Ctx {
 
   public boolean esTrans() {
     return tm != null;
+  }
+
+  /** Si esta regla corre en este análisis (para no repetir lo que otra ya marca). */
+  public boolean corre( String id ) {
+    return corren.contains( id );
   }
 
   public Opciones opciones() {

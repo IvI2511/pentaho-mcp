@@ -473,7 +473,7 @@ public final class CorrectorMain {
         }
         TransMeta paraReglas = analisis != null ? analisis : CorrectorPolitica.usaBase( e ) ? null : e.tm;
         CorrectorNota.Estatico est = CorrectorNota.analizar( pack, paraReglas, salida == null ? null : salida.step,
-          r );
+          r, dirPack );
         fases.marcar( "rules" );
         if ( bloqueada ) {
           CorrectorNota.puntuar( pack, r, est );

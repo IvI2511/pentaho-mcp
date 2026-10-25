@@ -13,6 +13,7 @@ import io.github.ivi2511.pentahomcp.lint.reglas.ReglasEstilo;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasEstructura;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasJob;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasOrden;
+import io.github.ivi2511.pentahomcp.lint.reglas.ReglasPerfil;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasRobustez;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasRutas;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasSeguridad;
@@ -38,6 +39,7 @@ public final class Catalogo {
     l.addAll( ReglasRutas.todas() );
     l.addAll( ReglasSeguridad.todas() );
     l.addAll( ReglasEstilo.todas() );
+    l.addAll( ReglasPerfil.todas() ); // apagadas: las enciende el perfil del proyecto (.pentaho-live/lint.yaml)
     l.addAll( ReglasRobustez.todas() ); // apagadas: corren con robustness=true y dan su sub-puntaje
     l.add( ReglasEstructura.kettleCheck() );
     Set<String> ids = new HashSet<String>();

@@ -38,6 +38,14 @@ public final class Resultado {
    */
   public Resultado robustez;
   public long ms;
+  /** El perfil con que se corrió (null = sin perfil). */
+  public PerfilEquipo perfil;
+  /** El perfil que se encontró pero no se pudo leer (lint_etl sigue sin él): su ruta y el error. */
+  public String perfilArchivo;
+  public String perfilError;
+  /** El mínimo del perfil (null = sin mínimo) y si el puntaje lo alcanza (null = sin mínimo). */
+  public Integer minScore;
+  public Boolean pasaMinimo;
 
   public static String banda( int score ) {
     return score >= 90 ? "A" : score >= 75 ? "B" : score >= 50 ? "C" : "D";

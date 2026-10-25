@@ -38,6 +38,14 @@ public final class Opciones {
    * corren (el disco ya no es lo que se ve) y las contraseñas se juzgan en memoria.
    */
   public boolean sinGuardar;
+  /**
+   * El perfil del proyecto o del curso (.pentaho-live/lint.yaml, 0.7): qué reglas corren y con qué gravedad, el mínimo y
+   * sus reglas propias (naming_convention, required_variable…). null = sin perfil. Con {@link #rules} explícitas, el
+   * perfil no cambia qué corre (solo las gravedades y las reglas del perfil que se nombren).
+   */
+  public PerfilEquipo perfil;
+  /** No corre las reglas que dependen de la máquina (env): el corrector con el perfil del curso. */
+  public boolean sinEntorno;
   /** Lo que el motor le pide al plugin (LintEntorno). Obligatorio. */
   public Entorno entorno;
 }

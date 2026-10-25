@@ -83,6 +83,7 @@ final class IdcMenu {
   static final String ROBUSTECER = "harden";
   static final String ORDENAR = "arrange";
   static final String LECCION = "lesson";
+  static final String PROYECTO = "project";
   static final String ACERCA = "about";
   /** Prefijo de los ids de las entradas de perspectiva: "perspective:" + id de la perspectiva. */
   static final String PERSPECTIVA = "perspective:";
@@ -156,6 +157,7 @@ final class IdcMenu {
       : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, LECCION, c.leccion ? r.s( "menu_lesson_show" ) : r.s( "menu_lesson" ), true,
       false, null ) );
+    l.add( new Entrada( Tipo.ACCION, PROYECTO, r.s( "menu_project" ), true, false, r.s( "menu_project_tip" ) ) );
     if ( !c.perspectivas.isEmpty() ) {
       l.add( Entrada.separador() );
       for ( String[] p : c.perspectivas ) {
@@ -441,6 +443,10 @@ final class IdcMenu {
       }
       if ( LECCION.equals( id ) ) {
         leccion( sp.getShell(), r );
+        return;
+      }
+      if ( PROYECTO.equals( id ) ) {
+        IdcProyecto.abrir( sp.getShell(), activo(), r );
         return;
       }
       AbstractMeta m = activo();

@@ -85,6 +85,13 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
 
 ## 0.7.0 · Trabajo en equipo y datos
 
+- **Convenciones del equipo y `pentaho-live init`** (E5 + X1, con el MVP de P4) — hecho en la rama
+  `feat/070-equipo`: perfil del linter `.pentaho-live/lint.yaml` (reglas, gravedades, mínimo, prefijos por
+  categoría, descripción obligatoria, variables obligatorias, reglas del equipo por patrón) que usan `lint_etl`,
+  «Revisar calidad…», los Informes y el corrector (`lint:profile`); `lint_profile`, `project_init`, «Preparar
+  proyecto…» y `pentaho-live init | lint | profile`; plantilla de CI con PDI en caché y el linter con el mínimo del
+  perfil. Queda para después: los pasos de pruebas (P1) y diff semántico (E1) del workflow, el comentario en el PR,
+  la imagen Docker de PDI para no bajar 400 MB, el autoarreglo de `step_without_description` y de los hosts.
 - **Diff visual** entre dos versiones de una transformación (agregado / borrado / cambiado, marcado en
   el lienzo).
 - **Pruebas de regresión** — datos de entrada fijos y salida esperada; se corren todas con un botón o

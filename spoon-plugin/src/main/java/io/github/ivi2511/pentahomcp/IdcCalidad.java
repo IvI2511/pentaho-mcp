@@ -119,6 +119,8 @@ final class IdcCalidad {
   final Label puntaje;
   final Label robustez;
   final Label conteos;
+  /** «Perfil: <nombre> (<ruta>)» del proyecto (E5), o que no hay o que no se pudo leer. */
+  final Label perfil;
   final Button profunda;
   final Button conRobustez;
   final Button revisar;
@@ -223,6 +225,9 @@ final class IdcCalidad {
     robustez.setFont( negrita( robustez, 1.1 ) );
     conteos = new Label( cab, SWT.NONE );
     conteos.setLayoutData( new GridData( SWT.FILL, SWT.CENTER, true, false ) );
+    perfil = new Label( shell, SWT.WRAP );
+    perfil.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
+    perfil.setForeground( gris );
 
     // opciones
     Composite op = new Composite( shell, SWT.NONE );
@@ -1002,6 +1007,25 @@ final class IdcCalidad {
   // ---------------------------------------------------------------- resultado
 
   /** Pinta un resultado de lint_etl. (UI) */
+  /**
+   * La línea del perfil del proyecto (lint_etl «profile»): «Perfil: Curso (C:\…\lint.yaml) · mínimo 75: lo cumple»,
+   * «Perfil: ninguno…» o el error del archivo encontrado.
+   */
+  static String textoPerfil( Rotulos r, JsonNode pf ) {
+    if ( pf == null || pf.isNull() ) {
+      return r.s( "q_profile_none" );
+    }
+    if ( pf.has( "error" ) ) {
+      return r.f( "q_profile_error", pf.path( "path" ).asText( "?" ), pf.path( "error" ).asText() );
+    }
+    String t = r.f( "q_profile", pf.path( "name" ).asText(), pf.path( "path" ).asText( "" ) );
+    if ( pf.has( "min_score" ) ) {
+      t += " · " + r.f( pf.path( "passed" ).asBoolean() ? "q_profile_min_ok" : "q_profile_min_ko", pf.path(
+        "min_score" ).asInt() );
+    }
+    return t;
+  }
+
   void mostrar( ObjectNode o, boolean pedidaProfunda ) {
     ultimo = o;
     int score = o.path( "score" ).asInt();
@@ -1023,6 +1047,13 @@ final class IdcCalidad {
       cuentas += " · " + r.f( "q_suppressed_count", sil );
     }
     conteos.setText( cuentas );
+    JsonNode pf = o.get( "profile" );
+    perfil.setText( textoPerfil( r, pf ) );
+    perfil.setToolTipText( pf != null && pf.has( "description" ) ? pf.path( "description" ).asText() : r.s(
+      "q_profile_tip" ) );
+    perfil.setForeground( pf == null ? gris : pf.has( "error" ) ? ambar : pf.has( "passed" ) && !pf.path( "passed" )
+      .asBoolean() ? rojo : gris );
+    shell.layout( true, true );
 
     JsonNode antes = elegido();
     String claveAntes = antes == null ? null : antes.path( "key" ).asText( null );
