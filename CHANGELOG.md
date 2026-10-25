@@ -73,6 +73,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   included (through MCP they stay in English, the same in every language).
 - A deep check with nothing to read says so ("it only confirms unsorted input and the empty decimal symbol with
   data") instead of "0 probes in 0.0 s"; the checks that could not be evaluated show their reason.
+### Changed
+
+- **Arrange canvas** (`arrange_canvas`, the canvas button and IDC menu item, and `build_steps` with
+  `arrange`) uses a new layered layout. Before, it could leave crossing hops, hops drawn over other steps
+  and steps on top of notes that could no longer be read. Now:
+  - each level goes in a column, the main flow in straight lanes, the source of a lookup (Stream lookup,
+    Append, Merge join… info streams) in the lane next to the step that reads it, the target of an error
+    hop below its source, and separate flows in separate bands;
+  - columns are spaced by the width of the step names measured with Spoon's canvas font, so names never
+    overlap, and everything lands on Spoon's grid;
+  - crossings are minimised (several barycenter sweeps and neighbour transpositions over virtual nodes),
+    then a local search over the real drawing (straight lines from icon centre to icon centre) moves steps
+    between lanes until no hop crosses another step or its name;
+  - **notes are never left under a step, a name, a hop or another note**. With `notes=keep_near` (default)
+    each note follows the steps it was next to (or on top of) and goes to the closest free spot around
+    them; with `notes=margin` all notes go in a band above the drawing. Their size is measured as Spoon
+    paints them (width/height and font of each note);
+  - steps and notes move in the same undo group: one Ctrl+Z in a transformation (in a job, Spoon undoes
+    the moved notes with a second Ctrl+Z); arranging an already arranged canvas moves nothing.
+  - `arrange_canvas` takes optional `mode` (`readable`, the default, or `compact`) and `notes`
+    (`keep_near` or `margin`), and returns `notes_moved` and the canvas metrics `before` and `after`
+    (hop crossings, hops through steps and names, overlapping steps/names, steps over notes, hops through
+    notes, overlapping notes). Lesson notes (class mode) keep using the class rule.
+  - On the repository examples (31 files) and PDI's samples (208): no hop through a step, no covered note
+    and no overlapping names after arranging; hop crossings 0.6.2 → now: 31 → 2 (repo) and 38 → 30 (PDI
+    samples, as drawn by hand: 39).
 
 ## [0.6.2] - 2026-10-25
 

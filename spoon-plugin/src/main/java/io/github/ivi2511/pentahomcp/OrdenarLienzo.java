@@ -32,8 +32,8 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * barra del lienzo de transformaciones y de jobs y un item en el menu contextual del fondo del lienzo.
  * <p>
  * <b>Mismo camino que la herramienta MCP:</b> {@link #ordenar(Spoon, AbstractMeta)} es lo que llama arrange_canvas
- * (TransTools) y lo que llaman el boton y el menu: TransLayout.ordenar, una sola accion de undo (un Ctrl+Z) y
- * Docs.touched.
+ * (TransTools) y lo que llaman el boton y el menu: TransLayout.ordenar (steps y notas), un solo grupo de undo (un
+ * Ctrl+Z en transformaciones) y Docs.touched.
  * <p>
  * <b>Por que no un SpoonPlugin con categoria "trans-graph"/"job-graph":</b> en PDI 9.4 TransGraph y JobGraph llaman a
  * {@code SpoonPluginManager.applyPluginsForContainer} con el campo {@code xulDomContainer} ANTES de asignarlo
@@ -68,6 +68,15 @@ final class OrdenarLienzo {
    * Docs.touched. Con sp null (pruebas) registra el undo directo en el meta y no redibuja. (UI)
    */
   static TransLayout.Movimientos ordenar( Spoon sp, AbstractMeta m ) throws ToolError {
+    return ordenar( sp, m, LienzoLayout.Opciones.defecto() );
+  }
+
+  /**
+   * Lo mismo con opciones (modo legible/compacto, notas cerca/al margen). Los steps y las notas que se movieron van al
+   * mismo grupo de undo: en una transformacion, un Ctrl+Z; en un job Spoon no encadena acciones y las notas son un
+   * Ctrl+Z aparte (ver UndoGrupo). (UI)
+   */
+  static TransLayout.Movimientos ordenar( Spoon sp, AbstractMeta m, LienzoLayout.Opciones o ) throws ToolError {
     if ( m instanceof org.pentaho.di.trans.TransMeta
       && !LeccionNotas.reconocer( (org.pentaho.di.trans.TransMeta) m ).isEmpty() ) {
       // documento con notas de leccion (modo clase): la regla de clase mueve steps y notas, mismo Ctrl+Z
@@ -83,9 +92,9 @@ final class OrdenarLienzo {
         med.cerrar();
       }
     }
-    TransLayout.Movimientos mov = TransLayout.ordenar( m );
-    if ( !mov.objetos.isEmpty() ) {
-      new UndoGrupo( sp, m ).posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
+    TransLayout.Movimientos mov = TransLayout.ordenar( m, o );
+    if ( !mov.vacio() ) {
+      mov.registrar( new UndoGrupo( sp, m ) );
       if ( sp != null ) {
         Docs.touched( m );
       }

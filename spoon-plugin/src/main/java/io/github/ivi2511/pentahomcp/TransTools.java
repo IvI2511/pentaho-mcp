@@ -547,21 +547,51 @@ final class TransTools {
       } ) );
 
     s.add( Tools.tool( "arrange_canvas",
-      "Automatically arranges the canvas of a transformation or a job from left to right following the hops "
-        + "(each level in a column, branches one below the other; in jobs START goes on the left). Use it when you "
-        + "finish building or when the drawing got messy. Notes are not moved, except in a transformation with "
-        + "lesson notes (class mode): then the class rule moves the steps and the lesson notes. Undo with Ctrl+Z.",
-      Tools.schema().document().build(),
-      a -> Docs.ui( () -> {
-        Spoon sp = Docs.spoon();
-        AbstractMeta m = Docs.resolver( a );
-        // el mismo camino que el boton «Ordenar lienzo» de la barra del lienzo
-        TransLayout.Movimientos mov = OrdenarLienzo.ordenar( sp, m );
-        ObjectNode o = Tools.obj();
-        o.put( "moved", mov.objetos.size() );
-        o.put( "columns", mov.columnas );
-        return o;
-      } ) ) );
+      "Automatically arranges the canvas of a transformation or a job from left to right following the hops: a layered "
+        + "layout (each level in a column, the main flow in straight lanes, lookup sources in the lane next to the "
+        + "step that reads them, error targets below their source, separate flows in separate bands; in jobs START "
+        + "goes on the left) that avoids crossings and never draws a hop over another step. Columns are spaced by the "
+        + "real width of the step names. Notes are never left under a step, a name, a hop or another note: with "
+        + "notes=keep_near (default) each note follows the steps it was next to; with notes=margin they go in a band "
+        + "above the drawing. A transformation with lesson notes (class mode) uses the class rule instead. Returns "
+        + "how many steps/notes moved and the canvas metrics before and after (hop crossings, hops through steps, "
+        + "overlaps). Undo with one Ctrl+Z (in a job, moved notes are a second Ctrl+Z: Spoon does not chain job undo).",
+      Tools.schema().document()
+        .strEnum( "mode", "readable (default: room for every name) or compact (tighter columns and lanes)", false,
+          "readable", "compact" )
+        .strEnum( "notes", "keep_near (default: each note next to the steps it describes) or margin (all notes in "
+          + "a band above the drawing)", false, "keep_near", "margin" ).build(),
+      a -> {
+        final LienzoLayout.Opciones op = new LienzoLayout.Opciones();
+        op.modo = LienzoLayout.Modo.de( Tools.optStr( a, "mode", null ) );
+        if ( op.modo == null ) {
+          throw new ToolError( "'mode' must be readable or compact, got: " + Tools.optStr( a, "mode", "" ) );
+        }
+        op.notas = LienzoLayout.ModoNotas.de( Tools.optStr( a, "notes", null ) );
+        if ( op.notas == null ) {
+          throw new ToolError( "'notes' must be keep_near or margin, got: " + Tools.optStr( a, "notes", "" ) );
+        }
+        return Docs.ui( () -> {
+          Spoon sp = Docs.spoon();
+          AbstractMeta m = Docs.resolver( a );
+          // el mismo camino que el boton «Ordenar lienzo» de la barra del lienzo
+          TransLayout.Movimientos mov = OrdenarLienzo.ordenar( sp, m, op );
+          ObjectNode o = Tools.obj();
+          o.put( "moved", mov.objetos.size() );
+          o.put( "notes_moved", mov.notas.size() );
+          o.put( "columns", mov.columnas );
+          if ( mov.medidaAntes != null && mov.medidaDespues != null ) {
+            o.put( "mode", op.modo.json );
+            o.put( "notes", op.notas.json );
+            o.set( "before", mov.medidaAntes.json() );
+            o.set( "after", mov.medidaDespues.json() );
+          }
+          if ( m instanceof org.pentaho.di.job.JobMeta && !mov.objetos.isEmpty() && !mov.notas.isEmpty() ) {
+            o.put( "undo", "Two Ctrl+Z: Spoon undoes the entries and the notes of a job separately" );
+          }
+          return o;
+        } );
+      } ) );
   }
 
   // ---------------------------------------------------------------- ayudas
