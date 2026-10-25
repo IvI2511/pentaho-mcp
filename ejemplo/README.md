@@ -42,6 +42,7 @@ ejemplo/
 │   ├── 06_kpi_desde_ficheros.ktr  el KPI por tienda y categoría en una sola transformación (la del corrector)
 │   └── RESULTADOS.md            los números comprobados de una ejecución con Kitchen
 ├── pack-correccion/             el ejercicio para el corrector de Pentaho Live (ver abajo)
+├── pruebas/                     dos pruebas de regresión con datasets dorados de la solución (Pentaho Live 0.7.0)
 ├── pack-correccion-alumnos.zip  su copia para alumnos, sin la solución ni el caso oculto
 ├── entregas-ejemplo/            cuatro entregas con errores típicos, para probar el corrector
 ├── leccion/                    la lección de 8 pasos del modo clase (parte 4 del guion de la demo)

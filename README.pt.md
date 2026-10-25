@@ -78,6 +78,17 @@ quebradas dos seus arquivos de entrada rodam contra uma cópia da transformaçã
 teste confere que cada linha lida foi carregada ou rejeitada com o motivo, e que rodar duas vezes não
 duplica nada.
 
+**Testes.** Congele o que uma transformação produz hoje e fique sabendo quando uma mudança altera isso:
+um teste troca os steps de entrada por datasets fixos (CSV), roda a transformação em uma JVM separada e
+compara a saída dos steps escolhidos com CSVs dourados, linha a linha: linhas que faltam, que sobram e
+valores que mudam, com a chave, a coluna, o esperado e o obtido. Crie a partir do que uma pré-visualização
+mostra (`test_create`, ou **IDC › Testes… › Criar teste a partir da pré-visualização…**), rode com o Claude
+(`test_run`, `test_run_all`) ou na janela **Testes…**, em verde ou vermelho, e, se quiser, ao salvar: só os
+testes afetados pela mudança rodam em segundo plano e o botão IDC mostra **✓ 12/12** ou **✗ 1**. Os testes
+ficam em `tests/` ao lado do `.ktr` (formato:
+[`docs/schemas/pentaho-live-test-1.schema.json`](docs/schemas/pentaho-live-test-1.schema.json)); podem pular
+um Table output, definir variáveis e carregar bancos de teste descartáveis, como o corretor.
+
 **Menu IDC.** A barra principal do Spoon ganha um menu suspenso **IDC** logo ao lado do seletor de
 perspectivas, com tudo isso à mão sem pedir ao Claude: **Revisar qualidade…** (pontuação, achados com como
 corrigi-los, clique em um para ver o seu step na tela, as correções automáticas com um único Ctrl+Z,
@@ -103,6 +114,7 @@ Kitchen.
 | *"Dê a lição de Stream lookup passo a passo, nível iniciante, em português."* | monta um step a cada clique em Próximo ▶, com uma nota numerada no canvas por step e as linhas que ele produz |
 | *"Faça um relatório desta transformação para o trabalho, em PDF e PowerPoint, com uma conclusão curta."* | monta o relatório (linhagem, dicionário de dados, métricas…), escreve a conclusão com os dados reais e exporta os dois arquivos |
 | *"Monte um pacote de correção a partir desta solução, com um caso oculto, e depois corrija as entregas de `C:\TP3\entregas`."* | roda a solução para obter a saída esperada, corrige cada entrega em JVMs à parte e resume as notas, quem errou o quê e por quê; a planilha e a devolutiva de cada aluno ficam na pasta de resultados |
+| *"Congele a saída de «Redondear importe» como teste e depois me diga se a minha mudança quebrou algo."* | cria o teste com as linhas de hoje, roda depois da sua mudança e explica a diferença linha a linha se ficar vermelho |
 
 ## Como funciona
 
@@ -127,7 +139,7 @@ flowchart LR
 ```
 
 - O **plugin do Spoon** é um plugin de ciclo de vida do Kettle. Quando o Spoon abre, ele sobe um servidor
-  MCP em `127.0.0.1:8765` com 73 ferramentas e aplica cada alteração na thread de interface do
+  MCP em `127.0.0.1:8765` com 77 ferramentas e aplica cada alteração na thread de interface do
   Spoon, com desfazer. O mesmo jar acrescenta as perspectivas **Relatórios** e **Corretor** ao seletor de
   perspectivas do Spoon.
 - O **plugin do Claude Code `pentaho-live`** conecta o Claude a esse servidor e inclui a skill

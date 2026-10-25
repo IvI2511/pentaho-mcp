@@ -1,0 +1,77 @@
+{
+  "$schema" : "https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/docs/schemas/pentaho-live-test-1.schema.json",
+  "format" : "pentaho-live-test/1",
+  "name" : "dim_producto",
+  "description" : "El catálogo de productos limpio y con su clave subrogada, sin cargar la tabla",
+  "transformation" : "../solucion-referencia/02_dim_producto.ktr",
+  "environment" : {
+    "locale" : "es_ES",
+    "timezone" : "Europe/Madrid",
+    "encoding" : "UTF-8",
+    "timeout_s" : 120,
+    "max_rows" : 1000000
+  },
+  "datasets" : [ {
+    "step" : "Leer productos (Excel)",
+    "file" : "datasets/dim_producto/leer_productos_excel.csv",
+    "columns" : [ {
+      "name" : "codigo_producto",
+      "type" : "String"
+    }, {
+      "name" : "nombre",
+      "type" : "String"
+    }, {
+      "name" : "categoria",
+      "type" : "String"
+    }, {
+      "name" : "precio_venta",
+      "type" : "Number",
+      "decimal" : "."
+    } ]
+  } ],
+  "case" : {
+    "id" : "dim_producto",
+    "expected" : "golden/dim_producto",
+    "weight" : 1.0,
+    "hidden" : false
+  },
+  "outputs" : [ {
+    "step" : "Asignar clave subrogada",
+    "columns" : [ {
+      "name" : "codigo_producto",
+      "type" : "String"
+    }, {
+      "name" : "nombre",
+      "type" : "String"
+    }, {
+      "name" : "categoria",
+      "type" : "String"
+    }, {
+      "name" : "precio_venta",
+      "type" : "Number"
+    }, {
+      "name" : "sk_producto",
+      "type" : "Integer"
+    } ],
+    "compare" : {
+      "key_columns" : [ "codigo_producto" ],
+      "ignore_column_order" : true,
+      "ignore_row_order" : true,
+      "numeric_tolerance" : 1.0E-6,
+      "relative_tolerance" : 0.0,
+      "trim" : true,
+      "case_sensitive" : true,
+      "strict_format" : false,
+      "extra_columns" : "penalize",
+      "max_examples" : 20
+    }
+  } ],
+  "golden_csv" : {
+    "separator" : ",",
+    "enclosure" : "\"",
+    "header" : true,
+    "encoding" : "UTF-8"
+  },
+  "run_whole_transformation" : false,
+  "created_with" : "Pentaho Live 0.6.2"
+}

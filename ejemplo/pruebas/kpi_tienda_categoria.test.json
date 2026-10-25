@@ -1,0 +1,123 @@
+{
+  "$schema" : "https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/docs/schemas/pentaho-live-test-1.schema.json",
+  "format" : "pentaho-live-test/1",
+  "name" : "kpi_tienda_categoria",
+  "description" : "El KPI de ventas por tienda y categoría (importe redondeado) con los datos de septiembre congelados",
+  "transformation" : "../solucion-referencia/06_kpi_desde_ficheros.ktr",
+  "environment" : {
+    "locale" : "es_ES",
+    "timezone" : "Europe/Madrid",
+    "encoding" : "UTF-8",
+    "timeout_s" : 120,
+    "max_rows" : 1000000
+  },
+  "datasets" : [ {
+    "step" : "Leer tiendas (JSON)",
+    "file" : "datasets/kpi_tienda_categoria/leer_tiendas_json.csv",
+    "columns" : [ {
+      "name" : "id_tienda",
+      "type" : "String"
+    }, {
+      "name" : "nombre",
+      "type" : "String"
+    } ]
+  }, {
+    "step" : "Leer productos (Excel)",
+    "file" : "datasets/kpi_tienda_categoria/leer_productos_excel.csv",
+    "columns" : [ {
+      "name" : "codigo_producto",
+      "type" : "String"
+    }, {
+      "name" : "nombre",
+      "type" : "String"
+    }, {
+      "name" : "categoria",
+      "type" : "String"
+    }, {
+      "name" : "precio_venta",
+      "type" : "Number",
+      "decimal" : "."
+    } ]
+  }, {
+    "step" : "Leer ventas (CSV)",
+    "file" : "datasets/kpi_tienda_categoria/leer_ventas_csv.csv",
+    "columns" : [ {
+      "name" : "id_ticket",
+      "type" : "String"
+    }, {
+      "name" : "linea",
+      "type" : "Integer",
+      "precision" : 0,
+      "format" : "#",
+      "decimal" : "."
+    }, {
+      "name" : "fecha",
+      "type" : "String"
+    }, {
+      "name" : "id_tienda",
+      "type" : "String"
+    }, {
+      "name" : "codigo_producto",
+      "type" : "String"
+    }, {
+      "name" : "cantidad",
+      "type" : "Integer",
+      "precision" : 0,
+      "format" : "#",
+      "decimal" : "."
+    }, {
+      "name" : "precio_unitario",
+      "type" : "String",
+      "format" : "#.##",
+      "decimal" : "."
+    }, {
+      "name" : "metodo_pago",
+      "type" : "String"
+    } ]
+  } ],
+  "case" : {
+    "id" : "kpi_tienda_categoria",
+    "expected" : "golden/kpi_tienda_categoria",
+    "weight" : 1.0,
+    "hidden" : false
+  },
+  "outputs" : [ {
+    "step" : "Redondear importe",
+    "columns" : [ {
+      "name" : "tienda",
+      "type" : "String"
+    }, {
+      "name" : "categoria",
+      "type" : "String"
+    }, {
+      "name" : "unidades",
+      "type" : "Integer"
+    }, {
+      "name" : "importe_sin_redondear",
+      "type" : "Number"
+    }, {
+      "name" : "importe",
+      "type" : "Number"
+    } ],
+    "compare" : {
+      "key_columns" : [ "tienda", "categoria" ],
+      "ignore_column_order" : true,
+      "ignore_row_order" : true,
+      "numeric_tolerance" : 1.0E-6,
+      "relative_tolerance" : 0.0,
+      "trim" : true,
+      "case_sensitive" : true,
+      "strict_format" : false,
+      "extra_columns" : "penalize",
+      "max_examples" : 20
+    }
+  } ],
+  "golden_csv" : {
+    "separator" : ",",
+    "enclosure" : "\"",
+    "header" : true,
+    "encoding" : "UTF-8"
+  },
+  "run_whole_transformation" : false,
+  "created_with" : "Pentaho Live 0.6.2"
+}

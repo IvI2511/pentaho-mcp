@@ -87,8 +87,19 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
 
 - **Diff visual** entre dos versiones de una transformación (agregado / borrado / cambiado, marcado en
   el lienzo).
-- **Pruebas de regresión** — datos de entrada fijos y salida esperada; se corren todas con un botón o
-  con Pan en CI.
+- **Pruebas de regresión** — **hechas** (25-oct-2026, rama `feat/070-pruebas`, sin publicar; P1 y P2 de la
+  propuesta 0.7). Quedó así: `tests/<nombre>.test.json` junto a la `.ktr` (formato `pentaho-live-test/1`,
+  JSON Schema en `docs/schemas/`), con datasets que reemplazan steps de entrada (un Injector con el RowMeta
+  original), salidas comparadas fila a fila con CSV dorados, ajustes (`skip_step`, `remove_step`,
+  `set_variable`, `set_parameter`) y bases de prueba descartables; el motor es el del corrector (el caso,
+  `compare`, las bases y las tablas son su formato) en una JVM aparte. `test_create` (snapshot),
+  `test_run`, `test_run_all`, `test_list`; **IDC › Pruebas…** (verde y rojo, ejecutar con cancelar, la
+  diferencia fila a fila, crear desde la vista previa) y **ejecutar al guardar** (apagado por defecto: solo
+  las pruebas afectadas por el cambio, indicador ✓ 12/12 o ✗ 1 en el botón IDC y un globo si falla). Guía:
+  `manual/12-pruebas.md`; ejemplo: `ejemplo/pruebas/`. Falta: correrlas con Pan en CI (P4, sin Spoon:
+  un `pentaho-live test` de línea de comandos sobre `PruebasMain`), pruebas de jobs, el diff de E1 para
+  elegir las pruebas afectadas con más precisión, y una prueba que congele una salida a archivo leyendo el
+  archivo (hoy se captura la salida del step).
 - **Generador de datos «sucios»** para practicar limpieza (nulos, duplicados, fechas y decimales mal
   escritos).
 - **Catálogo de una carpeta** — qué job llama a qué transformación, qué tablas lee y escribe cada una.

@@ -381,4 +381,47 @@ public class PruebaPruebasEtl {
       "03_ventas_por_producto.ktr" ) ).getAbsolutePath(), "las nuevas, junto a la .ktr" );
     noNulo( PruebasArchivos.buscar( "a", new File( sub, "03_ventas_por_producto.ktr" ), null ), "por nombre" );
   }
+
+  // ================================================================ ejemplo y esquema
+
+  /** Las pruebas de ejemplo/pruebas (Grano de Oro) pasan sobre la solucion de referencia, sin escribir nada. */
+  public void pruebaI_EjemploGranoDeOro() throws Exception {
+    File repo = EntornoKettle.recursos().getAbsoluteFile().getParentFile().getParentFile().getParentFile()
+      .getParentFile();
+    File carpeta = new File( repo, "ejemplo/pruebas" );
+    List<File> pruebas = PruebasArchivos.deCarpeta( carpeta );
+    igual( 2, pruebas.size(), "dos pruebas de ejemplo" );
+    File salida = new File( repo, "ejemplo/salida" );
+    String[] antes = salida.list();
+    for ( File f : pruebas ) {
+      ResultadoPrueba r = PruebasMotor.correr( f, op() );
+      igual( ResultadoPrueba.PASO, r.estado, f.getName() + ": " + r.mensaje );
+    }
+    igual( antes == null ? null : Arrays.asList( antes ), salida.list() == null ? null : Arrays.asList( salida
+      .list() ), "nada nuevo en ejemplo/salida" );
+    igual( 1, PruebasArchivos.deTransformacion( new File( repo,
+      "ejemplo/solucion-referencia/06_kpi_desde_ficheros.ktr" ) ).size(), "Spoon la encuentra desde la .ktr" );
+  }
+
+  /** El JSON Schema del formato nombra las mismas claves y ajustes que el modelo. */
+  public void pruebaJ_Esquema() throws Exception {
+    File repo = EntornoKettle.recursos().getAbsoluteFile().getParentFile().getParentFile().getParentFile()
+      .getParentFile();
+    com.fasterxml.jackson.databind.JsonNode e = CorrectorJson.mapper().readTree( new File( repo,
+      "docs/schemas/pentaho-live-test-1.schema.json" ) );
+    igual( DefPrueba.ESQUEMA, e.path( "$id" ).asText(), "el $id es el de las pruebas que se crean" );
+    igual( DefPrueba.FORMATO, e.path( "properties" ).path( "format" ).path( "const" ).asText(), "formato" );
+    com.fasterxml.jackson.databind.JsonNode completa = CorrectorJson.mapper().valueToTree( PruebasMotor.cargar(
+      new File( repo, "ejemplo/pruebas/kpi_tienda_categoria.test.json" ) ) );
+    for ( java.util.Iterator<String> it = completa.fieldNames(); it.hasNext(); ) {
+      String k = it.next();
+      cierto( e.path( "properties" ).has( k ), "el esquema describe '" + k + "'" );
+    }
+    List<String> tipos = new ArrayList<String>();
+    for ( com.fasterxml.jackson.databind.JsonNode t : e.path( "properties" ).path( "tweaks" ).path( "items" ).path(
+      "properties" ).path( "type" ).path( "enum" ) ) {
+      tipos.add( t.asText() );
+    }
+    igual( DefPrueba.Ajuste.TIPOS, tipos, "los ajustes" );
+  }
 }

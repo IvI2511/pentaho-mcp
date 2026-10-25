@@ -73,6 +73,16 @@ the plan and applies it as one Ctrl+Z, then proves it with a dirty-data test: br
 files run against a copy of the transformation in a sandbox, and the test checks that every row read was
 loaded or rejected with a reason, and that running it twice duplicates nothing.
 
+**Tests.** Freeze what a transformation produces today and get warned when a change alters it: a test
+replaces the input steps with fixed datasets (CSV), runs the transformation in a separate JVM and compares
+the output of the steps you choose with golden CSV files, row by row: missing rows, extra rows and changed
+values, with the key, the column, the expected and the actual value. Create one from what a preview shows
+(`test_create`, or **IDC › Tests… › Create test from preview…**), run them with Claude (`test_run`,
+`test_run_all`) or from the **Tests…** window, green or red, and optionally on every save: only the tests the
+change affects run in the background and the IDC button shows **✓ 12/12** or **✗ 1**. Tests live in `tests/`
+next to the `.ktr` (format: [`docs/schemas/pentaho-live-test-1.schema.json`](docs/schemas/pentaho-live-test-1.schema.json));
+they can skip a Table output, set variables and load disposable test databases, like the grader.
+
 **IDC menu.** Spoon's main toolbar gets an **IDC** drop-down right next to the perspective switcher, with
 everything above at hand without asking Claude: **Check quality…** (score, findings with how to fix them,
 click one to see its step on the canvas, apply the automatic fixes as one Ctrl+Z, silence a rule where it is
@@ -97,6 +107,7 @@ Kitchen.
 | *"Teach the Stream lookup lesson step by step, beginner level, in Spanish."* | builds it one step per click on Next ▶, with a numbered note on the canvas for every step and the rows it produces |
 | *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
 | *"Make a grading pack from this solution with a hidden case, then grade the submissions in `C:\TP3\entregas`."* | runs the solution to get the expected output, grades every submission in separate JVMs and tells you the grades, who failed what and why; the gradebook and each student's feedback are in the results folder |
+| *"Freeze the output of «Redondear importe» as a test, then tell me if my change broke anything."* | creates the test from today's rows, runs it after your change and explains the row diff if it is red |
 
 ## How it works
 
@@ -121,7 +132,7 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with 73 tools, and applies every edit on Spoon's UI thread with undo support.
+  `127.0.0.1:8765` with 77 tools, and applies every edit on Spoon's UI thread with undo support.
   The same jar adds the **Reports** and **Grader** perspectives to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.

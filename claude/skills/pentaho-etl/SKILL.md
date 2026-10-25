@@ -160,6 +160,16 @@ in silence, re-running changes nothing and a broken input file proves it.
 - Never "tolerate" by ignoring errors or ending an error hop in a Dummy: tolerant means *rejected with a
   reason, in a file someone reads*.
 
+## Tests: golden datasets
+
+When the person wants to keep a transformation from breaking (*prueba de regresión, que siga dando lo
+mismo, test this*): `preview_step` the step that matters and check it with the person → `test_create`
+(`name`, `output_steps`, `key_columns` when rows have an identity; writers are skipped and source steps
+frozen as datasets by default) → change → `test_run` / `test_run_all` → on `failed`, explain from the row
+diff (`case.tables[].comparison.examples`). Recreate with `replace: true` only when the change was
+intended. Tests live in `tests/` next to the `.ktr`; in Spoon, **IDC › Tests…** (with *Run on save*).
+Format, databases and troubleshooting: `manual/12-pruebas.md`.
+
 ## Where everything is
 
 | I need… | Read |
@@ -172,6 +182,7 @@ in silence, re-running changes nothing and a broken input file proves it.
 | Grading exercises: packs, `grade_exercise`, `grade_submissions`, the gradebook, the Grader perspective | `manual/07-corrector.md` |
 | Class mode: `lesson_start`, the Lesson tab, notes, the handout, ready lessons | `manual/08-modo-clase.md`, `lecciones/` |
 | Robustness: rejects with a reason, stable keys, re-runnable loads, `harden_etl`, `stress_test`, the recipes by hand | `manual/09-robustez.md` |
+| Regression tests with golden datasets: `test_create`, `test_run`, the test file, test databases, run on save | `manual/12-pruebas.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

@@ -62,6 +62,8 @@ final class PruebasGuardado {
   }
 
   private static final class Estado {
+    /** El documento abierto que se vigila (otro objeto = se cerro y se volvio a abrir: otra linea de base). */
+    java.lang.ref.WeakReference<AbstractMeta> doc;
     long modificado;
     Map<String, String> firma;
     PruebasProcesos.Corrida corrida;
@@ -141,6 +143,13 @@ final class PruebasGuardado {
       String k = PruebasArchivos.canonica( ktr );
       long mod = ktr.lastModified();
       Estado e = ESTADOS.get( k );
+      if ( e != null && ( e.doc == null || e.doc.get() != m ) ) {
+        if ( e.corrida != null && !e.corrida.terminada() ) {
+          continue;
+        }
+        ESTADOS.remove( k ); // otra pestaña con el mismo archivo: la linea de base es la suya
+        e = null;
+      }
       if ( e != null && e.modificado == mod ) {
         continue;
       }
@@ -152,6 +161,7 @@ final class PruebasGuardado {
       boolean guardado = !m.hasChanged();
       if ( e == null ) { // la primera vez: la linea de base, sin correr nada
         e = new Estado();
+        e.doc = new java.lang.ref.WeakReference<AbstractMeta>( m );
         e.modificado = mod;
         e.firma = guardado ? PruebasArchivos.firma( (TransMeta) m ) : null;
         ESTADOS.put( k, e );

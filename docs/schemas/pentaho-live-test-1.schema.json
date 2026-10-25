@@ -1,0 +1,185 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/docs/schemas/pentaho-live-test-1.schema.json",
+  "title": "Pentaho Live transformation test (pentaho-live-test/1)",
+  "description": "A regression test with golden datasets for a PDI 9.4 transformation: input steps replaced by fixed datasets, output steps compared row by row with golden CSV files. Paths are relative to the folder of the .test.json file. The 'case', 'test_databases', 'database_safety', 'tables', 'golden_csv' and 'compare' blocks use the same format as the grader's exercise packs.",
+  "type": "object",
+  "required": ["format", "transformation"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": "pentaho-live-test/1" },
+    "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$", "description": "Defaults to the file name without .test.json" },
+    "description": { "type": "string" },
+    "transformation": { "type": "string", "description": "The .ktr under test, e.g. ../06_kpi.ktr" },
+    "environment": {
+      "type": "object",
+      "description": "The separate JVM the test runs in",
+      "properties": {
+        "locale": { "type": "string", "default": "en_US", "description": "es_ES, en_US... (numbers and dates of steps that do not declare their format)" },
+        "timezone": { "type": "string", "default": "UTC" },
+        "encoding": { "type": "string", "default": "UTF-8" },
+        "timeout_s": { "type": "integer", "minimum": 1, "default": 120, "description": "Per run" },
+        "max_rows": { "type": "integer", "minimum": 1, "default": 1000000, "description": "Per captured output and per dataset" }
+      },
+      "additionalProperties": false
+    },
+    "datasets": {
+      "type": "array",
+      "description": "Steps whose output is replaced by fixed rows (the step does not run; its incoming hops are removed)",
+      "items": {
+        "type": "object",
+        "required": ["step", "file"],
+        "properties": {
+          "step": { "type": "string" },
+          "file": { "type": "string", "description": "CSV: comma, double quotes, header, UTF-8. Unformatted values: plain numbers with '.', dates yyyy-MM-dd HH:mm:ss.SSS, booleans Y/N, binaries in base64; empty = null" },
+          "columns": {
+            "type": "array",
+            "description": "Fields injected, with the metadata they had in the original step. Without columns, every CSV column is a String",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "enum": ["String", "Number", "Integer", "BigNumber", "Date", "Timestamp", "Boolean", "Binary", "Internet Address"] },
+                "length": { "type": "integer" },
+                "precision": { "type": "integer" },
+                "format": { "type": "string", "description": "Conversion mask kept on the field (not used to read the CSV)" },
+                "decimal": { "type": "string" },
+                "group": { "type": "string" },
+                "currency": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "case": {
+      "type": "object",
+      "description": "A case in the grader pack format. expected = folder of the golden CSV files (<step>.csv, <table>.csv)",
+      "properties": {
+        "id": { "type": "string" },
+        "expected": { "type": "string", "default": "golden/<name>" },
+        "db_scripts": {
+          "type": "object",
+          "description": "Connection -> SQL scripts with this test's source data, run after the test database's scripts",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "executions": { "type": "integer", "minimum": 1, "maximum": 5, "description": "Runs before capturing, without recreating the databases (2 catches a load that duplicates rows)" },
+        "inputs_dir": { "type": "string", "description": "Not used by tests" },
+        "hidden": { "type": "boolean", "description": "Not used by tests" },
+        "weight": { "type": "number", "description": "Not used by tests" }
+      }
+    },
+    "test_databases": {
+      "type": "array",
+      "description": "Disposable databases (grader pack format 2): dropped, created and filled with their scripts before the test; the transformation's connections are pointed there by name, database or type and host",
+      "items": {
+        "type": "object",
+        "required": ["connection", "type", "database"],
+        "properties": {
+          "connection": { "type": "string" },
+          "type": { "enum": ["H2", "MYSQL", "MARIADB", "POSTGRESQL"] },
+          "host": { "type": "string" },
+          "port": { "type": "string" },
+          "database": { "type": "string", "description": "Must end in _test, _prueba, _correccion or _grading (database_safety)" },
+          "original_database": { "type": "string", "description": "Never touched" },
+          "user": { "type": "string" },
+          "password_variable": { "type": "string", "description": "Kettle or environment variable with the password. Never the password itself" },
+          "scripts": { "type": "array", "items": { "type": "string" } },
+          "options": { "type": "object", "additionalProperties": { "type": "string" } },
+          "admin_database": { "type": "string" }
+        }
+      }
+    },
+    "database_safety": {
+      "type": "object",
+      "properties": {
+        "test_suffixes": { "type": "array", "items": { "type": "string" } },
+        "allow_any_name": { "type": "boolean" },
+        "deny": { "type": "array", "items": { "type": "string" } },
+        "single_worker": { "type": "boolean" }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Steps whose output rows are compared with a golden CSV",
+      "items": {
+        "type": "object",
+        "required": ["step"],
+        "properties": {
+          "step": { "type": "string" },
+          "file": { "type": "string", "description": "Golden CSV inside case.expected. Default: the step name in lower case with _ (Totales por producto -> totales_por_producto.csv)" },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": { "name": { "type": "string" }, "type": { "type": "string" }, "format": { "type": "string" } }
+            }
+          },
+          "compare": {
+            "type": "object",
+            "description": "The grader's comparison options. Defaults for tests: numeric_tolerance 0.000001, extra_columns penalize, max_examples 20",
+            "properties": {
+              "key_columns": { "type": "array", "items": { "type": "string" } },
+              "ignore_column_order": { "type": "boolean", "default": true },
+              "ignore_row_order": { "type": "boolean", "default": true },
+              "numeric_tolerance": { "type": "number", "default": 0.000001 },
+              "relative_tolerance": { "type": "number", "default": 0 },
+              "trim": { "type": "boolean", "default": true },
+              "case_sensitive": { "type": "boolean", "default": true },
+              "date_formats": { "type": "array", "items": { "type": "string" } },
+              "strict_format": { "type": "boolean", "default": false },
+              "extra_columns": { "enum": ["warn", "penalize"], "default": "penalize" },
+              "max_examples": { "type": "integer", "minimum": 0, "default": 20 }
+            }
+          },
+          "ignore_columns": { "type": "array", "items": { "type": "string" }, "description": "Not compared (load dates, UUIDs, system time)" }
+        }
+      }
+    },
+    "tables": {
+      "type": "array",
+      "description": "Tables read from the test databases after the run and compared with <case.expected>/<name>.csv (the whole transformation runs)",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "connection": { "type": "string" },
+          "name": { "type": "string" },
+          "key_columns": { "type": "array", "items": { "type": "string" } },
+          "ignore_columns": { "type": "array", "items": { "type": "string" } },
+          "columns": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    },
+    "golden_csv": {
+      "type": "object",
+      "properties": {
+        "separator": { "type": "string", "default": "," },
+        "enclosure": { "type": "string", "default": "\"" },
+        "header": { "type": "boolean", "default": true },
+        "encoding": { "type": "string", "default": "UTF-8" }
+      }
+    },
+    "tweaks": {
+      "type": "array",
+      "description": "Changes applied to the copy that runs, never to the file",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["skip_step", "remove_step", "set_variable", "set_parameter"], "description": "skip_step: the step does nothing and its rows pass through (a Table output that does not write). remove_step: the step and its hops are removed (if it receives error rows, they end there). set_variable / set_parameter: a value for the run" },
+          "step": { "type": "string" },
+          "name": { "type": "string" },
+          "value": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "run_whole_transformation": { "type": "boolean", "default": false, "description": "false: only what leads to the captured outputs runs, like a preview" },
+    "created_with": { "type": "string" }
+  }
+}

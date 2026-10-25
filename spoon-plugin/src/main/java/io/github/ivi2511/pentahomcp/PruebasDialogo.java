@@ -291,10 +291,22 @@ final class PruebasDialogo {
     c.setWidth( ancho );
   }
 
-  /** Muestra la ventana y lee las pruebas. (UI) */
+  /** Muestra la ventana, lee las pruebas y, si alguna esta en rojo, deja elegida la primera con su diferencia. (UI) */
   void abrir() {
     IdcMenu.abrirShell( shell, (Shell) shell.getParent() );
     cargar();
+    elegirPrimeraRoja();
+  }
+
+  void elegirPrimeraRoja() {
+    for ( int i = 0; i < filas.size(); i++ ) {
+      ResultadoPrueba x = filas.get( i ).resultado;
+      if ( x != null && !x.paso() && !ResultadoPrueba.CANCELADA.equals( x.estado ) ) {
+        tabla.setSelection( i );
+        elegida( false );
+        return;
+      }
+    }
   }
 
   // ---------------------------------------------------------------- lista

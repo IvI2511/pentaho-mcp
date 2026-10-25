@@ -21,6 +21,7 @@ import org.pentaho.di.trans.TransMeta;
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
 import io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba;
 import io.github.ivi2511.pentahomcp.corrector.modelo.CorrectorJson;
+import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.TablaSalida;
 import io.github.ivi2511.pentahomcp.pruebas.modelo.DefPrueba;
 import io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba;
@@ -53,7 +54,9 @@ final class PruebasTools {
       Tools.schema().document()
         .str( "transformation_file", "Absolute path of a .ktr on disk, instead of an open document", false )
         .str( "folder", "Absolute path of a tests folder: list all its tests, whatever transformation they test",
-          false ).build(),
+          false )
+        .bool( "show_in_spoon", "Also open IDC > Tests... in Spoon for this transformation (only when the user asks to "
+          + "see the tests in Spoon)", false ).build(),
       a -> listar( a ) ) );
 
     s.add( Tools.tool( "test_create",
@@ -370,6 +373,18 @@ final class PruebasTools {
       l.add( describir( f ) );
     }
     r.put( "count", pruebas.size() );
+    if ( Tools.optBool( a, "show_in_spoon", false ) ) {
+      if ( o.docId == null ) {
+        throw new ToolError( "show_in_spoon needs the transformation open in Spoon" );
+      }
+      final String id = o.docId;
+      Docs.ui( () -> {
+        TransMeta tm = (TransMeta) Docs.resolverSinActivar( Tools.obj().put( "document", id ) );
+        PruebasDialogo.abrir( Docs.spoon().getShell(), tm, PruebasDialogo.rotulos() );
+        return null;
+      } );
+      r.put( "shown_in_spoon", true );
+    }
     return r;
   }
 
@@ -493,8 +508,10 @@ final class PruebasTools {
         run.remove( "metrics" );
         run.remove( "detail_key" );
         run.remove( "detail_args" );
-        if ( !detalle || ResultadoPrueba.PASO.equals( r.estado ) ) {
-          run.remove( "log" );
+        boolean corrioBien = ResultadoCaso.TERMINO.equals( run.path( "state" ).asText() ) && run.path( "errors" )
+          .asLong( 0 ) == 0;
+        if ( !detalle || corrioBien ) {
+          run.remove( "log" ); // el log solo ayuda si la transformacion fallo
         }
       }
       ( (ObjectNode) caso ).remove( "comparison" ); // la suma de tables[]: repetida
