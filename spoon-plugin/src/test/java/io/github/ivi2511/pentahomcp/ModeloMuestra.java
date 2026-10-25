@@ -88,6 +88,7 @@ public final class ModeloMuestra {
     inf.secciones.add( calidad() );
     inf.secciones.add( Seccion.omitida( SeccionId.LECCION, "Guía de la lección",
       "Este documento no tiene una lección" ) );
+    inf.secciones.add( Seccion.omitida( SeccionId.CAMBIOS, "Cambios", "Sin otra versión con la que comparar" ) );
     inf.secciones.add( conexiones() );
     inf.secciones.add( narrativa() );
     return inf;

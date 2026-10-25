@@ -1,0 +1,6 @@
+#!/bin/sh
+# Pentaho Live: normalizes the staged .ktr/.kjb before each commit (pentaho-live normalize) and stages
+# them again, so two saves without real changes give zero diff. A file that also has unstaged changes is
+# left alone and the commit stops with a message. Optional: copy this file to .git/hooks/pre-commit and
+# make it executable. Needs the pentaho-live command in the PATH (the Windows installer puts it there).
+exec pentaho-live pre-commit

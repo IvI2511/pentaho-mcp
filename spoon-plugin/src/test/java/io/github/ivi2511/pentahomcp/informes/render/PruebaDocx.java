@@ -135,7 +135,7 @@ public class PruebaDocx {
         cierto( a.matches( "[A-Za-z][A-Za-z0-9_]{0,39}" ), "nombre de marcador valido en Word: " + a );
       }
       contiene( todo( doc ), "Secciones omitidas: Flujo del job: Solo para jobs; Guía de la lección: Este documento no "
-      + "tiene una lección.", "omitidas en el indice" );
+      + "tiene una lección; Cambios: Sin otra versión con la que comparar.", "omitidas en el indice" );
       contiene( todo( doc ), "actualizar los campos", "ayuda del indice" );
 
       // estado de la seccion en un recuadro, no en el titulo

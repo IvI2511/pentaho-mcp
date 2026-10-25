@@ -27,13 +27,15 @@ public final class SeccionId {
   public static final String CALIDAD = "quality";
   /** Guia de la leccion del modo clase (docs/modo-clase-diseno.md §9): solo con una leccion en el documento. */
   public static final String LECCION = "lesson";
+  /** Cambios por significado contra otra versión (diff semántico, 0.7): solo si se pide. */
+  public static final String CAMBIOS = "changes";
   public static final String CONEXIONES = "connections";
   public static final String NARRATIVA = "narrative";
 
   /** Orden en el informe (el indice va entre la portada y el resumen, lo pone el renderizador). */
   public static final List<String> ORDEN = Collections.unmodifiableList( Arrays.asList(
     PORTADA, RESUMEN, FLUJO, FLUJO_JOB, LINAJE, DICCIONARIO, DESTINO, PERFIL, METRICAS, VALIDACION, CALIDAD,
-    LECCION, CONEXIONES, NARRATIVA ) );
+    LECCION, CAMBIOS, CONEXIONES, NARRATIVA ) );
 
   /** Area de Rotulos con los titulos de las secciones. */
   public static final String AREA = "secciones";

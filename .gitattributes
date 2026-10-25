@@ -6,3 +6,4 @@
 *.bat -text
 *.sh -text
 launcher/pentaho-live -text
+launcher/git/pre-commit -text

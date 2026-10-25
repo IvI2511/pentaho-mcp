@@ -63,7 +63,7 @@ public class PruebaMcpInformes {
    * stress_test (robustez) + lint_profile y project_init (0.7, perfil del proyecto y pentaho-live init) +
    * test_create, test_run, test_run_all y test_list (0.7, pruebas con datasets dorados).
    */
-  private static final int TOOLS = 79;
+  private static final int TOOLS = 80;
 
   private McpHttpServer server;
   private int puerto;
@@ -88,6 +88,7 @@ public class PruebaMcpInformes {
     RobustezTools.register( server );
     EstresTools.register( server );
     PruebasTools.register( server );
+    DiffTools.register( server );
     server.start();
   }
 
@@ -105,6 +106,7 @@ public class PruebaMcpInformes {
     String instr = init.path( "result" ).path( "instructions" ).asText();
     contiene( instr, "build_report", "las instrucciones nombran build_report" );
     contiene( instr, "get_report_data", "las instrucciones nombran get_report_data" );
+    contiene( instr, "diff_documents", "las instrucciones nombran diff_documents" );
 
     JsonNode tools = rpc( "tools/list", McpHttpServer.JSON.createObjectNode() ).path( "result" ).path( "tools" );
     cierto( tools.isArray(), "tools/list devuelve un array" );
@@ -131,7 +133,8 @@ public class PruebaMcpInformes {
     noNulo( build, "build_report registrada" );
     igual( set( "document", "sections", "formats", "output_dir", "file_name", "language", "title", "narrative",
       "lineage_step", "profile_step", "profile_rows", "metrics", "query_database", "show_in_spoon", "documents",
-      "include_job_transformations", "combine", "pptx_appendix", "profile_steps", "quality_deep" ), props( build ),
+      "include_job_transformations", "combine", "pptx_appendix", "profile_steps", "quality_deep", "compare_with" ),
+      props( build ),
       "argumentos de build_report (diseno §1.5)" );
     igual( "[\"formats\"]", build.path( "inputSchema" ).path( "required" ).toString(), "formats es obligatorio" );
     List<String> formatos = new ArrayList<>();
@@ -151,7 +154,7 @@ public class PruebaMcpInformes {
 
     JsonNode datos = porNombre.get( "get_report_data" );
     noNulo( datos, "get_report_data registrada" );
-    igual( set( "document", "sections", "language", "max_rows", "quality_deep" ), props( datos ),
+    igual( set( "document", "sections", "language", "max_rows", "quality_deep", "compare_with" ), props( datos ),
       "argumentos de get_report_data" );
     JsonNode mostrar = porNombre.get( "show_report" );
     noNulo( mostrar, "show_report registrada" );

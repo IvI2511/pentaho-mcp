@@ -75,7 +75,11 @@ public class McpLifecycleListener implements LifecycleListener {
       + " Regression tests with golden data: test_create freezes what a transformation produces today (input steps "
       + "as datasets, chosen output steps as golden CSV, in tests/ next to the .ktr), test_run / test_run_all run "
       + "them in a separate JVM and return the row diff (missing, extra, changed rows), test_list lists them; run "
-      + "them after changing a transformation and explain any failure from its diff.";
+      + "them after changing a transformation and explain any failure from its diff."
+      + " To review what changed in a transformation "
+      + "or job (its unsaved changes, a git revision or another file) use diff_documents: the changes by meaning, "
+      + "never as XML lines and never with passwords; format=markdown for a pull request, show_on_canvas=true to "
+      + "mark them on Spoon's canvas, and build_report with compare_with for a changes section.";
 
   private McpHttpServer server;
 
@@ -139,6 +143,7 @@ public class McpLifecycleListener implements LifecycleListener {
       RobustezTools.register( server );
       EstresTools.register( server );
       PruebasTools.register( server );
+      DiffTools.register( server );
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("

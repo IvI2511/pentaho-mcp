@@ -154,6 +154,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unsure) run in the background; the IDC button shows **✓ 12/12** or **✗ 1** with the details in its tooltip,
   and a balloon warns when one fails.
 - The skill's manual gets `manual/12-pruebas.md`; `ejemplo/pruebas/` has tests for the Grano de Oro example.
+- **Semantic diff of `.ktr`/`.kjb`** (`diff_documents`, 74 MCP tools): compares a transformation or job
+  open in Spoon (or a file) with its saved file (`compare_with=saved`, the unsaved changes), a git revision
+  (`git:HEAD`, `git:HEAD~1`, a branch, a commit, through the system git) or another file, **by meaning**:
+  steps or job entries added, removed or renamed (recognised by type, configuration, neighbours and position;
+  the hops and references that only name the renamed step do not count), property changes as
+  `before → after` with readable names (a Filter rows condition as one line,
+  `saldo >= 1000.0 AND activo = 'S' → saldo > 1500 AND activo = 'S'`; field lists with added, removed and
+  re-ordered fields; SQL and other multi-line values line by line; file paths, targets), hops (added, removed,
+  enabled, error hop, job condition), error handling, connections, parameters, notes and document
+  properties. Box moves are ignored unless `ignore_positions=false`. Passwords and users are never shown,
+  not even encrypted: only that they changed. Output as JSON with a readable `text`, plain text or Markdown
+  (for a pull request), in English, Spanish or Portuguese. Both sides are read the way Spoon writes them
+  (loaded with Kettle), so a hand-written file does not show the default tags Kettle adds as changes.
+- **IDC › Compare…** in Spoon: compare the active document with its saved file, a git revision (the last
+  commits of the file are listed) or another file, and see the changes as **badges on the canvas** (`+`
+  green, `~` amber, `»` blue for renamed; removed steps as red dashed ghosts where they were, removed hops as
+  dashed lines) or in **two tabs**, the other version next to this one, both with badges. A list of changes
+  opens next to it: clicking a change selects its step (or both ends of a hop), *Copy as Markdown* copies the
+  diff. The badges are only drawing (a `TransPainterEnd`/`JobPainterEnd` extension): the document is not
+  modified, and closing the list removes them. `diff_documents show_on_canvas=true` does the same from
+  Claude, without taking the focus when Spoon is in the background.
+- **Changes report section** (`sections=["changes"]`, new `compare_with` argument of `build_report` and
+  `get_report_data`, which also adds the section): the table of changes by meaning against the saved file,
+  git (`git:HEAD` by default) or another file. Never in the default selection.
+- **`pentaho-live` git and console commands** (no Spoon; Java and the plugin jar of the PDI the launcher
+  uses, or `PENTAHO_LIVE_JAR`): `normalize [--check]` writes `.ktr`/`.kjb` canonically (2-space indentation,
+  LF, Kettle's own escaping, without `modified_user`/`modified_date`, attributes and parameters in a stable
+  order; steps, hops, connections, notes and fields keep their order), so two saves without real changes
+  give zero diff; `diff` (two files, or a file against `--rev`, exit 1 when they differ; text, Markdown or
+  JSON); `textconv` for git's `diff.kettle.textconv`, so `git diff` shows one property per line instead of
+  XML; `pre-commit` for an optional hook (`launcher/git/pre-commit`) that normalizes the staged files and
+  stages them again; `git-setup` prints the `.gitattributes` and `git config` lines. Wired in
+  `launcher/pentaho-live.cmd` and in `launcher/pentaho-live`, which on macOS and Linux runs these commands
+  itself. The existing launcher options are unchanged.
+- **Skill manual `11-versiones.md`** (also the MCP resource `pentaho://guide/versions`): when and how Claude
+  uses `diff_documents`, how to read the result, Compare… in Spoon, the report section and the git setup.
+
+### Tested
+
+- `PruebaDiff`: pairs of versions of the skill examples modified in the test (condition, rename with and
+  without other changes, not-a-rename, positions, field lists, parameters and error handling, multi-line SQL,
+  notes, jobs) and passwords and users never present in text, Markdown, JSON or textconv.
+- `PruebaNormalizador`: on every example and pattern of the skill the normalizer is idempotent, the
+  semantic diff with the original is empty, Kettle loads the normalized file with the same `getXML()` except
+  the two volatile fields, validation gives the same remarks, and running every example and pattern job
+  gives the same results and output files; a Spoon save normalized is stable.
+- `PruebaDiffGit`: a throwaway git repository: `diff --rev`, two files, JSON, `textconv` wired to
+  `git diff` through `.gitattributes`, `normalize --check`, the pre-commit hook, `diff_documents` with
+  `path`, the changes section.
+- `PruebaDiffLienzo`: the badges of each side, the drawing with a recording GC, the painter extensions,
+  the Compare… dialog and the list of changes off screen.
 
 ## [0.6.2] - 2026-10-25
 

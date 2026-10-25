@@ -137,7 +137,7 @@ public final class InformeServicio {
   private static final List<Recolector> RECOLECTORES = Collections.unmodifiableList( Arrays.<Recolector>asList(
     new SecPortada(), new SecResumen(), new SecFlujo( false ), new SecFlujo( true ), new SecLinaje(),
     new SecDiccionario(), new SecDestino(), new SecPerfil(), new SecMetricas(), new SecValidacion(), new SecCalidad(),
-    new SecLeccion(), new SecConexiones(), new SecNarrativa() ) );
+    new SecLeccion(), new SecCambios(), new SecConexiones(), new SecNarrativa() ) );
 
   /** Secciones marcadas por defecto (diseno §2.3); metrics ademas pide una corrida. */
   private static final Set<String> POR_DEFECTO = Collections.unmodifiableSet( new LinkedHashSet<String>( Arrays.asList(
@@ -312,7 +312,7 @@ public final class InformeServicio {
   static boolean barata( String id ) {
     return SeccionId.PORTADA.equals( id ) || SeccionId.RESUMEN.equals( id ) || SeccionId.FLUJO.equals( id )
       || SeccionId.FLUJO_JOB.equals( id ) || SeccionId.CONEXIONES.equals( id ) || SeccionId.NARRATIVA.equals( id )
-      || SeccionId.LECCION.equals( id );
+      || SeccionId.LECCION.equals( id ) || SeccionId.CAMBIOS.equals( id );
   }
 
   private static String noAplica( Recolector r, Captura c, String idioma ) {
@@ -357,6 +357,8 @@ public final class InformeServicio {
           marcada = marcada || p.calidadProfunda; // la revision profunda es de la seccion de calidad
         } else if ( SeccionId.NARRATIVA.equals( id ) ) {
           marcada = p.narrativa != null && Txt.vacio( p.narrativa.conclusiones ) != null;
+        } else if ( SeccionId.CAMBIOS.equals( id ) ) {
+          marcada = p.compararCon != null; // compare_with = quiere los cambios
         }
         if ( marcada && noAplica( rec, c, idioma ) == null ) {
           elegidas.add( id );

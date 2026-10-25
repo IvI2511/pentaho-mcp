@@ -87,8 +87,17 @@ they can skip a Table output, set variables and load disposable test databases, 
 everything above at hand without asking Claude: **Check quality…** (score, findings with how to fix them,
 click one to see its step on the canvas, apply the automatic fixes as one Ctrl+Z, silence a rule where it is
 deliberate, optional deep check that reads data), **Harden…** (the plan with checkboxes, apply as one Ctrl+Z,
-and the dirty-data test with its verdict), **Arrange canvas**, **Lesson**, the switch to Data Integration,
-Reports or Grader, and **About Pentaho Live**.
+and the dirty-data test with its verdict), **Arrange canvas**, **Compare…**, **Lesson**, the switch to Data
+Integration, Reports or Grader, and **About Pentaho Live**.
+
+**Versions.** See what changed between two versions of a transformation or job *by meaning*, not as XML lines:
+steps added, removed or renamed, `Filter rows: saldo > 1000 → saldo >= 1000`, field lists, SQL line by line,
+hops, connections (never their passwords), parameters. Compare the open document with its saved file, a git
+revision or another file; in Spoon (**IDC › Compare…**) the changes are marked on the canvas with + / − / ~
+badges and a list where a click selects the step; Claude gets the same as text or Markdown for a pull request,
+and reports get a **Changes** section. For team repositories, `pentaho-live normalize` writes `.ktr`/`.kjb`
+canonically (two saves without real changes give zero diff) and `pentaho-live textconv` makes `git diff` show
+the semantic view; see [`manual/11-versiones.md`](claude/skills/pentaho-etl/manual/11-versiones.md).
 
 **Team projects.** A project or a course shares its conventions in one file, `.pentaho-live/lint.yaml`: which
 quality rules run and how severe they are, the minimum score, a prefix per step category (`IN_`, `OUT_`, `LKP_`,
@@ -112,6 +121,7 @@ Kitchen.
 | *"Connect to my PostgreSQL database and load this file into the `clientes` table."* | adds the connection (you type the password in Spoon), lists tables and columns, maps the fields |
 | *"Make a job that runs these two transformations in order and stops if the first one fails."* | builds the job with its entries and success / failure hops |
 | *"The canvas is a mess, tidy it up."* | lays out the steps left to right, with no crossed lines |
+| *"What did I change since the last commit? Show it on the canvas."* | lists the changes by meaning (steps, conditions, fields, hops) and marks them on the canvas |
 | *"Why does this `.ktr` fail in Pan?"* | reads it, finds the problem with the verified error list and fixes it |
 | *"Check this transformation for bad practices before I hand it in, and fix what's safe."* | runs the quality check, explains each finding, applies the safe fixes in one Ctrl+Z and asks before the rest |
 | *"Teach the Stream lookup lesson step by step, beginner level, in Spanish."* | builds it one step per click on Next ▶, with a numbered note on the canvas for every step and the rows it produces |
@@ -143,7 +153,7 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with 77 tools, and applies every edit on Spoon's UI thread with undo support.
+  `127.0.0.1:8765` with 80 tools, and applies every edit on Spoon's UI thread with undo support.
   The same jar adds the **Reports** and **Grader** perspectives to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.
@@ -233,6 +243,7 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Databases | List connection types, add, test and delete connections, browse tables and columns, run SQL queries (read-only unless you ask for writes) |
 | Parameters | List, set and delete parameters |
 | Canvas | Add notes, select steps, tidy the layout, take a screenshot of the canvas |
+| Versions | Compare a transformation or job with its saved file, a git revision or another file by meaning (steps, properties, hops, connections without passwords), as JSON, text or Markdown, optionally marked on the canvas |
 | Grading | Build an exercise pack from a solution (cases, hidden cases, expected output, rules, rubric, a copy for students), validate it, grade one submission or a whole folder in separate JVMs, follow the job, get the gradebook and each student's feedback |
 | Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, Word, Excel, images, JSON), alone or several documents combined, with lineage, data dictionary, metrics, technical quality and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
 

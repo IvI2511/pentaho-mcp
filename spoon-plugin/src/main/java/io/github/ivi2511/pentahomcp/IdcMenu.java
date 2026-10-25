@@ -84,6 +84,8 @@ final class IdcMenu {
   /** «Pruebas…» (0.7.0): PruebasDialogo; sus textos estan en el area de las pruebas. */
   static final String PRUEBAS = "tests";
   static final String ORDENAR = "arrange";
+  /** «Comparar…»: el diff semántico (IdcComparar); sus textos están en diff_*.properties. */
+  static final String COMPARAR = "compare";
   static final String LECCION = "lesson";
   static final String PROYECTO = "project";
   static final String ACERCA = "about";
@@ -156,6 +158,9 @@ final class IdcMenu {
       : r.s( "menu_harden" ), trans, false, trans ? r.s( "menu_harden_tip" ) : hay ? r.s( "r_only_trans" )
       : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, ORDENAR, r.s( "menu_arrange" ), hay, false, hay ? r.s( "menu_arrange_tip" )
+      : r.s( "no_document" ) ) );
+    Rotulos rd = Rotulos.de( io.github.ivi2511.pentahomcp.diff.Salidas.AREA, r.idioma() );
+    l.add( new Entrada( Tipo.ACCION, COMPARAR, rd.s( "menu_compare" ), hay, false, hay ? rd.s( "menu_compare_tip" )
       : r.s( "no_document" ) ) );
     Rotulos rp = Rotulos.de( PruebasDialogo.AREA, r.idioma() );
     l.add( new Entrada( Tipo.ACCION, PRUEBAS, rp.s( "menu_tests" ), trans, false, trans ? rp.s( "menu_tests_tip" )
@@ -462,6 +467,8 @@ final class IdcMenu {
       if ( ORDENAR.equals( id ) ) {
         Docs.activar( m );
         OrdenarLienzo.ejecutar( sp, m );
+      } else if ( COMPARAR.equals( id ) ) {
+        IdcComparar.abrir( sp.getShell(), m, r.idioma() );
       } else if ( CALIDAD.equals( id ) ) {
         IdcCalidad.abrir( sp.getShell(), m, r );
       } else if ( PRUEBAS.equals( id ) ) {

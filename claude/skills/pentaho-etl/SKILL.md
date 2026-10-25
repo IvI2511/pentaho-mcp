@@ -174,6 +174,16 @@ in silence, re-running changes nothing and a broken input file proves it.
 - Never "tolerate" by ignoring errors or ending an error hop in a Dummy: tolerant means *rejected with a
   reason, in a file someone reads*.
 
+## Versions: what changed, and git
+
+When the person asks what changed (*¿qué cambié?, compara con la versión anterior, revisa el cambio de mi
+compañero, qué cambió el alumno respecto a la plantilla*): `diff_documents` with `compare_with` = `saved`
+(unsaved changes), `git:HEAD~1` / `git:main` or another file. It answers by meaning (step added/removed/renamed,
+`condition: saldo > 1000 → saldo >= 1000`, field lists, SQL line by line, hops, connections), never as XML and
+never with passwords. `format=markdown` for a PR; `show_on_canvas=true` marks the changes in Spoon (also by hand:
+IDC menu > Compare…). For a team repository, `pentaho-live git-setup` prints the `.gitattributes` and textconv
+lines and `pentaho-live normalize` makes saves stable. Details: `manual/11-versiones.md`.
+
 ## Tests: golden datasets
 
 When the person wants to keep a transformation from breaking (*prueba de regresión, que siga dando lo
@@ -196,6 +206,7 @@ Format, databases and troubleshooting: `manual/12-pruebas.md`.
 | Grading exercises: packs, `grade_exercise`, `grade_submissions`, the gradebook, the Grader perspective | `manual/07-corrector.md` |
 | Class mode: `lesson_start`, the Lesson tab, notes, the handout, ready lessons | `manual/08-modo-clase.md`, `lecciones/` |
 | Robustness: rejects with a reason, stable keys, re-runnable loads, `harden_etl`, `stress_test`, the recipes by hand | `manual/09-robustez.md` |
+| What changed between two versions (`diff_documents`, Compare…), readable `git diff`, `pentaho-live normalize`, the pre-commit hook | `manual/11-versiones.md` |
 | Regression tests with golden datasets: `test_create`, `test_run`, the test file, test databases, run on save | `manual/12-pruebas.md` |
 | Team projects: the lint profile `.pentaho-live/lint.yaml`, `lint_profile`, `project_init` / `pentaho-live init`, `pentaho-live lint`, CI | `manual/13-proyecto.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |

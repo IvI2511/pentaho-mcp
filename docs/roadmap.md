@@ -92,8 +92,17 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
   proyecto…» y `pentaho-live init | lint | profile`; plantilla de CI con PDI en caché y el linter con el mínimo del
   perfil. Queda para después: los pasos de pruebas (P1) y diff semántico (E1) del workflow, el comentario en el PR,
   la imagen Docker de PDI para no bajar 400 MB, el autoarreglo de `step_without_description` y de los hosts.
-- **Diff visual** entre dos versiones de una transformación (agregado / borrado / cambiado, marcado en
-  el lienzo).
+- **Diff semántico y visual** (E1, hecho en `feat/070-diff`): `diff_documents` compara el documento abierto
+  o un archivo con su archivo guardado, una revisión de git u otro archivo por significado (steps
+  añadidos, quitados y renombrados por tipo, configuración y vecinos; condiciones legibles, listas de
+  campos, SQL por líneas, saltos, manejo de errores, conexiones sin contraseñas, parámetros, notas),
+  en JSON, texto o Markdown; «IDC › Comparar…» con insignias + / − / ~ en el lienzo (extensiones
+  `TransPainterEnd`/`JobPainterEnd`, solo dibujo) o dos pestañas, y la lista de cambios; la sección
+  `changes` de los Informes (`compare_with`).
+- **Git que entiende Kettle** (E2 sin el merge, hecho en `feat/070-diff`): `pentaho-live normalize`
+  (XML canónico, probado con Kettle: mismo `getXML()`, mismos avisos y mismas corridas en todos los
+  ejemplos y patrones), `pentaho-live diff`, `pentaho-live textconv` para `git diff` y el hook de
+  pre-commit opcional. Manual `11-versiones.md`. El **merge de 3 vías por step** queda para 0.8.0.
 - **Pruebas de regresión** — **hechas** (25-oct-2026, rama `feat/070-pruebas`, sin publicar; P1 y P2 de la
   propuesta 0.7). Quedó así: `tests/<nombre>.test.json` junto a la `.ktr` (formato `pentaho-live-test/1`,
   JSON Schema en `docs/schemas/`), con datasets que reemplazan steps de entrada (un Injector con el RowMeta

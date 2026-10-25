@@ -43,6 +43,8 @@ public final class Pedido {
    */
   public boolean calidadProfunda;
   public Narrativa narrativa;
+  /** Sección changes: con qué comparar ("saved", "git:REV" o un archivo); null = guardado o git HEAD. */
+  public String compararCon;
   /**
    * Total en ms. Cada seccion tiene ademas su tope: campos 60 s, linaje 60 s, perfil 60 s, BD 15 s,
    * validacion 60 s, Chromium 60 s.
