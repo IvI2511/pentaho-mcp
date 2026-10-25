@@ -62,7 +62,7 @@ public class PruebaMcpInformes {
    * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3) + harden_etl y
    * stress_test (robustez).
    */
-  private static final int TOOLS = 73;
+  private static final int TOOLS = 77;
 
   private McpHttpServer server;
   private int puerto;
@@ -86,6 +86,7 @@ public class PruebaMcpInformes {
     LessonTools.register( server );
     RobustezTools.register( server );
     EstresTools.register( server );
+    PruebasTools.register( server );
     server.start();
   }
 
@@ -184,6 +185,14 @@ public class PruebaMcpInformes {
     contiene( robustecer.path( "description" ).asText(), "ONE Ctrl+Z", "un solo Ctrl+Z" );
     contiene( instr, "harden_etl", "las instrucciones nombran harden_etl" );
     noNulo( porNombre.get( "stress_test" ), "stress_test registrada" );
+    // 0.7.0: pruebas con datasets dorados
+    for ( String n : new String[] { "test_create", "test_run", "test_run_all", "test_list" } ) {
+      noNulo( porNombre.get( n ), n + " registrada" );
+      cierto( porNombre.get( n ).toString().chars().allMatch( ch -> ch < 128 ), n + " en ingles (ASCII)" );
+    }
+    igual( "[\"name\",\"output_steps\"]", porNombre.get( "test_create" ).path( "inputSchema" ).path( "required" )
+      .toString(), "test_create pide nombre y salidas" );
+    contiene( instr, "test_create", "las instrucciones nombran test_create" );
     for ( JsonNode t : new JsonNode[] { build, datos, mostrar, lint, arreglos, silenciar, robustecer } ) {
       String json = t.toString();
       cierto( json.chars().allMatch( ch -> ch < 128 ), "la tool " + t.path( "name" ).asText() + " esta en ingles "

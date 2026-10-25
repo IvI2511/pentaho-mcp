@@ -63,7 +63,7 @@ public class PruebaIdcMenu {
   public void pruebaA_Transformacion() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( IdcMenu.TRANSFORMACION, false, "001-spoon-jobs",
       "001-spoon-jobs", "Data Integration", "pentaho-live-reports", "Informes", "pentaho-live-grader", "Corrector" ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "perspective:001-spoon-jobs",
+    igual( Arrays.asList( "quality", "harden", "tests", "arrange", "lesson", "---", "perspective:001-spoon-jobs",
       "perspective:pentaho-live-reports", "perspective:pentaho-live-grader", "---", "about" ), ids( l ),
       "orden del menú" );
     for ( Entrada e : l ) {
@@ -71,6 +71,7 @@ public class PruebaIdcMenu {
     }
     igual( "Revisar calidad…", de( l, "quality" ).texto, "texto calidad" );
     igual( "Robustecer…", de( l, "harden" ).texto, "texto robustecer" );
+    igual( "Pruebas…", de( l, "tests" ).texto, "texto pruebas (0.7.0)" );
     igual( "Ordenar lienzo", de( l, "arrange" ).texto, "texto ordenar" );
     igual( "Lección…", de( l, "lesson" ).texto, "sin lección cargada" );
     igual( "Acerca de Pentaho Live", de( l, "about" ).texto, "texto acerca" );
@@ -87,6 +88,7 @@ public class PruebaIdcMenu {
       "Data Integration", "pentaho-live-reports", "Informes" ) );
     cierto( de( l, "quality" ).habilitada, "calidad sirve para jobs" );
     falso( de( l, "harden" ).habilitada, "robustecer solo transformaciones" );
+    falso( de( l, "tests" ).habilitada, "pruebas solo transformaciones" );
     igual( "Robustecer… (solo transformaciones)", de( l, "harden" ).texto, "lo dice" );
     contiene( de( l, "harden" ).ayuda, "job_guard", "y por qué" );
     cierto( de( l, "arrange" ).habilitada, "ordenar sirve para jobs" );
@@ -97,7 +99,7 @@ public class PruebaIdcMenu {
   /** Nada abierto: solo Lección, perspectivas y Acerca habilitadas. Sin perspectivas, un solo separador. */
   public void pruebaC_SinDocumento() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( null, false, null ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "about" ), ids( l ),
+    igual( Arrays.asList( "quality", "harden", "tests", "arrange", "lesson", "---", "about" ), ids( l ),
       "sin perspectivas no hay bloque ni separador de más" );
     falso( de( l, "quality" ).habilitada, "calidad" );
     falso( de( l, "harden" ).habilitada, "robustecer" );

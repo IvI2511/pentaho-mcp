@@ -67,7 +67,11 @@ public class McpLifecycleListener implements LifecycleListener {
       + "(one Ctrl+Z each; notes the user wrote are never touched). To teach, lesson_start sends a whole lesson "
       + "script (steps with what/why) that Spoon plays one step at a time (pace guided, auto or manual with "
       + "lesson_next); follow the class with lesson_status wait_s and steer it with lesson_control. The handout "
-      + "to share afterwards is build_report with sections=[\"lesson\"].";
+      + "to share afterwards is build_report with sections=[\"lesson\"]."
+      + " Regression tests with golden data: test_create freezes what a transformation produces today (input steps "
+      + "as datasets, chosen output steps as golden CSV, in tests/ next to the .ktr), test_run / test_run_all run "
+      + "them in a separate JVM and return the row diff (missing, extra, changed rows), test_list lists them; run "
+      + "them after changing a transformation and explain any failure from its diff.";
 
   private McpHttpServer server;
 
@@ -130,6 +134,7 @@ public class McpLifecycleListener implements LifecycleListener {
       LessonTools.register( server );
       RobustezTools.register( server );
       EstresTools.register( server );
+      PruebasTools.register( server );
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("
@@ -141,6 +146,8 @@ public class McpLifecycleListener implements LifecycleListener {
     OrdenarLienzo.instalarDesde( handler );
     // menu «IDC» en la barra principal, junto al selector de perspectivas (no lanza)
     IdcMenu.instalarDesde( handler );
+    // pruebas al guardar (P2, si esta activado) y su indicador en el boton IDC (no lanza)
+    PruebasGuardado.instalarDesde( handler );
   }
 
   /**
