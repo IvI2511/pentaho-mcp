@@ -64,9 +64,11 @@ public final class ResultadoCaso {
   public static final String SQL_PROHIBIDO = "forbidden_sql";
   /** La reescritura del sandbox cambio nombres de steps o extremos de hops (P14): no se corre. */
   public static final String REESCRITURA_FALLIDA = "rewrite_failed";
+  /** Formato 2: un step nombra un esquema que no es una base de prueba (Table output a otro esquema). */
+  public static final String ESQUEMA_AJENO = "foreign_schema";
   public static final List<String> MOTIVOS = Collections.unmodifiableList( Arrays.asList( STEP_NO_PERMITIDO,
     STEP_PELIGROSO, STEP_DESCONOCIDO, CONEXION_AJENA, ENTRADA_INESPERADA, SALIDA_INESPERADA, NOMBRE_REPETIDO, CICLO,
-    SQL_PROHIBIDO, REESCRITURA_FALLIDA ) );
+    SQL_PROHIBIDO, REESCRITURA_FALLIDA, ESQUEMA_AJENO ) );
 
   @JsonProperty( "id" )
   public String id;
@@ -81,9 +83,34 @@ public final class ResultadoCaso {
   public List<ResultadoCorreccion.Aviso> avisos = new ArrayList<>();
   @JsonProperty( "run" )
   public Corrida corrida = new Corrida();
-  /** Null si no hubo salida que comparar. */
+  /** Null si no hubo salida que comparar. Con la captura tables, la suma de las de {@link #tablas}. */
   @JsonProperty( "comparison" )
   public Comparacion comparacion;
+  /** Captura tables: la comparacion de cada tabla ("dim_cliente" → ...), en el orden del pack. */
+  @JsonProperty( "tables" )
+  public List<ComparacionTabla> tablas;
+
+  /** {@code tables[]}: una tabla capturada de la base de prueba y su comparacion. */
+  @JsonInclude( JsonInclude.Include.NON_NULL )
+  @JsonIgnoreProperties( ignoreUnknown = true )
+  public static final class ComparacionTabla {
+
+    @JsonProperty( "table" )
+    public String tabla;
+    @JsonProperty( "connection" )
+    public String conexion;
+    @JsonProperty( "comparison" )
+    public Comparacion comparacion;
+
+    public ComparacionTabla() {
+    }
+
+    public ComparacionTabla( String tabla, String conexion, Comparacion comparacion ) {
+      this.tabla = tabla;
+      this.conexion = conexion;
+      this.comparacion = comparacion;
+    }
+  }
 
   /** {@code run}: como corrio el caso. */
   @JsonInclude( JsonInclude.Include.NON_NULL )
@@ -96,9 +123,14 @@ public final class ResultadoCaso {
     /** Con {@link ResultadoCaso#BLOQUEADO}: uno de {@link ResultadoCaso#MOTIVOS}. */
     @JsonProperty( "reason" )
     public String motivo;
-    /** Texto para el docente: el step que bloqueo, la primera linea del error... (puede traer datos). */
+    /** Texto para el docente, en ingles: el step que bloqueo, la primera linea del error... (puede traer datos). */
     @JsonProperty( "detail" )
     public String detalle;
+    /** El mismo texto para traducirlo (clave del area «corrector»); null si no tiene traduccion. */
+    @JsonProperty( "detail_key" )
+    public String claveDetalle;
+    @JsonProperty( "detail_args" )
+    public List<String> argsDetalle;
     @JsonProperty( "seconds" )
     public Double segundos;
     /** Errores de Kettle (Trans.getErrors); null si no corrio. */

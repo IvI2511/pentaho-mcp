@@ -1,5 +1,9 @@
 package io.github.ivi2511.pentahomcp.corrector.modelo;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -29,6 +33,23 @@ public final class Caso {
   public double peso = 1;
   @JsonProperty( "hidden" )
   public boolean oculto;
+  /**
+   * Formato 2: scripts SQL de este caso por conexion ("GYM_OLTP" → ["bd/oculto/datos.sql"]), que corren despues de
+   * los de la base ({@code test_databases[].scripts}): los datos de origen de cada caso.
+   */
+  @JsonProperty( "db_scripts" )
+  public Map<String, List<String>> scriptsBase = new LinkedHashMap<>();
+  /**
+   * Formato 2: cuantas veces se corre la entrega en este caso antes de capturar (sin recrear las bases entre una y
+   * otra); null = 1. Con 2 se ve si una carga duplica filas al volver a correrla.
+   */
+  @JsonProperty( "executions" )
+  public Integer ejecuciones;
+
+  /** {@link #ejecuciones} entre 1 y 5. */
+  public int vecesQueCorre() {
+    return ejecuciones == null ? 1 : Math.max( 1, Math.min( 5, ejecuciones ) );
+  }
 
   public Caso() {
   }

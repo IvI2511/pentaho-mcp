@@ -276,6 +276,13 @@ final class CorrectorTabla {
     return leer( csv, lecturaEsperada( pack ) );
   }
 
+  /** La salida esperada de una tabla (captura tables): {@code expected_csv} y, sin encabezado, esos nombres. */
+  static CorrectorTabla esperada( File csv, Pack.FormatoCsv formato, List<String> nombres ) throws IOException {
+    Lectura l = Lectura.de( formato );
+    l.nombres = nombres;
+    return leer( csv, l );
+  }
+
   /** Igual que {@link #esperada(File, Pack)} con el texto del CSV (pack inline). */
   static CorrectorTabla esperadaTexto( String csv, Pack pack ) {
     return leerTexto( csv, lecturaEsperada( pack ) );

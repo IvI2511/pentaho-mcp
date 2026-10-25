@@ -407,7 +407,7 @@ public class PruebaCorrectorModelo {
     falso( ResultadoCaso.estadoValido( "graded" ), "graded es de entrega, no de caso" );
     igual( Arrays.asList( "key", "multiset", "position" ), Arrays.asList( Comparacion.POR_CLAVE,
       Comparacion.MULTICONJUNTO, Comparacion.POR_POSICION ), "modos de comparacion (§4)" );
-    igual( Arrays.asList( "file", "step", "query" ), Pack.Salida.CAPTURAS, "capturas (§2.2)" );
+    igual( Arrays.asList( "file", "step", "query", "tables" ), Pack.Salida.CAPTURAS, "capturas (§2.2)" );
   }
 
   public void pruebaParaAlumnoYSinLog() throws Exception {

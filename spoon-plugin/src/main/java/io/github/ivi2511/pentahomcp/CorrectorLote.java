@@ -131,7 +131,7 @@ final class CorrectorLote {
     String planilla;
     /** en | es | pt; null = el del pack. */
     String idioma;
-    /** file | step | query; null = la del pack. */
+    /** file | step | query | tables; null = la del pack. */
     String captura;
     /** Steps condicionales habilitados ademas de los del pack («Volver a corregir con...»). */
     final List<String> permitidosExtra = new ArrayList<String>();
@@ -439,6 +439,7 @@ final class CorrectorLote {
       po.arranqueMs = b.arranqueMs;
       po.guardarAbiertos = b.guardarAbiertos;
       po.versionPlugin = b.versionPlugin;
+      po.claves.putAll( b.claves );
     }
     po.workers = Math.max( 1, op.workers );
     po.captura = op.captura;
@@ -1057,7 +1058,7 @@ final class CorrectorLote {
     try {
       String x = new String( Files.readAllBytes( ktr.toPath() ), StandardCharsets.UTF_8 );
       String captura = op.captura != null ? op.captura : pack.salida.captura;
-      if ( Pack.Salida.CAPTURA_QUERY.equals( captura ) ) {
+      if ( Pack.Salida.aBase( captura ) ) {
         return A_BASE.matcher( x ).find();
       }
       if ( Pack.Salida.CAPTURA_STEP.equals( captura ) && pack.salida.step != null ) {

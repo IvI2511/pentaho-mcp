@@ -59,7 +59,9 @@ entregas. Cada una corre en una JVM aparte, nunca dentro de Spoon, y su salida s
 esperada: sale la nota con los criterios que fallaron, una pista para cada error típico (Group by sin ordenar,
 símbolo decimal vacío, duplicados sin quitar, rutas fijas), la devolución de cada alumno sin los valores del
 caso oculto y una planilla para Excel. Spoon suma la perspectiva **Corrector** con lo mismo y un asistente que
-arma el pack desde la transformación abierta.
+arma el pack desde la transformación abierta. Desde 0.6.2 también corrige cargas a MySQL, MariaDB, PostgreSQL o
+H2 sobre bases de prueba descartables que recrea antes de cada caso (nunca tus bases; la contraseña nunca va en el
+pack).
 
 **Modo clase.** Claude también puede *enseñar* un ETL: construye la transformación despacio, un step por
 cada clic en **Siguiente ▶** de una pestaña nueva, **Lección**, y explica cada step con una nota numerada en
@@ -286,6 +288,16 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
   muestra el informe completo.
 - El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
   transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
+
+## Lo nuevo en 0.6.2
+
+- **Menú IDC** al lado del selector de perspectivas de Spoon: *Revisar calidad…* (nota, hallazgos, aplicar
+  arreglos con un Ctrl+Z, silenciar una regla), *Robustecer…* (el plan de `harden_etl` con casillas, aplicar,
+  *Probar con datos sucios…*), *Ordenar lienzo*, *Lección* y el cambio de perspectiva, sin pedírselo a Claude.
+- El **corrector de ejercicios** corrige cargas en MySQL, MariaDB, PostgreSQL o H2 sobre bases de prueba
+  desechables que recrea antes de cada caso; sus mensajes salen en el idioma de Spoon.
+- `harden_etl` y `stress_test` responden en español, inglés o portugués, y un ensayo de `harden_etl` ya no
+  marca la transformación como modificada. Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Lo nuevo en 0.6.1
 

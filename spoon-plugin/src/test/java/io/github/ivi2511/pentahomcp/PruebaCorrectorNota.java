@@ -319,6 +319,7 @@ public class PruebaCorrectorNota {
     motivos.put( ResultadoCaso.CICLO, "D2" );
     motivos.put( ResultadoCaso.SQL_PROHIBIDO, "forbidden_sql" );
     motivos.put( ResultadoCaso.REESCRITURA_FALLIDA, "rewrite_failed" );
+    motivos.put( ResultadoCaso.ESQUEMA_AJENO, "foreign_schema" );
     igual( new TreeSet<String>( ResultadoCaso.MOTIVOS ), new TreeSet<String>( motivos.keySet() ),
       "una pista por cada motivo del §6" );
     for ( Map.Entry<String, String> mo : motivos.entrySet() ) {

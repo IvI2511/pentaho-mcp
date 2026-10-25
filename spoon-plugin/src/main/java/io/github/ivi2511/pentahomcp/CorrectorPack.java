@@ -60,7 +60,10 @@ import io.github.ivi2511.pentahomcp.corrector.modelo.Caso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.CorrectorJson;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ItemRubrica;
 import io.github.ivi2511.pentahomcp.corrector.modelo.OpcionesComparar;
+import io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Pack;
+import io.github.ivi2511.pentahomcp.corrector.modelo.SeguridadBases;
+import io.github.ivi2511.pentahomcp.corrector.modelo.TablaSalida;
 import io.github.ivi2511.pentahomcp.corrector.modelo.PoliticaPack;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Regla;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
@@ -164,6 +167,19 @@ public final class CorrectorPack implements Closeable {
   public static final String ZIP_NOMBRE = "zip_bad_name";
   public static final String ZIP_REPETIDO = "zip_duplicate";
   public static final String ZIP_ROTO = "zip_corrupt";
+  /** Formato 2 (0.6.2): el pack usa bases de prueba o la captura tables pero dice pentaho-live-exercise-pack/1. */
+  public static final String FORMATO_VIEJO = "format_too_old";
+  /** Una base de prueba que el corrector no recrearia: la original, del sistema, sin sufijo de prueba... */
+  public static final String BASE_INSEGURA = "unsafe_test_database";
+  /** Una tabla o un script de caso nombra una conexion que no esta en test_databases. */
+  public static final String BASE_DESCONOCIDA = "unknown_test_db";
+  /** Una base de prueba trae la contraseña: nunca va en el pack. */
+  public static final String CLAVE_EN_PACK = "password_in_pack";
+  /** Captura tables sin tablas. */
+  public static final String SIN_TABLAS = "no_tables";
+  public static final String TABLA_REPETIDA = "duplicate_table";
+  /** La carpeta expected de un caso no tiene el CSV de una tabla. */
+  public static final String FALTA_TABLA = "missing_expected_table";
 
   /** Todos los codigos: cada uno tiene su texto pack.&lt;codigo&gt; en en/es/pt (lo controla la prueba). */
   public static final List<String> CODIGOS = Collections.unmodifiableList( Arrays.asList( NO_EXISTE, NO_ES_PACK,
@@ -174,7 +190,8 @@ public final class CorrectorPack implements Closeable {
     REGLA_REPETIDA, LINT_DESCONOCIDA, SIN_RUBRICA, CHECK_DESCONOCIDO, REGLA_DESCONOCIDA, CHECK_REPETIDO,
     REQUIERE_MALO, SIN_PUNTOS, REGLA_SIN_USO, EXTENSION_SOLUCION, SIN_ENUNCIADO, SIN_TITULO, IDIOMA_DESCONOCIDO,
     CAMPO_IGNORADO, ENCABEZADO_ESPERADO, INLINE_GRANDE, INLINE_RESERVADO, INLINE_REPETIDO, ZIP_SLIP, ZIP_GRANDE,
-    ZIP_MUCHAS, ZIP_NOMBRE, ZIP_REPETIDO, ZIP_ROTO ) );
+    ZIP_MUCHAS, ZIP_NOMBRE, ZIP_REPETIDO, ZIP_ROTO, FORMATO_VIEJO, BASE_INSEGURA, BASE_DESCONOCIDA, CLAVE_EN_PACK,
+    SIN_TABLAS, TABLA_REPETIDA, FALTA_TABLA ) );
 
   /** Tipos de Kettle (ValueMetaFactory) que puede tener una columna de output.columns. */
   public static final List<String> TIPOS_KETTLE = Collections.unmodifiableList( Arrays.asList( "String", "Number",
@@ -313,8 +330,8 @@ public final class CorrectorPack implements Closeable {
       pack = null;
       return;
     }
-    if ( !Pack.FORMATO.equals( pack.formato ) ) {
-      error( "format", FORMATO_DESCONOCIDO, pack.formato, Pack.FORMATO );
+    if ( !Pack.FORMATOS.contains( pack.formato ) ) {
+      error( "format", FORMATO_DESCONOCIDO, pack.formato, String.join( ", ", Pack.FORMATOS ) );
       pack = null;
       return;
     }
@@ -726,6 +743,7 @@ public final class CorrectorPack implements Closeable {
     }
     validarCasos( entradas );
     validarSalida();
+    validarBases();
     validarComparar();
     validarReglas();
     validarRubrica();
@@ -798,12 +816,38 @@ public final class CorrectorPack implements Closeable {
           revisarEntradas( d + ".inputs_dir", c.dirEntradas, dir, entradas );
         }
       }
+      boolean tablas = Pack.Salida.CAPTURA_TABLAS.equals( pack.salida.captura );
       if ( vacio( c.esperado ) ) {
         error( d + ".expected", FALTA_VALOR );
+      } else if ( tablas ) {
+        File e = rutaDelPack( d + ".expected", c.esperado, true );
+        for ( int k = 0; e != null && k < pack.salida.tablas.size(); k++ ) {
+          TablaSalida t = pack.salida.tablas.get( k );
+          if ( t != null && !vacio( t.nombre ) && !new File( e, t.archivo() ).isFile() ) {
+            error( d + ".expected", FALTA_TABLA, c.esperado, t.archivo() );
+          }
+        }
       } else {
         File e = rutaDelPack( d + ".expected", c.esperado, false );
         if ( e != null ) {
           revisarEncabezado( d + ".expected", c.esperado, e );
+        }
+      }
+      if ( c.ejecuciones != null && ( c.ejecuciones < 1 || c.ejecuciones > 5 ) ) {
+        errorV( d + ".executions", VALOR_MALO, "range", c.ejecuciones, "1", "5" );
+      }
+      for ( Map.Entry<String, List<String>> en : c.scriptsBase.entrySet() ) {
+        String dd = d + ".db_scripts." + en.getKey();
+        if ( pack.base( en.getKey() ) == null ) {
+          error( dd, BASE_DESCONOCIDA, en.getKey() );
+        }
+        List<String> l = en.getValue() == null ? Collections.<String>emptyList() : en.getValue();
+        for ( int k = 0; k < l.size(); k++ ) {
+          if ( vacio( l.get( k ) ) ) {
+            error( dd + "[" + k + "]", FALTA_VALOR );
+          } else {
+            rutaDelPack( dd + "[" + k + "]", l.get( k ), false );
+          }
         }
       }
     }
@@ -898,7 +942,7 @@ public final class CorrectorPack implements Closeable {
     if ( !Pack.Salida.CAPTURAS.contains( s.captura ) ) {
       errorV( "output.capture", VALOR_MALO, "one_of", s.captura, String.join( ", ", Pack.Salida.CAPTURAS ) );
     }
-    if ( s.columnas.isEmpty() ) {
+    if ( s.columnas.isEmpty() && !Pack.Salida.CAPTURA_TABLAS.equals( s.captura ) ) {
       aviso( "output.columns", SIN_COLUMNAS );
     }
     Set<String> nombres = new HashSet<>();
@@ -959,6 +1003,117 @@ public final class CorrectorPack implements Closeable {
       }
     } else if ( s.base != null || !vacio( s.sql ) ) {
       avisoV( s.base != null ? "output.database" : "output.sql", CAMPO_IGNORADO, "database", s.captura );
+    }
+    if ( Pack.Salida.CAPTURA_TABLAS.equals( s.captura ) ) {
+      validarTablas( s );
+    } else if ( !s.tablas.isEmpty() ) {
+      avisoV( "output.tables", CAMPO_IGNORADO, "tables", s.captura );
+    }
+  }
+
+  /** Captura tables: cada tabla con nombre, en una base de prueba, sin repetir, y su clave entre sus columnas. */
+  private void validarTablas( Pack.Salida s ) {
+    if ( s.tablas.isEmpty() ) {
+      error( "output.tables", SIN_TABLAS );
+      return;
+    }
+    Set<String> vistas = new HashSet<>();
+    for ( int i = 0; i < s.tablas.size(); i++ ) {
+      TablaSalida t = s.tablas.get( i );
+      String d = "output.tables[" + i + "]";
+      if ( t == null ) {
+        error( d, FALTA_VALOR );
+        continue;
+      }
+      if ( vacio( t.nombre ) ) {
+        error( d + ".name", FALTA_VALOR );
+        continue;
+      }
+      if ( motivoRuta( t.archivo() ) != null || t.nombre.contains( "/" ) || t.nombre.contains( "\\" ) ) {
+        error( d + ".name", RUTA_MALA, t.nombre );
+      }
+      if ( vacio( t.conexion ) ) {
+        if ( pack.bases.size() != 1 ) {
+          error( d + ".connection", FALTA_VALOR );
+        }
+      } else if ( pack.base( t.conexion ) == null ) {
+        error( d + ".connection", BASE_DESCONOCIDA, t.conexion );
+      }
+      if ( !vistas.add( t.clave() ) ) {
+        error( d + ".name", TABLA_REPETIDA, t.nombre );
+      }
+      Set<String> cols = new HashSet<>();
+      for ( Pack.Columna c : t.columnas ) {
+        if ( c != null && c.nombre != null ) {
+          cols.add( c.nombre.trim().toLowerCase( Locale.ROOT ) );
+        }
+      }
+      for ( int k = 0; k < t.columnasClave.size(); k++ ) {
+        String col = t.columnasClave.get( k );
+        if ( vacio( col ) ) {
+          error( d + ".key_columns[" + k + "]", FALTA_VALOR );
+        } else if ( !cols.isEmpty() && !cols.contains( col.trim().toLowerCase( Locale.ROOT ) ) ) {
+          error( d + ".key_columns[" + k + "]", CLAVE_SIN_COLUMNA, col, lista( new ArrayList<>( cols ) ) );
+        } else if ( t.ignora( col ) ) {
+          errorV( d + ".key_columns[" + k + "]", VALOR_MALO, "ignored_key", col );
+        }
+      }
+    }
+  }
+
+  /**
+   * test_databases y database_safety (formato 2): tipo que el corrector sabe recrear, base, scripts dentro del pack,
+   * sin contraseña y con un nombre seguro ({@link CorrectorBases#inseguras}): una base mal nombrada hace invalido el
+   * pack, asi nunca se borra una base de verdad.
+   */
+  private void validarBases() {
+    if ( pack.usaBases() && Pack.FORMATO.equals( pack.formato ) ) {
+      error( "format", FORMATO_VIEJO, Pack.FORMATO, Pack.FORMATO_2 );
+    }
+    if ( Pack.Salida.CAPTURA_TABLAS.equals( pack.salida.captura ) && pack.bases.isEmpty() ) {
+      error( "test_databases", FALTA_VALOR );
+    }
+    JsonNode nodos = arbol == null ? null : arbol.get( "test_databases" );
+    for ( int i = 0; i < pack.bases.size(); i++ ) {
+      BaseDePrueba b = pack.bases.get( i );
+      String d = "test_databases[" + i + "]";
+      if ( b == null ) {
+        error( d, FALTA_VALOR );
+        continue;
+      }
+      JsonNode n = nodos == null || !nodos.isArray() ? null : nodos.get( i );
+      if ( n != null && n.isObject() && ( n.has( "password" ) || n.has( "pass" ) || n.has( "contrasena" ) ) ) {
+        error( d + ".password", CLAVE_EN_PACK );
+      }
+      if ( vacio( b.conexion ) ) {
+        error( d + ".connection", FALTA_VALOR );
+      }
+      if ( vacio( b.base ) ) {
+        error( d + ".database", FALTA_VALOR );
+      }
+      if ( !BaseDePrueba.TIPOS.contains( b.tipoNormal() ) ) {
+        errorV( d + ".type", VALOR_MALO, "one_of", b.tipo, String.join( ", ", BaseDePrueba.TIPOS ) );
+      }
+      if ( !vacio( b.puerto ) && !b.puerto.trim().matches( "\\d{1,5}" ) ) {
+        errorV( d + ".port", VALOR_MALO, "positive", b.puerto );
+      }
+      for ( int k = 0; k < b.scripts.size(); k++ ) {
+        if ( vacio( b.scripts.get( k ) ) ) {
+          error( d + ".scripts[" + k + "]", FALTA_VALOR );
+        } else {
+          rutaDelPack( d + ".scripts[" + k + "]", b.scripts.get( k ), false );
+        }
+      }
+    }
+    SeguridadBases seg = pack.seguridadEfectiva();
+    for ( int k = 0; k < seg.sufijos.size(); k++ ) {
+      if ( vacio( seg.sufijos.get( k ) ) ) {
+        error( "database_safety.test_suffixes[" + k + "]", FALTA_VALOR );
+      }
+    }
+    for ( CorrectorTextos.Mensaje m : CorrectorBases.inseguras( pack, null, CorrectorBases.originalesDeSolucion( raiz,
+      pack ) ) ) {
+      agregar( Problema.ERROR, "test_databases", BASE_INSEGURA, m.clave, m.args.toArray() );
     }
   }
 
@@ -1666,9 +1821,15 @@ public final class CorrectorPack implements Closeable {
     return c == null || vacio( c.dirEntradas ) ? null : archivo( c.dirEntradas );
   }
 
-  /** El CSV esperado del caso, o null. */
+  /** El CSV esperado del caso (con la captura tables, su carpeta), o null. */
   public File esperado( Caso c ) {
     return c == null || vacio( c.esperado ) ? null : archivo( c.esperado );
+  }
+
+  /** Captura tables: el CSV esperado de una tabla en un caso, o null. */
+  public File esperado( Caso c, TablaSalida t ) {
+    File d = esperado( c );
+    return d == null || t == null ? null : new File( d, t.archivo() );
   }
 
   /** Cada nombre de {@code inputs} con su archivo en la carpeta del caso (en el orden de inputs). */

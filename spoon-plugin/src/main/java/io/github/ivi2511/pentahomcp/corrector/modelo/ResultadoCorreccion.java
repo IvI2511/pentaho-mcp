@@ -68,9 +68,14 @@ public final class ResultadoCorreccion {
   /** Con {@link #BLOQUEADA}: uno de {@link ResultadoCaso#MOTIVOS}. */
   @JsonProperty( "reason" )
   public String motivo;
-  /** Texto para el docente: por que no cargo, se bloqueo o se cayo. */
+  /** Texto para el docente, en ingles: por que no cargo, se bloqueo o se cayo. */
   @JsonProperty( "detail" )
   public String detalle;
+  /** El mismo texto para traducirlo (clave del area «corrector» y sus argumentos); null si no tiene. */
+  @JsonProperty( "detail_key" )
+  public String claveDetalle;
+  @JsonProperty( "detail_args" )
+  public List<String> argsDetalle;
   /** Redondeada a 0,1; null en el parcial. */
   @JsonProperty( "grade" )
   public Double nota;
@@ -225,8 +230,14 @@ public final class ResultadoCorreccion {
 
     @JsonProperty( "code" )
     public String codigo;
+    /** En ingles. */
     @JsonProperty( "detail" )
     public String detalle;
+    /** El detalle para traducirlo (clave del area «corrector»); null si no tiene. */
+    @JsonProperty( "detail_key" )
+    public String claveDetalle;
+    @JsonProperty( "detail_args" )
+    public List<String> argsDetalle;
     /** El step al que se refiere, si hay uno. */
     @JsonProperty( "step" )
     public String step;
@@ -344,10 +355,19 @@ public final class ResultadoCorreccion {
         }
         if ( c.corrida != null ) {
           c.corrida.detalle = null;
+          c.corrida.claveDetalle = null;
+          c.corrida.argsDetalle = null;
           c.corrida.log = null;
         }
         if ( c.comparacion != null ) {
           c.comparacion.ejemplos = null;
+        }
+        if ( c.tablas != null ) {
+          for ( ResultadoCaso.ComparacionTabla t : c.tablas ) {
+            if ( t != null && t.comparacion != null ) {
+              t.comparacion.ejemplos = null;
+            }
+          }
         }
       }
     }

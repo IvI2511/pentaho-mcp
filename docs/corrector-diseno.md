@@ -455,7 +455,7 @@ de ejercicios…» por overlay XUL [NP].
 | Depende de un gancho de pestañas que Informes no tiene | Pedido a su WP1; plan B: perspectiva propia |
 | Se pisa con el linter (D1, D2, `unsorted_input`) y con las pruebas de regresión de 0.7 | Un solo motor de reglas (`LintMotor`) y un solo motor de corrida (`CorrectorMain`), reusados |
 | Archivos compartidos con Modo clase, linter e Informes (`McpLifecycleListener`, `plugin.json`, `SKILL.md`, README, CHANGELOG; `manual/04-*` ya lo piden dos) | Una línea de registro por equipo; el coordinador fusiona y numera el manual |
-| Jobs y bases que no son SQLite | 0.6: jobs con `file`/`query` sobre SQLite [NP]; MySQL, Postgres fuera de alcance |
+| Jobs y bases que no son SQLite | 0.6: jobs con `file`/`query` sobre SQLite [NP]. **0.6.2**: MySQL, MariaDB, PostgreSQL y H2 con bases de prueba descartables (`test_databases`, captura `tables`, formato 2; `CorrectorBases`): se recrean antes de cada caso, nunca la original, sufijo de prueba obligatorio, una base por worker (`_w1`, `_w2`), contraseña solo en memoria y por el entorno de la hija. Ver `manual/07-corrector.md` §11 [P con H2 en TCP] |
 
 Preguntas para Iván: ¿escala 10 con redondeo a 0,1 está bien para la UEM?; ¿las reglas suman aunque no
 corra (fede 2,0) o van con compuerta por defecto?; ¿coma decimal u otra máscara de fecha restan por

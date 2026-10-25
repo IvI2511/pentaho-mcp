@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-25
+
 ### Added
 
 - **IDC menu** in Spoon's main toolbar, right next to the perspective switcher (an `IDC` drop-down with the
@@ -37,6 +39,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   environment problems, notes and next step (`stress_test`, new optional `language` argument) come in English,
   Spanish or Portuguese. The default is English, as before; JSON keys, recipe ids, levels, check ids, statuses
   and verdicts do not change.
+- Exercise grader: **exercises with a database**. A pack (format `pentaho-live-exercise-pack/2`; packs without a
+  database are still written in format 1) can declare `test_databases`, one disposable test database per server
+  connection of the solution (MySQL, MariaDB, PostgreSQL or H2), with the pack's SQL scripts and per-case
+  `db_scripts`. Before every case of every submission the grader drops and recreates each test database and runs
+  the scripts (the names of the original databases in them are changed to the test ones), points the submission's
+  connections there (by name, by database or by type and host) and never connects to the original databases. The
+  new capture `tables` reads each declared table after the run and compares it like a file (key columns, ignored
+  columns, tolerances, the solution's types); `executions: 2` runs a case twice to catch a load that duplicates rows
+  on a re-run. With several workers each one gets its own test databases (`<database>_w1`, `_w2`).
+- Safety rules for test databases, checked when a pack is validated or created, before a batch and in the worker:
+  never the solution's own database, never a system database or one of `database_safety.deny`, and the name must
+  end in a test suffix (`_correccion`, `_test`, `_prueba`, `_grading`) unless `allow_any_name`. A step whose schema
+  or SQL names another database, or SQL that reads or writes server files or changes users or permissions, blocks
+  the submission (`foreign_schema`, `forbidden_sql`).
+- The password of a test database is never written to the pack or to any file: it comes from what the teacher types
+  in Spoon (kept in memory until Spoon closes; **Grade** asks for it when it is not known) or from the Kettle
+  variable `password_variable`, reaches the worker through the process environment and is scrubbed from results.
+- "Create pack from this transformation…": a **Test database** box for each server connection of the solution
+  (same server, port and user, the database with `_correccion`, password, scripts, hidden-case scripts, "run each
+  submission twice"); **Capture** lists the tables the solution's output steps write and its file outputs; step 2
+  edits the key and the ignored columns of each table and previews its expected output.
+- MCP: `create_exercise_pack` takes `test_databases`, `tables`, `database_safety` and, per case, `db_scripts` and
+  `executions` (it rejects any password); `capture` accepts `tables` in `create_exercise_pack`, `grade_exercise`
+  and `grade_submissions`.
 
 ### Fixed
 
@@ -45,6 +71,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   original, so a plan with proposals marked the transformation as changed in Spoon (and the «Harden…» dialog
   did the same just by opening). Every copy the tools make (dry runs, previews, runs, reports) now gets its
   own.
+- Creating a pack from a solution that uses a MySQL connection failed with `solution_blocked`
+  (`foreign_connection`): it now asks for a test database for it.
+- The grader's errors and details are shown in the language of the UI (Spanish, English or Portuguese): the result
+  keeps the English text in `detail` and adds `detail_key`/`detail_args`; the wizard, the panel and the reports
+  translate them. Some Spanish texts of "Grade again with…" used *usted*; they now use *tú*.
 
 ## [0.6.1] - 2026-10-24
 
@@ -561,7 +592,8 @@ canvas. **Robustness** makes a load tolerate dirty data and proves it with broke
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.5.0...v0.5.1

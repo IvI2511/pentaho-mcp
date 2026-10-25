@@ -51,6 +51,8 @@ import io.github.ivi2511.pentahomcp.CorrectorMain.Pedido;
 import io.github.ivi2511.pentahomcp.CorrectorPolitica.Entrega;
 import io.github.ivi2511.pentahomcp.CorrectorPolitica.Revision;
 import io.github.ivi2511.pentahomcp.CorrectorSandbox.Preparacion;
+import io.github.ivi2511.pentahomcp.CorrectorTextos.Mensaje;
+import io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Caso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.CorrectorJson;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ItemRubrica;
@@ -62,6 +64,8 @@ import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion.Aviso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion.Criterio;
+import io.github.ivi2511.pentahomcp.corrector.modelo.SeguridadBases;
+import io.github.ivi2511.pentahomcp.corrector.modelo.TablaSalida;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.lint.Nodos;
 
@@ -87,7 +91,13 @@ import io.github.ivi2511.pentahomcp.lint.Nodos;
  * yyyy-MM-dd. Las claves salen del Group by (o Sort rows) mas cercano a la salida y se verifica que sean unicas en
  * cada caso; si no, se compara sin clave y se avisa.</li>
  * </ul>
- * Los errores que impiden armar el pack lanzan {@link Fallo} con un codigo estable y un texto en ingles.
+ * <b>Bases de prueba</b> (formato 2): si la solucion lee o escribe un servidor (MySQL, PostgreSQL, H2), el pack lleva
+ * {@code test_databases} con una base descartable por conexion ({@link CorrectorBases}): sus scripts pasan a
+ * {@code bd/} (los de un caso, a {@code bd/<caso>/}), la contraseña nunca va al pack (llega a la hija por el entorno)
+ * y, con la captura {@code tables}, la salida esperada de cada tabla queda en {@code esperado/<caso>/<tabla>.csv}.
+ * <p>
+ * Los errores que impiden armar el pack lanzan {@link Fallo} con un codigo estable y un mensaje traducible (en
+ * ingles en {@code getMessage()}, en el idioma de la UI con {@link Fallo#texto}).
  *
  * @dueño C6
  */
@@ -98,6 +108,8 @@ public final class CorrectorCrearPack {
   static final String DATOS = "datos";
   static final String ESPERADO = "esperado";
   static final String PLANTILLA = "plantilla";
+  /** Los scripts de las bases de prueba (bd/ y bd/&lt;caso&gt;/). */
+  static final String BD = "bd";
   static final String ENUNCIADO = "enunciado.md";
   static final String VISIBLE = "visible";
 
@@ -134,6 +146,20 @@ public final class CorrectorCrearPack {
   static final String E_SIN_ENTRADA = "missing_input";
   static final String E_HIJA = "build_failed";
   static final String E_PACK = "invalid_pack";
+  /** Una base de prueba no es segura (es la original, del sistema, sin sufijo de prueba...). */
+  static final String E_BASE_INSEGURA = "unsafe_test_database";
+  /** La solucion usa una conexion de servidor sin base de prueba. */
+  static final String E_FALTA_BASE = "needs_test_database";
+  /** No se pudo preparar o leer una base de prueba (servidor, contraseña, script). */
+  static final String E_BASE = "test_database_failed";
+  /** Todos los codigos de {@link Fallo}: cada uno tiene su texto error.&lt;codigo&gt; en en/es/pt (lo controla la prueba). */
+  static final List<String> ERRORES = Collections.unmodifiableList( Arrays.asList( E_SOLUCION, E_DESTINO,
+    E_OPCIONES, E_CARGA, "solution_blocked", "solution_failed", "no_output_step", "missing_input", E_HIJA, E_PACK,
+    E_BASE_INSEGURA, E_FALTA_BASE, E_BASE ) );
+  /** Todos los avisos de crear un pack (warnings[].code). */
+  static final List<String> AVISOS = Collections.unmodifiableList( Arrays.asList( Aviso.SALIDA_AMBIGUA,
+    "key_not_unique", "no_key_columns", "locale_dependent", "locale_not_checked", "code_step_allowed",
+    "input_not_found", "input_name_clash", "empty_output", "pack_warning" ) );
 
   /** Familias que sugieren una regla must_use (la primera que use la solucion), en orden de prioridad. */
   private static final String[][] FAMILIAS = { { "usa_group_by", "Group by / Memory group by", "GroupBy",
@@ -143,6 +169,10 @@ public final class CorrectorCrearPack {
     "JoinRows" }, { "usa_unique", "Unique rows", "Unique", "UniqueRowsByHashSet" }, { "usa_switch_case",
     "Switch / case", "SwitchCase" }, { "usa_filtro", "Filter rows", "FilterRows" } };
   private static final List<String> CODIGO = Arrays.asList( "ScriptValueMod", "UserDefinedJavaClass", "Janino" );
+  /** Steps de base que un pack con bases de prueba deja correr siempre (sobre las bases de prueba). */
+  static final List<String> PASOS_DE_BASE = Collections.unmodifiableList( Arrays.asList( "TableInput", "TableOutput",
+    "InsertUpdate", "Update", "Delete", "DBLookup", "DBJoin", "DimensionLookup", "CombinationLookup",
+    "SynchronizeAfterMerge", "TableExists", "ColumnExists" ) );
   private static final Pattern MASCARA_SIMPLE = Pattern.compile( "[#0,.]+" );
   private static final Pattern FECHA_ISO = Pattern.compile( "\\d{4}-\\d{2}-\\d{2}" );
   private static final Pattern ENTERO = Pattern.compile( "-?(0|[1-9]\\d{0,17})" );
@@ -156,15 +186,34 @@ public final class CorrectorCrearPack {
 
   // ------------------------------------------------------------------ opciones y resultado
 
-  /** No se pudo armar el pack: {@link #codigo} estable (E_*) y el mensaje en ingles. */
+  /** No se pudo armar el pack: {@link #codigo} estable (E_*), el mensaje en ingles y, para traducirlo, su clave. */
   public static final class Fallo extends Exception {
 
     private static final long serialVersionUID = 1L;
     public final String codigo;
+    /** El mensaje traducible; null si vino solo en ingles (una hija de una version anterior). */
+    final transient Mensaje mensaje;
 
     Fallo( String codigo, String mensaje ) {
       super( mensaje );
       this.codigo = codigo;
+      this.mensaje = null;
+    }
+
+    Fallo( String codigo, Mensaje mensaje ) {
+      super( mensaje.en() );
+      this.codigo = codigo;
+      this.mensaje = mensaje;
+    }
+
+    /** El mensaje en el idioma de t (en ingles si no tiene clave). */
+    public String texto( Rotulos t ) {
+      return mensaje == null ? getMessage() : mensaje.texto( t );
+    }
+
+    /** El nombre del error en el idioma de t ("la solución está bloqueada"). */
+    public String nombre( Rotulos t ) {
+      return t.tiene( "error." + codigo ) ? t.s( "error." + codigo ) : codigo;
     }
   }
 
@@ -176,6 +225,10 @@ public final class CorrectorCrearPack {
     File dirEntradas;
     boolean oculto;
     double peso = 1;
+    /** Scripts SQL de este caso por conexion (los datos de origen del caso), o null. */
+    Map<String, List<File>> scripts;
+    /** Veces que corre la entrega antes de capturar (2: ver si duplica filas); null = 1. */
+    Integer ejecuciones;
 
     CasoNuevo() {
     }
@@ -226,6 +279,19 @@ public final class CorrectorCrearPack {
     /** Captura query: la base SQLite vacia con las tablas destino y el SELECT. */
     File plantilla;
     String sql;
+    /**
+     * Bases de prueba (formato 2), una por conexion de servidor que use la solucion: servidor, base de prueba,
+     * usuario, original_database, password_variable. Sus {@code scripts} se ignoran: van en {@link #scriptsBase}.
+     */
+    List<BaseDePrueba> bases;
+    /** Conexion → scripts del docente (archivos) que corren en su base antes de cada caso; se copian a bd/. */
+    Map<String, List<File>> scriptsBase;
+    /** Contraseñas por conexion (sin mayusculas), solo en memoria: van a las hijas por el entorno. */
+    Map<String, String> claves;
+    /** Reglas de nombre de las bases de prueba; null = las de por defecto. */
+    SeguridadBases seguridad;
+    /** Captura tables: las tablas a comparar (con clave e ignoradas); null = las que escribe la solucion. */
+    List<TablaSalida> tablas;
     /** Corregir la solucion con el otro locale (es_ES / en_US) y avisar si cambia. */
     boolean verificarLocales = true;
     /** Copia para alumnos (carpeta o .zip), o null. */
@@ -294,6 +360,9 @@ public final class CorrectorCrearPack {
     public List<String> permitidos = new ArrayList<String>();
     @JsonProperty( "steps" )
     public Integer steps;
+    /** Captura tables: las tablas comparadas, con su clave y sus columnas. */
+    @JsonProperty( "tables" )
+    public List<TablaSalida> tablas = new ArrayList<TablaSalida>();
   }
 
   @JsonInclude( JsonInclude.Include.NON_NULL )
@@ -348,6 +417,11 @@ public final class CorrectorCrearPack {
     public String codigoError;
     @JsonProperty( "error" )
     public String error;
+    /** El error para traducirlo (clave del area «corrector» y sus argumentos). */
+    @JsonProperty( "error_key" )
+    public String claveError;
+    @JsonProperty( "error_args" )
+    public List<String> argsError;
     @JsonProperty( "detected" )
     public Detectado detectado = new Detectado();
     @JsonProperty( "key_unique" )
@@ -367,24 +441,24 @@ public final class CorrectorCrearPack {
    */
   static Creado crear( Opciones op ) throws Exception {
     if ( op == null || op.solucion == null || !op.solucion.isFile() ) {
-      throw new Fallo( E_SOLUCION, "the solution transformation does not exist: " + ( op == null ? null
-        : op.solucion ) );
+      throw new Fallo( E_SOLUCION, new Mensaje( "crear.err.solution_not_found", op == null ? null : op.solucion ) );
     }
     if ( !op.solucion.getName().toLowerCase( Locale.ROOT ).endsWith( ".ktr" ) ) {
-      throw new Fallo( E_OPCIONES, "the solution must be a .ktr (jobs are not graded yet): " + op.solucion.getName() );
+      throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.not_ktr", op.solucion.getName() ) );
     }
     if ( op.destino == null ) {
-      throw new Fallo( E_OPCIONES, "pack_path is required" );
+      throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.no_pack_path" ) );
     }
     String captura = op.captura == null ? Pack.Salida.CAPTURA_ARCHIVO : op.captura;
     if ( !Pack.Salida.CAPTURAS.contains( captura ) ) {
-      throw new Fallo( E_OPCIONES, "capture must be one of " + Pack.Salida.CAPTURAS + ": " + captura );
+      throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.bad_capture", captura, String.join( ", ",
+        Pack.Salida.CAPTURAS ) ) );
     }
     if ( Pack.Salida.CAPTURA_QUERY.equals( captura ) && ( op.plantilla == null || !op.plantilla.isFile()
       || op.sql == null || op.sql.trim().isEmpty() ) ) {
-      throw new Fallo( E_OPCIONES, "capture query needs the template database (an empty SQLite file with the target "
-        + "tables) and the SQL that reads the result" );
+      throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.query_needs_template" ) );
     }
+    revisarBases( op, captura );
     File destino = op.destino.getAbsoluteFile();
     boolean zip = destino.getName().toLowerCase( Locale.ROOT ).endsWith( ".zip" );
     revisarDestino( destino, zip, op.reemplazar, "pack_path" );
@@ -398,18 +472,25 @@ public final class CorrectorCrearPack {
     boolean visible = false;
     for ( CasoNuevo c : casos ) {
       if ( c.id == null || !c.id.matches( "[A-Za-z0-9](?:[A-Za-z0-9._\\-]{0,62}[A-Za-z0-9_\\-])?" ) ) {
-        throw new Fallo( E_OPCIONES, "bad case id (letters, digits, . _ -): " + c.id );
+        throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.bad_case_id", c.id ) );
       }
       if ( !ids.add( c.id.toLowerCase( Locale.ROOT ) ) ) {
-        throw new Fallo( E_OPCIONES, "duplicate case id: " + c.id );
+        throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.duplicate_case", c.id ) );
       }
       if ( c.dirEntradas != null && !c.dirEntradas.isDirectory() ) {
-        throw new Fallo( E_SIN_ENTRADA, "case " + c.id + ": the inputs folder does not exist: " + c.dirEntradas );
+        throw new Fallo( E_SIN_ENTRADA, new Mensaje( "crear.err.no_inputs_folder", c.id, c.dirEntradas ) );
+      }
+      for ( List<File> l : c.scripts == null ? Collections.<List<File>>emptyList() : c.scripts.values() ) {
+        for ( File f : l == null ? Collections.<File>emptyList() : l ) {
+          if ( f == null || !f.isFile() ) {
+            throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.script_not_found", f ) );
+          }
+        }
       }
       visible |= !c.oculto;
     }
     if ( !visible ) {
-      throw new Fallo( E_OPCIONES, "at least one case must be visible" );
+      throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.no_visible" ) );
     }
 
     boolean temporal = op.dirTrabajo == null;
@@ -426,6 +507,73 @@ public final class CorrectorCrearPack {
         }
       }
     }
+  }
+
+  /**
+   * Las bases de prueba antes de lanzar nada: cada conexion de servidor que usa la solucion tiene la suya (o la
+   * entrega no podria correr), los scripts existen y ninguna base es la original, del sistema o sin sufijo de prueba.
+   */
+  private static void revisarBases( Opciones op, String captura ) throws Fallo {
+    List<BaseDePrueba> bases = op.bases == null ? Collections.<BaseDePrueba>emptyList() : op.bases;
+    if ( Pack.Salida.CAPTURA_TABLAS.equals( captura ) && bases.isEmpty() ) {
+      throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.tables_need_db" ) );
+    }
+    CorrectorBases.Inventario inv;
+    try {
+      inv = CorrectorBases.inventario( op.solucion );
+    } catch ( Exception e ) {
+      throw new Fallo( E_CARGA, new Mensaje( "crear.err.load", RunMotor.primeraLinea( e ) ) );
+    }
+    Pack p = new Pack();
+    p.seguridad = op.seguridad;
+    p.bases = new ArrayList<BaseDePrueba>();
+    for ( BaseDePrueba b : bases ) {
+      BaseDePrueba x = CorrectorJson.copia( b, BaseDePrueba.class ).completar();
+      CorrectorBases.Conexion c = inv.conexion( x.conexion );
+      if ( c == null ) {
+        throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.unknown_connection", x.conexion ) );
+      }
+      if ( vacio( x.baseOriginal ) ) {
+        x.baseOriginal = c.base;
+      }
+      p.bases.add( x );
+    }
+    for ( CorrectorBases.Conexion c : inv.usadas() ) {
+      boolean sqlite = "SQLITE".equalsIgnoreCase( c.tipo );
+      if ( p.base( c.nombre ) == null && !( sqlite && Pack.Salida.CAPTURA_QUERY.equals( captura ) ) ) {
+        throw new Fallo( E_FALTA_BASE, new Mensaje( "crear.err.needs_test_db", c.nombre, c.tipo ) );
+      }
+    }
+    List<String> originales = new ArrayList<String>();
+    for ( CorrectorBases.Conexion c : inv.conexiones ) {
+      if ( !vacio( c.base ) ) {
+        originales.add( c.base );
+      }
+    }
+    List<Mensaje> mal = CorrectorBases.inseguras( p, null, originales );
+    if ( !mal.isEmpty() ) {
+      throw new Fallo( E_BASE_INSEGURA, new Mensaje( "crear.err.unsafe", CorrectorTextos.lista( mal ) ) );
+    }
+    for ( List<File> l : op.scriptsBase == null ? Collections.<List<File>>emptyList() : op.scriptsBase.values() ) {
+      for ( File f : l == null ? Collections.<File>emptyList() : l ) {
+        if ( f == null || !f.isFile() ) {
+          throw new Fallo( E_OPCIONES, new Mensaje( "crear.err.script_not_found", f ) );
+        }
+      }
+    }
+  }
+
+  /** Copia un script del docente al pack (bd/ o bd/&lt;caso&gt;/) y devuelve su ruta relativa. */
+  private static String copiarScript( File f, File dirPack, String carpeta ) throws IOException {
+    File dir = new File( dirPack, carpeta.replace( '/', File.separatorChar ) );
+    mkdirs( dir );
+    String n = CorrectorSandbox.limpio( f.getName() );
+    File d = new File( dir, n );
+    for ( int i = 2; d.exists(); i++ ) {
+      d = new File( dir, n.replaceFirst( "(\\.[^.]*)?$", "_" + i + "$1" ) );
+    }
+    Files.copy( f.toPath(), d.toPath() );
+    return carpeta + "/" + d.getName();
   }
 
   private static Creado crearEn( Opciones op, List<CasoNuevo> casos, String captura, File destino, boolean zip,
@@ -451,10 +599,46 @@ public final class CorrectorCrearPack {
     p.enunciado = ENUNCIADO;
     p.solucion = SOLUCION + "/" + nombreSol;
     p.entradas = op.entradas == null ? new ArrayList<String>() : new ArrayList<String>( op.entradas );
+    boolean tablas = Pack.Salida.CAPTURA_TABLAS.equals( captura );
     for ( CasoNuevo c : casos ) {
-      Caso k = new Caso( c.id, DATOS + "/" + c.id, ESPERADO + "/" + c.id + ".csv", c.oculto );
+      Caso k = new Caso( c.id, DATOS + "/" + c.id, ESPERADO + "/" + c.id + ( tablas ? "" : ".csv" ), c.oculto );
       k.peso = c.peso;
+      k.ejecuciones = c.ejecuciones == null || c.ejecuciones <= 1 ? null : c.ejecuciones;
+      if ( c.scripts != null ) {
+        for ( Map.Entry<String, List<File>> e : c.scripts.entrySet() ) {
+          List<String> rutas = new ArrayList<String>();
+          for ( File f : e.getValue() == null ? Collections.<File>emptyList() : e.getValue() ) {
+            rutas.add( copiarScript( f, dirPack, BD + "/" + c.id ) );
+          }
+          if ( !rutas.isEmpty() ) {
+            k.scriptsBase.put( e.getKey(), rutas );
+          }
+        }
+      }
       p.casos.add( k );
+    }
+    if ( op.bases != null && !op.bases.isEmpty() ) {
+      CorrectorBases.Inventario inv = CorrectorBases.inventario( op.solucion );
+      for ( BaseDePrueba b : op.bases ) {
+        BaseDePrueba x = CorrectorJson.copia( b, BaseDePrueba.class ).completar();
+        x.tipo = x.tipoNormal();
+        x.scripts = new ArrayList<String>();
+        CorrectorBases.Conexion c = inv.conexion( x.conexion );
+        if ( vacio( x.baseOriginal ) && c != null ) {
+          x.baseOriginal = c.base;
+        }
+        List<File> sc = scriptsDe( op.scriptsBase, x.conexion );
+        for ( File f : sc ) {
+          x.scripts.add( copiarScript( f, dirPack, BD ) );
+        }
+        p.bases.add( x );
+      }
+      p.seguridad = op.seguridad == null ? null : CorrectorJson.copia( op.seguridad, SeguridadBases.class );
+    }
+    if ( tablas && op.tablas != null ) {
+      for ( TablaSalida ts : op.tablas ) {
+        p.salida.tablas.add( CorrectorJson.copia( ts, TablaSalida.class ).completar() );
+      }
     }
     p.salida.captura = captura;
     p.salida.step = op.stepSalida == null || op.stepSalida.trim().isEmpty() ? null : op.stepSalida.trim();
@@ -471,6 +655,7 @@ public final class CorrectorCrearPack {
     p.politica = op.politica != null ? CorrectorJson.copia( op.politica, PoliticaPack.class ) : politicaLocal();
     p.escala = op.escala != null && op.escala > 0 ? op.escala : 10;
     p.completar();
+    p.formato = p.formatoNecesario();
     Files.copy( op.solucion.toPath(), new File( new File( dirPack, SOLUCION ), nombreSol ).toPath(),
       StandardCopyOption.REPLACE_EXISTING );
     CorrectorJson.guardar( p, new File( dirPack, CorrectorPack.PACK_JSON ) );
@@ -495,30 +680,46 @@ public final class CorrectorCrearPack {
     CorrectorProcesos.Opciones po = opcionesHija( op.procesos );
     File pdi = po.pdi != null ? po.pdi.getAbsoluteFile() : CorrectorProcesos.pdiDetectado();
     if ( pdi == null || !CorrectorProcesos.esPdi( pdi ) ) {
-      throw new IllegalStateException( "data-integration not found (" + pdi + "): set the PDI folder" );
+      throw new Fallo( E_HIJA, new Mensaje( "crear.err.no_pdi", pdi ) );
     }
     File log = new File( trabajo, "crear-pack.log" );
-    Process pr = CorrectorProcesos.lanzarHija( CorrectorProcesos.comandoBase( po, p, pdi ), dirHija,
-      CorrectorCrearPack.class.getName(), Collections.singletonList( archivoEnc.getAbsolutePath() ), log,
-      "pack-builder" );
-    long limite = Math.max( 1, p.politica.timeoutSeg ) * 1000L * Math.max( 1, casos.size() ) + MARGEN_HIJA_MS;
+    List<String> enUso = CorrectorBases.clavesDeUso( p, null );
     try {
-      if ( !pr.waitFor( limite, TimeUnit.MILLISECONDS ) ) {
-        CorrectorProcesos.matar( pr );
-        throw new Fallo( E_HIJA, "running the solution took more than " + ( limite / 1000 ) + " s" + colaLog( log ) );
+      CorrectorBases.reservar( enUso );
+    } catch ( CorrectorBases.Falla f ) {
+      throw new Fallo( E_BASE, f.mensaje );
+    }
+    Hallado h;
+    try {
+      Map<String, String> claves = claves( op );
+      Process pr = CorrectorProcesos.lanzarHija( CorrectorProcesos.comandoBase( po, p, pdi ), dirHija,
+        CorrectorCrearPack.class.getName(), Collections.singletonList( archivoEnc.getAbsolutePath() ), log,
+        "pack-builder", CorrectorBases.entorno( p, claves ) );
+      int veces = 0;
+      for ( Caso c : p.casos ) {
+        veces += c.vecesQueCorre();
       }
-    } catch ( InterruptedException e ) {
-      CorrectorProcesos.matar( pr );
-      Thread.currentThread().interrupt();
-      throw e;
+      long limite = Math.max( 1, p.politica.timeoutSeg ) * 1000L * Math.max( 1, veces ) + MARGEN_HIJA_MS;
+      try {
+        if ( !pr.waitFor( limite, TimeUnit.MILLISECONDS ) ) {
+          CorrectorProcesos.matar( pr );
+          throw new Fallo( E_HIJA, new Mensaje( "crear.err.child_timeout", limite / 1000, colaLog( log ) ) );
+        }
+      } catch ( InterruptedException e ) {
+        CorrectorProcesos.matar( pr );
+        Thread.currentThread().interrupt();
+        throw e;
+      }
+      if ( !archivoHallado.isFile() ) {
+        throw new Fallo( E_HIJA, new Mensaje( "crear.err.child_stopped", pr.exitValue(), colaLog( log ) ) );
+      }
+      h = CorrectorJson.leer( archivoHallado, Hallado.class );
+    } finally {
+      CorrectorBases.liberar( enUso );
     }
-    if ( !archivoHallado.isFile() ) {
-      throw new Fallo( E_HIJA, "the pack builder stopped (exit code " + pr.exitValue() + ") without a result"
-        + colaLog( log ) );
-    }
-    Hallado h = CorrectorJson.leer( archivoHallado, Hallado.class );
     if ( h.codigoError != null ) {
-      throw new Fallo( h.codigoError, h.error );
+      throw h.claveError != null ? new Fallo( h.codigoError, new Mensaje( h.claveError, h.argsError ) )
+        : new Fallo( h.codigoError, h.error );
     }
 
     // pack.json completo
@@ -527,8 +728,26 @@ public final class CorrectorCrearPack {
     cr.casos.addAll( h.casos );
     cr.avisos.addAll( h.avisos );
     p.entradas = new ArrayList<String>( h.detectado.entradas );
+    if ( p.entradas.isEmpty() ) { // sin archivos de entrada (lee solo de una base): los casos no tienen carpeta
+      for ( Caso c : p.casos ) {
+        File d = new File( dirPack, c.dirEntradas.replace( '/', File.separatorChar ) );
+        String[] hay = d.list();
+        if ( hay != null && hay.length == 0 ) {
+          Files.delete( d.toPath() );
+        }
+        c.dirEntradas = null;
+      }
+      File datos = new File( dirPack, DATOS );
+      String[] hay = datos.list();
+      if ( hay != null && hay.length == 0 ) {
+        Files.delete( datos.toPath() );
+      }
+    }
     p.salida.step = h.detectado.stepSalida;
     p.salida.columnas = new ArrayList<Pack.Columna>( h.detectado.columnas );
+    if ( tablas ) {
+      p.salida.tablas = new ArrayList<TablaSalida>( h.detectado.tablas );
+    }
     if ( op.columnasClave == null ) {
       p.comparar.columnasClave = h.clavesUnicas ? new ArrayList<String>( h.detectado.claves )
         : new ArrayList<String>();
@@ -557,16 +776,16 @@ public final class CorrectorCrearPack {
     // validar
     try ( CorrectorPack v = CorrectorPack.abrir( dirPack ) ) {
       if ( !v.valido() ) {
-        throw new Fallo( E_PACK, "the created pack is not valid:\n" + v.textoProblemas( "en" ) );
+        throw new Fallo( E_PACK, new Mensaje( "crear.err.invalid_pack", problemas( v.errores() ) ) );
       }
       for ( CorrectorPack.Problema pr2 : v.avisos() ) {
-        cr.avisos.add( new Aviso( AVISO_PACK, pr2.linea( "en" ) ) );
+        cr.avisos.add( mensaje( pr2 ).aviso( AVISO_PACK ) );
       }
     }
 
     // la solucion con el otro locale
     if ( op.verificarLocales ) {
-      cr.verificacion = verificarLocale( dirPack, p, trabajo, op.procesos, cr.avisos );
+      cr.verificacion = verificarLocale( dirPack, p, trabajo, opcionesConClaves( op ), cr.avisos );
     }
 
     // copia para alumnos (de la carpeta armada) y destino
@@ -576,6 +795,57 @@ public final class CorrectorCrearPack {
     }
     cr.pack = moverPack( dirPack, destino, zip, op.reemplazar ).getAbsolutePath();
     return cr;
+  }
+
+  /** Las contraseñas de las bases de prueba (por conexion, sin mayusculas) que se pasaron. */
+  private static Map<String, String> claves( Opciones op ) {
+    Map<String, String> m = new LinkedHashMap<String, String>();
+    if ( op.claves != null ) {
+      for ( Map.Entry<String, String> e : op.claves.entrySet() ) {
+        if ( e.getKey() != null ) {
+          m.put( e.getKey().trim().toLowerCase( Locale.ROOT ), e.getValue() );
+        }
+      }
+    }
+    return m;
+  }
+
+  /** Las opciones de las hijas con las contraseñas de las bases de prueba. */
+  private static CorrectorProcesos.Opciones opcionesConClaves( Opciones op ) {
+    CorrectorProcesos.Opciones po = opcionesHija( op.procesos );
+    po.claves.putAll( claves( op ) );
+    return po;
+  }
+
+  /** Los scripts de una conexion (sin mayusculas). */
+  private static List<File> scriptsDe( Map<String, List<File>> m, String conexion ) {
+    List<File> l = new ArrayList<File>();
+    if ( m != null && conexion != null ) {
+      for ( Map.Entry<String, List<File>> e : m.entrySet() ) {
+        if ( e.getKey() != null && e.getKey().trim().equalsIgnoreCase( conexion.trim() ) && e.getValue() != null ) {
+          l.addAll( e.getValue() );
+        }
+      }
+    }
+    return l;
+  }
+
+  /** Un problema del pack como mensaje traducible ("donde: texto"). */
+  static Mensaje mensaje( CorrectorPack.Problema pr ) {
+    List<String> args = new ArrayList<String>();
+    for ( String x : pr.args ) {
+      args.add( !x.isEmpty() && x.charAt( 0 ) == '\u0001' ? CorrectorTextos.clave( "pack." + x.substring( 1 ) ) : x );
+    }
+    Mensaje m = new Mensaje( pr.clave, args );
+    return pr.donde.isEmpty() ? m : new Mensaje( "crear.problem_at", pr.donde, m.anidado() );
+  }
+
+  private static String problemas( List<CorrectorPack.Problema> l ) {
+    List<Mensaje> m = new ArrayList<Mensaje>();
+    for ( CorrectorPack.Problema p : l ) {
+      m.add( mensaje( p ) );
+    }
+    return CorrectorTextos.lista( m );
   }
 
   /** La politica por defecto: el locale y la zona de esta JVM (la del docente), UTF-8, 60 s. */
@@ -668,15 +938,20 @@ public final class CorrectorCrearPack {
         }
       }
       if ( r == null || r.nota == null || r.nota < p.escala - 1e-9 ) {
-        avisos.add( new Aviso( AVISO_LOCALE, "with the locale " + otro + " the solution gets " + ( r == null
-          || r.nota == null ? "no grade" : r.nota + "/" + numero( p.escala ) ) + ( r == null ? ""
-          : " (" + r.estado + ( v.fallados.isEmpty() ? "" : ", failed: " + String.join( ", ", v.fallados ) ) + ")" )
-          + ": its result depends on the locale (an empty decimal symbol when reading or writing?). The pack keeps "
-          + p.politica.locale ) );
+        String nota = r == null || r.nota == null ? "-" : numero( r.nota ) + "/" + numero( p.escala );
+        String estado = r == null ? "-" : CorrectorTextos.clave( "estado." + r.estado );
+        if ( r != null && ResultadoCorreccion.CAIDA.equals( r.estado ) && r.claveDetalle != null ) {
+          avisos.add( new Mensaje( "crear.aviso.locale_not_checked", otro, new Mensaje( r.claveDetalle,
+            r.argsDetalle ).anidado() ).aviso( AVISO_SIN_VERIFICAR ) );
+        } else {
+          avisos.add( new Mensaje( "crear.aviso.locale_dependent", otro, nota, estado, v.fallados.isEmpty() ? "-"
+            : String.join( ", ", v.fallados ), p.politica.locale ).aviso( AVISO_LOCALE ) );
+        }
       }
     } catch ( Throwable e ) {
-      avisos.add( new Aviso( AVISO_SIN_VERIFICAR, "the solution could not be graded with " + otro + ": "
-        + RunMotor.primeraLinea( e ) ) );
+      Mensaje m = e instanceof CorrectorBases.Falla ? ( (CorrectorBases.Falla) e ).mensaje : null;
+      avisos.add( new Mensaje( "crear.aviso.locale_not_checked", otro, m != null ? m.anidado()
+        : RunMotor.primeraLinea( e ) ).aviso( AVISO_SIN_VERIFICAR ) );
     }
     return v;
   }
@@ -724,6 +999,7 @@ public final class CorrectorCrearPack {
       po.arranqueMs = b.arranqueMs;
       po.margenMs = b.margenMs;
       po.versionPlugin = b.versionPlugin;
+      po.claves.putAll( b.claves );
     }
     return po;
   }
@@ -753,6 +1029,12 @@ public final class CorrectorCrearPack {
         if ( c.esperado != null ) {
           fuera.add( CorrectorPack.normalizarRuta( c.esperado ).toLowerCase( Locale.ROOT ) );
         }
+        for ( List<String> l : c.scriptsBase.values() ) {
+          for ( String x : l == null ? Collections.<String>emptyList() : l ) {
+            fuera.add( CorrectorPack.normalizarRuta( x ).toLowerCase( Locale.ROOT ) );
+          }
+        }
+        fuera.add( BD + "/" + c.id.toLowerCase( Locale.ROOT ) ); // la carpeta de sus scripts
       }
     }
     fuera.add( CorrectorPack.PACK_JSON );
@@ -766,7 +1048,7 @@ public final class CorrectorCrearPack {
       CorrectorJson.guardar( a, new File( dir, CorrectorPack.PACK_JSON ) );
       try ( CorrectorPack v = CorrectorPack.abrir( dir ) ) {
         if ( !v.valido() ) {
-          throw new Fallo( E_PACK, "the student copy is not valid:\n" + v.textoProblemas( "en" ) );
+          throw new Fallo( E_PACK, new Mensaje( "crear.err.invalid_student_copy", problemas( v.errores() ) ) );
         }
       }
       if ( zip ) {
@@ -822,7 +1104,7 @@ public final class CorrectorCrearPack {
     }
     if ( zip ) {
       if ( !destino.isFile() || !reemplazar ) {
-        throw new Fallo( E_DESTINO, que + " already exists: " + destino + " (pass replace to overwrite it)" );
+        throw new Fallo( E_DESTINO, new Mensaje( "crear.err.exists", que, destino ) );
       }
       return;
     }
@@ -833,8 +1115,8 @@ public final class CorrectorCrearPack {
     if ( destino.isDirectory() && reemplazar && new File( destino, CorrectorPack.PACK_JSON ).isFile() ) {
       return;
     }
-    throw new Fallo( E_DESTINO, que + " already exists and is not empty: " + destino + ( destino.isDirectory()
-      ? " (only an exercise pack can be replaced)" : "" ) );
+    throw new Fallo( E_DESTINO, new Mensaje( destino.isDirectory() ? "crear.err.exists_folder"
+      : "crear.err.exists_file", que, destino ) );
   }
 
   /** Pasa el pack armado a su destino: un .zip, o la carpeta (renombrada si se puede, si no copiada). */
@@ -874,7 +1156,7 @@ public final class CorrectorCrearPack {
     try {
       enc = CorrectorJson.leer( new File( args[ 0 ] ), Encargo.class );
       if ( !FORMATO_ENCARGO.equals( enc.formato ) ) {
-        throw new Fallo( E_HIJA, "unknown job format " + enc.formato );
+        throw new Fallo( E_HIJA, new Mensaje( "crear.err.bad_job", enc.formato ) );
       }
       KettleClientEnvironment.getInstance().setClient( KettleClientEnvironment.ClientType.PAN );
       LanguageChoice.getInstance().setDefaultLocale( Locale.US );
@@ -883,10 +1165,17 @@ public final class CorrectorCrearPack {
     } catch ( Fallo f ) {
       h.codigoError = f.codigo;
       h.error = f.getMessage();
+      if ( f.mensaje != null ) {
+        h.claveError = f.mensaje.clave;
+        h.argsError = new ArrayList<String>( f.mensaje.args );
+      }
     } catch ( Throwable t ) {
       t.printStackTrace( System.out );
+      Mensaje m = new Mensaje( "crear.err.builder", RunMotor.primeraLinea( t ) );
       h.codigoError = E_HIJA;
-      h.error = "the pack builder failed: " + RunMotor.primeraLinea( t );
+      h.error = m.en();
+      h.claveError = m.clave;
+      h.argsError = new ArrayList<String>( m.args );
     } finally {
       try {
         if ( enc != null && enc.resultado != null ) {
@@ -917,7 +1206,15 @@ public final class CorrectorCrearPack {
     try {
       e = CorrectorPolitica.cargar( sol );
     } catch ( Throwable t ) {
-      throw new Fallo( E_CARGA, "the solution could not be loaded: " + RunMotor.primeraLinea( t ) );
+      throw new Fallo( E_CARGA, new Mensaje( "crear.err.load", RunMotor.primeraLinea( t ) ) );
+    }
+    CorrectorBases.Sesion bases = null;
+    if ( !pack.bases.isEmpty() ) {
+      try {
+        bases = new CorrectorBases.Sesion( pack, dirPack, "", CorrectorBases.clavesDelEntorno( pack ) );
+      } catch ( CorrectorBases.Falla f ) {
+        throw new Fallo( E_BASE_INSEGURA, f.mensaje );
+      }
     }
     Detectado d = h.detectado;
     d.steps = e.tm.nrSteps();
@@ -935,8 +1232,8 @@ public final class CorrectorCrearPack {
       for ( String n : pack.entradas ) {
         File de = fuente == null ? leidas.get( n ) : new File( fuente, n );
         if ( de == null || !de.isFile() ) {
-          throw new Fallo( E_SIN_ENTRADA, "case " + c.id + ": " + ( fuente == null ? "the solution does not read "
-            + n : fuente + " has no " + n ) );
+          throw new Fallo( E_SIN_ENTRADA, fuente == null ? new Mensaje( "crear.err.input_not_read", c.id, n )
+            : new Mensaje( "crear.err.input_missing", c.id, fuente, n ) );
         }
         Files.copy( de.toPath(), new File( destino, n ).toPath(), StandardCopyOption.REPLACE_EXISTING );
       }
@@ -950,14 +1247,26 @@ public final class CorrectorCrearPack {
         pack.politica.permitirSteps.add( canon );
         d.permitidos.add( canon );
         if ( "ScriptValueMod".equalsIgnoreCase( canon ) ) {
-          h.avisos.add( new Aviso( AVISO_CODIGO, "the solution uses Modified JavaScript (" + Nodos.crudo( s, "name" )
-            + "): it is allowed in this pack, and running JavaScript is running code" ) );
+          h.avisos.add( new Mensaje( "crear.aviso.code_step_allowed", Nodos.crudo( s, "name" ) ).aviso(
+            AVISO_CODIGO ) );
+        }
+      }
+    }
+    if ( !pack.bases.isEmpty() ) {
+      // con bases de prueba, los steps de base de siempre quedan permitidos aunque la solucion no los use (un alumno
+      // puede cargar con Table output lo que la solucion carga con Insert/Update); el SQL libre (Execute SQL) solo si
+      // la solucion lo usa
+      for ( String s : PASOS_DE_BASE ) {
+        if ( !pack.politica.permite( s ) ) {
+          pack.politica.permitirSteps.add( s );
+          d.permitidos.add( s );
         }
       }
     }
     Revision rev = CorrectorPolitica.revisar( e, pack, false, Collections.<String>emptyList() );
     if ( rev.bloquea() ) {
-      throw new Fallo( E_BLOQUEADA, "the grader would not run the solution (" + rev.motivo + "): " + rev.detalle );
+      throw new Fallo( E_BLOQUEADA, new Mensaje( "crear.err.blocked", CorrectorTextos.clave( "motivo." + rev.motivo ),
+        rev.mensaje == null ? rev.detalle : rev.mensaje.anidado() ) );
     }
     CorrectorJson.guardar( pack, archivoPack ); // entradas y allow_steps: el sandbox de los casos los lee
 
@@ -969,23 +1278,33 @@ public final class CorrectorCrearPack {
     }
     String captura = pack.salida.captura;
     boolean query = Pack.Salida.CAPTURA_QUERY.equals( captura );
+    boolean tablas = Pack.Salida.CAPTURA_TABLAS.equals( captura );
+    boolean aBase = query || tablas;
     CorrectorMotor.Salida salida = CorrectorMotor.elegirSalida( pack, analisis, captura );
-    if ( pack.salida.step != null && ( salida.step == null || !salida.step.equals( pack.salida.step ) ) && !query ) {
-      throw new Fallo( E_SIN_SALIDA, "the output step " + CorrectorPolitica.q( pack.salida.step ) + " is not a "
-        + ( Pack.Salida.CAPTURA_ARCHIVO.equals( captura ) ? "Text file output" : "step" ) + " of the solution" );
+    if ( pack.salida.step != null && ( salida.step == null || !salida.step.equals( pack.salida.step ) ) && !aBase ) {
+      throw new Fallo( E_SIN_SALIDA, new Mensaje( Pack.Salida.CAPTURA_ARCHIVO.equals( captura )
+        ? "crear.err.output_not_tfo" : "crear.err.output_not_step", pack.salida.step ) );
     }
-    if ( !salida.hay() && !query ) {
-      throw new Fallo( E_SIN_SALIDA, ( salida.motivo == null ? "the solution has no output step" : salida.motivo )
-        + ( Pack.Salida.CAPTURA_ARCHIVO.equals( captura ) ? " (use capture step for other outputs)" : "" ) );
+    if ( !salida.hay() && !aBase ) {
+      Mensaje m = salida.mensaje != null ? salida.mensaje : new Mensaje( "crear.err.no_output_step" );
+      throw new Fallo( E_SIN_SALIDA, Pack.Salida.CAPTURA_ARCHIVO.equals( captura ) ? new Mensaje(
+        "crear.err.no_output.file", m.anidado() ) : m );
     }
     if ( !salida.empatados.isEmpty() ) {
-      h.avisos.add( new Aviso( AVISO_SALIDA_AMBIGUA, "several output steps: " + CorrectorPolitica.q( salida.step )
-        + " was chosen (also " + salida.empatados + "); pass output_step to choose" ) );
+      h.avisos.add( new Mensaje( "crear.aviso.output_ambiguous", salida.step, String.join( ", ", salida.empatados ) )
+        .aviso( AVISO_SALIDA_AMBIGUA ) );
+    }
+    if ( tablas && pack.salida.tablas.isEmpty() ) {
+      pack.salida.tablas.addAll( tablasEscritas( sol, pack ) );
+      if ( pack.salida.tablas.isEmpty() ) {
+        throw new Fallo( E_SIN_SALIDA, new Mensaje( "crear.err.no_tables" ) );
+      }
+      CorrectorJson.guardar( pack, archivoPack );
     }
     d.stepSalida = salida.step;
     d.tipoSalida = salida.tipo;
     StepMeta smSalida = salida.step == null ? null : analisis.findStep( salida.step );
-    if ( !query && smSalida != null ) {
+    if ( !aBase && smSalida != null ) {
       d.columnas.addAll( columnas( analisis, smSalida ) );
     }
 
@@ -993,37 +1312,64 @@ public final class CorrectorCrearPack {
     CorrectorMotor.Contexto cx = new CorrectorMotor.Contexto();
     cx.pack = pack;
     cx.dirPack = dirPack;
-    cx.captura = query ? Pack.Salida.CAPTURA_QUERY : Pack.Salida.CAPTURA_STEP;
+    cx.captura = tablas ? Pack.Salida.CAPTURA_TABLAS : query ? Pack.Salida.CAPTURA_QUERY : Pack.Salida.CAPTURA_STEP;
     cx.salida = salida;
     cx.dirTmpWorker = new File( System.getProperty( "java.io.tmpdir" ) ).getAbsoluteFile();
+    cx.bases = bases;
     CorrectorSandbox.Opciones so = new CorrectorSandbox.Opciones();
     so.dirTmpJvm = cx.dirTmpWorker;
-    Map<String, CorrectorTabla> tablas = new LinkedHashMap<String, CorrectorTabla>();
+    so.bases = bases;
+    Map<String, CorrectorTabla> salidas = new LinkedHashMap<String, CorrectorTabla>();
+    Map<String, Map<String, CorrectorBases.Captura>> capturas = new LinkedHashMap<String,
+      Map<String, CorrectorBases.Captura>>();
     for ( Caso c : pack.casos ) {
       Preparacion p = CorrectorSandbox.preparar( pack, dirPack, c, e, new File( new File( trabajo, "casos" ), c.id ),
         so );
       if ( p.bloqueada() ) {
-        throw new Fallo( E_BLOQUEADA, "case " + c.id + ": the grader would not run the solution (" + p.motivo + "): "
-          + p.detalle );
+        throw new Fallo( E_BLOQUEADA, new Mensaje( "crear.err.blocked_case", c.id, CorrectorTextos.clave( "motivo."
+          + p.motivo ), p.mensaje == null ? p.detalle : p.mensaje.anidado() ) );
       }
       Caso sinEsperado = new Caso( c.id, c.dirEntradas, null, c.oculto );
+      sinEsperado.scriptsBase = c.scriptsBase;
+      sinEsperado.ejecuciones = c.ejecuciones;
       ResultadoCaso rc = new ResultadoCaso();
       CorrectorMotor.Fin f = CorrectorMotor.correr( cx, sinEsperado, p, rc );
-      if ( !rc.corrioBien() || f.tabla == null ) {
-        throw new Fallo( E_CORRIDA, "case " + c.id + ": the solution did not finish cleanly (" + rc.corrida.estado
-          + ( rc.corrida.detalle == null ? "" : ": " + rc.corrida.detalle ) + ")" );
+      if ( f.fallaBase != null ) {
+        throw new Fallo( E_BASE, new Mensaje( "db.err.case", c.id, f.fallaBase.anidado() ) );
       }
-      tablas.put( c.id, f.tabla );
+      if ( !rc.corrioBien() || ( tablas ? f.tablas.isEmpty() : f.tabla == null ) ) {
+        throw new Fallo( E_CORRIDA, new Mensaje( "crear.err.run_failed", c.id, CorrectorTextos.clave( "caso."
+          + ( rc.corrida.estado == null ? "not_run" : rc.corrida.estado ) ), rc.corrida.claveDetalle != null
+          ? new Mensaje( rc.corrida.claveDetalle, rc.corrida.argsDetalle ).anidado() : rc.corrida.detalle == null
+          ? "-" : rc.corrida.detalle ) );
+      }
+      if ( tablas ) {
+        for ( Map.Entry<String, CorrectorBases.Captura> t : f.tablas.entrySet() ) {
+          if ( t.getValue().falta != null ) {
+            throw new Fallo( E_SIN_SALIDA, new Mensaje( "crear.err.table_not_read", c.id, t.getKey(),
+              t.getValue().falta ) );
+          }
+        }
+        capturas.put( c.id, new LinkedHashMap<String, CorrectorBases.Captura>( f.tablas ) );
+      } else {
+        salidas.put( c.id, f.tabla );
+      }
     }
+    if ( tablas ) {
+      esperadoDeTablas( pack, dirPack, capturas, sol, enc, h );
+      d.reglas.addAll( reglasSugeridas( e.tm, null, pack.idioma ) );
+      return;
+    }
+    Map<String, CorrectorTabla> tablas0 = salidas;
     if ( query || d.columnas.isEmpty() ) {
       d.columnas.clear();
-      d.columnas.addAll( tiposDeValores( tablas.values() ) );
+      d.columnas.addAll( tiposDeValores( tablas0.values() ) );
     }
 
     // esperado/
     boolean conMascara = Pack.Salida.CAPTURA_ARCHIVO.equals( captura );
     for ( Caso c : pack.casos ) {
-      CorrectorTabla t = tablas.get( c.id );
+      CorrectorTabla t = tablas0.get( c.id );
       File f = new File( dirPack, c.esperado.replace( '/', File.separatorChar ) );
       escribirEsperado( t, d.columnas, pack.salida.csvEsperado, conMascara, f );
       CasoCreado cc = new CasoCreado();
@@ -1034,7 +1380,7 @@ public final class CorrectorCrearPack {
       cc.esperado = c.esperado;
       h.casos.add( cc );
       if ( cc.filas == 0 ) {
-        h.avisos.add( new Aviso( AVISO_SALIDA_VACIA, "case " + c.id + ": the solution writes no rows" ) );
+        h.avisos.add( new Mensaje( "crear.aviso.empty_output", c.id ).aviso( AVISO_SALIDA_VACIA ) );
       }
     }
 
@@ -1044,17 +1390,16 @@ public final class CorrectorCrearPack {
     d.claves.addAll( claves );
     if ( claves.isEmpty() ) {
       if ( enc.claves == null ) {
-        h.avisos.add( new Aviso( AVISO_SIN_CLAVE, "no key columns found (no Group by or Sort rows before the "
-          + "output): rows are compared as a multiset" ) );
+        h.avisos.add( new Mensaje( "crear.aviso.no_key_columns" ).aviso( AVISO_SIN_CLAVE ) );
       }
     } else {
       for ( Caso c : pack.casos ) {
-        String rep = repetida( tablas.get( c.id ), claves, pack.comparar.distinguirMayusculas );
+        String rep = repetida( tablas0.get( c.id ), claves, pack.comparar.distinguirMayusculas );
         if ( rep != null ) {
           h.clavesUnicas = false;
-          h.avisos.add( new Aviso( AVISO_CLAVE_NO_UNICA, "case " + c.id + ": the key " + claves + " repeats ("
-            + ( c.oculto ? "hidden case" : rep ) + ")" + ( enc.claves == null ? ": rows are compared without a key"
-            : ": the comparison will report duplicate keys" ) ) );
+          h.avisos.add( new Mensaje( enc.claves == null ? "crear.aviso.key_not_unique"
+            : "crear.aviso.key_not_unique.forced", c.id, String.join( ", ", claves ), c.oculto ? "-" : rep ).aviso(
+            AVISO_CLAVE_NO_UNICA ) );
         }
       }
     }
@@ -1062,6 +1407,110 @@ public final class CorrectorCrearPack {
     // reglas sugeridas
     d.reglas.addAll( reglasSugeridas( e.tm, smSalida == null ? null : e.tm.findStep( smSalida.getName() ),
       pack.idioma ) );
+  }
+
+  /**
+   * Captura tables sin tablas pedidas: las que escriben los steps de salida a base de la solucion (Table output,
+   * Insert/Update, Update, Dimension lookup, Combination lookup...) en una conexion con base de prueba, con la clave
+   * que dice el step (las claves de Insert/Update, la natural de una dimension).
+   */
+  static List<TablaSalida> tablasEscritas( File solucion, Pack pack ) throws Exception {
+    List<TablaSalida> l = new ArrayList<TablaSalida>();
+    for ( CorrectorBases.TablaEscrita t : CorrectorBases.inventario( solucion ).tablasUnicas() ) {
+      BaseDePrueba b = pack.base( t.conexion );
+      if ( b == null ) {
+        continue;
+      }
+      TablaSalida ts = new TablaSalida( b.conexion, t.tabla );
+      ts.columnasClave.addAll( t.claves );
+      l.add( ts );
+    }
+    return l;
+  }
+
+  /**
+   * Captura tables: los tipos y la clave de cada tabla (la pedida; si no, la del step si es unica en todos los casos;
+   * si no, la clave primaria si es unica; si no, sin clave) y {@code esperado/<caso>/<tabla>.csv}.
+   */
+  private static void esperadoDeTablas( Pack pack, File dirPack, Map<String, Map<String, CorrectorBases.Captura>> capturas,
+                                        File solucion, Encargo enc, Hallado h ) throws Exception {
+    Detectado d = h.detectado;
+    for ( TablaSalida ts : pack.salida.tablas ) {
+      CorrectorBases.Captura primera = null;
+      List<CorrectorTabla> porCaso = new ArrayList<CorrectorTabla>();
+      for ( Caso c : pack.casos ) {
+        CorrectorBases.Captura x = capturas.get( c.id ).get( ts.nombre );
+        if ( primera == null ) {
+          primera = x;
+        }
+        porCaso.add( x.tabla );
+      }
+      ts.columnas = new ArrayList<Pack.Columna>( primera.tipos );
+      List<List<String>> candidatas = new ArrayList<List<String>>();
+      boolean pedida = !ts.columnasClave.isEmpty() && enc.claves != null;
+      if ( !ts.columnasClave.isEmpty() ) {
+        candidatas.add( new ArrayList<String>( ts.columnasClave ) );
+      }
+      if ( !pedida && !primera.clavePrimaria.isEmpty() ) {
+        candidatas.add( new ArrayList<String>( primera.clavePrimaria ) );
+      }
+      List<String> clave = new ArrayList<String>();
+      for ( List<String> k : candidatas ) {
+        boolean sirve = true;
+        String rep = null;
+        for ( CorrectorTabla t : porCaso ) {
+          rep = repetida( t, k, pack.comparar.distinguirMayusculas );
+          sirve &= rep == null;
+        }
+        if ( sirve ) {
+          clave = enMayusculas( k, primera.tabla );
+          break;
+        }
+        h.avisos.add( new Mensaje( "crear.aviso.table_key_not_unique", ts.nombre, String.join( ", ", k ), rep )
+          .aviso( AVISO_CLAVE_NO_UNICA ) );
+      }
+      if ( clave.isEmpty() ) {
+        h.avisos.add( new Mensaje( "crear.aviso.table_no_key", ts.nombre ).aviso( AVISO_SIN_CLAVE ) );
+      }
+      ts.columnasClave = clave;
+      int i = 0;
+      for ( Caso c : pack.casos ) {
+        CorrectorTabla t = porCaso.get( i++ );
+        CorrectorBases.ordenar( t, clave );
+        File f = new File( new File( dirPack, c.esperado.replace( '/', File.separatorChar ) ), ts.archivo() );
+        escribirEsperado( t, ts.columnas, pack.salida.csvEsperado, false, f );
+        CasoCreado cc = null;
+        for ( CasoCreado x : h.casos ) {
+          if ( x.id.equals( c.id ) ) {
+            cc = x;
+          }
+        }
+        if ( cc == null ) {
+          cc = new CasoCreado();
+          cc.id = c.id;
+          cc.oculto = c.oculto;
+          cc.esperado = c.esperado;
+          h.casos.add( cc );
+        }
+        cc.filas += t.cantidadFilas();
+        cc.columnas += t.columnas.size();
+        if ( t.cantidadFilas() == 0 ) {
+          h.avisos.add( new Mensaje( "crear.aviso.table_empty", ts.nombre, c.id ).aviso( AVISO_SALIDA_VACIA ) );
+        }
+      }
+      d.tablas.add( ts );
+    }
+    d.claves.clear();
+  }
+
+  /** Los nombres de la clave como estan en la tabla (H2 los guarda en mayusculas). */
+  private static List<String> enMayusculas( List<String> clave, CorrectorTabla t ) {
+    List<String> l = new ArrayList<String>();
+    for ( String k : clave ) {
+      int i = t.indice( k );
+      l.add( i < 0 ? k : t.columnas.get( i ) );
+    }
+    return l;
   }
 
   /**
@@ -1131,8 +1580,7 @@ public final class CorrectorCrearPack {
           continue; // una carpeta (Get file names, comodines): no es un archivo del pack
         }
         if ( !f.isFile() ) {
-          avisos.add( new Aviso( AVISO_ENTRADA_FALTA, "step " + CorrectorPolitica.q( nombre ) + " reads " + v
-            + ", which does not exist" ) );
+          avisos.add( new Mensaje( "crear.aviso.input_not_found", nombre, v ).aviso( AVISO_ENTRADA_FALTA ) );
           continue;
         }
         String n = f.getName();
@@ -1143,8 +1591,7 @@ public final class CorrectorCrearPack {
           }
         }
         if ( otra != null ) {
-          avisos.add( new Aviso( AVISO_ENTRADA_REPETIDA, "two inputs are called " + n + " (" + otra + " and " + f
-            + "): the grader redirects both to datos/" + n ) );
+          avisos.add( new Mensaje( "crear.aviso.input_name_clash", n, otra, f ).aviso( AVISO_ENTRADA_REPETIDA ) );
           continue;
         }
         m.put( n, f );

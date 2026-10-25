@@ -28,6 +28,7 @@ import org.pentaho.di.trans.step.StepMeta;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import io.github.ivi2511.pentahomcp.CorrectorTextos.Mensaje;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Pack;
 import io.github.ivi2511.pentahomcp.corrector.modelo.PoliticaPack;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
@@ -247,6 +248,24 @@ final class CorrectorPolitica {
 
   // ------------------------------------------------------------------ revision
 
+  /** Un problema que bloquea: el motivo ({@link ResultadoCaso#MOTIVOS}), el texto traducible y el step, si hay. */
+  static final class Hallazgo {
+
+    final String motivo;
+    final Mensaje mensaje;
+    final String step;
+
+    Hallazgo( String motivo, Mensaje mensaje, String step ) {
+      this.motivo = motivo;
+      this.mensaje = mensaje;
+      this.step = step;
+    }
+
+    String detalle() {
+      return mensaje == null ? null : mensaje.en();
+    }
+  }
+
   /** Lo que encontro {@link #revisar}: si bloquea, por que, y que steps no pueden correr. */
   static final class Revision {
 
@@ -254,6 +273,8 @@ final class CorrectorPolitica {
     String motivo;
     /** Para el docente, en ingles, con los nombres de la entrega. */
     String detalle;
+    /** El mismo detalle, para traducirlo. */
+    Mensaje mensaje;
     /** Steps que la politica no deja correr (nivel, campo, SQL), en el orden del XML. */
     final List<PasoBloqueado> bloqueados = new ArrayList<PasoBloqueado>();
     /** D1: los nombres repetidos tal como estan en el XML (todos los de cada grupo). */
@@ -283,7 +304,11 @@ final class CorrectorPolitica {
       if ( bloquea() ) {
         r.estado = ResultadoCorreccion.BLOQUEADA;
         r.motivo = motivo;
-        r.detalle = detalle;
+        if ( mensaje != null ) {
+          mensaje.en( r );
+        } else {
+          r.detalle = detalle;
+        }
       }
     }
 
@@ -297,7 +322,11 @@ final class CorrectorPolitica {
       }
       c.corrida.estado = ResultadoCaso.BLOQUEADO;
       c.corrida.motivo = motivo;
-      c.corrida.detalle = detalle;
+      if ( mensaje != null ) {
+        mensaje.en( c.corrida );
+      } else {
+        c.corrida.detalle = detalle;
+      }
     }
   }
 
@@ -312,13 +341,13 @@ final class CorrectorPolitica {
     Revision r = new Revision();
     PoliticaPack pol = pack == null || pack.politica == null ? new PoliticaPack() : pack.politica;
     List<Element> steps = e.steps();
-    Map<String, List<String>> detalles = new LinkedHashMap<String, List<String>>();
+    Map<String, List<Mensaje>> detalles = new LinkedHashMap<String, List<Mensaje>>();
 
     // D1 sobre el XML crudo
     r.nombresRepetidos.addAll( nombresRepetidos( e.crudo ) );
     if ( !r.nombresRepetidos.isEmpty() ) {
-      anotar( detalles, ResultadoCaso.NOMBRE_REPETIDO, "duplicate step names (Kettle merges them when loading): "
-        + citar( r.nombresRepetidos ) );
+      anotar( detalles, ResultadoCaso.NOMBRE_REPETIDO, new Mensaje( "det.duplicate_names", citar(
+        r.nombresRepetidos ) ) );
     }
 
     // niveles
@@ -330,13 +359,13 @@ final class CorrectorPolitica {
       String nivel = falta ? PoliticaPack.DESCONOCIDO : nivel( tipo );
       r.niveles.put( nombre, nivel );
       String motivo = null;
-      String texto = null;
+      Mensaje texto = null;
       if ( PoliticaPack.CONDICIONAL.equals( nivel ) ) {
         r.usaCondicionales = true;
         if ( !modoConfianza && !pol.permite( canon ) && !pol.permite( tipo ) && !contiene( permitidosExtra, canon )
           && !contiene( permitidosExtra, tipo ) ) {
           motivo = ResultadoCaso.STEP_NO_PERMITIDO;
-          texto = "step " + q( nombre ) + " (" + tipo + ") is conditional and the pack does not list it in allow_steps";
+          texto = new Mensaje( "det.step_not_allowed", nombre, tipo );
         }
       } else if ( PoliticaPack.PELIGROSO.equals( nivel ) ) {
         if ( modoConfianza ) {
@@ -346,7 +375,7 @@ final class CorrectorPolitica {
             nombre ) );
         } else {
           motivo = ResultadoCaso.STEP_PELIGROSO;
-          texto = "step " + q( nombre ) + " (" + tipo + ") is dangerous: it only runs in trust mode";
+          texto = new Mensaje( "det.dangerous_step", nombre, tipo );
         }
       } else if ( PoliticaPack.DESCONOCIDO.equals( nivel ) ) {
         boolean deja = falta ? !pol.bloqueaDesconocidos() : modoConfianza || !pol.bloqueaDesconocidos();
@@ -355,8 +384,7 @@ final class CorrectorPolitica {
           r.usaCondicionales = true;
         } else {
           motivo = ResultadoCaso.STEP_DESCONOCIDO;
-          texto = "step " + q( nombre ) + " (" + tipo + ") " + ( falta ? "uses a plugin that is not installed"
-            : "is not in the grader's policy" ) + " and the pack blocks unknown steps";
+          texto = new Mensaje( falta ? "det.unknown_step.missing" : "det.unknown_step.policy", nombre, tipo );
         }
       }
       if ( motivo != null ) {
@@ -367,11 +395,11 @@ final class CorrectorPolitica {
 
     // entradas y salidas cuyo archivo sale de un campo (no se pueden redirigir ni revisar)
     for ( Element s : steps ) {
-      String[] dc = desdeCampo( s, e.tm );
+      Hallazgo dc = desdeCampo( s, e.tm );
       if ( dc != null ) {
         String nombre = Nodos.crudo( s, "name" );
-        r.bloqueados.add( new PasoBloqueado( nombre, Nodos.txt( s, "type" ), r.niveles.get( nombre ), dc[ 0 ] ) );
-        anotar( detalles, dc[ 0 ], dc[ 1 ] );
+        r.bloqueados.add( new PasoBloqueado( nombre, Nodos.txt( s, "type" ), r.niveles.get( nombre ), dc.motivo ) );
+        anotar( detalles, dc.motivo, dc.mensaje );
       }
     }
 
@@ -385,21 +413,21 @@ final class CorrectorPolitica {
           continue;
         }
         Element dueno = hijoDeRaiz( e.kettle, hp[ 0 ] );
-        String donde;
+        Mensaje donde;
         if ( dueno != null && "step".equals( dueno.getTagName() ) ) {
           String nombre = Nodos.crudo( dueno, "name" );
-          donde = "step " + q( nombre ) + " (" + Nodos.txt( dueno, "type" ) + ")";
+          donde = new Mensaje( "det.where.step", nombre, Nodos.txt( dueno, "type" ) );
           if ( yaBloqueados.add( dueno ) ) {
             r.bloqueados.add( new PasoBloqueado( nombre, Nodos.txt( dueno, "type" ), r.niveles.get( nombre ),
               ResultadoCaso.SQL_PROHIBIDO ) );
           }
         } else if ( dueno != null && "connection".equals( dueno.getTagName() ) ) {
-          donde = "connection " + q( Nodos.txt( dueno, "name" ) );
+          donde = new Mensaje( "det.where.connection", Nodos.txt( dueno, "name" ) );
         } else {
-          donde = "<" + hp[ 0 ].getTagName() + ">";
+          donde = new Mensaje( "det.where.tag", hp[ 0 ].getTagName() );
         }
-        anotar( detalles, ResultadoCaso.SQL_PROHIBIDO, donde + ": " + prohibido
-          + " is not allowed (it would create or read files outside the sandbox)" );
+        anotar( detalles, ResultadoCaso.SQL_PROHIBIDO, new Mensaje( "det.forbidden_sql", donde.anidado(),
+          prohibido ) );
       }
       for ( Element s : steps ) {
         String tipo = Nodos.txt( s, "type" );
@@ -413,14 +441,15 @@ final class CorrectorPolitica {
     // D2
     r.enCiclo.addAll( stepsEnCiclo( e.tm ) );
     if ( !r.enCiclo.isEmpty() ) {
-      anotar( detalles, ResultadoCaso.CICLO, "enabled hops form a loop through " + citar( r.enCiclo ) );
+      anotar( detalles, ResultadoCaso.CICLO, new Mensaje( "det.cycle", citar( r.enCiclo ) ) );
     }
 
     for ( String m : PRIORIDAD ) {
-      List<String> d = detalles.get( m );
+      List<Mensaje> d = detalles.get( m );
       if ( d != null && !d.isEmpty() ) {
         r.motivo = m;
-        r.detalle = d.get( 0 ) + ( d.size() > 1 ? " (+" + ( d.size() - 1 ) + " more)" : "" );
+        r.mensaje = d.size() > 1 ? new Mensaje( "det.more", d.get( 0 ).anidado(), d.size() - 1 ) : d.get( 0 );
+        r.detalle = r.mensaje.en();
         break;
       }
     }
@@ -558,37 +587,35 @@ final class CorrectorPolitica {
    * o una URL, Get file names con «nombres desde un campo», Execute row SQL con el SQL en un archivo y Text file output
    * con el nombre en un campo (escribiria donde diga el campo: {@code unexpected_output}).
    */
-  static String[] desdeCampo( Element s, TransMeta tm ) {
+  static Hallazgo desdeCampo( Element s, TransMeta tm ) {
     String nombre = Nodos.crudo( s, "name" );
     String tipo = Nodos.txt( s, "type" );
     String canon = canonico( tipo ).toLowerCase( Locale.ROOT );
-    String quien = "step " + q( nombre ) + " (" + tipo + ")";
     if ( si( s, "fileNameInField" ) ) {
-      return new String[] { ResultadoCaso.SALIDA_INESPERADA, quien + " writes to the file named in field "
-        + q( Nodos.txt( s, "fileNameField" ) ) + ": it cannot be redirected to the sandbox" };
+      return new Hallazgo( ResultadoCaso.SALIDA_INESPERADA, new Mensaje( "det.field.output", nombre, tipo, Nodos.txt(
+        s, "fileNameField" ) ), nombre );
     }
     if ( si( s, "accept_filenames" ) ) {
-      return new String[] { ResultadoCaso.ENTRADA_INESPERADA, quien + " reads the files named in field "
-        + q( Nodos.txt( s, "accept_field" ) ) + ": they cannot be checked before running" };
+      return new Hallazgo( ResultadoCaso.ENTRADA_INESPERADA, new Mensaje( "det.field.accept", nombre, tipo, Nodos.txt(
+        s, "accept_field" ) ), nombre );
     }
     if ( ( canon.equals( "jsoninput" ) || canon.equals( "getxmldata" ) || canon.equals( "loadfileinput" )
       || canon.equals( "yamlinput" ) ) && ( si( s, "readurl" ) || si( s, "IsInFields" ) && si( s, "IsAFile" ) ) ) {
-      return new String[] { ResultadoCaso.ENTRADA_INESPERADA, quien + " reads " + ( si( s, "readurl" )
-        ? "URLs (readurl)" : "the files named in a field" ) + ": they cannot be checked before running" };
+      return new Hallazgo( ResultadoCaso.ENTRADA_INESPERADA, new Mensaje( si( s, "readurl" ) ? "det.field.url"
+        : "det.field.files", nombre, tipo ), nombre );
     }
     if ( ( canon.equals( "getfilenames" ) || canon.equals( "getfilesrowscount" ) ) && si( s, "filefield" ) ) {
-      return new String[] { ResultadoCaso.ENTRADA_INESPERADA, quien
-        + " takes the folder from a field: it cannot be checked before running" };
+      return new Hallazgo( ResultadoCaso.ENTRADA_INESPERADA, new Mensaje( "det.field.folder", nombre, tipo ), nombre );
     }
     if ( canon.equals( "execsqlrow" ) && si( s, "sqlFromfile" ) ) {
-      return new String[] { ResultadoCaso.ENTRADA_INESPERADA, quien
-        + " reads SQL from the files named in a field: they cannot be checked before running" };
+      return new Hallazgo( ResultadoCaso.ENTRADA_INESPERADA, new Mensaje( "det.field.sqlfile", nombre, tipo ),
+        nombre );
     }
     if ( canon.equals( "csvinput" ) || canon.equals( "parallelgzipcsvinput" ) ) {
       StepMeta sm = tm == null ? null : tm.findStep( nombre );
       if ( sm != null && tm.findNrPrevSteps( sm ) > 0 ) {
-        return new String[] { ResultadoCaso.ENTRADA_INESPERADA, quien + " has an incoming hop, so it reads the files "
-          + "named in field " + q( Nodos.txt( s, "filename_field" ) ) + ": they cannot be checked before running" };
+        return new Hallazgo( ResultadoCaso.ENTRADA_INESPERADA, new Mensaje( "det.field.csv", nombre, tipo, Nodos.txt(
+          s, "filename_field" ) ), nombre );
       }
     }
     return null;
@@ -701,10 +728,10 @@ final class CorrectorPolitica {
     return n instanceof Element ? (Element) n : null;
   }
 
-  private static void anotar( Map<String, List<String>> d, String motivo, String texto ) {
-    List<String> l = d.get( motivo );
+  private static void anotar( Map<String, List<Mensaje>> d, String motivo, Mensaje texto ) {
+    List<Mensaje> l = d.get( motivo );
     if ( l == null ) {
-      l = new ArrayList<String>();
+      l = new ArrayList<Mensaje>();
       d.put( motivo, l );
     }
     l.add( texto );

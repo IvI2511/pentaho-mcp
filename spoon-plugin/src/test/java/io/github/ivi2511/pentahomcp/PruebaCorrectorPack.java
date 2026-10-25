@@ -556,7 +556,7 @@ public class PruebaCorrectorPack {
   public void pruebaEsquema() throws Exception {
     // un error por cosa, con donde y codigo
     error( "captura", n -> n.with( "output" ).put( "capture", "csv" ), CorrectorPack.VALOR_MALO, "output.capture",
-      "\"csv\" is not valid; the possible values are: file, step, query." );
+      "\"csv\" is not valid; the possible values are: file, step, query, tables." );
     error( "kind", n -> n.put( "kind", "jobs" ), CorrectorPack.VALOR_MALO, "kind", "transformation, job" );
     error( "sin-id", n -> n.remove( "id" ), CorrectorPack.FALTA_VALOR, "id", "A value is required here." );
     error( "clave", n -> n.with( "compare" ).putArray( "key_columns" ).add( "product" ),

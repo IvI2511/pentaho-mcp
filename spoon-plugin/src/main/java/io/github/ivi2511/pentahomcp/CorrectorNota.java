@@ -91,6 +91,7 @@ final class CorrectorNota {
   static final String P_SALIDA_EN_CAMPO = "unexpected_output";
   static final String P_CONEXION = "foreign_connection";
   static final String P_SQL = "forbidden_sql";
+  static final String P_ESQUEMA = "foreign_schema";
   static final String P_REESCRITURA = "rewrite_failed";
   static final String P_D1 = "D1";
   static final String P_D2 = "D2";
@@ -463,7 +464,7 @@ final class CorrectorNota {
       }
     }
     String captura = pack.salida == null ? null : pack.salida.captura;
-    Set<String> tipos = Pack.Salida.CAPTURA_QUERY.equals( captura ) ? SALIDAS_A_BASE
+    Set<String> tipos = Pack.Salida.aBase( captura ) ? SALIDAS_A_BASE
       : Pack.Salida.CAPTURA_STEP.equals( captura ) ? Collections.<String>emptySet()
         : Collections.singleton( "TextFileOutput" );
     List<StepMeta> l = new ArrayList<StepMeta>();
@@ -921,6 +922,7 @@ final class CorrectorNota {
           agregar( out, P_SIN_SALIDA, t.f( "pista.no_output_step.step", pack.salida.step ) );
         } else {
           agregar( out, P_SIN_SALIDA, t.s( Pack.Salida.CAPTURA_QUERY.equals( captura ) ? "pista.no_output_step.query"
+            : Pack.Salida.CAPTURA_TABLAS.equals( captura ) ? "pista.no_output_step.tables"
             : "pista.no_output_step.file" ) );
         }
       }
@@ -1091,9 +1093,19 @@ final class CorrectorNota {
     } else if ( ResultadoCaso.SALIDA_INESPERADA.equals( motivo ) ) {
       agregar( out, P_SALIDA_EN_CAMPO, t.s( "pista.unexpected_output" ) );
     } else if ( ResultadoCaso.CONEXION_AJENA.equals( motivo ) ) {
-      agregar( out, P_CONEXION, t.s( "pista.foreign_connection" ) );
+      if ( pack.bases.isEmpty() ) {
+        agregar( out, P_CONEXION, t.s( "pista.foreign_connection" ) );
+      } else {
+        List<String> nombres = new ArrayList<String>();
+        for ( io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba b : pack.bases ) {
+          nombres.add( "«" + b.conexion + "»" );
+        }
+        agregar( out, P_CONEXION, t.f( "pista.foreign_connection.test", unir( nombres ) ) );
+      }
+    } else if ( ResultadoCaso.ESQUEMA_AJENO.equals( motivo ) ) {
+      agregar( out, P_ESQUEMA, t.s( "pista.foreign_schema" ) );
     } else if ( ResultadoCaso.SQL_PROHIBIDO.equals( motivo ) ) {
-      agregar( out, P_SQL, t.s( "pista.forbidden_sql" ) );
+      agregar( out, P_SQL, t.s( pack.bases.isEmpty() ? "pista.forbidden_sql" : "pista.forbidden_sql.server" ) );
     } else if ( ResultadoCaso.REESCRITURA_FALLIDA.equals( motivo ) ) {
       agregar( out, P_REESCRITURA, t.s( "pista.rewrite_failed" ) );
     } else if ( ResultadoCaso.NOMBRE_REPETIDO.equals( motivo ) ) {
@@ -1242,7 +1254,8 @@ final class CorrectorNota {
       b.append( "## " ).append( md( t.s( "md.avisos" ) ) ).append( "\n\n" );
       for ( Aviso a : r.avisos ) {
         if ( a != null ) {
-          b.append( "- " ).append( md( a.detalle != null ? a.detalle : a.codigo ) ).append( "\n" );
+          b.append( "- " ).append( md( a.detalle != null ? CorrectorTextos.detalle( t, a ) : a.codigo ) ).append(
+            "\n" );
         }
       }
       b.append( "\n" );
@@ -1273,7 +1286,7 @@ final class CorrectorNota {
     b.append( "- **" ).append( md( t.s( "md.corrida" ) ) ).append( ":** " ).append( md( linea.toString() ) )
       .append( "\n" );
     if ( run != null && run.detalle != null && !alumno ) {
-      b.append( "- " ).append( md( run.detalle ) ).append( "\n" );
+      b.append( "- " ).append( md( CorrectorTextos.detalle( t, run ) ) ).append( "\n" );
     }
     Comparacion cmp = rc.comparacion;
     if ( cmp != null ) {
@@ -1299,7 +1312,7 @@ final class CorrectorNota {
     }
     for ( Aviso a : rc.avisos ) {
       if ( a != null ) {
-        b.append( "- " ).append( md( a.detalle != null ? a.detalle : a.codigo ) ).append( "\n" );
+        b.append( "- " ).append( md( a.detalle != null ? CorrectorTextos.detalle( t, a ) : a.codigo ) ).append( "\n" );
       }
     }
     b.append( "\n" );

@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +48,9 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import io.github.ivi2511.pentahomcp.CorrectorPolitica.Entrega;
+import io.github.ivi2511.pentahomcp.CorrectorPolitica.Hallazgo;
+import io.github.ivi2511.pentahomcp.CorrectorTextos.Mensaje;
+import io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Caso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Pack;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
@@ -69,8 +73,12 @@ import io.github.ivi2511.pentahomcp.lint.Rutas;
  * <li><b>Salidas a archivo</b> ({@link #SALIDAS}): {@code file/name} → {@code ${...}/salida/<nombre base>}; si dos
  * chocan, sufijo {@code _<step>}. La que toma el nombre de un campo bloquea ({@code unexpected_output}).</li>
  * <li><b>Conexiones</b>: con base en el pack, toda conexion SQLite usada pasa a {@code db/<plantilla>} (ruta absoluta,
- * acceso nativo, sin opciones extra ni pool); cualquier otra usada bloquea ({@code foreign_connection}); las que no
- * usa nadie se sacan con un aviso (P15).</li>
+ * acceso nativo, sin opciones extra ni pool); con bases de prueba (formato 2), cada conexion usada pasa a la base de
+ * prueba que le corresponde ({@link CorrectorBases#emparejar}: por nombre, por base o por tipo y servidor), con el
+ * servidor, el usuario y las opciones del pack y la contraseña vacia (el motor la pone en memoria); los esquemas de
+ * los steps (Table output...) que nombran la base original pasan a la de prueba y el SQL de los steps no puede salir
+ * de las bases de prueba ({@code foreign_schema}, {@code forbidden_sql}). Cualquier otra conexion usada bloquea
+ * ({@code foreign_connection}); las que no usa nadie se sacan con un aviso (P15).</li>
  * <li><b>Entradas inesperadas</b>: toda ruta de un step (hojas con tag de archivo, la heuristica de
  * {@code absolute_path} del linter, y getResourceDependencies) que, con las variables resueltas, cae fuera de la
  * carpeta del caso y del tmp de la JVM, o usa un esquema VFS que no es {@code file:}, bloquea
@@ -137,6 +145,8 @@ final class CorrectorSandbox {
      * escribir. null = la carpeta tmp/ del caso.
      */
     File dirTmpJvm;
+    /** Las bases de prueba de esta JVM (con el sufijo del worker); null = las del pack sin sufijo. */
+    CorrectorBases.Sesion bases;
   }
 
   /** Una salida a archivo redirigida: C4 la usa para la captura {@code file}. */
@@ -178,8 +188,12 @@ final class CorrectorSandbox {
     String motivo;
     /** Para el docente, en ingles. */
     String detalle;
+    /** El mismo detalle, para traducirlo. */
+    Mensaje mensaje;
     /** El step del problema, si hay uno. */
     String step;
+    /** Conexion de la copia (nombre) → la base de prueba a la que apunta: el motor le pone la contraseña. */
+    final Map<String, CorrectorBases.Destino> conexionesPrueba = new LinkedHashMap<String, CorrectorBases.Destino>();
 
     boolean bloqueada() {
       return motivo != null;
@@ -197,7 +211,11 @@ final class CorrectorSandbox {
         }
         c.corrida.estado = ResultadoCaso.BLOQUEADO;
         c.corrida.motivo = motivo;
-        c.corrida.detalle = detalle;
+        if ( mensaje != null ) {
+          mensaje.en( c.corrida );
+        } else {
+          c.corrida.detalle = detalle;
+        }
       }
     }
 
@@ -238,7 +256,9 @@ final class CorrectorSandbox {
     p.baseDatos = copiarPlantilla( pack, dirPack, p.db );
     File tmpJvm = op != null && op.dirTmpJvm != null ? op.dirTmpJvm.getAbsoluteFile() : p.tmp;
 
-    List<String[]> problemas = new ArrayList<String[]>();
+    List<Hallazgo> problemas = new ArrayList<Hallazgo>();
+    CorrectorBases.Sesion bases = op != null && op.bases != null ? op.bases : pack.bases == null || pack.bases.isEmpty()
+      ? null : new CorrectorBases.Sesion( pack, dirPack, "", null );
     List<String> entradas = pack.entradas == null ? Collections.<String>emptyList() : pack.entradas;
     Element doc = (Element) e.kettle.cloneNode( true ); // lo que Kettle entendio (ver Entrega)
     String so = CorrectorPolitica.objetosCompartidos( e.crudo );
@@ -288,9 +308,9 @@ final class CorrectorSandbox {
     for ( Element s : Nodos.hijos( doc, "step" ) ) {
       String nombre = Nodos.crudo( s, "name" );
       String tipo = Nodos.txt( s, "type" );
-      String[] dc = CorrectorPolitica.desdeCampo( s, e.tm );
+      Hallazgo dc = CorrectorPolitica.desdeCampo( s, e.tm );
       if ( dc != null ) {
-        problemas.add( new String[] { dc[ 0 ], dc[ 1 ], nombre } );
+        problemas.add( dc );
       }
       if ( SALIDAS.contains( CorrectorPolitica.canonico( tipo ).toLowerCase( Locale.ROOT ) ) ) {
         redirigirSalida( s, nombre, tipo, vars, archivosSalida, hechos, p );
@@ -298,8 +318,11 @@ final class CorrectorSandbox {
       reescribirHojas( s, s, nombre, entradas, nombresSteps, hechos, p );
     }
 
-    // conexiones
-    conexiones( doc, e, p, problemas );
+    // conexiones, y con bases de prueba los esquemas y el SQL de los steps
+    conexiones( doc, e, p, problemas, bases );
+    if ( bases != null ) {
+      esquemasYSql( doc, vars, p, problemas, bases );
+    }
 
     // la copia
     p.ktr = new File( p.dirCaso, e.archivo == null ? "entrega.ktr" : e.archivo.getName() );
@@ -307,13 +330,13 @@ final class CorrectorSandbox {
     TransMeta tm2 = null;
     try {
       tm2 = new TransMeta( p.ktr.getAbsolutePath() );
-      String dif = diferencias( e.tm, tm2 );
+      Mensaje dif = diferenciasMensaje( e.tm, tm2 );
       if ( dif != null ) {
-        problemas.add( new String[] { ResultadoCaso.REESCRITURA_FALLIDA, dif, null } );
+        problemas.add( new Hallazgo( ResultadoCaso.REESCRITURA_FALLIDA, dif, null ) );
       }
     } catch ( Throwable t ) {
-      problemas.add( new String[] { ResultadoCaso.REESCRITURA_FALLIDA, "the rewritten copy does not load: "
-        + primeraLinea( t ), null } );
+      problemas.add( new Hallazgo( ResultadoCaso.REESCRITURA_FALLIDA, new Mensaje( "det.rewrite.load", primeraLinea(
+        t ) ), null ) );
     }
 
     // rutas fuera del sandbox
@@ -329,22 +352,25 @@ final class CorrectorSandbox {
 
     ordenarNotas( p.redirecciones );
     for ( String m : PRIORIDAD ) {
-      for ( String[] pr : problemas ) {
-        if ( m.equals( pr[ 0 ] ) && p.motivo == null ) {
-          p.motivo = m;
-          p.detalle = pr[ 1 ];
-          p.step = pr[ 2 ];
+      for ( Hallazgo pr : problemas ) {
+        if ( m.equals( pr.motivo ) && p.motivo == null ) {
+          poner( p, pr );
         }
       }
     }
-    for ( String[] pr : problemas ) { // un motivo que no esta en PRIORIDAD (no deberia pasar)
+    for ( Hallazgo pr : problemas ) { // un motivo que no esta en PRIORIDAD
       if ( p.motivo == null ) {
-        p.motivo = pr[ 0 ];
-        p.detalle = pr[ 1 ];
-        p.step = pr[ 2 ];
+        poner( p, pr );
       }
     }
     return p;
+  }
+
+  private static void poner( Preparacion p, Hallazgo h ) {
+    p.motivo = h.motivo;
+    p.mensaje = h.mensaje;
+    p.detalle = h.detalle();
+    p.step = h.step;
   }
 
   // ------------------------------------------------------------------ reescritura
@@ -519,7 +545,7 @@ final class CorrectorSandbox {
    * en el SQL de Table input y Execute SQL antes de correrlo, y un «ATT» en el default de un parametro mas
    * «${X}ACH DATABASE» en el SQL no esta en ninguna hoja. Solo si la entrega usa la base del pack.
    */
-  private static void sqlSustituido( Element doc, VariableSpace vars, Preparacion p, List<String[]> problemas ) {
+  private static void sqlSustituido( Element doc, VariableSpace vars, Preparacion p, List<Hallazgo> problemas ) {
     if ( p.baseDatos == null ) {
       return;
     }
@@ -539,11 +565,11 @@ final class CorrectorSandbox {
         continue;
       }
       String step = dueno != null && "step".equals( dueno.getTagName() ) ? Nodos.crudo( dueno, "name" ) : null;
-      String donde = step != null ? "step " + q( step )
-        : dueno != null && "connection".equals( dueno.getTagName() ) ? "connection " + q( Nodos.txt( dueno, "name" ) )
-        : "<" + hp[ 0 ].getTagName() + ">";
-      problemas.add( new String[] { ResultadoCaso.SQL_PROHIBIDO, donde + ": " + prohibido
-        + " after substituting variables is not allowed (it would create or read files outside the sandbox)", step } );
+      Mensaje donde = step != null ? new Mensaje( "det.where.step_only", step )
+        : dueno != null && "connection".equals( dueno.getTagName() ) ? new Mensaje( "det.where.connection", Nodos.txt(
+          dueno, "name" ) ) : new Mensaje( "det.where.tag", hp[ 0 ].getTagName() );
+      problemas.add( new Hallazgo( ResultadoCaso.SQL_PROHIBIDO, new Mensaje( "det.forbidden_sql.vars",
+        donde.anidado(), prohibido ), step ) );
     }
   }
 
@@ -560,21 +586,51 @@ final class CorrectorSandbox {
     return t;
   }
 
-  /** Conexiones usadas, ajenas y sin usar (§3); la SQLite usada pasa a la copia de la plantilla. */
-  private static void conexiones( Element doc, Entrega e, Preparacion p, List<String[]> problemas ) {
+  /**
+   * Conexiones usadas, ajenas y sin usar (§3); la SQLite usada pasa a la copia de la plantilla y, con bases de
+   * prueba, cada una pasa a la suya (primero las que coinciden por nombre o por base, despues por tipo y servidor).
+   */
+  private static void conexiones( Element doc, Entrega e, Preparacion p, List<Hallazgo> problemas,
+                                  CorrectorBases.Sesion bases ) {
     Set<String> usadas = new HashSet<String>();
     for ( String u : CorrectorPolitica.conexionesUsadas( e ) ) {
       usadas.add( u.toLowerCase( Locale.ROOT ) );
     }
     Set<String> definidas = new HashSet<String>();
+    List<Element> orden = new ArrayList<Element>();
+    List<Element> despues = new ArrayList<Element>();
     for ( Element c : Nodos.hijos( doc, "connection" ) ) {
+      boolean directa = bases != null && CorrectorBases.emparejar( bases.pack, Nodos.txt( c, "name" ), Nodos.txt( c,
+        "type" ), Nodos.txt( c, "server" ), Nodos.txt( c, "database" ), new HashSet<BaseDePrueba>(), true ) != null;
+      ( directa || bases == null ? orden : despues ).add( c );
+    }
+    orden.addAll( despues );
+    Set<BaseDePrueba> emparejadas = new HashSet<BaseDePrueba>();
+    for ( Element c : orden ) {
       String nombre = Nodos.txt( c, "name" );
       String tipo = Nodos.txt( c, "type" );
       definidas.add( nombre.toLowerCase( Locale.ROOT ) );
       if ( !usadas.contains( nombre.toLowerCase( Locale.ROOT ) ) ) {
         doc.removeChild( c );
-        p.avisos.add( new Aviso( Aviso.CONEXION_QUITADA, "connection " + q( nombre ) + " (" + tipo
-          + ") is not used by any step: removed" ) );
+        p.avisos.add( new Mensaje( "det.connection.unused", nombre, tipo ).aviso( Aviso.CONEXION_QUITADA ) );
+        continue;
+      }
+      if ( bases != null && !( p.baseDatos != null && "SQLITE".equalsIgnoreCase( tipo ) ) ) {
+        BaseDePrueba b = CorrectorBases.emparejar( bases.pack, nombre, tipo, Nodos.txt( c, "server" ), Nodos.txt( c,
+          "database" ), emparejadas, false );
+        if ( b != null ) {
+          emparejadas.add( b );
+          aPrueba( c, nombre, tipo, bases.destino( b ), p );
+          continue;
+        }
+        String step = stepQueUsa( e, nombre );
+        List<String> nombres = new ArrayList<String>();
+        for ( BaseDePrueba x : bases.pack.bases ) {
+          nombres.add( x.conexion );
+        }
+        problemas.add( new Hallazgo( ResultadoCaso.CONEXION_AJENA, step == null ? new Mensaje(
+          "det.connection.not_test", nombre, tipo, String.join( ", ", nombres ) ) : new Mensaje(
+          "det.connection.not_test.step", nombre, tipo, step, String.join( ", ", nombres ) ), step ) );
         continue;
       }
       if ( p.baseDatos != null && "SQLITE".equalsIgnoreCase( tipo ) ) {
@@ -594,29 +650,161 @@ final class CorrectorSandbox {
           + p.baseDatos.getName() );
       } else {
         String step = stepQueUsa( e, nombre );
-        problemas.add( new String[] { ResultadoCaso.CONEXION_AJENA, "connection " + q( nombre ) + " (" + tipo + ")"
-          + usadaPor( step ) + " is not the pack database", step } );
+        problemas.add( new Hallazgo( ResultadoCaso.CONEXION_AJENA, step == null ? new Mensaje(
+          "det.connection.not_pack", nombre, tipo ) : new Mensaje( "det.connection.not_pack.step", nombre, tipo, step ),
+          step ) );
       }
     }
     for ( DatabaseMeta d : e.tm.getDatabases() ) { // por si getXML no escribio alguna que Kettle cargo
       String k = d.getName() == null ? "" : d.getName().toLowerCase( Locale.ROOT );
       if ( !k.isEmpty() && !definidas.contains( k ) && !usadas.contains( k ) ) {
         definidas.add( k );
-        p.avisos.add( new Aviso( Aviso.CONEXION_QUITADA, "connection " + q( d.getName() ) + " (" + d.getPluginId()
-          + ") is not used by any step: removed" ) );
+        p.avisos.add( new Mensaje( "det.connection.unused", d.getName(), d.getPluginId() ).aviso(
+          Aviso.CONEXION_QUITADA ) );
       }
     }
     for ( String u : CorrectorPolitica.conexionesUsadas( e ) ) {
       if ( !definidas.contains( u.toLowerCase( Locale.ROOT ) ) ) {
         String step = stepQueUsa( e, u );
-        problemas.add( new String[] { ResultadoCaso.CONEXION_AJENA, "connection " + q( u ) + usadaPor( step )
-          + " is not defined in the transformation", step } );
+        problemas.add( new Hallazgo( ResultadoCaso.CONEXION_AJENA, step == null ? new Mensaje(
+          "det.connection.undefined", u ) : new Mensaje( "det.connection.undefined.step", u, step ), step ) );
       }
     }
   }
 
-  private static String usadaPor( String step ) {
-    return step == null ? "" : " used by step " + q( step );
+  /**
+   * Apunta una conexion de la copia a su base de prueba: tipo, acceso nativo, servidor, puerto, base (con el sufijo
+   * del worker) y usuario del pack; contraseña vacia (el motor pone la de verdad en memoria, asi no queda en ningun
+   * archivo); sin atributos salvo los de identificadores (fuera opciones extra, SQL al conectar, pool, cluster) y con
+   * las opciones JDBC del pack.
+   */
+  private static void aPrueba( Element c, String nombre, String tipo, CorrectorBases.Destino d, Preparacion p ) {
+    BaseDePrueba b = d.base;
+    String antes = Nodos.txt( c, "database" );
+    poner( c, "type", b.tipoNormal() );
+    poner( c, "access", "Native" );
+    poner( c, "server", CorrectorBases.n( b.servidor ) );
+    poner( c, "port", CorrectorBases.n( b.puerto ) );
+    poner( c, "database", d.nombre );
+    poner( c, "username", CorrectorBases.n( b.usuario ) );
+    poner( c, "password", "" );
+    for ( String tag : new String[] { "servername", "data_tablespace", "index_tablespace" } ) {
+      Element x = Nodos.hijo( c, tag );
+      if ( x != null ) {
+        x.setTextContent( "" );
+      }
+    }
+    Element attrs = Nodos.hijo( c, "attributes" );
+    if ( attrs == null ) {
+      attrs = c.getOwnerDocument().createElement( "attributes" );
+      c.appendChild( attrs );
+    }
+    for ( Element a : Nodos.hijos( attrs, "attribute" ) ) {
+      if ( !CorrectorBases.ATRIBUTOS.contains( Nodos.txt( a, "code" ).toLowerCase( Locale.ROOT ) ) ) {
+        attrs.removeChild( a );
+      }
+    }
+    for ( Map.Entry<String, String> o : b.opciones.entrySet() ) {
+      if ( o.getKey() == null || o.getKey().trim().isEmpty() ) {
+        continue;
+      }
+      Element a = c.getOwnerDocument().createElement( "attribute" );
+      Element code = c.getOwnerDocument().createElement( "code" );
+      code.setTextContent( "EXTRA_OPTION_" + b.tipoNormal() + "." + o.getKey().trim() );
+      Element val = c.getOwnerDocument().createElement( "attribute" );
+      val.setTextContent( o.getValue() == null ? "" : o.getValue() );
+      a.appendChild( code );
+      a.appendChild( val );
+      attrs.appendChild( a );
+    }
+    p.conexionesPrueba.put( nombre, d );
+    p.redirecciones.add( "connection " + q( nombre ) + " (" + tipo + "): " + antes + " -> test database "
+      + d.describir() );
+  }
+
+  /**
+   * Con bases de prueba: los esquemas que nombran los steps (Table output, Insert/Update...: hojas schema) en una
+   * conexion MySQL pasan de la base original a la de prueba; uno que no es de prueba bloquea
+   * ({@code foreign_schema}). Y el SQL de los steps (hojas sql/query, con las variables sustituidas) no puede nombrar
+   * otra base ni leer o escribir archivos del servidor ({@code forbidden_sql}).
+   */
+  private static void esquemasYSql( Element doc, VariableSpace vars, Preparacion p, List<Hallazgo> problemas,
+                                    CorrectorBases.Sesion bases ) {
+    Set<String> pruebas = bases.nombres();
+    Set<String> prohibidas = bases.prohibidas();
+    Map<String, String> renombres = bases.renombres();
+    Map<String, CorrectorBases.Destino> porConexion = new HashMap<String, CorrectorBases.Destino>();
+    for ( Map.Entry<String, CorrectorBases.Destino> en : p.conexionesPrueba.entrySet() ) {
+      porConexion.put( en.getKey().toLowerCase( Locale.ROOT ), en.getValue() );
+    }
+    for ( Element s : Nodos.hijos( doc, "step" ) ) {
+      String nombre = Nodos.crudo( s, "name" );
+      String tipo = Nodos.txt( s, "type" );
+      CorrectorBases.Destino d = null;
+      for ( Element[] hp : Nodos.hojas( s ) ) {
+        if ( "connection".equals( hp[ 0 ].getTagName() ) && d == null ) {
+          d = porConexion.get( hp[ 0 ].getTextContent().trim().toLowerCase( Locale.ROOT ) );
+        }
+      }
+      if ( d == null ) {
+        continue;
+      }
+      boolean mysql = d.base.esMysql();
+      for ( Element[] hp : Nodos.hojas( s ) ) {
+        Element h = hp[ 0 ];
+        String tag = h.getTagName().toLowerCase( Locale.ROOT );
+        String crudo = h.getTextContent();
+        String valor = sustituir( vars, crudo ).trim();
+        if ( mysql && ( tag.equals( "schema" ) || tag.equals( "schemaname" ) || tag.equals( "schema_name" ) ) ) {
+          if ( valor.isEmpty() ) {
+            continue;
+          }
+          if ( valor.contains( "${" ) || valor.contains( "%%" ) ) {
+            problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.variable", nombre, tipo,
+              crudo.trim() ), nombre ) );
+            continue;
+          }
+          String nuevo = renombres.get( valor.toLowerCase( Locale.ROOT ) );
+          if ( nuevo != null ) {
+            h.setTextContent( nuevo );
+            p.redirecciones.add( "schema " + q( nombre ) + ": " + crudo.trim() + " -> " + nuevo );
+          } else if ( !pruebas.contains( valor.toLowerCase( Locale.ROOT ) ) ) {
+            problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.foreign", nombre, tipo,
+              valor, String.join( ", ", pruebas ) ), nombre ) );
+          }
+          continue;
+        }
+        if ( mysql && ( tag.equals( "table" ) || tag.equals( "tablename" ) || tag.equals( "table_name" ) )
+          && valor.indexOf( '.' ) > 0 ) {
+          String esquema = valor.substring( 0, valor.indexOf( '.' ) ).replace( "`", "" ).trim();
+          String nuevo = renombres.get( esquema.toLowerCase( Locale.ROOT ) );
+          if ( nuevo != null ) {
+            h.setTextContent( nuevo + valor.substring( valor.indexOf( '.' ) ) );
+            p.redirecciones.add( "schema " + q( nombre ) + ": " + crudo.trim() + " -> " + h.getTextContent() );
+          } else if ( !pruebas.contains( esquema.toLowerCase( Locale.ROOT ) ) ) {
+            problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.foreign", nombre, tipo,
+              esquema, String.join( ", ", pruebas ) ), nombre ) );
+          }
+          continue;
+        }
+        if ( tag.contains( "sql" ) || tag.equals( "query" ) || tag.equals( "statement" ) ) {
+          // primero los nombres de las bases originales pasan a los de prueba (gym_dw.dim → gym_dw_correccion.dim)
+          String nuevo = mysql ? CorrectorBases.renombrar( crudo, renombres ) : crudo;
+          String ajeno = CorrectorBases.sqlAjeno( mysql ? CorrectorBases.renombrar( valor, renombres ) : valor,
+            pruebas, prohibidas );
+          if ( ajeno == null ) {
+            ajeno = CorrectorBases.sqlAjeno( nuevo, pruebas, prohibidas );
+          }
+          if ( ajeno != null ) {
+            problemas.add( new Hallazgo( ResultadoCaso.SQL_PROHIBIDO, new Mensaje( "det.sql.server", nombre, tipo,
+              ajeno ), nombre ) );
+          } else if ( !nuevo.equals( crudo ) ) {
+            h.setTextContent( nuevo );
+            p.redirecciones.add( "sql " + q( nombre ) + ": original database names -> test databases" );
+          }
+        }
+      }
+    }
   }
 
   /** El primer step que usa esa conexion (en el XML o por getUsedDatabaseConnections), o null (log, maxdate...). */
@@ -648,22 +836,27 @@ final class CorrectorSandbox {
 
   /** Que la copia tenga los mismos steps, hops y referencias entre steps que la entrega (P14); null si si. */
   static String diferencias( TransMeta a, TransMeta b ) {
+    Mensaje m = diferenciasMensaje( a, b );
+    return m == null ? null : m.en();
+  }
+
+  static Mensaje diferenciasMensaje( TransMeta a, TransMeta b ) {
     List<String> na = nombres( a );
     List<String> nb = nombres( b );
     if ( !na.equals( nb ) ) {
-      return "the rewrite changed the step names: " + na + " -> " + nb;
+      return new Mensaje( "det.rewrite.names", na, nb );
     }
     List<String> ha = hops( a );
     List<String> hb = hops( b );
     if ( !ha.equals( hb ) ) {
-      return "the rewrite changed the hops: " + ha + " -> " + hb;
+      return new Mensaje( "det.rewrite.hops", ha, hb );
     }
     for ( StepMeta sa : a.getSteps() ) {
       StepMeta sb = b.findStep( sa.getName() );
       String ra = referencias( sa );
       String rb = sb == null ? null : referencias( sb );
       if ( ra != null && rb != null && !ra.equals( rb ) ) {
-        return "the rewrite changed what step " + q( sa.getName() ) + " points to: " + ra + " -> " + rb;
+        return new Mensaje( "det.rewrite.refs", sa.getName(), ra, rb );
       }
     }
     return null;
@@ -712,7 +905,7 @@ final class CorrectorSandbox {
   }
 
   /** Las hojas de ruta del step (heuristica de absolute_path del linter) que caen fuera del sandbox. */
-  private static void revisarRutas( Element s, VariableSpace vars, List<Path> raices, List<String[]> problemas ) {
+  private static void revisarRutas( Element s, VariableSpace vars, List<Path> raices, List<Hallazgo> problemas ) {
     String nombre = Nodos.crudo( s, "name" );
     String tipo = Nodos.txt( s, "type" );
     boolean salida = SALIDAS.contains( CorrectorPolitica.canonico( tipo ).toLowerCase( Locale.ROOT ) );
@@ -720,13 +913,13 @@ final class CorrectorSandbox {
       if ( deDatos( s, r.elemento ) || plantillaApagada( r.elemento ) || esBandera( r.valor ) ) {
         continue;
       }
-      String fuera = rutaFuera( r.valor, vars, raices );
+      Mensaje fuera = rutaFueraMensaje( r.valor, vars, raices );
       if ( fuera != null ) {
         String tag = r.tag.toLowerCase( Locale.ROOT );
         boolean escribe = salida && tag.equals( "file/name" ) || tag.contains( "destination" )
           || tag.contains( "tempdirectory" );
-        problemas.add( new String[] { escribe ? ResultadoCaso.SALIDA_INESPERADA : ResultadoCaso.ENTRADA_INESPERADA,
-          "step " + q( nombre ) + " (" + tipo + ") <" + r.tag + ">: " + fuera, nombre } );
+        problemas.add( new Hallazgo( escribe ? ResultadoCaso.SALIDA_INESPERADA : ResultadoCaso.ENTRADA_INESPERADA,
+          new Mensaje( "det.path", nombre, tipo, r.tag, fuera.anidado() ), nombre ) );
       }
     }
   }
@@ -736,7 +929,7 @@ final class CorrectorSandbox {
    * caso. Solo si las hojas ya pasaron: asi una URL nunca llega a VFS (no se abre ninguna conexion).
    */
   private static void dependencias( TransMeta tm, Preparacion p, VariableSpace vars, List<Path> raices,
-    List<String[]> problemas ) {
+    List<Hallazgo> problemas ) {
     try {
       tm.setVariable( "java.io.tmpdir", vars.getVariable( "java.io.tmpdir" ) );
       for ( Map.Entry<String, String> par : p.parametros.entrySet() ) {
@@ -765,10 +958,10 @@ final class CorrectorSandbox {
             || en.getResource().trim().isEmpty() ) {
             continue;
           }
-          String fuera = rutaFuera( en.getResource(), vars, raices );
+          Mensaje fuera = rutaFueraMensaje( en.getResource(), vars, raices );
           if ( fuera != null ) {
-            problemas.add( new String[] { ResultadoCaso.ENTRADA_INESPERADA, "step " + q( s.getName() ) + " ("
-              + s.getStepID() + ") reads " + fuera, s.getName() } );
+            problemas.add( new Hallazgo( ResultadoCaso.ENTRADA_INESPERADA, new Mensaje( "det.reads", s.getName(),
+              s.getStepID(), fuera.anidado() ), s.getName() ) );
           }
         }
       }
@@ -781,6 +974,11 @@ final class CorrectorSandbox {
    * Una ruta relativa se resuelve contra el directorio de trabajo de la JVM (la carpeta de PDI en el worker).
    */
   static String rutaFuera( String valor, VariableSpace vars, List<Path> raices ) {
+    Mensaje m = rutaFueraMensaje( valor, vars, raices );
+    return m == null ? null : m.en();
+  }
+
+  static Mensaje rutaFueraMensaje( String valor, VariableSpace vars, List<Path> raices ) {
     String v0 = valor == null ? "" : valor.trim(); // en el detalle va lo que escribio el alumno, no la ruta resuelta
     String s = vars == null ? v0 : vars.environmentSubstitute( v0 );
     s = s == null ? "" : s.trim();
@@ -788,29 +986,29 @@ final class CorrectorSandbox {
       return null;
     }
     if ( s.contains( "${" ) || s.contains( "%%" ) ) {
-      return v0 + " has a variable that cannot be resolved before running";
+      return new Mensaje( "det.route.variable", v0 );
     }
     String esquema = esquema( s );
     if ( esquema != null && !esquema.equals( "file" ) ) {
-      return v0 + " is not a local file (" + esquema + ":)";
+      return new Mensaje( "det.route.scheme", v0, esquema );
     }
     Path p;
     try {
       File f = aArchivo( s ).getAbsoluteFile();
       if ( red( f.getPath() ) ) {
         // ni se canonicaliza: Windows abriria una conexion SMB (y mandaria las credenciales) al servidor que diga
-        return v0 + " is a network path (outside the sandbox)";
+        return new Mensaje( "det.route.network", v0 );
       }
       p = f.getCanonicalFile().toPath();
     } catch ( Exception ex ) {
-      return v0 + " is not a valid path";
+      return new Mensaje( "det.route.invalid", v0 );
     }
     for ( Path r : raices ) {
       if ( r != null && p.startsWith( r ) ) {
         return null;
       }
     }
-    return v0 + " is outside the sandbox";
+    return new Mensaje( "det.route.outside", v0 );
   }
 
   /** Ruta UNC o de dispositivo (\\servidor\recurso, //servidor, \\?\, \\.\): no se resuelve en el disco local. */

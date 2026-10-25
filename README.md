@@ -276,6 +276,16 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
   steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
 
+## New in 0.6.2
+
+- **IDC menu** next to Spoon's perspective switcher: *Check quality…* (score, findings, apply fixes in one
+  Ctrl+Z, silence a rule), *Harden…* (the `harden_etl` plan with checkboxes, apply, *Test with dirty data…*),
+  *Arrange canvas*, *Lesson*, and the switch between perspectives — no need to ask Claude.
+- The **exercise grader** grades loads into MySQL, MariaDB, PostgreSQL or H2 on disposable test databases
+  it recreates before every case; its messages come in Spoon's language.
+- `harden_etl` and `stress_test` answer in English, Spanish or Portuguese, and a `harden_etl` dry run no
+  longer marks the transformation as changed. See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## New in 0.6.1
 
 Bug fixes for robustness: the reports' «quality» section now includes the robustness findings and their
@@ -293,6 +303,8 @@ table also stopped the run. See [`CHANGELOG.md`](CHANGELOG.md).
 - **Exercise grader** (`create_exercise_pack`, `grade_exercise`, `grade_submissions`...): build a pack from
   your solution and grade a whole folder of submissions, each one in a separate JVM, with a hint per typical
   mistake, feedback for every student and a gradebook for Excel. Spoon gets a **Grader** perspective.
+  Since 0.6.2 it also grades loads into MySQL, MariaDB, PostgreSQL or H2, on disposable test databases it recreates
+  before every case (never your own databases; the password is never saved in the pack).
 - **Class mode** (`lesson_start`, `lesson_notes`...): Claude builds a transformation one step per click on
   **Next ▶**, with a numbered note on the canvas for each step, and the lesson becomes a handout.
 - **Robustness** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): every bad row goes to a rejects
