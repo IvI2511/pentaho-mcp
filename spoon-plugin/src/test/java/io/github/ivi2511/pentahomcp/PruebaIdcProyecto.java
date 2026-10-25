@@ -152,6 +152,17 @@ public class PruebaIdcProyecto {
     contiene( ui( () -> d.estado.getText() ), "no falta nada", "nada que crear" );
     igual( "ya existe (no se toca)", ui( () -> d.tabla.getItem( 0 ).getText( 1 ) ), "ya existe" );
     cerrarShell( d.shell );
+
+    // una ruta inicial larga no ensancha la ventana
+    StringBuilder larga = new StringBuilder( base.getAbsolutePath() );
+    while ( larga.length() < 220 ) {
+      larga.append( File.separator ).append( "carpeta-con-nombre-largo" );
+    }
+    final String ruta = larga.toString();
+    final IdcProyecto ancho = ui( () -> new IdcProyecto( host, r, ruta ) );
+    int w = ui( () -> ancho.shell.getSize().x );
+    cierto( w <= 900, "ancho con una ruta larga: " + w );
+    cerrarShell( ancho.shell );
   }
 
   public void pruebaB_PerfilEnCalidad() throws Exception {

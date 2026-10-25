@@ -118,7 +118,9 @@ final class IdcProyecto {
     f.setLayout( gf );
     new Label( f, SWT.NONE ).setText( r.s( "p_folder" ) );
     carpeta = new Text( f, SWT.BORDER | SWT.SINGLE );
-    carpeta.setLayoutData( new GridData( SWT.FILL, SWT.CENTER, true, false ) );
+    GridData gcar = new GridData( SWT.FILL, SWT.CENTER, true, false );
+    gcar.widthHint = 380; // una ruta larga no ensancha la ventana (pack)
+    carpeta.setLayoutData( gcar );
     carpeta.setText( inicial == null ? "" : inicial );
     elegir = new Button( f, SWT.PUSH );
     elegir.setText( r.s( "p_choose" ) );
@@ -146,7 +148,9 @@ final class IdcProyecto {
     c2.setWidth( 180 );
 
     estado = new Label( shell, SWT.WRAP );
-    estado.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
+    GridData ge = new GridData( SWT.FILL, SWT.TOP, true, false );
+    ge.widthHint = 560; // el texto se parte en líneas: un error con una ruta larga no ensancha la ventana
+    estado.setLayoutData( ge );
 
     Composite b = new Composite( shell, SWT.NONE );
     b.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );

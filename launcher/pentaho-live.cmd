@@ -83,10 +83,10 @@ set "PL_SPOON=%PL_PDI%\Spoon.bat"
 rem --- Java: the JRE that comes with the full install
 set "PL_JAVA_FROM=PDI's own search (PENTAHO_JAVA_HOME, JAVA_HOME, PATH)"
 if not exist "%PL_APP%\jre\bin\javaw.exe" goto :java_done
-if defined PL_PROYECTO goto :pl_proyecto
 set "PENTAHO_JAVA_HOME=%PL_APP%\jre"
 set "PL_JAVA_FROM=%PL_APP%\jre"
 :java_done
+if defined PL_PROYECTO goto :pl_proyecto
 
 rem --- Is Spoon with the plugin already open? (the MCP answers /ping)
 set "PL_PORT=8765"
