@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Comparacion;
 import io.github.ivi2511.pentahomcp.corrector.modelo.OpcionesComparar;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Pack;
+import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion.Aviso;
 
 /**
@@ -124,6 +125,90 @@ final class CorrectorComparar {
     this.tolerancia = decimal( op.toleranciaNumerica );
     this.relativa = decimal( op.toleranciaRelativa );
     this.maxEjemplos = Math.max( 0, op.maxEjemplos );
+  }
+
+  /**
+   * La comparacion de un caso con la captura tables: la suma de la de cada tabla. Columnas: las de cada tabla como
+   * {@code tabla.columna}, con el puntaje pesado por las columnas esperadas; filas: sumadas; valores: pesado por
+   * {@code max(esperadas, iguales + sobrantes)} de cada tabla (una tabla grande pesa mas); cantidad de filas: bien si
+   * esta bien en todas; ejemplos y diferencias por columna con la tabla delante de la clave o la columna.
+   */
+  static Comparacion juntar( List<ResultadoCaso.ComparacionTabla> tablas ) {
+    Comparacion c = new Comparacion();
+    c.modo = Comparacion.POR_CLAVE;
+    c.cantidadFilasOk = true;
+    double colNum = 0;
+    double colDen = 0;
+    double valNum = 0;
+    double valDen = 0;
+    for ( ResultadoCaso.ComparacionTabla t : tablas ) {
+      Comparacion x = t.comparacion;
+      if ( x == null ) {
+        continue;
+      }
+      String p = t.tabla + ".";
+      if ( !Comparacion.POR_CLAVE.equals( x.modo ) ) {
+        c.modo = x.modo;
+      }
+      for ( String k : x.columnasClave ) {
+        c.columnasClave.add( p + k );
+      }
+      for ( String k : x.columnas.esperadas ) {
+        c.columnas.esperadas.add( p + k );
+      }
+      for ( String k : x.columnas.reales ) {
+        c.columnas.reales.add( p + k );
+      }
+      for ( String k : x.columnas.faltan ) {
+        c.columnas.faltan.add( p + k );
+      }
+      for ( String k : x.columnas.sobran ) {
+        c.columnas.sobran.add( p + k );
+      }
+      for ( Comparacion.Renombre r : x.columnas.renombres ) {
+        c.columnas.renombres.add( new Comparacion.Renombre( p + r.esperada, p + r.real, r.coincidencia ) );
+      }
+      c.columnas.ordenDistinto |= x.columnas.ordenDistinto;
+      c.filas.esperadas += x.filas.esperadas;
+      c.filas.reales += x.filas.reales;
+      c.filas.iguales += x.filas.iguales;
+      c.filas.distintas += x.filas.distintas;
+      c.filas.faltan += x.filas.faltan;
+      c.filas.sobran += x.filas.sobran;
+      c.filas.clavesRepetidas += x.filas.clavesRepetidas;
+      c.cantidadFilasOk &= x.cantidadFilasOk;
+      for ( Map.Entry<String, Integer> e : x.diferenciasPorColumna.entrySet() ) {
+        c.diferenciasPorColumna.put( p + e.getKey(), e.getValue() );
+      }
+      if ( x.ejemplos != null ) {
+        copiarEjemplos( x.ejemplos.distintas, c.ejemplos.distintas, t.tabla );
+        copiarEjemplos( x.ejemplos.faltan, c.ejemplos.faltan, t.tabla );
+        copiarEjemplos( x.ejemplos.sobran, c.ejemplos.sobran, t.tabla );
+        copiarEjemplos( x.ejemplos.clavesRepetidas, c.ejemplos.clavesRepetidas, t.tabla );
+      }
+      double ne = x.columnas.esperadas.size();
+      colNum += x.puntajeColumnas * ne;
+      colDen += ne;
+      double den = Math.max( x.filas.esperadas, x.filas.iguales + x.filas.sobran );
+      valNum += x.puntajeValores * den;
+      valDen += den;
+    }
+    c.puntajeColumnas = colDen == 0 ? 1.0 : colNum / colDen;
+    c.puntajeValores = valDen == 0 ? 1.0 : valNum / valDen;
+    return c;
+  }
+
+  private static void copiarEjemplos( List<Comparacion.Ejemplo> de, List<Comparacion.Ejemplo> a, String tabla ) {
+    for ( Comparacion.Ejemplo e : de ) {
+      Comparacion.Ejemplo x = new Comparacion.Ejemplo();
+      x.clave = e.clave == null ? tabla : tabla + " · " + e.clave;
+      x.columna = e.columna;
+      x.esperado = e.esperado;
+      x.real = e.real;
+      x.veces = e.veces;
+      x.fila = e.fila;
+      a.add( x );
+    }
   }
 
   /** Con los tipos, las opciones y el locale ({@code policy.locale}) del pack. avisos puede ser null. */

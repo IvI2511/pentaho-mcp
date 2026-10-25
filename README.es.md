@@ -59,7 +59,9 @@ entregas. Cada una corre en una JVM aparte, nunca dentro de Spoon, y su salida s
 esperada: sale la nota con los criterios que fallaron, una pista para cada error típico (Group by sin ordenar,
 símbolo decimal vacío, duplicados sin quitar, rutas fijas), la devolución de cada alumno sin los valores del
 caso oculto y una planilla para Excel. Spoon suma la perspectiva **Corrector** con lo mismo y un asistente que
-arma el pack desde la transformación abierta.
+arma el pack desde la transformación abierta. Desde 0.6.2 también corrige cargas a MySQL, MariaDB, PostgreSQL o
+H2 sobre bases de prueba descartables que recrea antes de cada caso (nunca tus bases; la contraseña nunca va en el
+pack).
 
 **Modo clase.** Claude también puede *enseñar* un ETL: construye la transformación despacio, un step por
 cada clic en **Siguiente ▶** de una pestaña nueva, **Lección**, y explica cada step con una nota numerada en

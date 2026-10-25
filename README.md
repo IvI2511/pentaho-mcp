@@ -286,6 +286,8 @@ table also stopped the run. See [`CHANGELOG.md`](CHANGELOG.md).
 - **Exercise grader** (`create_exercise_pack`, `grade_exercise`, `grade_submissions`...): build a pack from
   your solution and grade a whole folder of submissions, each one in a separate JVM, with a hint per typical
   mistake, feedback for every student and a gradebook for Excel. Spoon gets a **Grader** perspective.
+  Since 0.6.2 it also grades loads into MySQL, MariaDB, PostgreSQL or H2, on disposable test databases it recreates
+  before every case (never your own databases; the password is never saved in the pack).
 - **Class mode** (`lesson_start`, `lesson_notes`...): Claude builds a transformation one step per click on
   **Next ▶**, with a numbered note on the canvas for each step, and the lesson becomes a handout.
 - **Robustness** (`lint_etl robustness=true`, `harden_etl`, `stress_test`): every bad row goes to a rejects

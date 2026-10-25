@@ -48,6 +48,7 @@ import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Widget;
 
+import io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ItemRubrica;
 import io.github.ivi2511.pentahomcp.corrector.modelo.PoliticaPack;
 import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCorreccion;
@@ -747,6 +748,23 @@ final class PanelCorrector {
       info( t.s( "ui.iniciando" ) );
       servicio.enSegundoPlano( () -> {
         try {
+          // un pack con bases de prueba: la contraseña que no se sabe se pide antes de lanzar nada
+          final List<BaseDePrueba> faltan = basesSinClave( p );
+          if ( !faltan.isEmpty() ) {
+            enUi( () -> {
+              dialogoClaves = new DialogoClaves( this, faltan, ok -> {
+                dialogoClaves = null;
+                if ( ok ) {
+                  arrancar( op );
+                } else {
+                  ocupado = false;
+                  habilitar();
+                  info( t.s( "ui.claves_cancelado" ) );
+                }
+              } );
+            } );
+            return null;
+          }
           final CorrectorLote l = CorrectorLote.iniciar( op );
           enUi( () -> {
             ocupado = false;
@@ -764,6 +782,38 @@ final class PanelCorrector {
     } catch ( Throwable x ) {
       ocupado = false;
       fallo( x );
+    }
+  }
+
+  /** El dialogo de contraseñas abierto, o null (pruebas). */
+  DialogoClaves dialogoClaves;
+
+  /** Arranca el lote en el pool (despues de pedir las contraseñas). (UI) */
+  private void arrancar( final CorrectorLote.Opciones op ) {
+    servicio.enSegundoPlano( () -> {
+      try {
+        final CorrectorLote l = CorrectorLote.iniciar( op );
+        enUi( () -> {
+          ocupado = false;
+          seguir( l );
+        } );
+      } catch ( Throwable x ) {
+        enUi( () -> {
+          ocupado = false;
+          habilitar();
+          fallo( x );
+        } );
+      }
+      return null;
+    } );
+  }
+
+  /** Las bases de prueba del pack sin contraseña conocida (vacio si no tiene bases o no abre). */
+  static List<BaseDePrueba> basesSinClave( File pack ) {
+    try ( CorrectorPack cp = CorrectorPack.abrir( pack ) ) {
+      return cp.pack() == null ? new ArrayList<BaseDePrueba>() : CorrectorBases.sinClave( cp.pack(), null );
+    } catch ( Throwable x ) {
+      return new ArrayList<BaseDePrueba>(); // el lote dira lo que pasa con el pack
     }
   }
 
@@ -1674,7 +1724,27 @@ final class PanelCorrector {
     } catch ( Throwable ignorada ) {
       // un servicio roto no puede tapar el error
     }
-    error( t.f( "ui.error", mensaje( x ) ) );
+    error( t.f( "ui.error", mensaje( x, t ) ) );
+  }
+
+  /**
+   * El mensaje de un error en el idioma de t: los del corrector (crear un pack, las bases de prueba, un pack
+   * invalido) traen su texto traducido; los demas, la primera linea de su mensaje.
+   */
+  static String mensaje( Throwable x, Rotulos t ) {
+    for ( Throwable c = x; c != null; c = c.getCause() == c ? null : c.getCause() ) {
+      if ( c instanceof CorrectorCrearPack.Fallo ) {
+        CorrectorCrearPack.Fallo f = (CorrectorCrearPack.Fallo) c;
+        return f.nombre( t ) + ": " + f.texto( t );
+      }
+      if ( c instanceof CorrectorBases.Falla ) {
+        return ( (CorrectorBases.Falla) c ).mensaje.texto( t );
+      }
+      if ( c instanceof CorrectorPack.PackInvalido ) {
+        return ( (CorrectorPack.PackInvalido) c ).texto( t.idioma() ).replace( "\n", " " );
+      }
+    }
+    return mensaje( x );
   }
 
   static String mensaje( Throwable x ) {

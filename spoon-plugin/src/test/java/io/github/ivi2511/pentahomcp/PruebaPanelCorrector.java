@@ -576,6 +576,108 @@ public class PruebaPanelCorrector {
     esperar( "su resumen", () -> etiqueta( "pack_info" ).contains( "2 casos" ), 20000 );
   }
 
+  /**
+   * El asistente con una solucion que lee y escribe un servidor (H2 en TCP dentro de esta JVM: ningun MySQL de la
+   * maquina): la «Base de prueba» de cada conexion viene con la base _correccion, la captura ofrece las tablas, una
+   * base que es la original se rechaza con el mensaje en español, y el analisis corre la solucion contra las bases de
+   * prueba y muestra la clave y la salida esperada de la tabla. Despues, el dialogo de contraseñas del panel.
+   */
+  public void pruebaJb_AsistenteBaseDePrueba() throws Exception {
+    memoria();
+    BasesH2 h2 = new BasesH2( new File( dir, "h2-asistente" ) );
+    try {
+      File profe = new File( dir, "profe-bd" );
+      File sol = h2.guardar( BasesH2.Variante.SOLUCION, new File( profe, "carga_dw.ktr" ) );
+      File crearOrigen = BasesH2.escribir( new File( profe, "crear_origen.sql" ), BasesH2.CREAR_ORIGEN );
+      File datos = BasesH2.escribir( new File( profe, "datos_visible.sql" ), BasesH2.DATOS_VISIBLE );
+      File crearDw = BasesH2.escribir( new File( profe, "crear_dw.sql" ), BasesH2.CREAR_DW );
+      File oculto = BasesH2.escribir( new File( profe, "datos_oculto.sql" ), "DELETE FROM clientes;\n"
+        + "DELETE FROM ciudades;\n" + BasesH2.DATOS_OCULTO );
+      servicio.solucion = sol;
+      clic( "crear_pack" );
+      esperar( "abre el asistente", () -> panel().asistente() != null && !panel().asistente().cerrado(), 5000 );
+      final AsistentePack a = panel().asistente();
+      igual( "gym_dw_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).getText() ),
+        "la base de prueba propuesta" );
+      igual( "gym_oltp_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:GYM_OLTP" ) ).getText() ),
+        "la del origen" );
+      igual( "localhost", ui( () -> ( (Text) a.buscar( "as_base_servidor:GYM_DW" ) ).getText() ), "el servidor" );
+      igual( String.valueOf( h2.puerto ), ui( () -> ( (Text) a.buscar( "as_base_puerto:GYM_DW" ) ).getText() ),
+        "el puerto" );
+      igual( "", ui( () -> ( (Text) a.buscar( "as_base_clave:GYM_DW" ) ).getText() ), "la contraseña, vacia" );
+      List<String> caps = ui( () -> a.itemsCaptura() );
+      igual( "tables", caps.get( 0 ), "la captura propuesta: las tablas (" + caps + ")" );
+      contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "DIM_CLIENTE", "el combo nombra la tabla" );
+      cierto( caps.contains( "step" ), "y las filas del step" );
+      final File destino = new File( dir, "packs/creado-bd" );
+      ui( () -> {
+        ( (Text) a.buscar( "as_destino" ) ).setText( destino.getPath() );
+        for ( String cx : new String[] { "GYM_OLTP", "GYM_DW" } ) {
+          ( (Text) a.buscar( "as_base_clave:" + cx ) ).setText( BasesH2.CLAVE );
+        }
+        ( (Text) a.buscar( "as_base_scripts:GYM_OLTP" ) ).setText( crearOrigen.getPath() + "; " + datos.getPath() );
+        ( (Text) a.buscar( "as_base_scripts:GYM_DW" ) ).setText( crearDw.getPath() );
+        ( (Text) a.buscar( "as_base_oculto:GYM_OLTP" ) ).setText( oculto.getPath() );
+        ( (Button) a.buscar( "as_dos_veces" ) ).setSelection( true );
+        ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).setText( "gym_dw" );
+        return null;
+      } );
+      clicEn( a, "as_siguiente" );
+      esperar( "rechaza la base original", () -> !a.trabajando() && a.estado().contains( "base de prueba" ), 20000 );
+      contiene( ui( () -> a.estado() ), "es una base de la solución", "en español: " + ui( () -> a.estado() ) );
+      noContiene( ui( () -> a.estado() ), "the grader", "nada en ingles" );
+      igual( 0, a.pagina(), "sigue en el paso 1" );
+      falso( h2.existe( "gym_dw" ), "la original no se toco" );
+      ui( () -> {
+        ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).setText( "gym_dw_correccion" );
+        return null;
+      } );
+      archivo( pantallaShell( a.shell, "corrector-asistente-base-paso1.png" ), 2000, "captura del paso 1" );
+      long t0 = System.currentTimeMillis();
+      clicEn( a, "as_siguiente" );
+      esperar( "analiza contra las bases de prueba", () -> a.pagina() == 1 && !a.trabajando(), 240000 );
+      System.out.println( "  asistente con base de prueba, analizar: " + ( System.currentTimeMillis() - t0 ) + " ms" );
+      igual( "ID_CLIENTE", ui( () -> ( (Text) a.buscar( "as_tabla_claves:DIM_CLIENTE" ) ).getText() ),
+        "la clave del Insert/Update" );
+      igual( "DIM_CLIENTE", ui( () -> ( (Combo) a.buscar( "as_tabla_vista" ) ).getText() ), "la tabla que se ve" );
+      igual( 3, ui( () -> ( (Table) a.buscar( "as_esperada" ) ).getItemCount() ), "3 clientes del caso visible" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_esperada_titulo" ) ).getText() ), "DIM_CLIENTE", "el titulo" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_columnas" ) ).getText() ), "DIM_CLIENTE (3 columnas)", "las tablas" );
+      archivo( pantallaShell( a.shell, "corrector-asistente-base-paso2.png" ), 2000, "captura del paso 2" );
+      falso( h2.existe( "gym_dw" ) || h2.existe( "gym_oltp" ), "las originales nunca" );
+      cierto( h2.existe( "gym_dw_correccion" ), "la de prueba si" );
+      ui( () -> {
+        a.cerrar();
+        return null;
+      } );
+
+      // el dialogo de contraseñas del panel: lo escrito queda solo en memoria
+      final io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba b = h2.base( "GYM_X", "x_correccion", "x" );
+      b.usuario = "otro-usuario";
+      final boolean[] ok = new boolean[ 1 ];
+      ui( () -> {
+        new DialogoClaves( panel(), Collections.singletonList( b ), r -> ok[ 0 ] = r );
+        return null;
+      } );
+      falso( CorrectorBases.recordada( b ), "todavia no" );
+      ui( () -> {
+        for ( Shell s2 : display.getShells() ) {
+          Control c = PanelCorrector.buscar( s2, "clave:GYM_X" );
+          if ( c != null ) {
+            ( (Text) c ).setText( "secreta" );
+            PanelCorrector.buscar( s2, "claves_aceptar" ).notifyListeners( SWT.Selection, new Event() );
+          }
+        }
+        return null;
+      } );
+      cierto( ok[ 0 ], "acepto" );
+      cierto( CorrectorBases.recordada( b ), "recordada en memoria" );
+      igual( "secreta", CorrectorBases.clave( b, null ), "la que se escribio" );
+    } finally {
+      h2.parar();
+    }
+  }
+
   /** Textos: las claves ui.* del codigo estan en los tres idiomas, con los mismos marcadores; nada crudo. */
   public void pruebaK_Textos() throws Exception {
     List<Properties> ps = new ArrayList<Properties>();

@@ -29,6 +29,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public final class Pack {
 
   public static final String FORMATO = "pentaho-live-exercise-pack/1";
+  /**
+   * Formato 2 (0.6.2): el de 1 mas las bases de prueba ({@code test_databases}, {@code database_safety},
+   * {@code cases[].db_scripts}, {@code cases[].executions}) y la captura {@code tables}. Un pack sin nada de eso se
+   * sigue escribiendo con {@link #FORMATO}, para que lo lea un plugin anterior.
+   */
+  public static final String FORMATO_2 = "pentaho-live-exercise-pack/2";
+  /** Los formatos que lee esta version. */
+  public static final List<String> FORMATOS = Collections.unmodifiableList( Arrays.asList( FORMATO, FORMATO_2 ) );
   public static final String TRANSFORMACION = "transformation";
   public static final String JOB = "job";
   /** Tope del contenido de {@link #inline} (§2.2), en caracteres UTF-16 sumados. */
@@ -79,6 +87,12 @@ public final class Pack {
   /** Solo en la variante de un solo .json: ruta relativa -> contenido de texto ("datos/visible/ventas.csv"). */
   @JsonProperty( "inline" )
   public Map<String, String> inline;
+  /** Formato 2: las bases de prueba donde corren las entregas que usan conexiones (MySQL, PostgreSQL, H2). */
+  @JsonProperty( "test_databases" )
+  public List<BaseDePrueba> bases = new ArrayList<>();
+  /** Formato 2: las reglas de nombre de las bases de prueba; null = las de por defecto. */
+  @JsonProperty( "database_safety" )
+  public SeguridadBases seguridad;
 
   /** Bloque {@code output}: de donde y como se captura la salida, y sus columnas con los tipos de la solucion. */
   @JsonInclude( JsonInclude.Include.NON_EMPTY )
@@ -91,8 +105,15 @@ public final class Pack {
     public static final String CAPTURA_STEP = "step";
     /** SQL del pack sobre la copia de la base SQLite del pack. */
     public static final String CAPTURA_QUERY = "query";
+    /** Formato 2: un SELECT de cada tabla de {@link #tablas} en las bases de prueba. */
+    public static final String CAPTURA_TABLAS = "tables";
     public static final List<String> CAPTURAS = Collections.unmodifiableList( Arrays.asList( CAPTURA_ARCHIVO,
-      CAPTURA_STEP, CAPTURA_QUERY ) );
+      CAPTURA_STEP, CAPTURA_QUERY, CAPTURA_TABLAS ) );
+
+    /** query o tables: el resultado queda en una base (no hay step del que leerlo). */
+    public static boolean aBase( String captura ) {
+      return CAPTURA_QUERY.equals( captura ) || CAPTURA_TABLAS.equals( captura );
+    }
 
     @JsonProperty( "capture" )
     public String captura = CAPTURA_ARCHIVO;
@@ -111,6 +132,22 @@ public final class Pack {
     /** Solo captura query: el SELECT sobre la copia de la base. */
     @JsonProperty( "sql" )
     public String sql;
+    /** Solo captura tables: las tablas que se leen de las bases de prueba despues de correr. */
+    @JsonProperty( "tables" )
+    public List<TablaSalida> tablas = new ArrayList<>();
+
+    /** La tabla con ese nombre (sin mayusculas), o null. */
+    public TablaSalida tabla( String nombre ) {
+      if ( nombre == null || tablas == null ) {
+        return null;
+      }
+      for ( TablaSalida t : tablas ) {
+        if ( t != null && t.nombre != null && t.nombre.trim().equalsIgnoreCase( nombre.trim() ) ) {
+          return t;
+        }
+      }
+      return null;
+    }
 
     /** La columna con ese nombre (sin mayusculas, con trim), o null. */
     public Columna columna( String nombre ) {
@@ -231,6 +268,32 @@ public final class Pack {
     if ( salida.csvEsperado == null ) {
       salida.csvEsperado = new FormatoCsv();
     }
+    if ( salida.tablas == null ) {
+      salida.tablas = new ArrayList<>();
+    }
+    for ( TablaSalida t : salida.tablas ) {
+      if ( t != null ) {
+        t.completar();
+      }
+    }
+    if ( bases == null ) {
+      bases = new ArrayList<>();
+    }
+    for ( BaseDePrueba b : bases ) {
+      if ( b != null ) {
+        b.completar();
+      }
+    }
+    if ( seguridad != null ) {
+      seguridad.completar();
+    }
+    if ( casos != null ) {
+      for ( Caso c : casos ) {
+        if ( c != null && c.scriptsBase == null ) {
+          c.scriptsBase = new LinkedHashMap<>();
+        }
+      }
+    }
     if ( comparar == null ) {
       comparar = new OpcionesComparar();
     }
@@ -273,6 +336,34 @@ public final class Pack {
 
   public boolean esJob() {
     return JOB.equals( tipo );
+  }
+
+  /** Usa algo del formato 2: bases de prueba o la captura tables. */
+  public boolean usaBases() {
+    return bases != null && !bases.isEmpty() || salida != null && Salida.CAPTURA_TABLAS.equals( salida.captura );
+  }
+
+  /** {@link #FORMATO_2} si {@link #usaBases()}, si no {@link #FORMATO}: el que hay que escribir. */
+  public String formatoNecesario() {
+    return usaBases() ? FORMATO_2 : FORMATO;
+  }
+
+  /** Las reglas de nombre de las bases de prueba (las del pack o las de por defecto). */
+  public SeguridadBases seguridadEfectiva() {
+    return seguridad != null ? seguridad.completar() : new SeguridadBases();
+  }
+
+  /** La base de prueba de esa conexion (sin mayusculas), o null. */
+  public BaseDePrueba base( String conexion ) {
+    if ( conexion == null || bases == null ) {
+      return null;
+    }
+    for ( BaseDePrueba b : bases ) {
+      if ( b != null && b.conexion != null && b.conexion.trim().equalsIgnoreCase( conexion.trim() ) ) {
+        return b;
+      }
+    }
+    return null;
   }
 
   /** El caso con ese id, o null. */
@@ -358,8 +449,15 @@ public final class Pack {
         String k = normalizar( it.next() );
         boolean sacar = solucion != null && k.equals( normalizar( solucion ) );
         for ( Caso c : ocultos ) {
-          sacar |= c.esperado != null && k.equals( normalizar( c.esperado ) );
+          sacar |= c.esperado != null && ( k.equals( normalizar( c.esperado ) )
+            || k.startsWith( normalizar( c.esperado ) + "/" ) );
           sacar |= c.dirEntradas != null && k.startsWith( normalizar( c.dirEntradas ) + "/" );
+          for ( List<String> l : c.scriptsBase == null ? Collections.<List<String>>emptyList()
+            : c.scriptsBase.values() ) {
+            for ( String x : l == null ? Collections.<String>emptyList() : l ) {
+              sacar |= x != null && k.equals( normalizar( x ) );
+            }
+          }
         }
         if ( sacar ) {
           it.remove();

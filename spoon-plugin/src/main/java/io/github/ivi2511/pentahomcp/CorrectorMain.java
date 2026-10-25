@@ -32,6 +32,7 @@ import org.pentaho.di.trans.step.StepMeta;
 import io.github.ivi2511.pentahomcp.CorrectorPolitica.Entrega;
 import io.github.ivi2511.pentahomcp.CorrectorPolitica.Revision;
 import io.github.ivi2511.pentahomcp.CorrectorSandbox.Preparacion;
+import io.github.ivi2511.pentahomcp.CorrectorTextos.Mensaje;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Caso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.CorrectorJson;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Pack;
@@ -136,6 +137,9 @@ public final class CorrectorMain {
     public boolean conservarSandbox;
     @JsonProperty( "plugin_version" )
     public String versionPlugin;
+    /** Sufijo de las bases de prueba de este worker ("_w2"); null o "" = sin sufijo. */
+    @JsonProperty( "db_suffix" )
+    public String sufijoBase;
     @JsonProperty( "submissions" )
     public List<Pedido> entregas;
   }
@@ -332,6 +336,10 @@ public final class CorrectorMain {
     final File dirSandbox;
     final File tmp;
     final double inicioKettle;
+    /** Las bases de prueba de este worker (con su sufijo y las contraseñas del entorno); null si el pack no tiene. */
+    CorrectorBases.Sesion bases;
+    /** Las bases de prueba no son seguras o no se pudieron preparar: ninguna entrega corre. */
+    Mensaje fallaBases;
 
     Worker( Trabajo tr, double inicioKettle ) throws IOException {
       this.tr = tr;
@@ -343,6 +351,31 @@ public final class CorrectorMain {
       this.dirSandbox = new File( tr.dirSandbox ).getAbsoluteFile();
       this.tmp = new File( System.getProperty( "java.io.tmpdir" ) ).getAbsoluteFile();
       this.inicioKettle = inicioKettle;
+      if ( !pack.bases.isEmpty() ) {
+        try {
+          bases = new CorrectorBases.Sesion( pack, dirPack, tr.sufijoBase, CorrectorBases.clavesDelEntorno( pack ) );
+          StringBuilder b = new StringBuilder();
+          for ( CorrectorBases.Destino d : bases.destinos.values() ) {
+            b.append( b.length() == 0 ? "" : ", " ).append( d.describir() ).append( d.clave == null ? " (no password)"
+              : "" );
+          }
+          System.out.println( "[corrector] worker " + tr.worker + ": test databases " + b );
+        } catch ( CorrectorBases.Falla f ) {
+          fallaBases = f.mensaje;
+          System.out.println( "[corrector] worker " + tr.worker + ": " + f.getMessage() );
+        }
+      }
+    }
+
+    /** Escribe el resultado sin ninguna contraseña de las bases de prueba (por si un texto la trae). */
+    void guardar( ResultadoCorreccion r, File destino ) throws IOException {
+      if ( bases == null || bases.claves().isEmpty() ) {
+        CorrectorJson.guardar( r, destino );
+        return;
+      }
+      com.fasterxml.jackson.databind.JsonNode n = CorrectorJson.mapper().valueToTree( r );
+      tapar( n, bases.claves() );
+      CorrectorJson.guardar( CorrectorJson.mapper().treeToValue( n, ResultadoCorreccion.class ), destino );
     }
 
     /** Corrige y escribe el resultado; un error del corrector queda como {@code crashed}. true = reciclar. */
@@ -356,9 +389,9 @@ public final class CorrectorMain {
         try {
           ResultadoCorreccion r = nuevo( pd );
           r.estado = ResultadoCorreccion.CAIDA;
-          r.detalle = "grader error: " + RunMotor.primeraLinea( t );
+          new Mensaje( "det.grader_error", RunMotor.primeraLinea( t ) ).en( r );
           CorrectorNota.puntuar( pack, r, null );
-          CorrectorJson.guardar( r, new File( pd.resultado ) );
+          guardar( r, new File( pd.resultado ) );
         } catch ( Throwable t2 ) {
           t2.printStackTrace( System.out );
         }
@@ -379,6 +412,12 @@ public final class CorrectorMain {
       boolean cortada = false;
       Revision rev = null;
       try {
+        if ( fallaBases != null ) { // las bases de prueba no son seguras: no corre nada (es del pack, no del alumno)
+          r.estado = ResultadoCorreccion.CAIDA;
+          fallaBases.en( r );
+          CorrectorNota.puntuar( pack, r, null );
+          return;
+        }
         Entrega e;
         try {
           e = CorrectorPolitica.cargar( new File( pd.archivo ) );
@@ -401,6 +440,7 @@ public final class CorrectorMain {
         if ( !rev.bloquea() ) {
           CorrectorSandbox.Opciones op = new CorrectorSandbox.Opciones();
           op.dirTmpJvm = tmp;
+          op.bases = bases;
           for ( Caso c : pack.casos ) {
             Preparacion p = CorrectorSandbox.preparar( pack, dirPack, c, e, new File( dirAlumno, c.id ), op );
             ResultadoCaso rc = r.caso( c.id );
@@ -439,7 +479,7 @@ public final class CorrectorMain {
           CorrectorNota.puntuar( pack, r, est );
           return;
         }
-        CorrectorJson.guardar( r, destino ); // el parcial: si la hija muere, el padre tiene las reglas
+        guardar( r, destino ); // el parcial: si la hija muere, el padre tiene las reglas
         caerSiSePide( pd );
 
         CorrectorMotor.Contexto cx = new CorrectorMotor.Contexto();
@@ -449,23 +489,35 @@ public final class CorrectorMain {
         cx.salida = salida;
         cx.dirTmpWorker = tmp;
         cx.conservarSalida = tr.conservarSandbox;
+        cx.bases = bases;
         boolean vencio = false;
+        Mensaje fallaBase = null;
         for ( Caso c : pack.casos ) {
           ResultadoCaso rc = r.caso( c.id );
           CorrectorMotor.Fin f = CorrectorMotor.correr( cx, c, preparados.get( c.id ), rc );
           corrio |= f.corrio;
           cortada |= f.cortada || f.colgada;
           vencio |= ResultadoCaso.TIEMPO_AGOTADO.equals( rc.corrida.estado );
-          CorrectorJson.guardar( r, destino );
+          guardar( r, destino );
+          if ( f.fallaBase != null ) {
+            fallaBase = new Mensaje( "db.err.case", c.id, f.fallaBase.anidado() );
+            break; // la base de prueba no responde: el resto de los casos tampoco correria
+          }
         }
         fases.marcar( "cases" );
-        r.estado = vencio ? ResultadoCorreccion.TIEMPO_AGOTADO : ResultadoCorreccion.CORREGIDA;
+        if ( fallaBase != null ) {
+          r.estado = ResultadoCorreccion.CAIDA;
+          fallaBase.en( r );
+          cortada = true;
+        } else {
+          r.estado = vencio ? ResultadoCorreccion.TIEMPO_AGOTADO : ResultadoCorreccion.CORREGIDA;
+        }
         CorrectorNota.puntuar( pack, r, est );
       } catch ( Throwable t ) { // un error del corrector: crashed con lo que ya se sabia (reglas, casos corridos)
         t.printStackTrace( System.out );
         r.estado = ResultadoCorreccion.CAIDA;
         r.motivo = null;
-        r.detalle = "grader error: " + RunMotor.primeraLinea( t );
+        new Mensaje( "det.grader_error", RunMotor.primeraLinea( t ) ).en( r );
         cortada = true;
         try {
           CorrectorNota.puntuar( pack, r, null );
@@ -475,7 +527,7 @@ public final class CorrectorMain {
       } finally {
         r.tiempos.procesoSeg = Math.round( ( System.currentTimeMillis() - inicio ) / 10.0 ) / 100.0;
         r.corregidoEl = ahora();
-        CorrectorJson.guardar( r, destino );
+        guardar( r, destino );
         System.out.println( "[corrector] " + pd.alumno + ": " + r.estado + ( r.motivo == null ? "" : " (" + r.motivo
           + ")" ) + " " + r.nota + " in " + r.tiempos.procesoSeg + " s " + fases );
         guardarAbierto( pd, dirAlumno, r );
@@ -594,6 +646,38 @@ public final class CorrectorMain {
     }
   }
 
+  /** Cambia las contraseñas en todos los textos del arbol JSON (solo valores de texto: los numeros no se tocan). */
+  static void tapar( com.fasterxml.jackson.databind.JsonNode n, List<String> claves ) {
+    if ( n == null ) {
+      return;
+    }
+    if ( n.isObject() ) {
+      com.fasterxml.jackson.databind.node.ObjectNode o = (com.fasterxml.jackson.databind.node.ObjectNode) n;
+      for ( java.util.Iterator<Map.Entry<String, com.fasterxml.jackson.databind.JsonNode>> it = o.fields();
+            it.hasNext(); ) {
+        Map.Entry<String, com.fasterxml.jackson.databind.JsonNode> e = it.next();
+        if ( e.getValue().isTextual() ) {
+          String t = CorrectorBases.tapar( e.getValue().asText(), claves );
+          if ( !t.equals( e.getValue().asText() ) ) {
+            e.setValue( new com.fasterxml.jackson.databind.node.TextNode( t ) );
+          }
+        } else {
+          tapar( e.getValue(), claves );
+        }
+      }
+    } else if ( n.isArray() ) {
+      com.fasterxml.jackson.databind.node.ArrayNode a = (com.fasterxml.jackson.databind.node.ArrayNode) n;
+      for ( int i = 0; i < a.size(); i++ ) {
+        if ( a.get( i ).isTextual() ) {
+          a.set( i, new com.fasterxml.jackson.databind.node.TextNode( CorrectorBases.tapar( a.get( i ).asText(),
+            claves ) ) );
+        } else {
+          tapar( a.get( i ), claves );
+        }
+      }
+    }
+  }
+
   /** Copia una carpeta (sin seguir enlaces). */
   static void copiarArbol( File de, File a ) throws IOException {
     if ( Files.isSymbolicLink( de.toPath() ) ) {
@@ -616,7 +700,11 @@ public final class CorrectorMain {
   private static void bloquear( ResultadoCorreccion r, Entrega e, Revision rev, Preparacion bloqueo ) {
     r.estado = ResultadoCorreccion.BLOQUEADA;
     r.motivo = bloqueo.motivo;
-    r.detalle = bloqueo.detalle;
+    if ( bloqueo.mensaje != null ) {
+      bloqueo.mensaje.en( r );
+    } else {
+      r.detalle = bloqueo.detalle;
+    }
     if ( bloqueo.step != null ) {
       StepMeta sm = e.tm.findStep( bloqueo.step );
       r.stepsBloqueados.add( new PasoBloqueado( bloqueo.step, sm == null ? null : sm.getStepID(),
@@ -626,7 +714,11 @@ public final class CorrectorMain {
       if ( rc.corrida.estado == null ) {
         rc.corrida.estado = ResultadoCaso.BLOQUEADO;
         rc.corrida.motivo = bloqueo.motivo;
-        rc.corrida.detalle = bloqueo.detalle;
+        if ( bloqueo.mensaje != null ) {
+          bloqueo.mensaje.en( rc.corrida );
+        } else {
+          rc.corrida.detalle = bloqueo.detalle;
+        }
       }
     }
   }

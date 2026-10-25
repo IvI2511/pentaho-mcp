@@ -164,11 +164,15 @@ public final class CorreccionAInforme {
   public static ResultadoCorreccion paraAlumno( ResultadoCorreccion r ) {
     ResultadoCorreccion x = r.paraAlumno().completar();
     x.detalle = null;
+    x.claveDetalle = null;
+    x.argsDetalle = null;
     for ( ResultadoCaso rc : x.casos ) {
       if ( rc == null ) {
         continue;
       }
       rc.corrida.detalle = null;
+      rc.corrida.claveDetalle = null;
+      rc.corrida.argsDetalle = null;
       rc.corrida.log = null;
       if ( rc.oculto ) {
         rc.redirecciones.clear();
@@ -283,11 +287,11 @@ public final class CorreccionAInforme {
         txt += " (" + texto( t, "motivo.", r.motivo ) + ")";
       }
       if ( !a.alumno && Txt.vacio( r.detalle ) != null ) {
-        txt += "\n" + t.f( "inf.detalle", r.detalle.trim() );
+        txt += "\n" + t.f( "inf.detalle", CorrectorTextos.detalle( t, r ).trim() );
       }
       s.con( aviso( "grade-status", nivelAviso( r.estado ), txt ) );
     } else if ( !a.alumno && Txt.vacio( r.detalle ) != null ) {
-      s.con( parrafo( "grade-detail", t.f( "inf.detalle", r.detalle.trim() ) ) );
+      s.con( parrafo( "grade-detail", t.f( "inf.detalle", CorrectorTextos.detalle( t, r ).trim() ) ) );
     }
     return s;
   }
@@ -427,7 +431,7 @@ public final class CorreccionAInforme {
       lista( det, t.s( "md.redirecciones" ), rc.redirecciones );
     }
     if ( !a.alumno && Txt.vacio( run.detalle ) != null ) {
-      det.items.add( t.f( "inf.detalle", run.detalle.trim() ) );
+      det.items.add( t.f( "inf.detalle", CorrectorTextos.detalle( t, run ).trim() ) );
     }
     for ( ResultadoCorreccion.Aviso av : nn( rc.avisos ) ) {
       String x = textoAviso( av, t, !a.alumno );
@@ -974,6 +978,9 @@ public final class CorreccionAInforme {
     }
     String k = "aviso." + a.codigo;
     String det = Txt.vacio( a.detalle ) == null ? null : a.detalle.trim();
+    if ( det != null && a.claveDetalle != null && t.tiene( a.claveDetalle ) ) {
+      det = CorrectorTextos.detalle( t, a ).trim(); // el detalle en el idioma del informe
+    }
     if ( a.codigo == null || !t.tiene( k ) ) {
       return det != null ? det : a.codigo;
     }

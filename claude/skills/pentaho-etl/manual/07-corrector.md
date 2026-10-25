@@ -218,3 +218,84 @@ submissions from strangers, a virtual machine. The plugin sends nothing over the
 category from a CSV, an Excel and a JSON, with a hidden case), and `ejemplo/entregas-ejemplo/` has four
 submissions with typical mistakes: absolute paths (9.5), no deduplication (5.3), the empty decimal symbol (6.0)
 and a Group by without Sort rows (5.0). Its README explains how a teacher uses it.
+
+## 11. Exercises with a database (Ejercicios con base de datos)
+
+Since 0.6.2 a pack can grade exercises that **read and write a real database server** (MySQL, MariaDB,
+PostgreSQL or H2): a star-schema load with Table input, Database lookup, Insert/Update, Dimension lookup… The
+pack (format `pentaho-live-exercise-pack/2`; packs without a database stay in format 1 and older plugins still read
+them) declares one **test database** per server connection of the solution:
+
+```json
+"test_databases": [
+  { "connection": "GYM_OLTP", "type": "MYSQL", "host": "localhost", "port": "3306",
+    "database": "gym_oltp_correccion", "original_database": "gym_oltp", "user": "corrector",
+    "password_variable": "GYM_TEST_PASSWORD", "scripts": ["bd/crear_origen.sql"] },
+  { "connection": "GYM_DW", "type": "MYSQL", "host": "localhost", "port": "3306",
+    "database": "gym_dw_correccion", "original_database": "gym_dw", "user": "corrector",
+    "password_variable": "GYM_TEST_PASSWORD", "scripts": ["bd/crear_dw.sql"] } ],
+"cases": [ { "id": "visible", "expected": "esperado/visible", "executions": 2,
+             "db_scripts": { "GYM_OLTP": ["bd/visible/datos.sql"] } },
+           { "id": "oculto", "expected": "esperado/oculto", "hidden": true, "executions": 2,
+             "db_scripts": { "GYM_OLTP": ["bd/oculto/datos.sql"] } } ],
+"output": { "capture": "tables",
+            "tables": [ { "connection": "GYM_DW", "name": "dim_cliente", "key_columns": ["id_cliente"],
+                          "ignore_columns": ["fecha_carga"] } ] }
+```
+
+**Before every case of every submission** the grader drops and creates again each test database (`DROP DATABASE`
++ `CREATE DATABASE`; in H2, `DROP ALL OBJECTS`), runs its `scripts` and then the case's `db_scripts` (with the
+names of the original databases changed to the test ones; `CREATE DATABASE`/`USE` of a test database is skipped,
+and a script that names any other database is refused). Then it rewrites the submission's connections — by name,
+otherwise by the database they point to, otherwise the only one of the same type and host — to the test
+database (server, port, user and the pack's JDBC `options`; every other option of the student is removed), runs the
+transformation `executions` times without recreating in between (2 catches a load that **duplicates rows** when it
+runs again: an Insert/Update gives the same tables, a Table output doubles them), and with the capture **`tables`**
+reads `SELECT *` of each declared table (without `ignore_columns`, sorted by the key) and compares it like a file
+with `<expected>/<table>.csv`: key columns, tolerances and the solution's types. The case's comparison is the sum
+of its tables (`tables[]` in the result has each one). A test database can also feed an exercise that writes a file:
+any capture works with `test_databases`.
+
+**Safety rules** (checked when the pack is validated or created, before a batch starts and again in the worker):
+
+| Rule | Why |
+|---|---|
+| `database` is never an `original_database` nor a database of the solution's connections | the grader drops it |
+| It must end in a test suffix: `_correccion`, `_test`, `_prueba`, `_grading` (`database_safety.test_suffixes`) | a typo cannot hit a real database; `database_safety.allow_any_name: true` is an explicit override |
+| Never a system database (`mysql`, `information_schema`, `sys`, `postgres`…) nor one of `database_safety.deny` (`*` allowed) | |
+| The grader never connects to the original databases | the student's connections are rewritten before anything runs |
+| A step whose schema (Table output, Insert/Update…) or SQL names another database, or SQL that reads or writes server files, users or permissions (`INTO OUTFILE`, `LOAD DATA`, `GRANT`, `COPY … TO`, `CSVWRITE`…) blocks | `foreign_schema`, `forbidden_sql` |
+| With several workers each one gets its own databases: `gym_dw_correccion_w1`, `_w2`… (`database_safety.single_worker: true` = one worker) | two submissions never share a database |
+
+These checks reduce the risk; the real protection is a **database user with rights only on the test databases**
+(MySQL: ``GRANT ALL ON `%\_correccion`.* TO 'corrector'@'localhost'``). Never use an administrator account.
+
+**The password never goes in the pack** (a `password` key makes it invalid). When grading, the grader takes it from
+what the teacher typed in Spoon in this session (the wizard or the dialog that **Grade** opens when it does not
+know it; it stays in memory until Spoon closes), otherwise from the Kettle variable `password_variable`
+(`kettle.properties`, then the environment). It reaches the worker through the process environment, the sandbox
+copy of the submission has an empty password, and the result is scrubbed of it.
+
+**Creating the pack.** In Spoon, **Create pack from this transformation…** detects the connections: the **Test
+database** box proposes the same server, port and user and the database with `_correccion`; add the password, the
+**Scripts** (create the tables and load the visible case: `;`-separated `.sql` files) and, for a hidden case, its
+**Hidden case scripts** (they run after the others: start them with `DELETE FROM …` to replace the data). **Capture**
+lists the tables written by the solution's output steps (Table output, Insert/Update, Update, Dimension lookup,
+Combination lookup…) and the files. Step 2 shows each table's key (the Insert/Update or dimension key, or the primary
+key, checked to be unique) and the columns to ignore (surrogate keys, load dates). Over MCP,
+`create_exercise_pack` takes the same as `test_databases` (absolute paths in `scripts`), `tables`,
+`database_safety`, and `db_scripts`/`executions` per case; `grade_*` read the password from `password_variable`.
+The database steps (Table input/output, Insert/Update, Update, Delete, Database lookup/join, Dimension and
+Combination lookup) are allowed in such packs; Execute SQL only if the solution uses it.
+
+| What you see | What it is |
+|---|---|
+| `unsafe_test_database` | A test database is the original, a system one, in `deny` or without a test suffix: rename it |
+| `needs_test_database` | The solution uses a server connection without a test database |
+| `crashed`, «Could not connect to the test database» | Server down, wrong user or password, or no right to create the database |
+| `crashed`, «The script … failed at statement …» | The pack's script has an error; the statement is quoted |
+| `blocked`, `foreign_connection` | The submission uses a connection that matches none of the test databases (another name and another database) |
+| «in use by another grading» | Another batch or pack creation of this Spoon uses the same test databases: wait |
+
+A worker that ran database steps is replaced after each submission (about 6 s more per submission); two workers
+halve the time.

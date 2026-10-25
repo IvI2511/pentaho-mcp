@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.github.ivi2511.pentahomcp.CorrectorMain.Pedido;
 import io.github.ivi2511.pentahomcp.CorrectorMain.Trabajo;
+import io.github.ivi2511.pentahomcp.CorrectorTextos.Mensaje;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Caso;
 import io.github.ivi2511.pentahomcp.corrector.modelo.CorrectorJson;
 import io.github.ivi2511.pentahomcp.corrector.modelo.Pack;
@@ -115,6 +116,11 @@ final class CorrectorProcesos implements Closeable {
     boolean guardarAbiertos = true;
     /** null = la del plugin. */
     String versionPlugin;
+    /**
+     * Contraseñas de las bases de prueba por conexion (sin mayusculas), solo en memoria: van a la hija por su entorno.
+     * Las que faltan salen de lo que se escribio en esta sesion o de la variable password_variable del pack.
+     */
+    final Map<String, String> claves = new LinkedHashMap<String, String>();
   }
 
   /** Avisos del lote, en el hilo del supervisor (no bloquear). */
@@ -168,13 +174,17 @@ final class CorrectorProcesos implements Closeable {
   private volatile boolean terminado;
   private int fallosSeguidos;
   private Throwable error;
+  /** Las bases de prueba reservadas en esta JVM mientras dura el lote. */
+  private final List<String> reservadas = new ArrayList<String>();
+  /** Las contraseñas para el entorno de las hijas. */
+  private final Map<String, String> entornoBases;
 
   /**
    * @param dirPack la carpeta del pack ya abierto ({@code CorrectorPack.raiz()}): un .zip o un .json inline ya son
    *   carpeta. Tiene que seguir existiendo hasta que termine el lote.
    * @param dirSalida {@code output_dir}: resultados, {@code _logs/}, {@code _abiertos/} y {@code _sandbox/}
    */
-  CorrectorProcesos( File dirPack, Pack pack, File dirSalida, Opciones op, Oyente oyente ) {
+  CorrectorProcesos( File dirPack, Pack pack, File dirSalida, Opciones op, Oyente oyente ) throws CorrectorBases.Falla {
     this.dirPack = dirPack.getAbsoluteFile();
     this.dirSalida = dirSalida.getAbsoluteFile();
     this.op = op == null ? new Opciones() : op;
@@ -191,11 +201,37 @@ final class CorrectorProcesos implements Closeable {
       throw new IllegalStateException( "data-integration not found (" + pdi + "): set the PDI folder" );
     }
     this.comandoBase = comandoBase( this.op, this.pack, pdi );
-    int casos = Math.max( 1, this.pack.casos.size() );
+    int casos = 0;
+    for ( Caso c : this.pack.casos ) {
+      casos += c == null ? 0 : c.vecesQueCorre();
+    }
+    casos = Math.max( 1, casos );
     this.limiteEntrega = this.op.limiteEntregaMs > 0 ? this.op.limiteEntregaMs
       : Math.max( 1, this.pack.politica.timeoutSeg ) * 1000L * casos + this.op.margenMs;
-    for ( int i = 1; i <= Math.max( 1, this.op.workers ); i++ ) {
+    int n = CorrectorBases.workersPermitidos( this.pack, Math.max( 1, this.op.workers ) );
+    if ( !this.pack.bases.isEmpty() ) {
+      // las bases de prueba: seguras con el sufijo de cada worker y libres en esta JVM, o no corre nada
+      List<String> sufijos = CorrectorBases.sufijos( this.pack, n );
+      List<CorrectorTextos.Mensaje> mal = CorrectorBases.inseguras( this.pack, sufijos,
+        CorrectorBases.originalesDeSolucion( this.dirPack, this.pack ) );
+      if ( !mal.isEmpty() ) {
+        throw new CorrectorBases.Falla( new CorrectorTextos.Mensaje( "db.err.unsafe", CorrectorTextos.lista( mal ) ) );
+      }
+      List<String> uso = CorrectorBases.clavesDeUso( this.pack, sufijos );
+      CorrectorBases.reservar( uso );
+      reservadas.addAll( uso );
+    }
+    this.entornoBases = CorrectorBases.entorno( this.pack, this.op.claves );
+    for ( int i = 1; i <= n; i++ ) {
       workers.add( new Worker( i ) );
+    }
+  }
+
+  /** Suelta las bases de prueba reservadas (una vez). */
+  private void liberarBases() {
+    synchronized ( reservadas ) {
+      CorrectorBases.liberar( reservadas );
+      reservadas.clear();
     }
   }
 
@@ -329,6 +365,9 @@ final class CorrectorProcesos implements Closeable {
     if ( supervisor != null && supervisor.isAlive() ) {
       cancelar();
     }
+    if ( supervisor == null || !supervisor.isAlive() ) {
+      liberarBases();
+    }
   }
 
   // ------------------------------------------------------------------ supervisor
@@ -351,6 +390,7 @@ final class CorrectorProcesos implements Closeable {
       matarTodos();
     } finally {
       terminado = true;
+      liberarBases();
       if ( !op.conservarSandbox ) {
         try {
           CorrectorSandbox.borrar( dirSandbox );
@@ -424,8 +464,8 @@ final class CorrectorProcesos implements Closeable {
       for ( String ticket : pendientes ) {
         File f = new File( new File( dirCola, CorrectorMain.PENDIENTES ), ticket );
         if ( CorrectorMain.reservar( dirCola, ticket ) && f.delete() ) {
-          cerrar( ticket, null, null, ResultadoCorreccion.CAIDA, "the grading worker could not start ("
-            + fallosSeguidos + " attempts): see " + LOGS + "/" );
+          cerrar( ticket, null, null, ResultadoCorreccion.CAIDA, new Mensaje( "det.worker.start", fallosSeguidos,
+            LOGS + "/" ) );
         }
       }
       pendientes = pendientes();
@@ -476,11 +516,11 @@ final class CorrectorProcesos implements Closeable {
       if ( new File( new File( dirCola, CorrectorMain.HECHAS ), w.id + CorrectorMain.SEP_TOMADA + ticket ).isFile() ) {
         terminar( ticket, leer( porTicket.get( ticket ) ) ); // termino justo antes de salir
       } else if ( ticket.equals( w.vencido ) ) {
-        cerrar( ticket, w.id, e.getValue(), ResultadoCorreccion.MATADA, "the grading worker went over "
-          + ( limiteEntrega / 1000 ) + " s with this submission (timeout_s x cases + margin) and was killed" );
+        cerrar( ticket, w.id, e.getValue(), ResultadoCorreccion.MATADA, new Mensaje( "det.worker.killed",
+          limiteEntrega / 1000 ) );
       } else {
-        cerrar( ticket, w.id, e.getValue(), ResultadoCorreccion.CAIDA, "the grading worker stopped (exit code "
-          + codigo + ") while grading this submission: see " + LOGS + "/worker-" + w.ranura + ".log" );
+        cerrar( ticket, w.id, e.getValue(), ResultadoCorreccion.CAIDA, new Mensaje( "det.worker.stopped", codigo,
+          LOGS + "/worker-" + w.ranura + ".log" ) );
       }
       w.tomoAlguna = true;
     }
@@ -495,7 +535,7 @@ final class CorrectorProcesos implements Closeable {
    * Pone el resultado final de un ticket que el worker no termino (sobre su parcial, si hay) y pasa el ticket a
    * hechas/. {@code desde}: cuando se vio tomado (para {@code process_s}), o null.
    */
-  private void cerrar( String ticket, String worker, Long desde, String estado, String detalle ) throws IOException {
+  private void cerrar( String ticket, String worker, Long desde, String estado, Mensaje detalle ) throws IOException {
     Pedido p = porTicket.get( ticket );
     File destino = new File( p.resultado );
     ResultadoCorreccion r = null;
@@ -511,7 +551,7 @@ final class CorrectorProcesos implements Closeable {
     }
     r.estado = estado;
     r.motivo = null;
-    r.detalle = detalle;
+    detalle.en( r );
     for ( Caso c : pack.casos ) {
       if ( r.caso( c.id ) == null ) {
         ResultadoCaso rc = new ResultadoCaso();
@@ -563,7 +603,7 @@ final class CorrectorProcesos implements Closeable {
     } catch ( Exception e ) {
       ResultadoCorreccion r = vacio( p );
       r.estado = ResultadoCorreccion.CAIDA;
-      r.detalle = "the result could not be read: " + RunMotor.primeraLinea( e );
+      new Mensaje( "det.result_unreadable", RunMotor.primeraLinea( e ) ).en( r );
       return r;
     }
   }
@@ -641,12 +681,13 @@ final class CorrectorProcesos implements Closeable {
     tr.idioma = op.idioma;
     tr.conservarSandbox = op.conservarSandbox;
     tr.versionPlugin = version();
+    tr.sufijoBase = CorrectorBases.sufijoWorker( pack, w.ranura, workers.size() );
     File trabajo = new File( dirCola, "trabajo-" + w.id + ".json" );
     CorrectorJson.guardar( tr, trabajo );
 
     File log = new File( dirLogs, "worker-" + w.ranura + ".log" );
     w.proceso = lanzarHija( comandoBase, dw, CorrectorMain.class.getName(), Collections.singletonList(
-      trabajo.getAbsolutePath() ), log, w.id );
+      trabajo.getAbsolutePath() ), log, w.id, entornoBases );
     w.lanzado = System.currentTimeMillis();
     lanzados.add( w.id );
   }
@@ -660,6 +701,15 @@ final class CorrectorProcesos implements Closeable {
    */
   static Process lanzarHija( List<String> comandoBase, File dirHija, String clase, List<String> args, File log,
                              String id ) throws IOException {
+    return lanzarHija( comandoBase, dirHija, clase, args, log, id, null );
+  }
+
+  /**
+   * Igual, con variables de entorno de mas para la hija (las contraseñas de las bases de prueba: asi no pasan por
+   * ningun archivo ni por la linea de comandos, que queda en el log).
+   */
+  static Process lanzarHija( List<String> comandoBase, File dirHija, String clase, List<String> args, File log,
+                             String id, Map<String, String> entornoExtra ) throws IOException {
     File kettleHome = new File( dirHija, "kettle-home" );
     File home = new File( dirHija, "home" );
     File metastore = new File( dirHija, "metastore" );
@@ -688,6 +738,14 @@ final class CorrectorProcesos implements Closeable {
     }
     env.put( "KETTLE_HOME", kettleHome.getAbsolutePath() );
     env.put( "PENTAHO_METASTORE_FOLDER", metastore.getAbsolutePath() );
+    for ( Iterator<String> it = env.keySet().iterator(); it.hasNext(); ) {
+      if ( it.next().toUpperCase( Locale.ROOT ).startsWith( CorrectorBases.VARIABLE_ENTORNO ) ) {
+        it.remove(); // nada de una corrida anterior: solo las de esta
+      }
+    }
+    if ( entornoExtra != null ) {
+      env.putAll( entornoExtra );
+    }
     File dirLog = log.getAbsoluteFile().getParentFile();
     if ( dirLog != null && !dirLog.isDirectory() && !dirLog.mkdirs() && !dirLog.isDirectory() ) {
       throw new IOException( "cannot create " + dirLog );

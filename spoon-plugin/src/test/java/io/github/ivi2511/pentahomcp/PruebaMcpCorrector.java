@@ -146,11 +146,12 @@ public class PruebaMcpCorrector {
     JsonNode crear = porNombre.get( "create_exercise_pack" );
     igual( set( "document", "solution_file", "pack_path", "title", "statement", "inputs", "cases", "output_step",
       "capture", "key_columns", "compare", "rules", "rubric", "policy", "check_locales", "student_copy", "template_db",
-      "sql", "replace", "language", "scale" ), props( crear ), "argumentos de create_exercise_pack (§8 + solution_file, "
-      + "template_db/sql de la captura query, replace, language y scale)" );
+      "sql", "replace", "language", "scale", "test_databases", "tables", "database_safety" ), props( crear ),
+      "argumentos de create_exercise_pack (§8 + solution_file, template_db/sql de la captura query, replace, language, "
+      + "scale y las bases de prueba de 0.6.2)" );
     igual( "[\"pack_path\",\"title\"]", crear.path( "inputSchema" ).path( "required" ).toString(), "obligatorios" );
-    igual( set( "id", "inputs_dir", "hidden", "weight" ), nombres( prop( crear, "cases" ).path( "items" ).path(
-      "properties" ) ), "cada caso" );
+    igual( set( "id", "inputs_dir", "hidden", "weight", "db_scripts", "executions" ), nombres( prop( crear, "cases" )
+      .path( "items" ).path( "properties" ) ), "cada caso" );
     contiene( crear.path( "description" ).asText(), "RUNS the solution", "avisa que corre la solucion" );
 
     JsonNode validar = porNombre.get( "validate_exercise_pack" );
