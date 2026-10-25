@@ -76,6 +76,14 @@ datos sucios: copias rotas de tus archivos de entrada corren contra una copia de
 entorno aislado, y la prueba comprueba que cada fila leída se cargó o se rechazó con su motivo, y que
 ejecutarla dos veces no duplica nada.
 
+**Menú IDC.** La barra principal de Spoon tiene un desplegable **IDC** justo al lado del selector de
+perspectivas, con todo lo anterior a mano sin pedírselo a Claude: **Revisar calidad…** (puntuación,
+hallazgos con cómo arreglarlos, clic en uno para ver su step en el lienzo, los arreglos automáticos con un
+solo Ctrl+Z, silenciar una regla donde es deliberada y una revisión profunda opcional que lee datos),
+**Robustecer…** (el plan con casillas, aplicarlo con un solo Ctrl+Z y la prueba con datos sucios con su
+veredicto), **Ordenar lienzo**, **Lección**, el cambio a Data Integration, Informes o Corrector y **Acerca de
+Pentaho Live**.
+
 ¿No tienes Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
 

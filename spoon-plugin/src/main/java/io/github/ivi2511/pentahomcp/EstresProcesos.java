@@ -33,9 +33,37 @@ final class EstresProcesos {
   private EstresProcesos() {
   }
 
+  /**
+   * Para cancelar una prueba desde fuera (el diálogo «Robustecer…» del menú IDC): {@link #cancelar} mata la JVM hija si
+   * ya arrancó, o hace que no arranque. Desde MCP no hay corte (null).
+   */
+  static final class Corte {
+    private volatile boolean pedido;
+    private volatile Process proceso;
+
+    boolean pedido() {
+      return pedido;
+    }
+
+    /** Mata la hija (y sus hijos) si está corriendo. Puede tardar hasta 10 s: no llamarlo en el hilo de UI. */
+    void cancelar() {
+      pedido = true;
+      Process p = proceso;
+      if ( p != null ) {
+        matar( p );
+      }
+    }
+  }
+
   /** Corre la hija con el trabajo y espera hasta timeoutMs; devuelve el código de salida o -1 si se la mató. */
   static int correr( File pdi, File sandbox, File trabajo, File log, long timeoutMs ) throws IOException,
     InterruptedException {
+    return correr( pdi, sandbox, trabajo, log, timeoutMs, null );
+  }
+
+  /** Igual, con un corte (null = sin cancelación): cancelado, devuelve -1. */
+  static int correr( File pdi, File sandbox, File trabajo, File log, long timeoutMs, Corte corte )
+    throws IOException, InterruptedException {
     File kettleHome = new File( sandbox, "kettle_home" );
     File home = new File( sandbox, "home" );
     File metastore = new File( sandbox, "metastore" );
@@ -76,7 +104,17 @@ final class EstresProcesos {
     env.put( "PENTAHO_METASTORE_FOLDER", metastore.getAbsolutePath() );
     pb.redirectErrorStream( true );
     pb.redirectOutput( ProcessBuilder.Redirect.appendTo( log ) );
+    if ( corte != null && corte.pedido ) {
+      return -1;
+    }
     Process p = pb.start();
+    if ( corte != null ) {
+      corte.proceso = p;
+      if ( corte.pedido ) {
+        matar( p );
+        return -1;
+      }
+    }
     try {
       p.getOutputStream().close();
     } catch ( IOException ignored ) {
@@ -86,7 +124,7 @@ final class EstresProcesos {
       matar( p );
       return -1;
     }
-    return p.exitValue();
+    return corte != null && corte.pedido ? -1 : p.exitValue();
   }
 
   /** Mata la hija y sus hijos (Java 9+, ProcessHandle por reflexión: el plugin compila para Java 8). */

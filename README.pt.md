@@ -76,6 +76,14 @@ quebradas dos seus arquivos de entrada rodam contra uma cópia da transformaçã
 teste confere que cada linha lida foi carregada ou rejeitada com o motivo, e que rodar duas vezes não
 duplica nada.
 
+**Menu IDC.** A barra principal do Spoon ganha um menu suspenso **IDC** logo ao lado do seletor de
+perspectivas, com tudo isso à mão sem pedir ao Claude: **Revisar qualidade…** (pontuação, achados com como
+corrigi-los, clique em um para ver o seu step na tela, as correções automáticas com um único Ctrl+Z,
+silenciar uma regra onde ela é deliberada e uma revisão profunda opcional que lê dados), **Robustecer…** (o
+plano com caixas de seleção, aplicá-lo com um único Ctrl+Z e o teste com dados sujos com o seu veredito),
+**Organizar tela**, **Lição**, a troca para Data Integration, Relatórios ou Corretor e **Sobre o Pentaho
+Live**.
+
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
 

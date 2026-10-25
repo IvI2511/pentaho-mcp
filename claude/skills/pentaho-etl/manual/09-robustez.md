@@ -5,7 +5,8 @@ its reason instead of stopping the load or vanishing, re-running never duplicate
 broken input file proves it. Everything here is taken from `../patrones/06_carga_tolerante/`, which runs
 with Kitchen 9.4.0.0-343 three times (clean file, clean file again, broken file) and is checked by
 `../patrones/verificar.ps1 -Solo 06`. Tools: `lint_etl robustness=true` (detect), `harden_etl` (apply),
-`stress_test` (prove). Words used in the files: `motivo` = reason, `campos_error` = failing fields,
+`stress_test` (prove); by hand they are in Spoon's **IDC** menu > **Harden…** (plan with checkboxes, Apply,
+Test with dirty data). Words used in the files: `motivo` = reason, `campos_error` = failing fields,
 `rechazos` = rejects.
 
 ## 1. What "robust" means here

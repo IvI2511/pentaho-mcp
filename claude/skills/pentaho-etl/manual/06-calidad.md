@@ -5,6 +5,8 @@ Kettle lets through (fixed paths, passwords in the file, Group by without sortin
 outputs without fields…), with a **0-100 score** that says where every lost point comes from.
 `apply_lint_fixes` applies the fixes it proposes as one Ctrl+Z, and `suppress_lint` silences a rule where it is
 a deliberate choice. The Reports have the same check as the **Technical quality** section (`quality`).
+By hand, the person has it in Spoon's **IDC** menu (next to the perspective switcher) > **Check quality…**: the same
+`lint_etl` / `apply_lint_fixes all_auto` / `suppress_lint`, with the deep check as a checkbox.
 
 If `lint_etl` is not among the tools, the Spoon plugin is older than 0.6.0: use `validate`, `preview_step` and
 the checklist in `03-errores-comunes.md` §E.

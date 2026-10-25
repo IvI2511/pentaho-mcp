@@ -73,24 +73,7 @@ final class LintTools {
         .bool( "include_kettle_checks", "Also list what Spoon's Verify says (it may connect to the database; it "
           + "never lowers the score). Default false", false )
         .strEnum( "language", "Language of the messages (default en)", false, "en", "es", "pt" ).build(),
-      a -> {
-        final Opciones op = opciones( a );
-        final Copia c = copia( a, false );
-        op.sinGuardar = c.sinGuardar;
-        final LintEntorno env = new LintEntorno( c.meta );
-        op.entorno = env;
-        if ( op.deep ) {
-          op.sondas = new LintSondas(); // el modo profundo: previews de solo lectura (§3.3)
-        }
-        Resultado r = RunMotor.enSegundoPlano( () -> {
-          Resultado x = LintMotor.analizar( c.meta, op );
-          LintPropuestas.completar( x, c.meta, op.lang ); // nombres para default_step_name, sin IA
-          return x;
-        }, MS_LINT + ( op.deep ? op.deepBudgetMs + MS_CIERRE_PROFUNDO : 0 ), env::cancelar, "The lint" );
-        r.document = c.id;
-        ObjectNode o = LintJson.resultado( r );
-        return RunMotor.json( o );
-      } ) );
+      a -> RunMotor.json( lint( a, null ) ) ) );
 
     s.add( Tools.tool( "apply_lint_fixes",
       "Applies the fixes that lint_etl proposes, by key. It runs the rules again first: a key that no longer appears "
@@ -128,6 +111,32 @@ final class LintTools {
         .str( "reason", "Why it is deliberate (stored with it and shown by lint_etl)", false )
         .bool( "remove", "true = remove the silence instead (default false)", false ).build(),
       a -> silenciar( a ) ) );
+  }
+
+  /**
+   * lint_etl: copia en la UI y análisis en un hilo de trabajo. Lo llaman la herramienta MCP y el diálogo «Revisar
+   * calidad…» del menú IDC ({@link IdcCalidad}). alCancelar (null en MCP) recibe con qué cancelar el análisis
+   * (LintEntorno.cancelar: corta el modo profundo y los cálculos de campos), antes de que empiece.
+   */
+  static ObjectNode lint( JsonNode a, java.util.function.Consumer<Runnable> alCancelar ) throws Exception {
+    final Opciones op = opciones( a );
+    final Copia c = copia( a, false );
+    op.sinGuardar = c.sinGuardar;
+    final LintEntorno env = new LintEntorno( c.meta );
+    op.entorno = env;
+    if ( op.deep ) {
+      op.sondas = new LintSondas(); // el modo profundo: previews de solo lectura (§3.3)
+    }
+    if ( alCancelar != null ) {
+      alCancelar.accept( env::cancelar );
+    }
+    Resultado r = RunMotor.enSegundoPlano( () -> {
+      Resultado x = LintMotor.analizar( c.meta, op );
+      LintPropuestas.completar( x, c.meta, op.lang ); // nombres para default_step_name, sin IA
+      return x;
+    }, MS_LINT + ( op.deep ? op.deepBudgetMs + MS_CIERRE_PROFUNDO : 0 ), env::cancelar, "The lint" );
+    r.document = c.id;
+    return LintJson.resultado( r );
   }
 
   /** values: {key: valor} (un nombre, un símbolo decimal, una descripción, ${VAR} para una contraseña…). */

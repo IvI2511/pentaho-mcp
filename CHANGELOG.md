@@ -7,6 +7,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **IDC menu** in Spoon's main toolbar, right next to the perspective switcher (an `IDC` drop-down with the
+  IDC Studios symbol), in Spoon's language (English, Spanish, Portuguese). Everything that so far was only
+  reachable through Claude, by hand:
+  - **Check quality…**: a non-modal window with the 0-100 score and grade of the active transformation or
+    job, the findings (severity, rule, step or entry, message, how to fix it, whether it has an automatic
+    fix); clicking one selects its step or entry on the canvas. **Apply automatic fixes** runs
+    `apply_lint_fixes` with `all_auto` (one Ctrl+Z in a transformation), **Silence this rule here** runs
+    `suppress_lint` on that step or entry with an optional reason, **Deep check (reads data)** is `lint_etl`
+    `deep=true` with the same read-only rule, and **Include robustness** adds the robustness score. The
+    check runs in the background and can be cancelled.
+  - **Harden…**: the `harden_etl` plan (every recipe, dry run) as a list with checkboxes. Automatic
+    proposals start checked; the ones that change which rows reach the outputs or the design of the load
+    start unchecked and marked ⚠; manual ones cannot be checked and show how to do them. **Apply** is
+    `harden_etl` `dry_run=false` with the checked ones (one Ctrl+Z). **Test with dirty data…** runs
+    `stress_test` in the background with a progress bar, elapsed time and Cancel (which stops the test
+    JVM), and shows the verdict, the checks of every variant and the messages, with an environment problem
+    (a missing database or table) shown apart from robustness failures.
+  - **Arrange canvas** (the same action as the canvas button), **Lesson** (shows the Lesson tab of the
+    lesson loaded in the active transformation, or explains how to start one with Claude), the switch to
+    every perspective of Spoon's own switcher (Data Integration, Reports, Grader…) and **About Pentaho
+    Live** (version and a link to the repository).
+  - The dialogs call the same code as the MCP tools, with the same arguments; MCP behaviour and the 73
+    tools are unchanged.
+
 ## [0.6.1] - 2026-10-24
 
 Bug fixes for the robustness tools.

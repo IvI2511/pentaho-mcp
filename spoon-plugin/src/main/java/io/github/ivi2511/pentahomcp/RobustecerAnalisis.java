@@ -87,6 +87,8 @@ final class RobustecerAnalisis {
     Map<String, List<String>> claves = new HashMap<String, List<String>>();
     Set<String> confirmar = new HashSet<String>();
     boolean confirmarTodo;
+    /** Keys que no se aplican aunque sean auto (las que se desmarcaron en el menú IDC; vacío desde MCP). */
+    Set<String> excluir = new HashSet<String>();
     boolean ensayo = true;
     /** null = el idioma del documento (sus nombres de steps y notas); si no se nota, en. */
     String lang;
@@ -215,7 +217,7 @@ final class RobustecerAnalisis {
   static List<Propuesta> elegir( Plan plan, Pedido p ) {
     List<Propuesta> l = new ArrayList<Propuesta>();
     for ( Propuesta x : visibles( plan, p ) ) {
-      if ( !x.aplicable() ) {
+      if ( !x.aplicable() || p.excluir.contains( x.key ) ) {
         continue;
       }
       if ( Receta.AUTO.equals( x.nivel ) || p.confirmarTodo || p.confirmar.contains( x.key ) ) {

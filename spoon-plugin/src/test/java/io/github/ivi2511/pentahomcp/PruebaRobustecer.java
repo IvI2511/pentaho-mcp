@@ -166,6 +166,24 @@ public class PruebaRobustecer {
     contiene( o.toString(), "+ error hop Cargar clientes -> ", "el diff del hop de error" );
   }
 
+  /**
+   * Menú IDC, «Robustecer…»: una propuesta auto que la persona desmarcó (Pedido.excluir) no se elige; las demás auto
+   * sí, y una confirm marcada entra. Desde MCP excluir queda vacío y el plan elige lo mismo que antes.
+   */
+  public void pruebaExcluidasDelMenuIdc() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"all\"],\"language\":\"es\"}" );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( tm, p );
+    List<String> todas = keys( RobustecerAnalisis.elegir( plan, p ) );
+    cierto( todas.contains( "harden:rejects_on_error:Convertir tipos" ), "sin excluir: la auto entra " + todas );
+    p.excluir.add( "harden:rejects_on_error:Convertir tipos" );
+    p.confirmar.add( "harden:required_fields:Leer ventas" );
+    List<String> menos = keys( RobustecerAnalisis.elegir( plan, p ) );
+    cierto( !menos.contains( "harden:rejects_on_error:Convertir tipos" ), "excluida: no entra " + menos );
+    cierto( menos.contains( "harden:required_fields:Leer ventas" ), "la confirm marcada entra " + menos );
+    igual( todas.size(), menos.size(), "una menos y una más" );
+  }
+
   public void pruebaPlanCompleto() throws Exception {
     TransMeta tm = antes( "dw.sqlite" );
     RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"all\"],\"language\":\"es\"}" );

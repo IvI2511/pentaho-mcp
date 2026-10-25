@@ -200,7 +200,18 @@ final class RobustezTools {
 
   /** harden_etl. */
   static Object robustecer( JsonNode a ) throws Exception {
+    return robustecer( a, null );
+  }
+
+  /**
+   * harden_etl con, además, propuestas auto que la persona desmarcó en el diálogo «Robustecer…» del menú IDC
+   * ({@link IdcRobustez}): no se aplican (excluir; null en MCP, que aplica todas las auto pedidas).
+   */
+  static Object robustecer( JsonNode a, Set<String> excluir ) throws Exception {
     final RobustecerAnalisis.Pedido p = pedido( a );
+    if ( excluir != null ) {
+      p.excluir.addAll( excluir );
+    }
     final Object[] copia = Docs.ui( () -> {
       AbstractMeta m = Docs.resolverSinActivar( a );
       if ( !( m instanceof TransMeta ) ) {

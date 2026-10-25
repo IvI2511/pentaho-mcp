@@ -73,6 +73,13 @@ the plan and applies it as one Ctrl+Z, then proves it with a dirty-data test: br
 files run against a copy of the transformation in a sandbox, and the test checks that every row read was
 loaded or rejected with a reason, and that running it twice duplicates nothing.
 
+**IDC menu.** Spoon's main toolbar gets an **IDC** drop-down right next to the perspective switcher, with
+everything above at hand without asking Claude: **Check quality…** (score, findings with how to fix them,
+click one to see its step on the canvas, apply the automatic fixes as one Ctrl+Z, silence a rule where it is
+deliberate, optional deep check that reads data), **Harden…** (the plan with checkboxes, apply as one Ctrl+Z,
+and the dirty-data test with its verdict), **Arrange canvas**, **Lesson**, the switch to Data Integration,
+Reports or Grader, and **About Pentaho Live**.
+
 No Spoon open? The skill still helps: Claude writes the `.ktr` / `.kjb` file and checks it with Pan or
 Kitchen.
 

@@ -139,6 +139,8 @@ public class McpLifecycleListener implements LifecycleListener {
     }
     // boton «Ordenar lienzo (Pentaho Live)» en la barra y el menu contextual de los lienzos (no lanza)
     OrdenarLienzo.instalarDesde( handler );
+    // menu «IDC» en la barra principal, junto al selector de perspectivas (no lanza)
+    IdcMenu.instalarDesde( handler );
   }
 
   /**

@@ -76,6 +76,8 @@ final class EstresTools {
     boolean conservar;
     /** Carpeta base del sandbox (null = java.io.tmpdir/pentaho-live-estres). */
     File base;
+    /** Para cancelar desde el menú IDC (null desde MCP). */
+    EstresProcesos.Corte corte;
   }
 
   static void register( McpHttpServer s ) {
@@ -141,7 +143,13 @@ final class EstresTools {
 
   /** stress_test: copia en la UI (sin activar la pestaña), todo lo demás en un hilo de trabajo. */
   static Object probar( JsonNode a ) throws Exception {
+    return probar( a, null );
+  }
+
+  /** stress_test con un corte para cancelarla (el diálogo «Robustecer…» del menú IDC; null desde MCP). */
+  static Object probar( JsonNode a, EstresProcesos.Corte corte ) throws Exception {
     final Pedido p = pedido( a );
+    p.corte = corte;
     final Object[] copia = Docs.ui( () -> {
       AbstractMeta m = Docs.resolverSinActivar( a );
       if ( !( m instanceof TransMeta ) ) {
@@ -289,8 +297,14 @@ final class EstresTools {
       Files.write( fTrabajo.toPath(), om.writerWithDefaultPrettyPrinter().writeValueAsBytes( trabajo ) );
       File log = new File( new File( sb, "logs" ), "child.log" );
       long t0 = System.currentTimeMillis();
+      if ( p.corte != null && p.corte.pedido() ) {
+        throw new ToolError( "The stress test was cancelled" );
+      }
       int codigo = EstresProcesos.correr( pdi, sb, fTrabajo, log, MS_ARRANQUE + vueltas * ( p.timeoutS * 1000L
-        + 5000L ) );
+        + 5000L ), p.corte );
+      if ( p.corte != null && p.corte.pedido() ) {
+        throw new ToolError( "The stress test was cancelled" );
+      }
       o.put( "ran", true ).put( "ms", System.currentTimeMillis() - t0 );
       if ( codigo != 0 ) {
         o.withArray( "notes" ).add( codigo < 0 ? "the test JVM was stopped (time budget exceeded)"
