@@ -62,7 +62,7 @@ public class PruebaMcpInformes {
    * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3) + harden_etl y
    * stress_test (robustez).
    */
-  private static final int TOOLS = 73;
+  private static final int TOOLS = 81; // 0.7.0: +6 del plano y el boceto, +2 de la hoja de mapeo
 
   private McpHttpServer server;
   private int puerto;
@@ -86,6 +86,8 @@ public class PruebaMcpInformes {
     LessonTools.register( server );
     RobustezTools.register( server );
     EstresTools.register( server );
+    PlanoTools.register( server );
+    MapeoTools.register( server );
     server.start();
   }
 

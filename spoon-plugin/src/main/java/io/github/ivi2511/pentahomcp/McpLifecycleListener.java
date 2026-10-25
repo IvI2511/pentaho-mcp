@@ -67,7 +67,13 @@ public class McpLifecycleListener implements LifecycleListener {
       + "(one Ctrl+Z each; notes the user wrote are never touched). To teach, lesson_start sends a whole lesson "
       + "script (steps with what/why) that Spoon plays one step at a time (pace guided, auto or manual with "
       + "lesson_next); follow the class with lesson_status wait_s and steer it with lesson_control. The handout "
-      + "to share afterwards is build_report with sections=[\"lesson\"].";
+      + "to share afterwards is build_report with sections=[\"lesson\"]."
+      + " To design before building, write an ETL plan with plan_create (a small <name>.plan.yaml: goal, grain, "
+      + "sources, targets, rules, stages, risks, decisions; interview the user first), check it with plan_review, "
+      + "build its skeleton with plan_build (mode=sketch: placeholder steps with TO DO notes, one Ctrl+Z; fill each "
+      + "one with fill_placeholder) and compare plan and canvas with plan_check (warnings only); plan_get returns its "
+      + "data-flow, activity and component diagrams. mapping_export writes the source-to-target mapping sheet of a "
+      + "transformation and mapping_import checks a filled one against it (dry run, then apply).";
 
   private McpHttpServer server;
 
@@ -130,6 +136,8 @@ public class McpLifecycleListener implements LifecycleListener {
       LessonTools.register( server );
       RobustezTools.register( server );
       EstresTools.register( server );
+      PlanoTools.register( server ); // 0.7.0: plano ETL, boceto (D1, D2)
+      MapeoTools.register( server ); // 0.7.0: hoja de mapeo (D3)
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("

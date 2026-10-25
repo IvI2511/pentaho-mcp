@@ -19,6 +19,8 @@ public final class SeccionId {
   public static final String FLUJO_JOB = "job_flow";
   public static final String LINAJE = "lineage";
   public static final String DICCIONARIO = "dictionary";
+  /** Hoja de mapeo origen-destino (D3): una fila por campo destino. Nunca por defecto. */
+  public static final String MAPEO = "mapping";
   public static final String DESTINO = "target_model";
   public static final String PERFIL = "profile";
   public static final String METRICAS = "metrics";
@@ -32,7 +34,7 @@ public final class SeccionId {
 
   /** Orden en el informe (el indice va entre la portada y el resumen, lo pone el renderizador). */
   public static final List<String> ORDEN = Collections.unmodifiableList( Arrays.asList(
-    PORTADA, RESUMEN, FLUJO, FLUJO_JOB, LINAJE, DICCIONARIO, DESTINO, PERFIL, METRICAS, VALIDACION, CALIDAD,
+    PORTADA, RESUMEN, FLUJO, FLUJO_JOB, LINAJE, DICCIONARIO, MAPEO, DESTINO, PERFIL, METRICAS, VALIDACION, CALIDAD,
     LECCION, CONEXIONES, NARRATIVA ) );
 
   /** Area de Rotulos con los titulos de las secciones. */

@@ -150,7 +150,11 @@ final class McpResources {
       "How to make a load tolerate dirty data: every bad row to a rejects file with its reason, nothing lost in "
         + "silence, stable keys and re-runnable loads; the fast path with the tools, each recipe by hand with "
         + "its PDI 9.4 XML (tested in pattern 06), declared drops, pitfalls and how to read stress_test.",
-      "manual/09-robustez.md" )
+      "manual/09-robustez.md" ),
+    new Doc( "pentaho://guide/plan", "plan", "ETL plan (plan_create, plan_review, plan_build, plan_check, mappings)",
+      "Design before building: interviewing the user, the <name>.plan.yaml format, the review codes and their "
+        + "questions, the three views, the sketch on the canvas (placeholders, fill_placeholder), drift, and the "
+        + "source-to-target mapping sheet both ways (mapping_export, mapping_import).", "manual/10-plano.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

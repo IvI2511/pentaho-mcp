@@ -45,6 +45,8 @@ ejemplo/
 ├── pack-correccion-alumnos.zip  su copia para alumnos, sin la solución ni el caso oculto
 ├── entregas-ejemplo/            cuatro entregas con errores típicos, para probar el corrector
 ├── leccion/                    la lección de 8 pasos del modo clase (parte 4 del guion de la demo)
+├── plano/                      el plano ETL de la carga (diseñar antes de construir): grano-de-oro.plan.yaml,
+│                                su documento con los tres diagramas y la hoja de mapeo de 04_hechos_ventas
 ├── construido-en-vivo/          la misma ETL, construida por el MCP dentro de Spoon (ver abajo)
 ├── informes/                    los informes que generó la pestaña Informes (PDF, PowerPoint, Word, HTML, Markdown)
 ├── capturas/                    el GIF de la construcción, el lienzo de cada transformación y páginas del informe

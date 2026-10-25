@@ -83,6 +83,12 @@ final class IdcMenu {
   static final String ROBUSTECER = "harden";
   static final String ORDENAR = "arrange";
   static final String LECCION = "lesson";
+  /** Plano ETL (D1): la perspectiva Diseño con el plano de la transformación activa. */
+  static final String DISENO = "design";
+  /** Hoja de mapeo origen-destino (D3). */
+  static final String MAPEO = "mapping";
+  /** Línea informativa con el progreso del boceto (D2). */
+  static final String BOCETO = "sketch";
   static final String ACERCA = "about";
   /** Prefijo de los ids de las entradas de perspectiva: "perspective:" + id de la perspectiva. */
   static final String PERSPECTIVA = "perspective:";
@@ -136,6 +142,8 @@ final class IdcMenu {
     String documento;
     /** La transformación activa tiene una lección viva (no terminada). */
     boolean leccion;
+    /** «Boceto: 7 de 12 piezas construidas» si la transformación activa salió de un plano (plan_build); si no, null. */
+    String boceto;
     /** {id, nombre visible}, en el orden del selector de Spoon. */
     final List<String[]> perspectivas = new ArrayList<String[]>();
     /** Id de la perspectiva activa. */
@@ -156,6 +164,12 @@ final class IdcMenu {
       : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, LECCION, c.leccion ? r.s( "menu_lesson_show" ) : r.s( "menu_lesson" ), true,
       false, null ) );
+    l.add( new Entrada( Tipo.ACCION, DISENO, r.s( "menu_design" ), true, false, r.s( "menu_design_tip" ) ) );
+    l.add( new Entrada( Tipo.ACCION, MAPEO, r.s( "menu_mapping" ), trans, false, trans ? r.s( "menu_mapping_tip" )
+      : hay ? r.s( "r_only_trans" ) : r.s( "no_document" ) ) );
+    if ( c.boceto != null ) {
+      l.add( new Entrada( Tipo.ACCION, BOCETO, c.boceto, false, false, null ) );
+    }
     if ( !c.perspectivas.isEmpty() ) {
       l.add( Entrada.separador() );
       for ( String[] p : c.perspectivas ) {
@@ -351,6 +365,10 @@ final class IdcMenu {
       AbstractMeta m = activo();
       if ( m instanceof TransMeta ) {
         c.documento = TRANSFORMACION;
+        PlanoConstruir.Progreso pr = PlanoConstruir.progreso( (TransMeta) m );
+        if ( pr != null ) {
+          c.boceto = rotulos().f( "menu_sketch", pr.construidas, pr.total );
+        }
         Leccion l = LeccionMotor.deDocumento( (TransMeta) m );
         if ( l != null ) {
           synchronized ( l ) {
@@ -443,6 +461,10 @@ final class IdcMenu {
         leccion( sp.getShell(), r );
         return;
       }
+      if ( DISENO.equals( id ) ) {
+        DisenoPerspective.mostrar( sp, null );
+        return;
+      }
       AbstractMeta m = activo();
       if ( m == null ) {
         aviso( sp.getShell(), r, r.s( "no_document" ) );
@@ -453,6 +475,12 @@ final class IdcMenu {
         OrdenarLienzo.ejecutar( sp, m );
       } else if ( CALIDAD.equals( id ) ) {
         IdcCalidad.abrir( sp.getShell(), m, r );
+      } else if ( MAPEO.equals( id ) ) {
+        if ( m instanceof TransMeta ) {
+          IdcMapeo.abrir( sp.getShell(), (TransMeta) m, Rotulos.de( PlanoInforme.AREA, r.idioma() ) );
+        } else {
+          aviso( sp.getShell(), r, r.s( "r_only_trans" ) );
+        }
       } else if ( ROBUSTECER.equals( id ) ) {
         if ( m instanceof TransMeta ) {
           IdcRobustez.abrir( sp.getShell(), (TransMeta) m, r );

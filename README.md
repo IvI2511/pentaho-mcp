@@ -73,6 +73,17 @@ the plan and applies it as one Ctrl+Z, then proves it with a dirty-data test: br
 files run against a copy of the transformation in a sandbox, and the test checks that every row read was
 loaded or rejected with a reason, and that running it twice duplicates nothing.
 
+**Design first.** Before anyone drags a step, Claude interviews you (what is one row of the fact table? the
+whole history or only what is new? what happens to a sale whose customer does not exist?) and writes a small,
+versionable **ETL plan** (`<name>.plan.yaml`): goal, grain, sources, targets, rules, stages, risks and decisions.
+A static review finds what is missing (no grain, a lookup without a key, a load that duplicates rows when run
+twice, a source with no rejects plan), and a new **Design** perspective draws the plan as a data-flow diagram,
+a UML activity diagram of the job and a components and deployment diagram. Then Claude builds it as a
+**sketch**: one placeholder step per stage with a colored TO DO note, filled in piece by piece while the IDC
+menu counts the pieces built; a drift check tells you where the canvas and the plan disagree. The classic
+**source-to-target mapping sheet** works both ways: exported from an ETL (Excel, Markdown, HTML, PDF, Word),
+or read back from a sheet a teacher or client filled in, with the missing steps proposed.
+
 **IDC menu.** Spoon's main toolbar gets an **IDC** drop-down right next to the perspective switcher, with
 everything above at hand without asking Claude: **Check quality…** (score, findings with how to fix them,
 click one to see its step on the canvas, apply the automatic fixes as one Ctrl+Z, silence a rule where it is
@@ -97,6 +108,7 @@ Kitchen.
 | *"Teach the Stream lookup lesson step by step, beginner level, in Spanish."* | builds it one step per click on Next ▶, with a numbered note on the canvas for every step and the rows it produces |
 | *"Make a report of this transformation for my assignment, as PDF and PowerPoint, with a short conclusion."* | builds the report (lineage, data dictionary, metrics…), writes the conclusion from the real data and exports both files |
 | *"Make a grading pack from this solution with a hidden case, then grade the submissions in `C:\TP3\entregas`."* | runs the solution to get the expected output, grades every submission in separate JVMs and tells you the grades, who failed what and why; the gradebook and each student's feedback are in the results folder |
+| *"Before building, let's design the monthly sales load: ask me what you need."* | interviews you, writes the plan, reviews it, shows the data-flow, activity and component diagrams, and builds the sketch on the canvas |
 
 ## How it works
 

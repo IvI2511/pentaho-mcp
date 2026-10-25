@@ -1,6 +1,6 @@
 ---
 name: pentaho-etl
-description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), grade students' exercises against an expected output (exercise packs, rubric, gradebook), teach it step by step on the canvas (class mode, lessons), make a load tolerate dirty data (rejects with a reason, harden_etl, stress_test), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
+description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), grade students' exercises against an expected output (exercise packs, rubric, gradebook), teach it step by step on the canvas (class mode, lessons), make a load tolerate dirty data (rejects with a reason, harden_etl, stress_test), plan an ETL before building it (design file, data-flow and UML diagrams, sketch on the canvas, source-to-target mapping sheet), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
 ---
 
 # Pentaho Data Integration 9.4 — ETLs
@@ -160,6 +160,19 @@ in silence, re-running changes nothing and a broken input file proves it.
 - Never "tolerate" by ignoring errors or ending an error hop in a Dummy: tolerant means *rejected with a
   reason, in a file someone reads*.
 
+## Design first: the ETL plan
+
+When the person wants to **plan before building** (*diseño, plano, UML de la carga*, the design as a first
+deliverable, a design to review in a PR): interview them (goal, sources, **grain**, full or incremental, keys and
+re-runnable loads, SCD, **what to do with orphans**, rejects, rules, job order and failure path), write
+`<name>.plan.yaml` with `plan_create`, loop `plan_review` (ask its `ask_the_user` questions) until no errors, show
+the three views (`plan_get`: data flow, UML activity, components; `show=true` opens the Design perspective only if
+asked), then `plan_build` one transformation at a time: a **sketch** of placeholders with TO DO notes, one Ctrl+Z,
+filled piece by piece with `fill_placeholder` (start from `patrones/`). `plan_check` reports the drift between plan
+and canvas (warnings only). `mapping_export` / `mapping_import`: the source-to-target mapping sheet, both ways.
+Never invent a grain, a key or a rejects policy: ask. Interview, format, review codes, drift and the mapping sheet:
+`manual/10-plano.md`.
+
 ## Where everything is
 
 | I need… | Read |
@@ -172,6 +185,7 @@ in silence, re-running changes nothing and a broken input file proves it.
 | Grading exercises: packs, `grade_exercise`, `grade_submissions`, the gradebook, the Grader perspective | `manual/07-corrector.md` |
 | Class mode: `lesson_start`, the Lesson tab, notes, the handout, ready lessons | `manual/08-modo-clase.md`, `lecciones/` |
 | Robustness: rejects with a reason, stable keys, re-runnable loads, `harden_etl`, `stress_test`, the recipes by hand | `manual/09-robustez.md` |
+| Design first: the plan file, the interview, `plan_review`, the sketch (`plan_build`, `fill_placeholder`), drift (`plan_check`), the mapping sheet | `manual/10-plano.md`, `ejemplo/plano/` of the repo |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

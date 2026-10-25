@@ -136,7 +136,7 @@ public final class InformeServicio {
   /** Los recolectores, en el orden del informe (SeccionId.ORDEN). */
   private static final List<Recolector> RECOLECTORES = Collections.unmodifiableList( Arrays.<Recolector>asList(
     new SecPortada(), new SecResumen(), new SecFlujo( false ), new SecFlujo( true ), new SecLinaje(),
-    new SecDiccionario(), new SecDestino(), new SecPerfil(), new SecMetricas(), new SecValidacion(), new SecCalidad(),
+    new SecDiccionario(), new SecMapeo(), new SecDestino(), new SecPerfil(), new SecMetricas(), new SecValidacion(), new SecCalidad(),
     new SecLeccion(), new SecConexiones(), new SecNarrativa() ) );
 
   /** Secciones marcadas por defecto (diseno §2.3); metrics ademas pide una corrida. */
@@ -291,7 +291,8 @@ public final class InformeServicio {
     if ( SeccionId.FLUJO.equals( id ) || SeccionId.FLUJO_JOB.equals( id ) ) {
       return Disponibilidad.COSTO_UI;
     }
-    if ( SeccionId.LINAJE.equals( id ) || SeccionId.DICCIONARIO.equals( id ) || SeccionId.CALIDAD.equals( id ) ) {
+    if ( SeccionId.LINAJE.equals( id ) || SeccionId.DICCIONARIO.equals( id ) || SeccionId.CALIDAD.equals( id )
+      || SeccionId.MAPEO.equals( id ) ) {
       // quality: las reglas que miran los campos los calculan (Pedido.calidadProfunda ademas lee las fuentes)
       return Disponibilidad.COSTO_CAMPOS;
     }

@@ -63,7 +63,8 @@ public class PruebaIdcMenu {
   public void pruebaA_Transformacion() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( IdcMenu.TRANSFORMACION, false, "001-spoon-jobs",
       "001-spoon-jobs", "Data Integration", "pentaho-live-reports", "Informes", "pentaho-live-grader", "Corrector" ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "perspective:001-spoon-jobs",
+    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "design", "mapping", "---",
+      "perspective:001-spoon-jobs",
       "perspective:pentaho-live-reports", "perspective:pentaho-live-grader", "---", "about" ), ids( l ),
       "orden del menú" );
     for ( Entrada e : l ) {
@@ -97,7 +98,7 @@ public class PruebaIdcMenu {
   /** Nada abierto: solo Lección, perspectivas y Acerca habilitadas. Sin perspectivas, un solo separador. */
   public void pruebaC_SinDocumento() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( null, false, null ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "about" ), ids( l ),
+    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "design", "mapping", "---", "about" ), ids( l ),
       "sin perspectivas no hay bloque ni separador de más" );
     falso( de( l, "quality" ).habilitada, "calidad" );
     falso( de( l, "harden" ).habilitada, "robustecer" );
@@ -105,6 +106,25 @@ public class PruebaIdcMenu {
     cierto( de( l, "lesson" ).habilitada, "lección explica cómo empezar una" );
     cierto( de( l, "about" ).habilitada, "acerca" );
     igual( es.s( "no_document" ), de( l, "quality" ).ayuda, "ayuda: abre un documento" );
+    cierto( de( l, "design" ).habilitada, "Diseño… siempre (abre la perspectiva)" );
+    falso( de( l, "mapping" ).habilitada, "la hoja de mapeo necesita una transformación" );
+  }
+
+  /** 0.7.0: Diseño…, Hoja de mapeo… y, si la transformación salió de un plano, el progreso del boceto. */
+  public void pruebaF_DisenoYBoceto() {
+    Contexto c = contexto( IdcMenu.TRANSFORMACION, false, null );
+    c.boceto = es.f( "menu_sketch", 7, 12 );
+    List<Entrada> l = IdcMenu.modelo( es, c );
+    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "design", "mapping", "sketch", "---", "about" ),
+      ids( l ), "el progreso va después de Hoja de mapeo" );
+    igual( "Boceto: 7 de 12 piezas construidas", de( l, "sketch" ).texto, "texto del progreso" );
+    falso( de( l, "sketch" ).habilitada, "solo informa" );
+    igual( "Diseño…", de( l, "design" ).texto, "Diseño…" );
+    igual( "Hoja de mapeo…", de( l, "mapping" ).texto, "Hoja de mapeo…" );
+    List<Entrada> j = IdcMenu.modelo( es, contexto( IdcMenu.JOB, false, null ) );
+    falso( de( j, "mapping" ).habilitada, "mapeo: solo transformaciones" );
+    List<Entrada> en = IdcMenu.modelo( Rotulos.de( IdcMenu.AREA, "en" ), c );
+    igual( "Mapping sheet…", de( en, "mapping" ).texto, "en inglés" );
   }
 
   /** Lección viva: la entrada dice que muestra la pestaña. */

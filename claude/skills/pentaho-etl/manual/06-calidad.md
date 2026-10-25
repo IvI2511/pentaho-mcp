@@ -133,6 +133,7 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `select_star` | I | Table input with `SELECT *` | by hand | — |
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
 | `parameter_without_default` | I | Parameter without a default (credentials excluded) | by hand | — |
+| `placeholder_step` | W | A sketch placeholder of `plan_build` (a Dummy with a TO DO note) is still on the canvas: that piece is not built | by hand: `fill_placeholder` | `10-plano.md` |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
 | the robustness family (below) | W / I | **Off by default** in `lint_etl`: `robustness: true` runs them with a score of their own (the reports' `quality` section always does, §9) | `harden_etl` | `09-robustez.md` |
 | `kettle_check` | E / W | What Spoon's Verify says (`include_kettle_checks`), listed apart | — | — |

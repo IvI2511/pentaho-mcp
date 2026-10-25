@@ -11,9 +11,11 @@ import static io.github.ivi2511.pentahomcp.Verificador.nulo;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -143,9 +145,12 @@ public class PruebaModelo {
     cierto( niveles.containsAll( Arrays.asList( "null", Indicador.OK, Indicador.WARN, Indicador.ERROR ) ),
       "niveles de indicador: " + niveles );
     cierto( ia, "algun bloque con ia = true" );
-    igual( SeccionId.ORDEN.size(), inf.secciones.size(), "una seccion por id" );
-    for ( int i = 0; i < SeccionId.ORDEN.size(); i++ ) {
-      igual( SeccionId.ORDEN.get( i ), inf.secciones.get( i ).id, "orden de las secciones" );
+    // la muestra no trae la hoja de mapeo (0.7.0): los renderizadores la prueban aparte (PruebaMapeo)
+    List<String> orden = new ArrayList<>( SeccionId.ORDEN );
+    orden.remove( SeccionId.MAPEO );
+    igual( orden.size(), inf.secciones.size(), "una seccion por id" );
+    for ( int i = 0; i < orden.size(); i++ ) {
+      igual( orden.get( i ), inf.secciones.get( i ).id, "orden de las secciones" );
     }
     Map<String, String> svg = ModeloMuestra.svgPrerender( inf );
     igual( 3, svg.size(), "un SVG de muestra por diagrama con mermaid" );
@@ -242,7 +247,8 @@ public class PruebaModelo {
     igual( Formato.HTML_ESTATICO, Formato.deClave( "html_light" ), "clave html_light" );
     igual( Formato.MARKDOWN, Formato.deClave( "MD" ), "clave md" );
     nulo( Formato.deClave( "odt" ), "clave desconocida" );
-    igual( 14, SeccionId.ORDEN.size(), "catorce secciones (quality, de la fase de calidad; lesson, del modo clase)" );
+    igual( 15, SeccionId.ORDEN.size(), "quince secciones (quality, de la fase de calidad; lesson, del modo clase; "
+      + "mapping, la hoja de mapeo de 0.7.0)" );
     // los recolectores de WP3-WP5 (stubs o reales) declaran un id valido
     for ( Recolector r : new Recolector[] { new SecLinaje(), new SecMetricas(), new SecPerfil(), new SecDestino() } ) {
       cierto( SeccionId.valido( r.id() ), r.getClass().getSimpleName() + ".id() valido: " + r.id() );
