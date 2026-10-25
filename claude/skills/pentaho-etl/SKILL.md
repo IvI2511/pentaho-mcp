@@ -41,7 +41,12 @@ starts Spoon and returns right away: ask the user first (it opens a window), wai
 3. `validate`, then `preview_step` on the last step to see real rows, then `lint_etl` for what Kettle
    lets through (see "Quality" below).
 4. `canvas_screenshot` returns a PNG of the canvas: use it to check the drawing (overlapping steps,
-   crossing hops). `arrange_canvas` if there are branches or lookups.
+   crossing hops). `arrange_canvas` if there are branches or lookups: a layered layout (straight lanes,
+   lookup sources next to their step, error targets below, no hop over another step, names never
+   overlapping) that also moves the notes so none is covered (`notes=keep_near` keeps each one next to its
+   steps, `notes=margin` puts them all above; `mode=compact` for tighter spacing). It returns the
+   `before`/`after` metrics (crossings, hops through steps, overlaps): report them if the user asked to
+   tidy the drawing. One Ctrl+Z undoes it.
 5. `save` with a `.ktr`/`.kjb` path. `run mode=visible` if the user wants to watch it run;
    `get_run_status` for status and log, `stop_run` to stop it.
 6. If something goes wrong: `get_step`, `configure_step` (merges over the current config),

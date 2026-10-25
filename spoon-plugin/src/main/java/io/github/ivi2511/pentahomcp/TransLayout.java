@@ -6,23 +6,18 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.pentaho.di.base.AbstractMeta;
+import org.pentaho.di.core.NotePadMeta;
 import org.pentaho.di.core.gui.Point;
-import org.pentaho.di.job.JobHopMeta;
-import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.job.entry.JobEntryCopy;
-import org.pentaho.di.trans.TransHopMeta;
-import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
 
 /**
- * Auto-layout de izquierda a derecha para transformaciones y jobs (logica pura, sin Spoon).
- *
- * Columna = profundidad topologica por hops (camino mas largo desde una raiz): x = 100 + col*170.
- * Orden dentro de cada columna: baricentro de los vecinos con pasadas de ida y vuelta (reduce cruces);
- * en un empate, la rama mas larga primero y despues la posicion actual. Altura: cada nodo a la altura
- * de su predecesor mas alto, con 110 px minimos entre nodos de la misma columna, asi la linea
- * principal queda recta y las ramas van debajo. En jobs, START va primero. Los ciclos (posibles en
- * jobs) se cortan ignorando las aristas de vuelta.
+ * Ordena el lienzo de transformaciones y jobs (arrange_canvas, el boton «Ordenar lienzo», build_steps): lee el
+ * documento ({@link LienzoModelo}), calcula con {@link LienzoLayout} (por capas, sin hops por encima de steps ni
+ * notas tapadas) y aplica las posiciones de steps y notas, devolviendo lo que se movio para el undo.
+ * <p>
+ * {@link #calcular} es el layout anterior (columnas de 170 px, filas de 110): lo sigue usando el modo clase
+ * (LeccionLayout) tal cual, y sus constantes la ubicacion de harden_etl.
  */
 final class TransLayout {
 
@@ -40,18 +35,22 @@ final class TransLayout {
     final List<Integer> indices = new ArrayList<Integer>();
     final List<Point> antes = new ArrayList<Point>();
     final List<Point> despues = new ArrayList<Point>();
+    /** Las notas que se movieron (indice en el documento, posicion antes y despues). */
+    final List<Object> notas = new ArrayList<Object>();
+    final List<Integer> notasIndices = new ArrayList<Integer>();
+    final List<Point> notasAntes = new ArrayList<Point>();
+    final List<Point> notasDespues = new ArrayList<Point>();
     int columnas;
+    /** Metricas del lienzo antes y despues (null si no se midio). */
+    LienzoMetricas.Cuenta medidaAntes;
+    LienzoMetricas.Cuenta medidaDespues;
 
     Object[] objetos() {
       return objetos.toArray();
     }
 
     int[] indices() {
-      int[] r = new int[ indices.size() ];
-      for ( int i = 0; i < r.length; i++ ) {
-        r[ i ] = indices.get( i );
-      }
-      return r;
+      return enteros( indices );
     }
 
     Point[] antes() {
@@ -61,58 +60,81 @@ final class TransLayout {
     Point[] despues() {
       return despues.toArray( new Point[ 0 ] );
     }
+
+    boolean vacio() {
+      return objetos.isEmpty() && notas.isEmpty();
+    }
+
+    /**
+     * Registra el movimiento en el grupo: una accion de posicion de steps y otra de notas, encadenadas (en una
+     * transformacion, un solo Ctrl+Z; en un job Spoon no encadena y las notas son un Ctrl+Z aparte). Devuelve
+     * cuantas acciones agrego.
+     */
+    int registrar( UndoGrupo u ) {
+      int n = 0;
+      if ( !objetos.isEmpty() ) {
+        u.posicion( objetos(), indices(), antes(), despues() );
+        n++;
+      }
+      if ( !notas.isEmpty() ) {
+        u.posicion( notas.toArray(), enteros( notasIndices ), notasAntes.toArray( new Point[ 0 ] ),
+          notasDespues.toArray( new Point[ 0 ] ) );
+        n++;
+      }
+      return n;
+    }
+
+    private static int[] enteros( List<Integer> l ) {
+      int[] r = new int[ l.size() ];
+      for ( int i = 0; i < r.length; i++ ) {
+        r[ i ] = l.get( i );
+      }
+      return r;
+    }
   }
 
-  /** Ordena el lienzo del documento y devuelve lo que se movio. */
+  /** Ordena el lienzo del documento con las opciones por defecto y devuelve lo que se movio. */
   static Movimientos ordenar( AbstractMeta m ) {
-    List<Point> actuales = new ArrayList<Point>();
-    List<int[]> aristas = new ArrayList<int[]>();
-    int inicio = -1;
-    List<Object> nodos = new ArrayList<Object>();
-    if ( m instanceof TransMeta ) {
-      TransMeta tm = (TransMeta) m;
-      for ( StepMeta s : tm.getSteps() ) {
-        nodos.add( s );
-        actuales.add( s.getLocation() );
-      }
-      for ( int i = 0; i < tm.nrTransHops(); i++ ) {
-        TransHopMeta h = tm.getTransHop( i );
-        aristas.add( new int[] { nodos.indexOf( h.getFromStep() ), nodos.indexOf( h.getToStep() ) } );
-      }
-    } else if ( m instanceof JobMeta ) {
-      JobMeta jm = (JobMeta) m;
-      for ( JobEntryCopy c : jm.getJobCopies() ) {
-        if ( inicio < 0 && c.isStart() ) {
-          inicio = nodos.size();
-        }
-        nodos.add( c );
-        actuales.add( c.getLocation() );
-      }
-      for ( int i = 0; i < jm.nrJobHops(); i++ ) {
-        JobHopMeta h = jm.getJobHop( i );
-        aristas.add( new int[] { nodos.indexOf( h.getFromEntry() ), nodos.indexOf( h.getToEntry() ) } );
-      }
-    }
-    int[] col = new int[ nodos.size() ];
-    Point[] nuevas = calcular( actuales, aristas, inicio, col );
+    return ordenar( m, LienzoLayout.Opciones.defecto() );
+  }
+
+  /** Ordena el lienzo del documento (steps y notas) y devuelve lo que se movio, con las metricas antes y despues. */
+  static Movimientos ordenar( AbstractMeta m, LienzoLayout.Opciones o ) {
+    LienzoModelo mod = LienzoModelo.de( m );
+    LienzoLayout.Resultado r = LienzoLayout.calcularEstable( mod.grafo, o );
     Movimientos mov = new Movimientos();
-    for ( int i = 0; i < nodos.size(); i++ ) {
-      mov.columnas = Math.max( mov.columnas, col[ i ] + 1 );
-      Point a = actuales.get( i );
-      Point n = nuevas[ i ];
-      if ( a != null && a.x == n.x && a.y == n.y ) {
+    mov.columnas = r.columnas;
+    mov.medidaAntes = LienzoMetricas.medir( mod.grafo, null, null );
+    mov.medidaDespues = LienzoMetricas.medir( mod.grafo, r.nodos, r.notas );
+    for ( int i = 0; i < mod.nodos.size(); i++ ) {
+      Point a = mod.grafo.actuales.get( i );
+      Point n = r.nodos[ i ];
+      if ( n == null || a != null && a.x == n.x && a.y == n.y ) {
         continue;
       }
-      Object o = nodos.get( i );
-      mov.objetos.add( o );
+      Object o2 = mod.nodos.get( i );
+      mov.objetos.add( o2 );
       mov.indices.add( i ); // en TransMeta/JobMeta el indice del nodo es su posicion en la lista
       mov.antes.add( a == null ? new Point( 0, 0 ) : new Point( a.x, a.y ) );
-      mov.despues.add( n );
-      if ( o instanceof StepMeta ) {
-        ( (StepMeta) o ).setLocation( n.x, n.y );
+      mov.despues.add( new Point( n.x, n.y ) );
+      if ( o2 instanceof StepMeta ) {
+        ( (StepMeta) o2 ).setLocation( n.x, n.y );
       } else {
-        ( (JobEntryCopy) o ).setLocation( n.x, n.y );
+        ( (JobEntryCopy) o2 ).setLocation( n.x, n.y );
       }
+    }
+    for ( int j = 0; j < mod.notas.size(); j++ ) {
+      NotePadMeta nota = mod.notas.get( j );
+      Point a = nota.getLocation();
+      Point n = r.notas[ j ];
+      if ( n == null || a != null && a.x == n.x && a.y == n.y ) {
+        continue;
+      }
+      mov.notas.add( nota );
+      mov.notasIndices.add( j );
+      mov.notasAntes.add( a == null ? new Point( 0, 0 ) : new Point( a.x, a.y ) );
+      mov.notasDespues.add( new Point( n.x, n.y ) );
+      nota.setLocation( n.x, n.y );
     }
     return mov;
   }

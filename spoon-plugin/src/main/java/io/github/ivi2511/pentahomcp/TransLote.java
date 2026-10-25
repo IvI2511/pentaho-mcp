@@ -513,9 +513,7 @@ final class TransLote {
       }
     } else if ( completo && l.arrange ) {
       mov = TransLayout.ordenar( tm );
-      if ( !mov.objetos.isEmpty() ) {
-        e.undo.posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
-      }
+      mov.registrar( e.undo );
     }
     tm.unselectAll();
     for ( StepMeta s : e.creados ) {
