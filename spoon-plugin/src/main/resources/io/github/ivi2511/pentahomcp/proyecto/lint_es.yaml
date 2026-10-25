@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=lint.schema.json
+# Perfil del linter de Pentaho Live: las convenciones de este proyecto o curso.
+# Lo usan solos lint_etl (Claude), «Revisar calidad…» del menú IDC, la sección Calidad de los
+# informes, el corrector (renglón lint:profile) y `pentaho-live lint` (CI): buscan
+# .pentaho-live/lint.yaml subiendo carpetas desde la del .ktr/.kjb.
+# Formato completo: manual/13-proyecto.md de la skill pentaho-etl.
+version: 1
+name: {{NAME}}
+description: Convenciones del equipo para ETL con Pentaho Data Integration 9.4.
+
+# Puntaje mínimo (0-100) para dar por bueno un .ktr/.kjb. Con un error el puntaje nunca pasa de 74.
+min_score: 75
+
+# Reglas (ids en pentaho://lint/rules): off, on, o la gravedad que quieras (error, warning, info).
+rules:
+  absolute_path: error        # nada de C:\Users\... en un proyecto compartido
+  password_in_file: error
+  default_step_name: warning  # «Text file output 2» no documenta nada
+  # select_star: off
+
+# Prefijos por categoría de step: input, output, lookup, filter, join, transform, aggregate,
+# flow, script, validation, utility, mapping, other; y by_type para un tipo concreto.
+naming:
+  steps:
+    input: IN_
+    output: OUT_
+    lookup: LKP_
+    filter: FLT_
+    # by_type: { TableInput: SRC_ }
+  entries:
+    transformation: TR_
+    job: JB_
+
+# Descripción obligatoria en cada step (clic derecho > Editar descripción).
+step_description:
+  required: false
+  except: [Dummy]
+
+# Variables obligatorias en vez de rutas y hosts escritos a mano.
+required_variables:
+  paths: [DIR_DATOS, Internal.Entry.Current.Directory]
+  hosts: [DB_HOST]
+
+# Reglas propias del equipo: patrones (expresiones regulares), nunca código.
+# where: name | path | sql | description | xml; must: not_match (por defecto) | match.
+team_rules:
+  - id: no_tmp_folder
+    title: Nada en carpetas temporales
+    message: "«{where}» usa una carpeta temporal ({match}): usa ${DIR_DATOS} o salida/."
+    severity: warning
+    where: path
+    pattern: '(?i)(^|[\\/])te?mp([\\/]|$)'

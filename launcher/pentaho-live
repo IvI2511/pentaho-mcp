@@ -1,6 +1,28 @@
 #!/bin/sh
 # pentaho-live for Git Bash / MSYS2 (where Claude Code runs its commands on Windows): bash does not
 # run a .cmd file by its bare name, so this forwards to pentaho-live.cmd, next to this file.
+# [0.7 project] init / lint / profile on macOS and Linux (no cmd.exe): Java + the PDI of PDI_HOME
+# (default ~/pentaho/data-integration, where instalar.sh --instalar-pdi puts it). On Windows they go to the .cmd.
+case "$1" in
+  init|lint|profile)
+    if ! command -v cmd.exe >/dev/null 2>&1; then
+      pdi="${PDI_HOME:-$HOME/pentaho/data-integration}"
+      if [ ! -d "$pdi/plugins/pentaho-mcp" ]; then
+        echo "pentaho-live: no Pentaho Live plugin in $pdi/plugins (set PDI_HOME to its data-integration folder)" >&2
+        exit 2
+      fi
+      java="java"
+      [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] && java="$JAVA_HOME/bin/java"
+      [ -n "${PENTAHO_JAVA_HOME:-}" ] && [ -x "$PENTAHO_JAVA_HOME/bin/java" ] && java="$PENTAHO_JAVA_HOME/bin/java"
+      # Java 9+ reads JDK_JAVA_OPTIONS (Kettle needs these opens on 17+); Java 8 ignores it
+      JDK_JAVA_OPTIONS="--add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED"
+      export JDK_JAVA_OPTIONS
+      exec "$java" -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 -DKETTLE_PLUGIN_BASE_FOLDERS="$pdi/plugins" \
+        -cp "$pdi/lib/*:$pdi/plugins/pentaho-mcp/*:$pdi/plugins/pentaho-mcp/lib/*:$pdi/classes" \
+        io.github.ivi2511.pentahomcp.ProyectoMain "$@"
+    fi
+    ;;
+esac
 cmd_file="$(cygpath -w "$0" 2>/dev/null).cmd"
 [ -f "$cmd_file" ] || cmd_file="pentaho-live.cmd"
 exec cmd.exe //c "$cmd_file" "$@"

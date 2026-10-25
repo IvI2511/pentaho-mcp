@@ -95,12 +95,27 @@ final class LintPropuestas {
       if ( p == null ) {
         continue;
       }
+      p = conPrefijo( r.perfil, h, p );
       p = unico( p, tomados );
       tomados.add( p.toLowerCase( Locale.ROOT ) );
       a.preview = p;
       a.needsValue = false;
       a.param( "proposed_by", "rules" );
     }
+  }
+
+  /**
+   * Con un perfil de proyecto que pide prefijos (naming_convention), el nombre propuesto ya los lleva: así el arreglo
+   * de default_step_name deja también cumplida la convención («Leer ventas» → «IN_Leer ventas»).
+   */
+  static String conPrefijo( io.github.ivi2511.pentahomcp.lint.PerfilEquipo pf, Hallazgo h, String p ) {
+    if ( pf == null || h.fix == null || pf.apaga( io.github.ivi2511.pentahomcp.lint.PerfilEquipo.NAMING ) ) {
+      return p;
+    }
+    boolean step = "default_step_name".equals( h.rule );
+    String tipo = h.fix.params.get( "type" );
+    String pre = step ? pf.prefijoStep( tipo ) : pf.prefijoEntrada( tipo );
+    return pre == null ? p : pf.conPrefijo( p, pre, step );
   }
 
   /** Cuántos steps o entradas nombra la descripción propuesta como mucho. */

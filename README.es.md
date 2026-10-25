@@ -86,6 +86,16 @@ solo Ctrl+Z, silenciar una regla donde es deliberada y una revisión profunda op
 veredicto), **Ordenar lienzo**, **Lección**, el cambio a Data Integration, Informes o Corrector y **Acerca de
 Pentaho Live**.
 
+**Proyectos en equipo.** Un proyecto o un curso comparte sus convenciones en un archivo,
+`.pentaho-live/lint.yaml`: qué reglas de calidad corren y con qué gravedad, el puntaje mínimo, un prefijo por
+categoría de step (`IN_`, `OUT_`, `LKP_`, `FLT_`…), descripción en cada step, `${DIR_DATOS}` y `${DB_HOST}` en vez de
+rutas y hosts escritos a mano, y reglas propias del equipo como patrones. Claude, **Revisar calidad…** («Perfil:
+Curso (…) · mínimo 75: lo cumple»), los informes y el corrector lo usan solos, y renombrar según la convención se
+deshace con un Ctrl+Z. `pentaho-live init` (o **IDC > Preparar proyecto…**, o pidiéndoselo a Claude) crea solo lo
+que falta en un repositorio de equipo: `etl/`, `datasets/`, `tests/`, `contracts/`, `env/`, `.gitignore`,
+`.gitattributes`, ese perfil, un README con las convenciones y un workflow de GitHub Actions que instala PDI con
+Pentaho Live (con caché) y hace fallar el pull request si un `.ktr` no llega al mínimo (`pentaho-live lint etl`).
+
 ¿No tienes Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
 
@@ -102,6 +112,7 @@ Kitchen.
 | *"Revisa las buenas prácticas de esta transformación antes de que la entregue y arregla lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
 | *"Da la lección de Stream lookup paso a paso, nivel principiante."* | la construye un step por cada clic en Siguiente ▶, con una nota numerada en el lienzo por step y las filas que produce |
 | *"Hazme un informe de esta transformación para la práctica, en PDF y PowerPoint, con una conclusión corta."* | arma el informe (linaje, diccionario de datos, métricas…), escribe la conclusión con los datos reales y exporta los dos archivos |
+| *"Prepara `C:\proyectos\ventas` como proyecto de equipo con las convenciones del curso."* | crea solo lo que falta (carpetas, `.gitignore`, el perfil del linter, README, CI) y te dice qué creó; después `lint_etl` revisa cada ETL con ese perfil |
 | *"Con esta solución, un pack de corrección con un caso oculto; y después, las notas de las entregas de `C:\TP3\entregas`."* | corre la solución para sacar la salida esperada, corrige cada entrega en JVMs aparte y resume las notas, quién falló qué y por qué; la planilla y la devolución de cada alumno quedan en la carpeta de resultados |
 
 ## Cómo funciona

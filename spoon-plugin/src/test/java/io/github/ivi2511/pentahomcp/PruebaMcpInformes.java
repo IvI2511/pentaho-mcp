@@ -60,9 +60,9 @@ public class PruebaMcpInformes {
    * 54 tools de 0.4.0 + build_report, get_report_data, show_report y set_error_handling (0.5.0) + lint_etl,
    * apply_lint_fixes y suppress_lint (linter) + las 5 del corrector (CorrectorTools) + lesson_notes (modo
    * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3) + harden_etl y
-   * stress_test (robustez).
+   * stress_test (robustez) + lint_profile y project_init (0.7, perfil del proyecto y pentaho-live init).
    */
-  private static final int TOOLS = 73;
+  private static final int TOOLS = 75;
 
   private McpHttpServer server;
   private int puerto;
@@ -161,12 +161,13 @@ public class PruebaMcpInformes {
     JsonNode lint = porNombre.get( "lint_etl" );
     noNulo( lint, "lint_etl registrada" );
     igual( set( "document", "deep", "deep_timeout_s", "rules", "min_severity", "steps", "include_kettle_checks",
-      "language", "robustness" ), props( lint ), "argumentos de lint_etl (diseno del linter §6 + robustez §3)" );
+      "language", "robustness", "profile" ), props( lint ), "argumentos de lint_etl (diseno del linter §6 + robustez "
+      + "§3 + perfil del proyecto)" );
     igual( Arrays.asList( "info", "warning", "error" ), textos( prop( lint, "min_severity" ).path( "enum" ) ),
       "enum de min_severity" );
     JsonNode arreglos = porNombre.get( "apply_lint_fixes" );
     noNulo( arreglos, "apply_lint_fixes registrada" );
-    igual( set( "document", "keys", "values", "dry_run", "language" ), props( arreglos ),
+    igual( set( "document", "keys", "values", "dry_run", "language", "profile" ), props( arreglos ),
       "argumentos de apply_lint_fixes (diseno del linter §6)" );
     igual( "[\"keys\"]", arreglos.path( "inputSchema" ).path( "required" ).toString(), "keys es obligatorio" );
     igual( "string", prop( arreglos, "values" ).path( "additionalProperties" ).path( "type" ).asText(),
@@ -177,6 +178,13 @@ public class PruebaMcpInformes {
     igual( set( "document", "rule", "step", "entry", "reason", "remove" ), props( silenciar ),
       "argumentos de suppress_lint" );
     igual( "[\"rule\"]", silenciar.path( "inputSchema" ).path( "required" ).toString(), "rule es obligatorio" );
+    // 0.7: el perfil del proyecto (E5) y pentaho-live init (X1)
+    igual( set( "document", "path" ), props( porNombre.get( "lint_profile" ) ), "argumentos de lint_profile" );
+    JsonNode proyecto = porNombre.get( "project_init" );
+    noNulo( proyecto, "project_init registrada" );
+    igual( set( "folder", "profile_name", "language", "dry_run" ), props( proyecto ), "argumentos de project_init" );
+    igual( "[\"folder\"]", proyecto.path( "inputSchema" ).path( "required" ).toString(), "folder es obligatorio" );
+    contiene( proyecto.path( "description" ).asText(), "never overwrites", "project_init no pisa nada" );
     JsonNode robustecer = porNombre.get( "harden_etl" );
     noNulo( robustecer, "harden_etl registrada" );
     igual( set( "document", "recipes", "steps", "rejects_file", "required_fields", "keys", "confirm", "dry_run",

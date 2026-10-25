@@ -30,12 +30,24 @@ rem      IDC_LAUNCHER_READY_FILE  set by IDCLauncher.exe (used with --launcher)
 rem
 rem  Exit codes: 0 = Spoon is starting, or was already open
 rem              1 = no PDI (data-integration\Spoon.bat) found
+rem
+rem  Project commands (no Spoon; block [0.7 project] at the end of this file):
+rem      pentaho-live init [folder]         team project template (only what is missing)
+rem      pentaho-live lint <files|folders>  lint with the project's profile; exit 1 below its min_score
+rem      pentaho-live profile [folder]      the lint profile that applies there
 rem ===========================================================================
 setlocal EnableExtensions DisableDelayedExpansion
 
 set "PL_BIN=%~dp0"
 for %%I in ("%~dp0..") do set "PL_APP=%%~fI"
 set "PL_PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+rem --- [0.7 project] init / lint / profile: they skip the options below and go to :pl_proyecto
+set "PL_PROYECTO="
+if /i "%~1"=="init" set "PL_PROYECTO=1"
+if /i "%~1"=="lint" set "PL_PROYECTO=1"
+if /i "%~1"=="profile" set "PL_PROYECTO=1"
+if defined PL_PROYECTO goto :args_done
 
 rem --- Options (anything else is ignored)
 set "PL_GUI="
@@ -71,6 +83,7 @@ set "PL_SPOON=%PL_PDI%\Spoon.bat"
 rem --- Java: the JRE that comes with the full install
 set "PL_JAVA_FROM=PDI's own search (PENTAHO_JAVA_HOME, JAVA_HOME, PATH)"
 if not exist "%PL_APP%\jre\bin\javaw.exe" goto :java_done
+if defined PL_PROYECTO goto :pl_proyecto
 set "PENTAHO_JAVA_HOME=%PL_APP%\jre"
 set "PL_JAVA_FROM=%PL_APP%\jre"
 :java_done
@@ -176,6 +189,10 @@ echo   If Spoon is already open (the MCP answers on 127.0.0.1:%%PENTAHO_MCP_PORT
 echo   --gui                   report with a message box
 echo   --launcher              used by IDCLauncher.exe, the splash screen of the shortcuts (implies --gui)
 echo   PENTAHO_LIVE_DRY_RUN=1  only print what it would do
+echo Project commands (no Spoon needed):
+echo   pentaho-live init [folder] [--name N] [--lang en^|es^|pt] [--dry-run]
+echo   pentaho-live lint ^<files or folders^> [--profile path^|none] [--min-score N] [--format text^|json^|github]
+echo   pentaho-live profile [folder]
 exit /b 0
 
 rem --- IDCLauncher.exe closes its splash screen when its ready file exists. Only
@@ -193,3 +210,33 @@ if not defined PL_SIGNAL exit /b 0
 if exist "%IDC_LAUNCHER_READY_FILE%" exit /b 0
 (type nul > "%IDC_LAUNCHER_READY_FILE%") 2>nul
 exit /b 0
+
+rem ===========================================================================
+rem  [0.7 project] pentaho-live init | lint | profile
+rem  io.github.ivi2511.pentahomcp.ProyectoMain, without Spoon: the classpath is
+rem  data-integration\lib plus the plugin (plugins\pentaho-mcp), Kettle's own
+rem  plugins come from data-integration\plugins. The arguments go as they are.
+rem  Java: <install folder>\jre (full install), else PENTAHO_JAVA_HOME, JAVA_HOME
+rem  or the java of the PATH. Exit code: the one of ProyectoMain (0 ok, 1 a file
+rem  below the minimum score, 2 usage or profile error).
+rem ===========================================================================
+:pl_proyecto
+if not exist "%PL_PDI%\plugins\pentaho-mcp" goto :pl_proyecto_sin_plugin
+set "PL_JAVA=java"
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "PL_JAVA=%JAVA_HOME%\bin\java.exe"
+if defined PENTAHO_JAVA_HOME if exist "%PENTAHO_JAVA_HOME%\bin\java.exe" set "PL_JAVA=%PENTAHO_JAVA_HOME%\bin\java.exe"
+if exist "%PL_APP%\jre\bin\java.exe" set "PL_JAVA=%PL_APP%\jre\bin\java.exe"
+set "PL_PCP=%PL_PDI%\lib\*;%PL_PDI%\plugins\pentaho-mcp\*;%PL_PDI%\plugins\pentaho-mcp\lib\*;%PL_PDI%\classes"
+rem Java 9+ reads JDK_JAVA_OPTIONS (Kettle needs these opens on 17+); Java 8 ignores it
+set "JDK_JAVA_OPTIONS=--add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED"
+if "%PENTAHO_LIVE_DRY_RUN%"=="1" goto :pl_proyecto_ensayo
+"%PL_JAVA%" -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 "-DKETTLE_PLUGIN_BASE_FOLDERS=%PL_PDI%\plugins" -cp "%PL_PCP%" io.github.ivi2511.pentahomcp.ProyectoMain %*
+exit /b %ERRORLEVEL%
+:pl_proyecto_ensayo
+setlocal EnableDelayedExpansion
+echo [dry run] "!PL_JAVA!" -Xmx1g -Djava.awt.headless=true -cp "!PL_PCP!" io.github.ivi2511.pentahomcp.ProyectoMain %*
+endlocal
+exit /b 0
+:pl_proyecto_sin_plugin
+echo Pentaho Live: no plugin in "%PL_PDI%\plugins\pentaho-mcp" (PDI from %PL_PDI_FROM%). Reinstall Pentaho Live.
+exit /b 2

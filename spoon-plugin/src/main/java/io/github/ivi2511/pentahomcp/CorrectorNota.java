@@ -179,6 +179,11 @@ final class CorrectorNota {
    * output / Table output de la entrega). Devuelve lo que las pistas necesitan. tm null: nada se evalua.
    */
   static Estatico analizar( Pack pack, TransMeta tm, String pasoSalida, ResultadoCorreccion r ) {
+    return analizar( pack, tm, pasoSalida, r, null );
+  }
+
+  /** Como el de arriba; dirPack: la carpeta del pack, donde va su perfil del linter (lint:profile, 0.7). */
+  static Estatico analizar( Pack pack, TransMeta tm, String pasoSalida, ResultadoCorreccion r, java.io.File dirPack ) {
     pack.completar();
     r.completar();
     String idioma = idioma( pack, r );
@@ -210,11 +215,15 @@ final class CorrectorNota {
       }
     }
     Set<String> correr = new LinkedHashSet<String>( pedidas );
+    boolean conPerfil = correr.remove( CorrectorPerfil.ID ); // lint:profile, con el perfil del pack (CorrectorPerfil)
     e.lintDePistas = !usaBases( tm );
     if ( e.lintDePistas ) {
       correr.addAll( LINT_DE_PISTAS );
     }
     Map<String, ReglaEvaluada> lint = evaluarLint( correr, tm, idioma );
+    if ( conPerfil ) {
+      lint.put( CorrectorPerfil.ID, CorrectorPerfil.evaluar( dirPack, tm, idioma ) );
+    }
     for ( ItemRubrica i : pack.rubrica ) {
       ReglaEvaluada x = i != null && i.esLint() ? lint.get( normLint( i.idLint() ) ) : null;
       if ( x != null ) {

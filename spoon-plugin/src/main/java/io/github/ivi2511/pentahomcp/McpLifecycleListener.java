@@ -67,7 +67,11 @@ public class McpLifecycleListener implements LifecycleListener {
       + "(one Ctrl+Z each; notes the user wrote are never touched). To teach, lesson_start sends a whole lesson "
       + "script (steps with what/why) that Spoon plays one step at a time (pace guided, auto or manual with "
       + "lesson_next); follow the class with lesson_status wait_s and steer it with lesson_control. The handout "
-      + "to share afterwards is build_report with sections=[\"lesson\"].";
+      + "to share afterwards is build_report with sections=[\"lesson\"]."
+      + " In a team project, lint_etl uses the project's lint profile (.pentaho-live/lint.yaml, found going up the "
+      + "folders; lint_profile shows it) on its own: follow its naming prefixes, required variables and team rules "
+      + "when you build, and check 'profile.passed'. project_init prepares a team project (folders, .gitignore, the "
+      + "profile, README, GitHub Actions CI) without overwriting anything.";
 
   private McpHttpServer server;
 

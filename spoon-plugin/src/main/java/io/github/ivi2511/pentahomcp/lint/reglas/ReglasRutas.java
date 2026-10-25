@@ -114,6 +114,11 @@ public final class ReglasRutas {
       Hallazgo h = en( ctx, Sev.WARNING, s, c, r.tag );
       h.message = ctx.t( "absolute_path.msg", "where", nombre( s, c ), "value", r.valor );
       String[] p = Rutas.propuesta( ctx.meta().getFilename(), r.valor );
+      io.github.ivi2511.pentahomcp.lint.PerfilEquipo pf = ctx.opciones().perfil;
+      if ( pf != null && !pf.variablesRuta.isEmpty() ) { // el perfil pide su variable (required_variables.paths)
+        String[] v = Rutas.propuestaConVariable( r.valor, pf.variablesRuta.get( 0 ) );
+        p = new String[] { v[ 0 ], pf.variablesRuta.get( 0 ), v[ 1 ] };
+      }
       h.fix = Arreglo.conConfirmacion( Arreglo.REPLACE_VALUE ).vista( p[ 0 ] ).param( "tag", r.tag );
       if ( p[ 1 ] != null ) {
         h.fix.param( "parameter", p[ 1 ] ).param( "default", p[ 2 ] );

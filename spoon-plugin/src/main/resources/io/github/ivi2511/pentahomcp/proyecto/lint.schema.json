@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/IvI2511/pentaho-mcp/schemas/lint-profile-1.json",
+  "title": "Pentaho Live lint profile (.pentaho-live/lint.yaml)",
+  "description": "Shared conventions of a project or course: which lint rules run and how severe they are, the minimum score, naming prefixes, required descriptions and variables, and the team's own pattern rules. Declarative only: nothing in it is executed.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1, "description": "Format version (1)." },
+    "name": { "type": "string", "description": "Name of the profile, shown as 'Profile: <name>'." },
+    "description": { "type": "string" },
+    "min_score": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Minimum lint score (0-100). pentaho-live lint exits with 1 below it; the grader's lint:profile line passes from it." },
+    "robustness": { "type": "boolean", "description": "Also run the robustness rules (their own sub-score)." },
+    "rules": {
+      "type": "object",
+      "description": "Rule id (see pentaho://lint/rules) -> off, on or a severity.",
+      "additionalProperties": {
+        "anyOf": [
+          { "type": "string", "enum": ["off", "on", "error", "warning", "info"] },
+          { "type": "boolean" }
+        ]
+      }
+    },
+    "naming": {
+      "type": "object",
+      "properties": {
+        "steps": { "$ref": "#/definitions/prefixesSteps" },
+        "entries": { "$ref": "#/definitions/prefixesEntries" }
+      },
+      "additionalProperties": false
+    },
+    "step_description": {
+      "anyOf": [
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "properties": {
+            "required": { "type": "boolean" },
+            "except": { "type": "array", "items": { "type": "string" }, "description": "Step or entry type ids that need no description." }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "required_variables": {
+      "type": "object",
+      "properties": {
+        "paths": { "$ref": "#/definitions/variables", "description": "A file path has to start with one of these variables." },
+        "hosts": { "$ref": "#/definitions/variables", "description": "The host of a database connection has to use one of these variables." }
+      },
+      "additionalProperties": false
+    },
+    "team_rules": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["id", "pattern"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,60}$" },
+          "title": { "type": "string" },
+          "message": { "type": "string", "description": "Placeholders: {where} (step or entry), {match}." },
+          "fix": { "type": "string" },
+          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+          "where": { "type": "string", "enum": ["xml", "name", "path", "sql", "description"] },
+          "step_types": { "type": "array", "items": { "type": "string" } },
+          "entry_types": { "type": "array", "items": { "type": "string" } },
+          "pattern": { "type": "string", "maxLength": 500, "description": "Java regular expression." },
+          "must": { "type": "string", "enum": ["not_match", "match"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "definitions": {
+    "prefix": { "type": "string", "maxLength": 40 },
+    "variables": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "byType": { "type": "object", "additionalProperties": { "$ref": "#/definitions/prefix" } },
+    "prefixesSteps": {
+      "type": "object",
+      "properties": {
+        "input": { "$ref": "#/definitions/prefix" },
+        "output": { "$ref": "#/definitions/prefix" },
+        "lookup": { "$ref": "#/definitions/prefix" },
+        "filter": { "$ref": "#/definitions/prefix" },
+        "join": { "$ref": "#/definitions/prefix" },
+        "transform": { "$ref": "#/definitions/prefix" },
+        "aggregate": { "$ref": "#/definitions/prefix" },
+        "flow": { "$ref": "#/definitions/prefix" },
+        "script": { "$ref": "#/definitions/prefix" },
+        "validation": { "$ref": "#/definitions/prefix" },
+        "utility": { "$ref": "#/definitions/prefix" },
+        "mapping": { "$ref": "#/definitions/prefix" },
+        "other": { "$ref": "#/definitions/prefix" },
+        "by_type": { "$ref": "#/definitions/byType" }
+      },
+      "additionalProperties": false
+    },
+    "prefixesEntries": {
+      "type": "object",
+      "properties": {
+        "transformation": { "$ref": "#/definitions/prefix" },
+        "job": { "$ref": "#/definitions/prefix" },
+        "sql": { "$ref": "#/definitions/prefix" },
+        "file": { "$ref": "#/definitions/prefix" },
+        "condition": { "$ref": "#/definitions/prefix" },
+        "mail": { "$ref": "#/definitions/prefix" },
+        "utility": { "$ref": "#/definitions/prefix" },
+        "other": { "$ref": "#/definitions/prefix" },
+        "by_type": { "$ref": "#/definitions/byType" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -86,6 +86,16 @@ plano com caixas de seleção, aplicá-lo com um único Ctrl+Z e o teste com dad
 **Organizar tela**, **Lição**, a troca para Data Integration, Relatórios ou Corretor e **Sobre o Pentaho
 Live**.
 
+**Projetos em equipe.** Um projeto ou um curso compartilha as suas convenções em um arquivo,
+`.pentaho-live/lint.yaml`: quais regras de qualidade rodam e com que gravidade, a pontuação mínima, um prefixo por
+categoria de step (`IN_`, `OUT_`, `LKP_`, `FLT_`…), descrição em cada step, `${DIR_DATOS}` e `${DB_HOST}` em vez de
+caminhos e hosts escritos à mão, e regras próprias da equipe como padrões. O Claude, **Revisar qualidade…**
+("Perfil: Curso (…) · mínimo 75: atingido"), os relatórios e o corretor o usam sozinhos, e renomear conforme a
+convenção se desfaz com um Ctrl+Z. `pentaho-live init` (ou **IDC > Preparar projeto…**, ou pedindo ao Claude) cria
+só o que falta em um repositório de equipe: `etl/`, `datasets/`, `tests/`, `contracts/`, `env/`, `.gitignore`,
+`.gitattributes`, esse perfil, um README com as convenções e um workflow do GitHub Actions que instala o PDI com o
+Pentaho Live (com cache) e faz o pull request falhar se um `.ktr` não chega ao mínimo (`pentaho-live lint etl`).
+
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
 

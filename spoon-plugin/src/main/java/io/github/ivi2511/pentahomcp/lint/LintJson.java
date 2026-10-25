@@ -15,6 +15,42 @@ public final class LintJson {
   private LintJson() {
   }
 
+  /**
+   * El perfil del proyecto con que se corrió: {name, path, description, min_score, passed}, o {path, error} si se
+   * encontró pero no se pudo leer; null sin perfil.
+   */
+  public static ObjectNode perfil( Resultado r ) {
+    if ( r.perfil != null ) {
+      ObjectNode p = F.objectNode();
+      p.put( "name", r.perfil.nombre );
+      if ( r.perfil.archivo != null ) {
+        p.put( "path", r.perfil.archivo.getAbsolutePath() );
+      }
+      if ( r.perfil.descripcion != null ) {
+        p.put( "description", r.perfil.descripcion );
+      }
+      if ( r.minScore != null ) {
+        p.put( "min_score", r.minScore ).put( "passed", Boolean.TRUE.equals( r.pasaMinimo ) );
+      }
+      if ( !r.perfil.avisos.isEmpty() ) {
+        ArrayNode w = p.putArray( "warnings" );
+        for ( String a : r.perfil.avisos ) {
+          w.add( a );
+        }
+      }
+      return p;
+    }
+    if ( r.perfilError != null ) {
+      ObjectNode p = F.objectNode();
+      if ( r.perfilArchivo != null ) {
+        p.put( "path", r.perfilArchivo );
+      }
+      p.put( "error", r.perfilError );
+      return p;
+    }
+    return null;
+  }
+
   public static ObjectNode resultado( Resultado r ) {
     ObjectNode o = F.objectNode();
     if ( r.document != null ) {
@@ -42,6 +78,10 @@ public final class LintJson {
       if ( r.gateApplied ) {
         s.put( "error_gate", Puntaje.COMPUERTA_ERROR );
       }
+    }
+    ObjectNode pf = perfil( r );
+    if ( pf != null ) {
+      o.set( "profile", pf );
     }
     o.set( "findings", hallazgos( r.findings ) );
     if ( r.hidden > 0 ) {

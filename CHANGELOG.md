@@ -9,6 +9,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Team conventions: the project's lint profile** (`.pentaho-live/lint.yaml`, or `.json` with the JSON Schema
+  `lint.schema.json`), found going up the folders from the document's folder. It turns rules on or off and sets their
+  severity, adds a `min_score`, a prefix per step or entry category (`naming`, by category or `by_type`), a required
+  description per step, the variables that paths and database hosts have to use (`required_variables`) and the
+  team's own rules as declarative patterns (`team_rules`: regex on the name, paths, SQL, description or XML, with a
+  time limit). Four new rules that only run with a profile: `naming_convention` (automatic fix: rename, one Ctrl+Z,
+  references updated; the proposed names of `default_step_name` carry the prefix), `step_without_description`,
+  `required_variable` (with it, `absolute_path` proposes the profile's variable) and `team_pattern`. `lint_etl`
+  and `apply_lint_fixes` use it on their own (new argument `profile`: a file, a folder or `none`) and return
+  `profile: {name, path, min_score, passed}`; the IDC **Check quality…** dialog shows "Profile: name (path) ·
+  minimum N: met"; the reports' quality section names it; the grader has a new rubric line `lint:profile` (the
+  pack's own `.pentaho-live/lint.yaml`, passes from its `min_score`).
+- New MCP tools **`lint_profile`** (the effective profile and where it was found) and **`project_init`**.
+- **`pentaho-live init [folder]`** (also **IDC > Prepare project…** and `project_init`): a team project with
+  only what is missing, never overwriting a file: `etl/`, `datasets/`, `tests/`, `contracts/`, `env/` with an
+  example `dev.properties`, `.gitignore` (secrets, run outputs, SQLite outputs), `.gitattributes` (the readable-diff
+  driver for `.ktr`/`.kjb`, commented until `pentaho-live textconv` exists), a default course profile, a README
+  with the conventions and `.github/workflows/pentaho-live.yml`: PDI CE 9.4 with Pentaho Live from the release,
+  cached, and the linter with the profile's minimum score on every `.ktr`/`.kjb` under `etl/` (annotations and a
+  job summary; TODO steps for golden-dataset tests and the semantic diff).
+- **`pentaho-live lint <files|folders>`** (`--profile`, `--min-score`, `--format text|json|github`, `--summary`)
+  and **`pentaho-live profile`**, without Spoon (`ProyectoMain`): exit code 1 when a file is below the minimum.
+  `launcher/pentaho-live` runs them on macOS and Linux too, with `PDI_HOME`.
+- Skill: `manual/13-proyecto.md` (the profile format, init, lint and CI).
+
 - **Details window** in the IDC menu's **Check quality…** and **Harden…** dialogs: a double click (or Enter, or
   the new *Details…* button) on a finding or a recipe opens it in its own resizable window, with the title, a
   severity or level badge, where it is with **Go to step**, what happens, why it matters, how to fix it with the

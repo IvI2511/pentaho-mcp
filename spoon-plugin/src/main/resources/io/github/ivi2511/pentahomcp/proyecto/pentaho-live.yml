@@ -1,0 +1,73 @@
+# Pentaho Live CI (created by `pentaho-live init`, Pentaho Live {{VERSION}}).
+# On every pull request and push to main: installs PDI CE 9.4 with the Pentaho Live plugin (cached),
+# lints every .ktr/.kjb under etl/ with the project's profile (.pentaho-live/lint.yaml) and fails
+# if one is below its min_score. The steps marked TODO are added by later Pentaho Live versions.
+name: pentaho-live
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PENTAHO_LIVE_VERSION: "{{VERSION}}"
+  # PDI CE 9.4 with the plugin already inside (the same zip as the release's installers)
+  PDI_ZIP_URL: https://github.com/IvI2511/pentaho-mcp/releases/download/v{{VERSION}}/pdi-ce-9.4-con-pentaho-mcp.zip
+
+jobs:
+  lint:
+    name: Lint .ktr/.kjb (project profile)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Cache PDI CE 9.4 + Pentaho Live
+        id: pdi-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pdi
+          key: pdi-ce-9.4-pentaho-live-${{ env.PENTAHO_LIVE_VERSION }}
+
+      - name: Install PDI CE 9.4 + Pentaho Live (about 400 MB, only without cache)
+        if: steps.pdi-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/pdi"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/pdi.zip" "$PDI_ZIP_URL"
+          unzip -q "$RUNNER_TEMP/pdi.zip" -d "$RUNNER_TEMP/pdi"
+          rm "$RUNNER_TEMP/pdi.zip"
+          ls "$RUNNER_TEMP/pdi/data-integration/plugins/pentaho-mcp"
+
+      - name: Lint with the project profile
+        run: |
+          PDI="$RUNNER_TEMP/pdi/data-integration"
+          export KETTLE_HOME="$RUNNER_TEMP/kettle-home"
+          mkdir -p "$KETTLE_HOME/.kettle"
+          # the same as `pentaho-live lint etl` on a computer with Pentaho Live installed
+          java -Xmx1g \
+            --add-opens java.base/java.net=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED \
+            --add-opens java.base/sun.net.www.protocol.jar=ALL-UNNAMED \
+            -Djava.awt.headless=true -DKETTLE_PLUGIN_BASE_FOLDERS="$PDI/plugins" \
+            -cp "$PDI/lib/*:$PDI/plugins/pentaho-mcp/*:$PDI/plugins/pentaho-mcp/lib/*:$PDI/classes" \
+            io.github.ivi2511.pentahomcp.ProyectoMain lint etl \
+            --format github --summary "$GITHUB_STEP_SUMMARY"
+
+      # TODO(pentaho-live tests): run the golden-dataset tests in tests/ with Pan when
+      # `pentaho-live test` is available (Pentaho Live roadmap P1), for example:
+      # - name: Tests with golden datasets
+      #   run: java ... io.github.ivi2511.pentahomcp.ProyectoMain test tests
+
+      # TODO(pentaho-live diff): semantic diff of the .ktr/.kjb changed in the pull request
+      # against the base branch (roadmap E1/P4), posted as a comment with the score before and after:
+      # - name: Semantic diff
+      #   if: github.event_name == 'pull_request'
+      #   run: java ... io.github.ivi2511.pentahomcp.diff.LineaComandos diff --format markdown ...
