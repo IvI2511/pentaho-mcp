@@ -80,6 +80,35 @@ The errors that stop `create_exercise_pack` come with a stable code: `solution_n
 (`replace: true` overwrites), `bad_options`, `solution_load_failed`, `solution_blocked` (the solution itself uses a
 dangerous step), `solution_failed`, `no_output_step`, `missing_input`, `build_failed`, `invalid_pack`.
 
+### 3.1 Creating a pack in Spoon, step by step
+
+**Grader → Create pack from this transformation…** opens a wizard on the active tab. The step list on the left shows
+where you are (▶ current, ✓ done, ○ pending; click a done step to go back); every field has a line of help with an
+example under it, and anything wrong is shown **in red right under the field** (the page jumps to it). The common
+case is: open the solution, **Next**, **Next**, **Save pack**.
+
+1. **Solution and output**: the exercise title (students see it), **What is compared** in plain words — *the tables
+   it loads into the database* (the usual choice for a database exercise; or only one of them), *the file written by
+   the step «X»*, or *the rows coming out of the last step* —, where the pack is saved (proposed: `pack-<name>` next
+   to the solution; a new or empty folder or a `.zip`), the language of the feedback and **Prepare a copy for
+   students**.
+2. **Test data**: the hidden case folder (optional: the same file names with other data; students never see its
+   values) and, for a database exercise, one box per connection (see §11). **Next** runs your solution in a separate
+   process and builds a draft pack in a temporary folder: nothing is saved yet. If the solution does not finish
+   cleanly, the red box shows the **whole Kettle error** of the step that failed («Step»: message: cause).
+3. **What is compared**: the expected output of the visible case (the first 30 rows) and one row per column with two
+   boxes: **Identifies the row** (the key: the grader matches the student's rows with yours by these columns; with
+   none, rows are compared in order) and, for tables, **Do not compare** (auto-increment ids, load dates). With
+   tables, pick each table in **Table** (and untick **Compare this table** to leave one out); otherwise **Step that
+   gives the result** can be changed and **Run again**. **Save pack** already works from here.
+4. **Rules and grade**: the points of each run criterion (runs, columns, row count, values, each with one line of
+   explanation), the suggested design rules (tick/untick; their points are spread again when you change them), the
+   scale and the total.
+5. **Review and save**: a summary in words — exercise and where it is saved, what is compared (keys and ignored
+   columns), the cases, the test databases and their scripts, the grade, and what students get — and **Save pack**,
+   which builds the pack again in its folder, grades your solution with the other number format and writes the copy
+   for students. **Use this pack** puts it in the Grader.
+
 ## 4. How a submission is graded
 
 All of it happens in the child JVM (a worker), with an empty `KETTLE_HOME` and the pack's locale, timezone and
@@ -179,8 +208,9 @@ The perspective switcher has **Grader** next to Data Integration and Reports:
   recorded in the result) and **Open feedback**.
 - **Grades ▾** (open the gradebook, course report as HTML or PDF) and **Export feedback** (HTML and PDF per
   student).
-- **Create pack from this transformation…**: a 4-step wizard on the active tab (exercise and cases; detected inputs,
-  output step, keys and the expected output, **before saving anything**; suggested rules; rubric).
+- **Create pack from this transformation…**: a 5-step wizard on the active tab (§3.1): solution and output; test
+  data; what is compared (the expected output, **before saving anything**, and the key and ignored columns as
+  boxes); rules and grade; review and save.
 
 `PENTAHO_LIVE_GRADER=off` (system property, `kettle.properties` or environment variable) hides the perspective;
 the MCP tools stay.
@@ -211,6 +241,8 @@ submissions from strangers, a virtual machine. The plugin sends nothing over the
 | `key_not_unique` / `no_key_columns` | The key repeats in the expected output: the pack compares without a key (as a multiset) |
 | Every submission is `killed_timeout` | `timeout_s` too short for the data, or a worker that cannot start Kettle (see `_logs/` in the output folder) |
 | A `.kjb` is `load_failed` | Jobs are not graded yet: grade the transformation |
+| `finished_with_errors` / `solution_failed`: «Step»: message: cause | The detail is the whole Kettle error of the first step that failed (not only its first line) |
+| «Error creating temporary file(s)» in Join Rows or Group by (0.6.2) | Fixed in 0.7.0: the temporary folder of Sort rows, Join Rows, Group by and Blocking step always goes to the case's `tmp/` (a local path that exists and is deleted with the sandbox) |
 
 ## 10. A complete example
 
@@ -276,13 +308,33 @@ know it; it stays in memory until Spoon closes), otherwise from the Kettle varia
 (`kettle.properties`, then the environment). It reaches the worker through the process environment, the sandbox
 copy of the submission has an empty password, and the result is scrubbed of it.
 
-**Creating the pack.** In Spoon, **Create pack from this transformation…** detects the connections: the **Test
-database** box proposes the same server, port and user and the database with `_correccion`; add the password, the
-**Scripts** (create the tables and load the visible case: `;`-separated `.sql` files) and, for a hidden case, its
-**Hidden case scripts** (they run after the others: start them with `DELETE FROM …` to replace the data). **Capture**
-lists the tables written by the solution's output steps (Table output, Insert/Update, Update, Dimension lookup,
-Combination lookup…) and the files. Step 2 shows each table's key (the Insert/Update or dimension key, or the primary
-key, checked to be unique) and the columns to ignore (surrogate keys, load dates). Over MCP,
+**Creating the pack.** In Spoon, **Create pack from this transformation…** (§3.1) detects the server connections.
+Step 2, **Test data**, explains in one sentence why a test database is needed and has one box per connection:
+
+- **Server, Port, User, Password**: the same server, port and user as the solution; the password stays in memory
+  until Spoon closes.
+- **Test database**: the original with `_correccion` (`gym_dw` → `gym_dw_correccion`). **Test connection** only
+  creates and drops that test database (in H2 it empties it) and says ✓ or why not; a name that breaks a safety rule
+  is marked in red under the field before anything runs.
+- **Scripts** — what they are: the `.sql` files that build the starting point of every run, in order, inside the
+  empty test database: they create the tables the solution reads and writes and load the visible case's source data
+  (`CREATE TABLE …; INSERT INTO …`). The wizard **looks for them next to the solution** (its folder and two levels of
+  subfolders, and the folder above): a script goes to the connection whose original database it names (`USE gym`,
+  `CREATE DATABASE gym`) or whose tables it creates or loads; scripts that create tables go first; a script whose name
+  says `oculto`, `hidden` or `secret` goes to **Hidden case scripts**; packs and scripts of no connection are skipped.
+  Without any script the test database is empty and the solution will not find its tables (orange warning).
+- **Generate the script from the current database…**: reads the **original** database **read-only** — the connection
+  is set read-only, only `SELECT`/`SHOW` and JDBC metadata run, a user with read rights is enough — and writes, where
+  you choose, a script with its tables (MySQL: `SHOW CREATE TABLE`; PostgreSQL/H2: columns, types, `NOT NULL`, primary
+  key, foreign keys at the end), in foreign-key order, and their rows (at most 100 000 per table). The tables the
+  solution loads go **empty** (the students have to fill them). It never writes `CREATE DATABASE` or `USE` and never
+  contains the password. It is put first in **Scripts** with a link to open it: **review it** before saving.
+- **Hidden case scripts**: other data for a hidden case (they run after the others: start them with `DELETE FROM …` to
+  replace the data), and **Run every submission twice**.
+
+**What is compared** lists the tables written by the solution's output steps (Table output, Insert/Update, Update,
+Dimension lookup, Combination lookup…) and the files. Step 3 shows each table's key (the Insert/Update or dimension
+key, or the primary key, checked to be unique) and the columns not to compare as boxes. Over MCP,
 `create_exercise_pack` takes the same as `test_databases` (absolute paths in `scripts`), `tables`,
 `database_safety`, and `db_scripts`/`executions` per case; `grade_*` read the password from `password_variable`.
 The database steps (Table input/output, Insert/Update, Update, Delete, Database lookup/join, Dimension and
