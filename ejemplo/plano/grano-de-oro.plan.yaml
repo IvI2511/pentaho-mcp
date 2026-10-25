@@ -1,0 +1,347 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/docs/plano.schema.json
+# Plano ETL de Pentaho Live (plan_create / plan_review / plan_build / plan_check)
+plan: 1
+name: Grano de Oro · carga del almacén de ventas
+language: es
+goal: Cargar cada mes las ventas de las cuatro cafeterías en un modelo en estrella de SQLite y calcular las ventas por tienda y categoría y el ticket medio, sin hacerlo a mano en una hoja de cálculo.
+grain: una fila por línea de ticket válida (id_ticket, linea)
+load: full
+sources:
+  - id: ventas
+    name: ventas_2026_09.csv
+    format: csv
+    location: datos/ventas_2026_09.csv
+    volume: 3000 líneas de ticket por mes (muestra de uno de cada diez tickets)
+    frequency: mensual
+    key: [id_ticket, linea]
+    rejects: salida/rechazos_ventas.csv
+    notes: Dos modelos de TPV con fechas en dos formatos, coma decimal en algunos precios y un lote reenviado (duplicados).
+  - id: productos
+    name: productos.xlsx
+    format: excel
+    location: datos/productos.xlsx
+    volume: 28 productos
+    frequency: cuando compras cambia el catálogo
+    key: [codigo_producto]
+    notes: Excel escrito a mano (hoja Productos), con espacios sobrantes y categorías escritas de varias maneras.
+  - id: tiendas
+    name: tiendas.json
+    format: json
+    location: datos/tiendas.json
+    volume: 4 tiendas
+    frequency: cuando abre una tienda
+    key: [id_tienda]
+    notes: JSON anidado ($.tiendas[*], ubicación en un objeto aparte).
+targets:
+  - id: dim_tienda
+    name: dim_tienda
+    kind: dimension
+    location: salida/grano_de_oro_dw.sqlite
+    connection: dw
+    key: [id_tienda]
+    load: overwrite
+  - id: dim_producto
+    name: dim_producto
+    kind: dimension
+    location: salida/grano_de_oro_dw.sqlite
+    connection: dw
+    key: [codigo_producto]
+    load: overwrite
+  - id: dim_fecha
+    name: dim_fecha
+    kind: dimension
+    location: salida/grano_de_oro_dw.sqlite
+    connection: dw
+    key: [fecha]
+    load: overwrite
+  - id: hechos_ventas
+    name: hechos_ventas
+    kind: fact
+    location: salida/grano_de_oro_dw.sqlite
+    connection: dw
+    key: [id_ticket, linea]
+    load: overwrite
+  - id: rechazos_ventas
+    name: rechazos_ventas.csv
+    kind: file
+    location: salida/rechazos_ventas.csv
+    load: overwrite
+    notes: Las columnas de la venta ya normalizadas más motivo_rechazo.
+  - id: kpi_categoria
+    name: kpi_ventas_tienda_categoria
+    kind: table
+    location: salida/grano_de_oro_dw.sqlite
+    connection: dw
+    key: [tienda, categoria]
+    load: overwrite
+    notes: También en salida/kpi_ventas_tienda_categoria.csv.
+  - id: kpi_ticket
+    name: kpi_ticket_medio_tienda
+    kind: table
+    location: salida/grano_de_oro_dw.sqlite
+    connection: dw
+    key: [tienda]
+    load: overwrite
+    notes: También en salida/kpi_ticket_medio_tienda.csv.
+rules:
+  - id: R1
+    text: Todas las fechas pasan a aaaa-MM-dd (llegan como aaaa-MM-dd y como dd/MM/aaaa).
+  - id: R2
+    text: Los precios se leen con punto decimal aunque vengan con coma; el resultado no depende del idioma del equipo.
+  - id: R3
+    text: metodo_pago en mayúsculas y sin espacios, solo TARJETA, EFECTIVO o BIZUM.
+  - id: R4
+    text: id_tienda y codigo_producto sin espacios y en mayúsculas.
+  - id: R5
+    text: En el catálogo, nombres sin espacios sobrantes y una sola forma de cada categoría con inicial mayúscula.
+  - id: R6
+    text: Un mismo (id_ticket, linea) se carga una sola vez; las copias se rechazan como DUPLICADO.
+  - id: R7
+    text: "Motivo de rechazo, el primero que se cumpla: DUPLICADO, TIENDA_VACIA, CANTIDAD_NO_VALIDA, TIENDA_DESCONOCIDA, PRODUCTO_DESCONOCIDO, FECHA_NO_VALIDA."
+  - id: R8
+    text: sk_fecha con formato aaaammdd; dia_semana de 1 (lunes) a 7 (domingo); es_fin_de_semana S o N.
+  - id: R9
+    text: importe = precio_unitario × cantidad, redondeado a 2 decimales.
+  - id: R10
+    text: Ventas por tienda y categoría (unidades e importe), calculadas desde el modelo estrella.
+  - id: R11
+    text: ticket_medio = importe_total / tickets distintos con al menos una línea válida, con la mitad hacia arriba.
+stages:
+  - id: leer_tiendas
+    name: Leer tiendas (JSON)
+    kind: extract
+    transformation: 01_dim_tienda
+    reads: [tiendas]
+    step_type: JsonInput
+  - id: estandarizar_tiendas
+    name: Estandarizar textos
+    kind: clean
+    transformation: 01_dim_tienda
+    after: [leer_tiendas]
+    rules: [R4]
+    step_type: StringOperations
+  - id: sk_tienda
+    name: Asignar clave subrogada
+    kind: transform
+    transformation: 01_dim_tienda
+    description: sk_tienda consecutiva desde 1
+    after: [estandarizar_tiendas]
+    step_type: Sequence
+  - id: cargar_dim_tienda
+    name: Cargar dim_tienda
+    kind: load
+    transformation: 01_dim_tienda
+    after: [sk_tienda]
+    writes: [dim_tienda]
+    step_type: TableOutput
+  - id: leer_productos
+    name: Leer productos (Excel)
+    kind: extract
+    transformation: 02_dim_producto
+    reads: [productos]
+    step_type: ExcelInput
+  - id: estandarizar_productos
+    name: Estandarizar textos
+    kind: clean
+    transformation: 02_dim_producto
+    after: [leer_productos]
+    rules: [R4, R5]
+    step_type: StringOperations
+  - id: ordenar_productos
+    name: Ordenar por código
+    kind: transform
+    transformation: 02_dim_producto
+    description: el orden fija las claves subrogadas
+    after: [estandarizar_productos]
+    step_type: SortRows
+  - id: sk_producto
+    name: Asignar clave subrogada
+    kind: transform
+    transformation: 02_dim_producto
+    description: sk_producto consecutiva desde 1
+    after: [ordenar_productos]
+    step_type: Sequence
+  - id: cargar_dim_producto
+    name: Cargar dim_producto
+    kind: load
+    transformation: 02_dim_producto
+    after: [sk_producto]
+    writes: [dim_producto]
+    step_type: TableOutput
+  - id: generar_dias
+    name: Generar 30 días
+    kind: extract
+    transformation: 03_dim_fecha
+    description: dim_fecha no sale de ningún fichero, se genera
+    step_type: RowGenerator
+  - id: atributos_dia
+    name: Atributos del día
+    kind: transform
+    transformation: 03_dim_fecha
+    after: [generar_dias]
+    rules: [R8]
+    step_type: Formula
+  - id: cargar_dim_fecha
+    name: Cargar dim_fecha
+    kind: load
+    transformation: 03_dim_fecha
+    after: [atributos_dia]
+    writes: [dim_fecha]
+    step_type: TableOutput
+  - id: leer_ventas
+    name: Leer ventas (CSV)
+    kind: extract
+    transformation: 04_hechos_ventas
+    reads: [ventas]
+    step_type: CsvInput
+  - id: estandarizar_ventas
+    name: Estandarizar textos
+    kind: clean
+    transformation: 04_hechos_ventas
+    after: [leer_ventas]
+    rules: [R3, R4]
+    step_type: StringOperations
+  - id: normalizar_ventas
+    name: Normalizar fecha y precio
+    kind: clean
+    transformation: 04_hechos_ventas
+    after: [estandarizar_ventas]
+    rules: [R1, R2]
+    step_type: ReplaceString
+  - id: deduplicar
+    name: Eliminar duplicados
+    kind: dedupe
+    transformation: 04_hechos_ventas
+    description: ordenar antes por id_ticket y linea; las copias salen por el hop de error
+    after: [normalizar_ventas]
+    key: [id_ticket, linea]
+    rules: [R6]
+    step_type: Unique
+  - id: buscar_tienda
+    name: Buscar tienda
+    kind: lookup
+    transformation: 04_hechos_ventas
+    after: [deduplicar]
+    lookup: dim_tienda
+    key: [id_tienda]
+    on_missing: reject
+    step_type: DBLookup
+  - id: buscar_producto
+    name: Buscar producto
+    kind: lookup
+    transformation: 04_hechos_ventas
+    after: [buscar_tienda]
+    lookup: dim_producto
+    key: [codigo_producto]
+    on_missing: reject
+    step_type: DBLookup
+  - id: buscar_fecha
+    name: Buscar fecha
+    kind: lookup
+    transformation: 04_hechos_ventas
+    after: [buscar_producto]
+    lookup: dim_fecha
+    key: [fecha]
+    on_missing: reject
+    step_type: DBLookup
+  - id: validar_linea
+    name: ¿Línea válida?
+    kind: validate
+    transformation: 04_hechos_ventas
+    after: [buscar_fecha]
+    rules: [R7]
+    step_type: FilterRows
+  - id: calcular_importe
+    name: Calcular importe
+    kind: transform
+    transformation: 04_hechos_ventas
+    after: [validar_linea]
+    rules: [R9]
+    step_type: Calculator
+  - id: cargar_hechos
+    name: Cargar hechos_ventas
+    kind: load
+    transformation: 04_hechos_ventas
+    after: [calcular_importe]
+    writes: [hechos_ventas]
+    step_type: TableOutput
+  - id: escribir_rechazos
+    name: Escribir rechazos
+    kind: reject
+    transformation: 04_hechos_ventas
+    description: hechos + rechazos = líneas del CSV
+    after: [validar_linea, deduplicar]
+    writes: [rechazos_ventas]
+    step_type: TextFileOutput
+  - id: leer_modelo
+    name: Leer modelo estrella
+    kind: extract
+    transformation: 05_kpi_ventas
+    reads: [hechos_ventas, dim_tienda, dim_producto]
+    step_type: TableInput
+  - id: ventas_categoria
+    name: Ventas por tienda y categoría
+    kind: aggregate
+    transformation: 05_kpi_ventas
+    after: [leer_modelo]
+    rules: [R10]
+    step_type: GroupBy
+  - id: cargar_kpi_categoria
+    name: Cargar KPI tienda y categoría
+    kind: load
+    transformation: 05_kpi_ventas
+    after: [ventas_categoria]
+    writes: [kpi_categoria]
+    step_type: TableOutput
+  - id: totales_tienda
+    name: Totales por tienda
+    kind: aggregate
+    transformation: 05_kpi_ventas
+    description: importe total y tickets distintos por tienda
+    after: [leer_modelo]
+    step_type: GroupBy
+  - id: ticket_medio
+    name: Calcular ticket medio
+    kind: transform
+    transformation: 05_kpi_ventas
+    after: [totales_tienda]
+    rules: [R11]
+    step_type: Calculator
+  - id: cargar_kpi_ticket
+    name: Cargar KPI ticket medio
+    kind: load
+    transformation: 05_kpi_ventas
+    after: [ticket_medio]
+    writes: [kpi_ticket]
+    step_type: TableOutput
+orchestration:
+  name: job_carga_dw
+  order: [01_dim_tienda, 02_dim_producto, 03_dim_fecha, 04_hechos_ventas, 05_kpi_ventas]
+  on_failure: abort
+  notify: Registrar el error
+  folder: ../solucion-referencia
+environment:
+  connections:
+    - name: dw
+      type: SQLite
+      host: salida/grano_de_oro_dw.sqlite
+  folders:
+    - name: datos
+      path: datos/
+    - name: salida
+      path: salida/
+  runner: Kitchen, una vez al mes
+risks:
+  - text: El TPV reenvió un lote y hay líneas repetidas.
+    mitigation: Ordenar por id_ticket y linea y eliminar duplicados; las copias van a rechazos como DUPLICADO (R6).
+  - text: En un equipo en español 2.50 se lee como 250 sin dar error.
+    mitigation: Pasar el precio a texto con punto decimal y convertirlo con símbolo decimal explícito (R2).
+  - text: Códigos de producto o tiendas que no existen en las dimensiones.
+    mitigation: Las búsquedas rechazan los huérfanos con su motivo (on_missing reject).
+decisions:
+  - text: Carga completa en cada ejecución; el job vuelve a crear el modelo estrella antes de cargar.
+    why: Es una muestra mensual pequeña y así repetir la carga deja siempre el mismo resultado.
+  - text: dim_fecha se genera (los 30 días de septiembre) en lugar de salir de las ventas.
+    why: Así un día sin ventas también existe en la dimensión.
+  - text: sk_fecha es una clave inteligente aaaammdd; sk_tienda y sk_producto son subrogadas consecutivas.
+    why: Lo pide el enunciado (3.1).

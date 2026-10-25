@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import io.github.ivi2511.pentahomcp.lint.reglas.ReglasBoceto;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasCalculo;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasEstilo;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasEstructura;
@@ -40,6 +41,7 @@ public final class Catalogo {
     l.addAll( ReglasSeguridad.todas() );
     l.addAll( ReglasEstilo.todas() );
     l.addAll( ReglasPerfil.todas() ); // apagadas: las enciende el perfil del proyecto (.pentaho-live/lint.yaml)
+    l.addAll( ReglasBoceto.todas() ); // modo boceto (plan_build): placeholder_step
     l.addAll( ReglasRobustez.todas() ); // apagadas: corren con robustness=true y dan su sub-puntaje
     l.add( ReglasEstructura.kettleCheck() );
     Set<String> ids = new HashSet<String>();

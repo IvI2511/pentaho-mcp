@@ -89,6 +89,18 @@ guardar: solo corren en segundo plano las pruebas que toca el cambio y el botón
 [`docs/schemas/pentaho-live-test-1.schema.json`](docs/schemas/pentaho-live-test-1.schema.json)); pueden
 saltarse un Table output, fijar variables y cargar bases de prueba descartables, como el corrector.
 
+**Diseñar antes de construir.** Antes de arrastrar un solo step, Claude te entrevista (¿qué es una fila de la
+tabla de hechos?, ¿llega todo el histórico o solo lo nuevo?, ¿qué hacemos con una venta cuyo cliente no
+existe?) y escribe un **plano ETL** pequeño y versionable (`<nombre>.plan.yaml`): objetivo, grano, fuentes,
+destinos, reglas, etapas, riesgos y decisiones. Una revisión estática encuentra lo que falta (sin grano, una
+búsqueda sin clave, una carga que duplica filas si se repite, una fuente sin plan de rechazos) y una perspectiva
+nueva, **Diseño**, dibuja el plano como diagrama de flujo de datos, diagrama de actividad UML del job y diagrama
+de componentes y despliegue. Después Claude lo construye como **boceto**: un step marcador por etapa con una
+nota PENDIENTE de color, que se va rellenando pieza a pieza mientras el menú IDC cuenta las piezas construidas;
+la comprobación de deriva te dice dónde no coinciden el lienzo y el plano. La clásica **hoja de mapeo
+origen-destino** funciona en los dos sentidos: se exporta desde un ETL (Excel, Markdown, HTML, PDF, Word) o se
+lee una hoja que rellenó el profe o el cliente, con los steps que faltan propuestos.
+
 **Menú IDC.** La barra principal de Spoon tiene un desplegable **IDC** justo al lado del selector de
 perspectivas, con todo lo anterior a mano sin pedírselo a Claude: **Revisar calidad…** (puntuación,
 hallazgos con cómo arreglarlos, clic en uno para ver su step en el lienzo, los arreglos automáticos con un
@@ -137,6 +149,7 @@ Kitchen.
 | *"Prepara `C:\proyectos\ventas` como proyecto de equipo con las convenciones del curso."* | crea solo lo que falta (carpetas, `.gitignore`, el perfil del linter, README, CI) y te dice qué creó; después `lint_etl` revisa cada ETL con ese perfil |
 | *"Con esta solución, un pack de corrección con un caso oculto; y después, las notas de las entregas de `C:\TP3\entregas`."* | corre la solución para sacar la salida esperada, corrige cada entrega en JVMs aparte y resume las notas, quién falló qué y por qué; la planilla y la devolución de cada alumno quedan en la carpeta de resultados |
 | *"Congela la salida de «Redondear importe» como prueba y dime después si mi cambio rompió algo."* | crea la prueba con las filas de hoy, la corre después de tu cambio y te explica la diferencia fila a fila si sale en rojo |
+| *"Antes de construir, diseñemos la carga mensual de ventas: pregúntame lo que necesites."* | te entrevista, escribe el plano, lo revisa, te enseña los diagramas de flujo de datos, actividad y componentes, y construye el boceto en el lienzo |
 
 ## Cómo funciona
 

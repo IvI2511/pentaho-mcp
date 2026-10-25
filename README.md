@@ -83,6 +83,17 @@ change affects run in the background and the IDC button shows **✓ 12/12** or *
 next to the `.ktr` (format: [`docs/schemas/pentaho-live-test-1.schema.json`](docs/schemas/pentaho-live-test-1.schema.json));
 they can skip a Table output, set variables and load disposable test databases, like the grader.
 
+**Design first.** Before anyone drags a step, Claude interviews you (what is one row of the fact table? the
+whole history or only what is new? what happens to a sale whose customer does not exist?) and writes a small,
+versionable **ETL plan** (`<name>.plan.yaml`): goal, grain, sources, targets, rules, stages, risks and decisions.
+A static review finds what is missing (no grain, a lookup without a key, a load that duplicates rows when run
+twice, a source with no rejects plan), and a new **Design** perspective draws the plan as a data-flow diagram,
+a UML activity diagram of the job and a components and deployment diagram. Then Claude builds it as a
+**sketch**: one placeholder step per stage with a colored TO DO note, filled in piece by piece while the IDC
+menu counts the pieces built; a drift check tells you where the canvas and the plan disagree. The classic
+**source-to-target mapping sheet** works both ways: exported from an ETL (Excel, Markdown, HTML, PDF, Word),
+or read back from a sheet a teacher or client filled in, with the missing steps proposed.
+
 **IDC menu.** Spoon's main toolbar gets an **IDC** drop-down right next to the perspective switcher, with
 everything above at hand without asking Claude: **Check quality…** (score, findings with how to fix them,
 click one to see its step on the canvas, apply the automatic fixes as one Ctrl+Z, silence a rule where it is
@@ -129,6 +140,7 @@ Kitchen.
 | *"Set up `C:\proyectos\ventas` as a team project with our course conventions."* | creates only what is missing (folders, `.gitignore`, the lint profile, README, CI) and tells you what it created; then `lint_etl` checks every ETL against the profile |
 | *"Make a grading pack from this solution with a hidden case, then grade the submissions in `C:\TP3\entregas`."* | runs the solution to get the expected output, grades every submission in separate JVMs and tells you the grades, who failed what and why; the gradebook and each student's feedback are in the results folder |
 | *"Freeze the output of «Redondear importe» as a test, then tell me if my change broke anything."* | creates the test from today's rows, runs it after your change and explains the row diff if it is red |
+| *"Before building, let's design the monthly sales load: ask me what you need."* | interviews you, writes the plan, reviews it, shows the data-flow, activity and component diagrams, and builds the sketch on the canvas |
 
 ## How it works
 

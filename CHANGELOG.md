@@ -205,6 +205,47 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `path`, the changes section.
 - `PruebaDiffLienzo`: the badges of each side, the drawing with a recording GC, the painter extensions,
   the Compare… dialog and the list of changes off screen.
+- **ETL plan (design before building).** A small, versionable design file, `<name>.plan.yaml` (or `.plan.json`;
+  JSON Schema in `docs/plano.schema.json`): goal, grain, full or incremental load, sources (format, location,
+  volume, frequency, key, rejects plan), targets (kind, key, load type), business rules, stages (kind,
+  transformation, after, reads, writes, lookup with key and what to do with orphans, rules, suggested step),
+  orchestration, environment, risks and decisions. YAML is read with PDI's SnakeYAML in safe mode only (no Java
+  tags) and written deterministically, so diffs stay clean. New MCP tools:
+  - `plan_create` writes it (shape errors come back and nothing is written) and `plan_review` checks it without
+    Spoon: missing grain, sources without a rejects plan, lookups without a key or without an orphans policy,
+    loads that duplicate rows when re-run, upsert/SCD without a key, incremental load without a watermark,
+    stages with no input or that lead nowhere, unused rules, missing orchestration or failure path… each with
+    how to fix it and, when only the user knows, the question to ask them (en/es/pt).
+  - `plan_get` returns the plan and its three views as Mermaid — **data flow**, **UML activity** of the
+    orchestration and **components and deployment** — and writes the design document (HTML, Markdown, PDF,
+    Word, Excel, images) with the report renderers and the own diagram engine.
+  - `plan_build` builds one transformation of the plan on the canvas, animated and undone with **one Ctrl+Z**:
+    `mode=sketch` (default) makes each stage a placeholder (a Dummy named like the stage with a colored TO DO
+    note: what it reads, looks up, writes, its rules and the suggested step), `mode=steps` uses the suggested
+    step types; `pace=lesson` plays it as a class-mode lesson. The transformation keeps a link to the plan.
+  - `fill_placeholder` replaces a placeholder with the real step or a chain of steps, keeping its hops and
+    removing its note (one Ctrl+Z).
+  - `plan_check` reports the drift between the plan and what is built (open documents, or `<name>.ktr` and the
+    job next to the plan): stages without a step, placeholders left, other step types, sources and targets no
+    step names, a load that is not the planned one, orphans or bad rows the plan rejects with no error hop or
+    rejects output, and a job that does not follow the orchestration. Warnings only.
+- **Design perspective** in Spoon: open a plan, see its document with the three diagrams and the review, build
+  the sketch in the linked (or a new) transformation, check the drift, export it. `PENTAHO_LIVE_DESIGN=off`
+  turns it off.
+- **Sketch mode**: the IDC menu shows «Sketch: 7 of 12 pieces built» for a transformation that came from a plan,
+  and the new lint rule `placeholder_step` (warning) flags every placeholder left.
+- **Source-to-target mapping sheet**, both ways: `mapping_export` (and the new report section `mapping`, never
+  by default) writes one row per target field — source and target as `resource.field`, type, rule (from the
+  field lineage), default (e.g. a Stream lookup's), validation (filters and error handling on the way),
+  status, owner and notes — as Excel, Markdown, HTML, PDF or Word; `mapping_import` reads a filled sheet (xlsx
+  or csv, headers in English, Spanish or Portuguese), says which rows are implemented, differ or are missing,
+  and proposes steps for the missing ones (a Calculator copy, an Add constants, a placeholder with the rule),
+  applied before the target step with one Ctrl+Z.
+- IDC menu: **Design…** (the Design perspective with the plan of the active transformation) and **Mapping
+  sheet…** (export, or check a filled sheet and apply the proposals).
+- Skill: `manual/10-plano.md` (interviewing the user, the plan format, review codes, sketch, drift, mapping
+  sheet), also the MCP resource `pentaho://guide/plan`. Example: `ejemplo/plano/` with the Grano de Oro plan,
+  its design document and diagrams, and the mapping sheet of `04_hechos_ventas`.
 
 ## [0.6.2] - 2026-10-25
 

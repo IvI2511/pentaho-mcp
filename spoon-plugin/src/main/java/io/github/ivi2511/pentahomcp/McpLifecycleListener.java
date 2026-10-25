@@ -79,7 +79,13 @@ public class McpLifecycleListener implements LifecycleListener {
       + " To review what changed in a transformation "
       + "or job (its unsaved changes, a git revision or another file) use diff_documents: the changes by meaning, "
       + "never as XML lines and never with passwords; format=markdown for a pull request, show_on_canvas=true to "
-      + "mark them on Spoon's canvas, and build_report with compare_with for a changes section.";
+      + "mark them on Spoon's canvas, and build_report with compare_with for a changes section."
+      + " To design before building, write an ETL plan with plan_create (a small <name>.plan.yaml: goal, grain, "
+      + "sources, targets, rules, stages, risks, decisions; interview the user first), check it with plan_review, "
+      + "build its skeleton with plan_build (mode=sketch: placeholder steps with TO DO notes, one Ctrl+Z; fill each "
+      + "one with fill_placeholder) and compare plan and canvas with plan_check (warnings only); plan_get returns its "
+      + "data-flow, activity and component diagrams. mapping_export writes the source-to-target mapping sheet of a "
+      + "transformation and mapping_import checks a filled one against it (dry run, then apply).";
 
   private McpHttpServer server;
 
@@ -144,6 +150,8 @@ public class McpLifecycleListener implements LifecycleListener {
       EstresTools.register( server );
       PruebasTools.register( server );
       DiffTools.register( server );
+      PlanoTools.register( server ); // 0.7.0: plano ETL, boceto (D1, D2)
+      MapeoTools.register( server ); // 0.7.0: hoja de mapeo (D3)
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("

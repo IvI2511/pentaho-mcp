@@ -61,9 +61,11 @@ public class PruebaMcpInformes {
    * apply_lint_fixes y suppress_lint (linter) + las 5 del corrector (CorrectorTools) + lesson_notes (modo
    * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3) + harden_etl y
    * stress_test (robustez) + lint_profile y project_init (0.7, perfil del proyecto y pentaho-live init) +
-   * test_create, test_run, test_run_all y test_list (0.7, pruebas con datasets dorados).
+   * test_create, test_run, test_run_all y test_list (0.7, pruebas con datasets dorados) + diff_documents (0.7, diff
+   * semántico) + plan_create, plan_get, plan_review, plan_build, fill_placeholder, plan_check, mapping_export y
+   * mapping_import (0.7, plano ETL, boceto y hoja de mapeo).
    */
-  private static final int TOOLS = 80;
+  private static final int TOOLS = 88; // 0.7.0: +2 equipo, +4 pruebas, +1 diff, +6 plano y boceto, +2 mapeo
 
   private McpHttpServer server;
   private int puerto;
@@ -89,6 +91,8 @@ public class PruebaMcpInformes {
     EstresTools.register( server );
     PruebasTools.register( server );
     DiffTools.register( server );
+    PlanoTools.register( server );
+    MapeoTools.register( server );
     server.start();
   }
 

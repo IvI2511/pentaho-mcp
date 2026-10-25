@@ -139,6 +139,7 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `select_star` | I | Table input with `SELECT *` | confirm when it is `SELECT * FROM` one table: name the columns the query gives today (computed against the database); otherwise by hand | — |
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
 | `parameter_without_default` | I | Parameter without a default (credentials excluded) | value: the default | — |
+| `placeholder_step` | W | A sketch placeholder of `plan_build` (a Dummy with a TO DO note) is still on the canvas: that piece is not built | by hand: `fill_placeholder` | `10-plano.md` |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
 | `naming_convention`, `step_without_description`, `required_variable`, `team_pattern` | I / W / per rule | **Off without a project profile** (0.7): `.pentaho-live/lint.yaml` turns them on and then they count. Prefix per step or entry category, a description on every step, `${DIR_DATOS}` / `${DB_HOST}` instead of literal paths and hosts, the team's own pattern rules | rename (one Ctrl+Z) / path value | `13-proyecto.md` |
 | the robustness family (below) | W / I | **Off by default** in `lint_etl`: `robustness: true` runs them with a score of their own (the reports' `quality` section always does, §9) | `harden_etl` | `09-robustez.md` |

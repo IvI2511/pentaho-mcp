@@ -407,7 +407,8 @@ final class ReportTools {
   private static ObjectNode esquema( Modo modo ) {
     Tools.Schema sc = Tools.schema().document();
     sc.raw( "sections", listaEnum( "Section ids to include, in any order: cover, summary, flow (transformations), "
-      + "job_flow (jobs), lineage (transformations), dictionary (transformations), target_model (transformations "
+      + "job_flow (jobs), lineage (transformations), dictionary (transformations), mapping (transformations: the "
+      + "source-to-target mapping sheet, one row per target field; never by default), target_model (transformations "
       + "with Table output or Insert/Update), profile, metrics, validation, quality (technical quality: the lint_etl "
       + "rules, score and findings, plus the robustness rules with their own score; it does not repeat what "
       + "validation shows), lesson (class mode: the handout of the "

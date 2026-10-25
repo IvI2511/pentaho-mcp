@@ -106,7 +106,7 @@ foreach ($d in @("catalogo\steps", "catalogo\job-entries", "manual")) {
 foreach ($f in @("catalogo\INDICE.md", "catalogo\steps-comunes.md", "manual\01-formato-ktr.md",
                  "manual\02-formato-kjb.md", "manual\03-errores-comunes.md", "manual\04-informes.md",
                  "manual\06-calidad.md", "manual\07-corrector.md", "manual\08-modo-clase.md",
-                 "manual\09-robustez.md", "manual\11-versiones.md",
+                 "manual\09-robustez.md", "manual\10-plano.md", "manual\11-versiones.md",
                  "manual\12-pruebas.md", "manual\13-proyecto.md")) {
   $from = Join-Path $skill $f
   if (-not (Test-Path $from)) { throw "Falta $from (catalogo de la skill pentaho-etl)" }

@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/IvI2511/pentaho-mcp/main/docs/plano.schema.json",
+  "title": "Pentaho Live ETL plan (<name>.plan.yaml)",
+  "description": "A small, versionable design of an ETL, written before building it. Read by plan_get, plan_review, plan_build and plan_check (Pentaho Live 0.7). Keys in English, texts in the user's language.",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "definitions": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "texts": {
+      "description": "One text or a list of texts",
+      "oneOf": [ { "type": "string" }, { "type": "array", "items": { "type": "string" } } ]
+    }
+  },
+  "properties": {
+    "plan": { "description": "Format version", "const": 1 },
+    "name": { "type": "string", "description": "Name of the plan" },
+    "language": { "enum": ["en", "es", "pt"], "description": "Language of the texts (and of the TO DO notes)" },
+    "goal": { "type": "string", "description": "What the ETL must achieve and for whom" },
+    "grain": { "type": "string", "description": "What one row of the main target represents" },
+    "load": { "enum": ["full", "incremental"], "description": "The whole history every time, or only new rows" },
+    "incremental_by": { "type": "string", "description": "Watermark of an incremental load (date or sequence field)" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/definitions/id", "description": "Default: made from the name" },
+          "name": { "type": "string" },
+          "format": { "enum": ["csv", "text", "excel", "json", "xml", "table", "api", "other"] },
+          "location": { "type": "string", "description": "File path (relative to the project) or schema.table" },
+          "volume": { "type": "string" },
+          "frequency": { "type": "string" },
+          "key": { "$ref": "#/definitions/texts" },
+          "rejects": { "type": "string", "description": "Where the bad rows go, with their reason (the rejects plan)" },
+          "connection": { "type": "string", "description": "Database connection (environment.connections)" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/definitions/id" },
+          "name": { "type": "string", "description": "Table name or file name" },
+          "kind": { "enum": ["fact", "dimension", "table", "file", "other"] },
+          "location": { "type": "string" },
+          "connection": { "type": "string" },
+          "key": { "$ref": "#/definitions/texts" },
+          "load": { "enum": ["insert", "append", "truncate_insert", "upsert", "scd1", "scd2", "overwrite"] },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": { "id": { "type": "string" }, "text": { "type": "string" } }
+          }
+        ]
+      }
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/definitions/id" },
+          "name": { "type": "string", "description": "Becomes the step name: unique within its transformation" },
+          "kind": { "enum": ["extract", "clean", "validate", "dedupe", "lookup", "transform", "aggregate", "load", "reject", "other"] },
+          "transformation": { "type": "string", "description": "The .ktr it goes in (file name without .ktr)" },
+          "description": { "type": "string" },
+          "after": { "$ref": "#/definitions/texts", "description": "Stage ids it comes after" },
+          "reads": { "$ref": "#/definitions/texts", "description": "Source (or target) ids it reads" },
+          "writes": { "$ref": "#/definitions/texts", "description": "Target ids it writes" },
+          "lookup": { "type": "string", "description": "Source, target or stage id it looks up in" },
+          "key": { "$ref": "#/definitions/texts" },
+          "on_missing": { "enum": ["reject", "default", "unknown_member", "fail"], "description": "What to do with orphans" },
+          "rules": { "$ref": "#/definitions/texts", "description": "Rule ids it implements" },
+          "step_type": { "type": "string", "description": "Suggested Kettle step type id (CsvInput, StreamLookup...)" }
+        }
+      }
+    },
+    "orchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "The job (.kjb without extension)" },
+        "order": { "$ref": "#/definitions/texts", "description": "Transformations in run order" },
+        "on_failure": { "enum": ["abort", "continue", "notify"] },
+        "notify": { "type": "string", "description": "What is done on failure (log, mail...)" },
+        "folder": { "type": "string", "description": "Folder of the .ktr/.kjb, relative to the plan (default: the plan's)" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": { "name": { "type": "string" }, "type": { "type": "string" }, "host": { "type": "string" } }
+          }
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": { "name": { "type": "string" }, "path": { "type": "string" } }
+          }
+        },
+        "runner": { "type": "string", "description": "Where and how it runs (Kitchen on a server, Spoon...)" }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": { "text": { "type": "string" }, "mitigation": { "type": "string" } }
+          }
+        ]
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": { "text": { "type": "string" }, "why": { "type": "string" } }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -165,7 +165,11 @@ final class McpResources {
       "The project's lint profile .pentaho-live/lint.yaml (rules, severities, min_score, naming prefixes, required "
         + "variables, team rules) and lint_profile; project_init / pentaho-live init; pentaho-live lint, test and "
         + "diff on the command line; the GitHub Actions workflow (lint, golden-dataset tests, semantic diff of a pull "
-        + "request); the grader's lint:profile line.", "manual/13-proyecto.md" )
+        + "request); the grader's lint:profile line.", "manual/13-proyecto.md" ),
+    new Doc( "pentaho://guide/plan", "plan", "ETL plan (plan_create, plan_review, plan_build, plan_check, mappings)",
+      "Design before building: interviewing the user, the <name>.plan.yaml format, the review codes and their "
+        + "questions, the three views, the sketch on the canvas (placeholders, fill_placeholder), drift, and the "
+        + "source-to-target mapping sheet both ways (mapping_export, mapping_import).", "manual/10-plano.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

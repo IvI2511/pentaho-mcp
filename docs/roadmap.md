@@ -85,6 +85,16 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
 
 ## 0.7.0 · Trabajo en equipo y datos
 
+- **Plano ETL, boceto y hoja de mapeo (D1-D3) — hecho en la rama `feat/070-diseno`**: el plano
+  `<nombre>.plan.yaml` (esquema `docs/plano.schema.json`) con `plan_create`, `plan_get`, `plan_review`,
+  `plan_build`, `plan_check` y `fill_placeholder`; la perspectiva **Diseño** (flujo de datos, actividad UML
+  del job, componentes y despliegue, con el motor de diagramas de los Informes); el lienzo en modo boceto
+  (marcadores Dummy con nota PENDIENTE de color, progreso en el menú IDC, regla `placeholder_step`); la hoja
+  de mapeo origen-destino con `mapping_export` (sección `mapping` de los Informes) y `mapping_import`
+  (ensayo y aplicar en un Ctrl+Z); el manual `10-plano.md` y el ejemplo `ejemplo/plano/` de Grano de Oro.
+  Falta: que `plan_build` arme también el job de la orquestación; reglas de la hoja de mapeo más allá de
+  copiar, constante y marcador (Value mapper, cambio de tipo); D4 (modelo estrella → DDL → esqueleto) y D5
+  (de la servilleta al plano) en 0.8.
 - **Convenciones del equipo y `pentaho-live init`** (E5 + X1, con el MVP de P4) — hecho en la rama
   `feat/070-equipo`: perfil del linter `.pentaho-live/lint.yaml` (reglas, gravedades, mínimo, prefijos por
   categoría, descripción obligatoria, variables obligatorias, reglas del equipo por patrón) que usan `lint_etl`,

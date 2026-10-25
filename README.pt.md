@@ -89,6 +89,18 @@ ficam em `tests/` ao lado do `.ktr` (formato:
 [`docs/schemas/pentaho-live-test-1.schema.json`](docs/schemas/pentaho-live-test-1.schema.json)); podem pular
 um Table output, definir variáveis e carregar bancos de teste descartáveis, como o corretor.
 
+**Projetar antes de construir.** Antes de arrastar um único step, o Claude entrevista você (o que é uma linha
+da tabela fato? chega todo o histórico ou só o novo? o que fazemos com uma venda cujo cliente não existe?) e
+escreve um **plano ETL** pequeno e versionável (`<nome>.plan.yaml`): objetivo, grão, fontes, destinos, regras,
+etapas, riscos e decisões. Uma revisão estática encontra o que falta (sem grão, uma busca sem chave, uma carga
+que duplica linhas se repetida, uma fonte sem plano de rejeições) e uma perspectiva nova, **Design**, desenha o
+plano como diagrama de fluxo de dados, diagrama de atividade UML do job e diagrama de componentes e
+implantação. Depois o Claude o constrói como **esboço**: um step marcador por etapa com uma nota PENDENTE
+colorida, preenchido peça por peça enquanto o menu IDC conta as peças construídas; a verificação de desvio diz
+onde o canvas e o plano não batem. A clássica **planilha de mapeamento origem-destino** funciona nos dois
+sentidos: é exportada de um ETL (Excel, Markdown, HTML, PDF, Word) ou lida de uma planilha que o professor ou o
+cliente preencheu, com os steps que faltam propostos.
+
 **Menu IDC.** A barra principal do Spoon ganha um menu suspenso **IDC** logo ao lado do seletor de
 perspectivas, com tudo isso à mão sem pedir ao Claude: **Revisar qualidade…** (pontuação, achados com como
 corrigi-los, clique em um para ver o seu step na tela, as correções automáticas com um único Ctrl+Z,
@@ -136,6 +148,7 @@ Kitchen.
 | *"Faça um relatório desta transformação para o trabalho, em PDF e PowerPoint, com uma conclusão curta."* | monta o relatório (linhagem, dicionário de dados, métricas…), escreve a conclusão com os dados reais e exporta os dois arquivos |
 | *"Monte um pacote de correção a partir desta solução, com um caso oculto, e depois corrija as entregas de `C:\TP3\entregas`."* | roda a solução para obter a saída esperada, corrige cada entrega em JVMs à parte e resume as notas, quem errou o quê e por quê; a planilha e a devolutiva de cada aluno ficam na pasta de resultados |
 | *"Congele a saída de «Redondear importe» como teste e depois me diga se a minha mudança quebrou algo."* | cria o teste com as linhas de hoje, roda depois da sua mudança e explica a diferença linha a linha se ficar vermelho |
+| *"Antes de construir, vamos projetar a carga mensal de vendas: pergunte o que precisar."* | entrevista você, escreve o plano, revisa, mostra os diagramas de fluxo de dados, atividade e componentes e constrói o esboço no canvas |
 
 ## Como funciona
 
