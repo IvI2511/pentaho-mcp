@@ -81,10 +81,13 @@ final class LintTools {
         + "fix with auto=true and confirm=false: they do not change rows, output formats, paths or steps (proposed "
         + "names for default step/entry names, START renamed, Calculator operands swapped). A fix with confirm=true "
         + "changes what the ETL does (inserts a Sort rows or an ORDER BY, copy mode, paths, decimal symbol, declared "
-        + "output fields, failure hop to an Abort): ASK THE PERSON before passing its key. A fix with "
-        + "needs_value=true needs values[key] (a better name, '.' or ',', a description, a ${VARIABLE} for a "
-        + "password, a parameter default); values[key] also overrides a proposal. In a transformation all the "
-        + "changes are ONE Ctrl+Z in Spoon; in a job each change is its own Ctrl+Z (undo_steps). dry_run=true only "
+        + "output fields, failure hop to an Abort, a password moved to the proposed ${DB_PASSWORD_<CONNECTION>} "
+        + "variable, a disabled hop enabled, a loose step or entry deleted, the columns of a SELECT * named, the "
+        + "proposed description): ASK THE PERSON before passing its key. A fix with "
+        + "needs_value=true needs values[key] (a better name, '.' or ',', a description, a parameter default); "
+        + "values[key] also overrides a proposal. In a transformation all the changes are ONE Ctrl+Z in Spoon, "
+        + "declared parameters and the description included; in a job each change is its own Ctrl+Z (undo_steps). "
+        + "The texts of change, reason and notes come in 'language'. dry_run=true only "
         + "says what would change and the new score. Returns applied [{key, change}], skipped [{key, reason}], "
         + "undo_steps, score_before and score_after. Nothing is saved: use 'save' afterwards.",
       Tools.schema().document()
@@ -93,8 +96,8 @@ final class LintTools {
         .raw( "values", valores(), false )
         .bool( "dry_run", "Only report what would change and the score it would get; change nothing (default "
           + "false)", false )
-        .strEnum( "language", "Language of the names it proposes and creates (default en; use the same as in "
-          + "lint_etl so the proposed names match)", false, "en", "es", "pt" ).build(),
+        .strEnum( "language", "Language of the names it proposes and creates and of the texts it returns "
+          + "(default en; use the same as in lint_etl so the proposed names match)", false, "en", "es", "pt" ).build(),
       a -> arreglar( a ) ) );
 
     s.add( Tools.tool( "suppress_lint",
@@ -205,6 +208,15 @@ final class LintTools {
    * dry_run todo pasa sobre la copia y el documento no se toca.
    */
   static Object arreglar( JsonNode a ) throws Exception {
+    return arreglar( a, false );
+  }
+
+  /**
+   * Como {@link #arreglar(JsonNode)}; con continuarUndo (el menú IDC, que aplica antes recetas de harden_etl en la
+   * misma tanda), los cambios se encadenan al último grupo de undo del documento si nadie tocó nada en medio: un
+   * solo Ctrl+Z para todo.
+   */
+  static Object arreglar( JsonNode a, boolean continuarUndo ) throws Exception {
     final LintArreglos.Pedido p = LintArreglos.pedido( a ); // los argumentos se validan antes de buscar Spoon
     final Copia c = copia( a, true );
     final Opciones op = new Opciones();
@@ -233,7 +245,8 @@ final class LintTools {
           Docs.activar( m ); // como las demás herramientas que editan: el usuario ve los cambios en el lienzo
         }
         Spoon sp = Docs.spoon();
-        LintArreglos.Hecho hh = LintArreglos.aplicar( m, an, p.lang, new UndoGrupo( sp, m ), sp.getRepository(),
+        LintArreglos.Hecho hh = LintArreglos.aplicar( m, an, p.lang, continuarUndo ? UndoGrupo.continuando( sp, m )
+          : new UndoGrupo( sp, m ), sp.getRepository(),
           sp.getMetaStore() );
         if ( hh.cambios > 0 ) {
           Docs.touched( m );
@@ -254,7 +267,7 @@ final class LintTools {
       r2 = RunMotor.enSegundoPlano( () -> LintMotor.analizar( despues, op2 ), MS_LINT, env2::cancelar, "The lint" );
     }
     return RunMotor.json( LintArreglos.respuesta( c.id, an, h, r2, p.dryRun, c.sinGuardar,
-      c.meta instanceof TransMeta ) );
+      c.meta instanceof TransMeta, p.lang ) );
   }
 
   /** suppress_lint: la regla se valida antes de buscar Spoon; el cambio va en la UI, sin traer la pestaña al frente. */

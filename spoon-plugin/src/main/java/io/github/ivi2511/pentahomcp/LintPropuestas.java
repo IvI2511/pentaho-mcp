@@ -75,6 +75,15 @@ final class LintPropuestas {
       if ( a == null || a.preview != null || !a.needsValue ) {
         continue;
       }
+      if ( "no_description".equals( h.rule ) ) {
+        String d = descripcion( m, t );
+        if ( d != null ) { // la persona la confirma (y la puede cambiar): no entra en all_auto
+          a.preview = d;
+          a.needsValue = false;
+          a.param( "proposed_by", "rules" );
+        }
+        continue;
+      }
       String p = null;
       if ( "default_step_name".equals( h.rule ) && m instanceof TransMeta && h.step != null ) {
         StepMeta s = ( (TransMeta) m ).findStep( h.step );
@@ -92,6 +101,57 @@ final class LintPropuestas {
       a.needsValue = false;
       a.param( "proposed_by", "rules" );
     }
+  }
+
+  /** Cuántos steps o entradas nombra la descripción propuesta como mucho. */
+  static final int MAX_DESCRIPCION = 4;
+
+  /**
+   * La descripción propuesta para no_description: qué lee y qué escribe una transformación, o qué ejecuta un job, con
+   * los nombres de sus steps o entradas. null si no hay nada que decir (sin entradas ni salidas).
+   */
+  static String descripcion( AbstractMeta m, Textos t ) {
+    if ( m instanceof TransMeta ) {
+      List<String> lee = new ArrayList<String>();
+      List<String> escribe = new ArrayList<String>();
+      for ( StepMeta s : ( (TransMeta) m ).getSteps() ) {
+        String id = s.getStepID();
+        if ( LEEN_ARCHIVO.contains( id ) || "TableInput".equals( id ) ) {
+          lee.add( t.t( "word.quoted", "name", s.getName() ) );
+        } else if ( ESCRIBEN_ARCHIVO.contains( id ) || ESCRIBEN_TABLA.contains( id ) ) {
+          escribe.add( t.t( "word.quoted", "name", s.getName() ) );
+        }
+      }
+      if ( lee.isEmpty() && escribe.isEmpty() ) {
+        return null;
+      }
+      if ( escribe.isEmpty() ) {
+        return t.t( "desc.trans.in", "in", lista( lee ) );
+      }
+      if ( lee.isEmpty() ) {
+        return t.t( "desc.trans.out", "out", lista( escribe ) );
+      }
+      return t.t( "desc.trans", "in", lista( lee ), "out", lista( escribe ) );
+    }
+    if ( m instanceof JobMeta ) {
+      List<String> corre = new ArrayList<String>();
+      for ( JobEntryCopy c : ( (JobMeta) m ).getJobCopies() ) {
+        String pid = c.getEntry() == null ? "" : c.getEntry().getPluginId();
+        if ( "TRANS".equals( pid ) || "JOB".equals( pid ) || "SQL".equals( pid ) || "SHELL".equals( pid ) ) {
+          corre.add( t.t( "word.quoted", "name", c.getName() ) );
+        }
+      }
+      return corre.isEmpty() ? null : t.t( "desc.job", "entries", lista( corre ) );
+    }
+    return null;
+  }
+
+  static final Set<String> ESCRIBEN_TABLA = new HashSet<String>( Arrays.asList( "TableOutput", "InsertUpdate", "Update",
+    "Delete", "SynchronizeAfterMerge", "DimensionLookup", "CombinationLookup" ) );
+
+  private static String lista( List<String> l ) {
+    return l.size() <= MAX_DESCRIPCION ? String.join( ", ", l ) : String.join( ", ", l.subList( 0, MAX_DESCRIPCION ) )
+      + " (+" + ( l.size() - MAX_DESCRIPCION ) + ")";
   }
 
   /** Nombres de steps o entradas del documento, en minúsculas (Kettle los busca sin distinguir mayúsculas). */

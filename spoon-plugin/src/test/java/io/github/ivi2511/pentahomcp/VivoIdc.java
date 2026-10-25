@@ -95,6 +95,17 @@ public final class VivoIdc {
       }
       return "closed";
     }
+    if ( "deshacer".equals( accion ) || "rehacer".equals( accion ) ) {
+      // el Ctrl+Z / Ctrl+Y de Spoon sobre el documento activo, sin teclado (no se activa ninguna ventana)
+      AbstractMeta m = IdcMenu.activo();
+      if ( "deshacer".equals( accion ) ) {
+        sp.undoAction( m );
+      } else {
+        sp.redoAction( m );
+      }
+      return "ok " + accion + " params=" + java.util.Arrays.toString( m.listParameters() ) + " steps="
+        + ( m instanceof TransMeta ? ( (TransMeta) m ).nrSteps() : -1 );
+    }
     if ( accion.startsWith( "calidad:" ) ) {
       return calidad( accion.substring( 8 ) );
     }
@@ -123,7 +134,31 @@ public final class VivoIdc {
       d.tabla.setSelection( Integer.parseInt( que.substring( 5 ) ) );
       d.elegida( true );
     } else if ( que.equals( "aplicar" ) ) {
-      d.aplicarAuto();
+      d.aplicarMarcados();
+    } else if ( que.startsWith( "marcar:" ) ) {
+      TableItem it = d.tabla.getItem( Integer.parseInt( que.substring( 7 ) ) );
+      it.setChecked( d.marcable( (JsonNode) it.getData() ) );
+      d.contar();
+    } else if ( que.startsWith( "detalle:" ) ) {
+      d.tabla.setSelection( Integer.parseInt( que.substring( 8 ) ) );
+      d.elegida( false );
+      abrirFuera();
+      d.abrirDetalle();
+    } else if ( que.equals( "ventana-aplicar" ) ) {
+      d.aplicarDesdeVentana();
+    } else if ( que.equals( "ventana-claude" ) ) {
+      java.util.function.BiConsumer<org.eclipse.swt.widgets.Display, String> antes = IdcDetalle.portapapeles;
+      IdcDetalle.portapapeles = ( dis, t ) -> copiado = t; // nunca el portapapeles de quien usa el PC
+      try {
+        d.ventana.claude.notifyListeners( org.eclipse.swt.SWT.Selection, new org.eclipse.swt.widgets.Event() );
+      } finally {
+        IdcDetalle.portapapeles = antes;
+      }
+      return "copied=" + copiado;
+    } else if ( que.equals( "ventana-cerrar" ) ) {
+      if ( d.ventana != null && !d.ventana.shell.isDisposed() ) {
+        d.ventana.shell.close();
+      }
     } else if ( que.startsWith( "silenciar:" ) ) {
       d.tabla.setSelection( Integer.parseInt( que.substring( 10 ) ) );
       d.elegida( false );
@@ -146,9 +181,12 @@ public final class VivoIdc {
       .append( d.aplicar.getEnabled() ? "" : " [off]" ).append( "\nfooter=" ).append( d.pie.getText() );
     for ( int i = 0; i < d.tabla.getItemCount() && i < 40; i++ ) {
       TableItem it = d.tabla.getItem( i );
-      b.append( "\n  " ).append( it.getText( 0 ) ).append( " | " ).append( it.getText( 1 ) ).append( " | " )
-        .append( it.getText( 2 ) ).append( " | " ).append( it.getText( 5 ) );
+      b.append( "\n  [" ).append( it.getChecked() ? "x" : " " ).append( "] " ).append( it.getText( 1 ) )
+        .append( " | " ).append( it.getText( 2 ) ).append( " | " ).append( it.getText( 3 ) ).append( " | " )
+        .append( it.getText( 5 ) );
     }
+    b.append( "\ndetail=" ).append( d.detalle.getData( "plano" ) );
+    ventana( b, d.ventana );
     return b.toString();
   }
 
@@ -169,6 +207,15 @@ public final class VivoIdc {
       d.contar();
     } else if ( que.equals( "aplicar" ) ) {
       d.aplicarPlan();
+    } else if ( que.startsWith( "detalle:" ) ) {
+      d.tabla.setSelection( Integer.parseInt( que.substring( 8 ) ) );
+      d.elegida();
+      abrirFuera();
+      d.abrirDetalle();
+    } else if ( que.equals( "ventana-cerrar" ) ) {
+      if ( d.ventana != null && !d.ventana.shell.isDisposed() ) {
+        d.ventana.shell.close();
+      }
     } else if ( que.equals( "probar" ) ) {
       d.probar();
     } else if ( que.equals( "cancelar" ) ) {
@@ -193,6 +240,31 @@ public final class VivoIdc {
         .append( it.getText( 2 ) ).append( " | " ).append( it.getText( 3 ) );
     }
     b.append( "\nmessages=" ).append( d.mensajes.getText() );
+    b.append( "\nwhat=" ).append( d.queHara.getVisible() ? d.queHara.getData( "plano" ) : "" );
+    b.append( "\ndetail=" ).append( d.detalle.getData( "plano" ) );
+    ventana( b, d.ventana );
     return b.toString();
+  }
+
+  private static String copiado;
+
+  /** Las ventanas de detalle se abren junto al diálogo (fuera de la pantalla) y sin activarse. */
+  private static void abrirFuera() {
+    IdcDetalle.abridor = ( s, p ) -> {
+      s.setLocation( p.getLocation().x + 40, p.getLocation().y + 40 );
+      s.setVisible( true );
+    };
+  }
+
+  private static void ventana( StringBuilder b, IdcDetalle.Ventana v ) {
+    if ( v == null || v.shell.isDisposed() ) {
+      return;
+    }
+    b.append( "\nwindow=" ).append( v.shell.getText() ).append( " | " ).append( v.titulo.getText() ).append( " | " )
+      .append( v.insignia.getText() ).append( " | " ).append( v.donde.getText() ).append( "\nwindow.value=" )
+      .append( v.filaValor.getVisible() ? v.etiquetaValor.getText() + " " + v.valor.getText() : "" )
+      .append( "\nwindow.apply=" ).append( v.aplicar.getVisible() ? v.aplicar.getText() + ( v.aplicar.getEnabled()
+        ? "" : " [off]" ) : "" ).append( "\nwindow.status=" ).append( v.estado.getText() ).append( "\nwindow.body=" )
+      .append( v.cuerpo.getText() );
   }
 }

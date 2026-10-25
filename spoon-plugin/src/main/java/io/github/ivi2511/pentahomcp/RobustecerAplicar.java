@@ -31,7 +31,7 @@ import io.github.ivi2511.pentahomcp.robustez.Propuesta;
  * harden_etl, paso 2 (hilo de UI sobre el documento vivo; o un hilo de trabajo sobre una copia en dry_run y en las
  * pruebas): resuelve TODOS los nombres antes de tocar nada (una propuesta que ya no encaja va a skipped entera) y
  * aplica en un orden fijo, todo en un {@link UndoGrupo} = un Ctrl+Z: (1) steps nuevos, (2) hops que se quitan,
- * (3) hops nuevos, (4) reconfiguraciones, (5) manejo de errores, (6) parámetros (fuera del undo de Spoon).
+ * (3) hops nuevos, (4) reconfiguraciones, (5) manejo de errores, (6) parámetros (con {@link UndoEfecto}).
  */
 final class RobustecerAplicar {
 
@@ -325,12 +325,23 @@ final class RobustecerAplicar {
       }
     }
     TransOps.resolverReferencias( tm );
-    // (6) parámetros: fuera del undo de Spoon (como add_parameter del linter)
+    // (6) parámetros: Spoon no los deshace; UndoEfecto los mete en el mismo Ctrl+Z
+    UndoEfecto.Foto fotoAntes = null;
+    List<String> parametros = new ArrayList<String>();
     for ( Cambio c : cambios ) {
       if ( Cambio.ADD_PARAMETER.equals( c.op ) ) {
+        if ( fotoAntes == null ) {
+          fotoAntes = UndoEfecto.Foto.de( tm );
+        }
         tm.addParameterDefinition( c.get( "name" ), c.get( "default" ), c.get( "description" ) );
-        h.notas.add( tx.f( "note_parameter", c.get( "name" ) ) );
+        parametros.add( c.get( "name" ) );
         h.cambios++;
+      }
+    }
+    if ( fotoAntes != null ) {
+      tm.activateParameters();
+      if ( !UndoEfecto.registrar( undo, tm, fotoAntes ) ) {
+        h.notas.add( tx.f( "note_parameter", String.join( ", ", parametros ) ) );
       }
     }
     tm.clearCaches();

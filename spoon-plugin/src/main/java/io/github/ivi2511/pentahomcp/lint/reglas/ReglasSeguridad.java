@@ -55,9 +55,25 @@ public final class ReglasSeguridad {
     return x.startsWith( "Encrypted " ) ? Sev.WARNING : Sev.ERROR;
   }
 
-  static String variable( String nombre ) {
+  /**
+   * La variable propuesta: ${DB_PASSWORD_<NOMBRE>} (todas las claves juntas en kettle.properties, una por conexión);
+   * sin nombre, ${DB_PASSWORD}.
+   */
+  public static String variable( String nombre ) {
     String n = nombre == null ? "" : nombre.toUpperCase( Locale.ROOT ).replaceAll( "[^A-Z0-9]+", "_" ).replaceAll( "^_+|_+$", "" );
-    return "${" + ( n.isEmpty() ? "DB" : n ) + "_PASSWORD}";
+    return "${DB_PASSWORD" + ( n.isEmpty() ? "" : "_" + n ) + "}";
+  }
+
+  /** «X» de «${X}» (o de «%%X%%»); null si el valor no es una sola variable. */
+  public static String nombreVariable( String v ) {
+    String x = v == null ? "" : v.trim();
+    if ( x.startsWith( "${" ) && x.endsWith( "}" ) && x.indexOf( '}' ) == x.length() - 1 ) {
+      return x.substring( 2, x.length() - 1 );
+    }
+    if ( x.startsWith( "%%" ) && x.endsWith( "%%" ) && x.length() > 4 && x.indexOf( "%%", 2 ) == x.length() - 2 ) {
+      return x.substring( 2, x.length() - 2 );
+    }
+    return null;
   }
 
   static final class ClaveEnArchivo extends ReglaBase {
@@ -156,7 +172,9 @@ public final class ReglasSeguridad {
       h.message = ctx.t( sev == Sev.ERROR ? "password_in_file.msg.plain" : "password_in_file.msg.encrypted", "where", donde );
       h.evidencia( "stored", sev == Sev.ERROR ? "plain text" : "Encrypted (reversible)" );
       String var = variable( nombre );
-      h.fix = Arreglo.asistido( Arreglo.REPLACE_VALUE ).vista( var ).param( "variable", var.substring( 2, var.length() - 1 ) );
+      // con confirmación: la conexión deja de tener la clave hasta que la persona define la variable
+      h.fix = Arreglo.conConfirmacion( Arreglo.REPLACE_VALUE ).vista( var ).param( "variable", var.substring( 2,
+        var.length() - 1 ) );
     }
 
     private static int numero( String s ) {

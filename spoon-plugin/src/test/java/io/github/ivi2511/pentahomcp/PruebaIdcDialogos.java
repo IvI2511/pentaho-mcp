@@ -5,13 +5,17 @@ import static io.github.ivi2511.pentahomcp.Verificador.cierto;
 import static io.github.ivi2511.pentahomcp.Verificador.contiene;
 import static io.github.ivi2511.pentahomcp.Verificador.falso;
 import static io.github.ivi2511.pentahomcp.Verificador.igual;
+import static io.github.ivi2511.pentahomcp.Verificador.noContiene;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -44,9 +48,11 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
 
 /**
  * Los diálogos del menú IDC con servicios falsos: «Revisar calidad…» ({@link IdcCalidad}: puntuación, tabla, clic =
- * step en el lienzo, arreglos automáticos, silenciar, revisión profunda y cancelar) y «Robustecer…»
- * ({@link IdcRobustez}: casillas del plan, aplicar con confirm/excluidas, prueba con datos sucios con su veredicto, el
- * problema del entorno aparte y cancelar). También el botón en una barra con un selector de perspectivas de mentira y
+ * step en el lienzo, detalle con formato, casillas y «Aplicar marcados» con recetas de robustez encadenadas, la ventana
+ * de detalle con su ensayo, su valor editable, aplicar solo ese y el pedido para Claude, silenciar, revisión profunda
+ * (y la que no tiene nada que leer) y cancelar) y «Robustecer…» ({@link IdcRobustez}: casillas del plan, detalle con
+ * los cambios, aplicar con confirm/excluidas, la ventana de detalle de una receta, «qué hará» la prueba con datos
+ * sucios antes de correrla, su veredicto, el problema del entorno aparte, cancelar y la prueba que no puede correr). También el botón en una barra con un selector de perspectivas de mentira y
  * los MenuItem del modelo.
  * <p>
  * Como PruebaPanelSwt: las ventanas se abren fuera de la pantalla (-20000, -20000), sin activarse
@@ -64,12 +70,15 @@ public class PruebaIdcDialogos {
   private File capturas;
   private Rotulos r;
   private IdcCalidad.Preguntador preguntadorAntes;
+  private java.util.function.BiConsumer<Shell, Shell> abridorAntes;
 
   public void preparar() throws Exception {
     EntornoKettle.iniciar();
     capturas = EntornoKettle.salida( "idc" );
     r = Rotulos.de( IdcMenu.AREA, "es" );
     preguntadorAntes = IdcCalidad.preguntador;
+    abridorAntes = IdcDetalle.abridor;
+    IdcDetalle.abridor = ( v, p ) -> mostrar( v );
     final CountDownLatch listo = new CountDownLatch( 1 );
     hiloUi = new Thread( () -> {
       display = new Display();
@@ -99,6 +108,7 @@ public class PruebaIdcDialogos {
 
   public void cerrar() {
     IdcCalidad.preguntador = preguntadorAntes;
+    IdcDetalle.abridor = abridorAntes;
     try {
       ui( () -> {
         if ( host != null && !host.isDisposed() ) {
@@ -122,7 +132,7 @@ public class PruebaIdcDialogos {
 
   // ================================================================ calidad
 
-  /** Revisión, tabla, clic = step, arreglos automáticos (y otra revisión), silenciar. */
+  /** Revisión, tabla, clic = step, arreglos marcados (y otra revisión), silenciar. */
   public void pruebaA_Calidad() throws Exception {
     final CalidadFalsa s = new CalidadFalsa();
     final IdcCalidad d = ui( () -> {
@@ -132,53 +142,82 @@ public class PruebaIdcDialogos {
       return x;
     } );
     try {
-      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 3, "primera revisión" );
+      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 4, "primera revisión" );
       ui( () -> {
         igual( "Calidad · ventas_por_producto", d.shell.getText(), "título" );
         igual( "62/100 · C", d.puntaje.getText(), "puntuación y nota" );
         igual( "", d.robustez.getText(), "sin robustez" );
         contiene( d.conteos.getText(), "1 errores · 1 avisos · 1 info", "cuentas" );
         contiene( d.conteos.getText(), "1 silenciados", "silenciados" );
-        igual( "Error", d.tabla.getItem( 0 ).getText( 0 ), "gravedad en castellano" );
-        igual( "absolute_path", d.tabla.getItem( 0 ).getText( 1 ), "regla" );
-        igual( "Leer ventas", d.tabla.getItem( 0 ).getText( 2 ), "dónde: el step" );
+        igual( "Error", d.tabla.getItem( 0 ).getText( 1 ), "gravedad en castellano" );
+        igual( "Ruta absoluta", d.tabla.getItem( 0 ).getText( 2 ), "la regla con su título en castellano" );
+        igual( "el step «Leer ventas»", d.tabla.getItem( 0 ).getText( 3 ), "dónde: el step" );
         igual( "automático", d.tabla.getItem( 1 ).getText( 5 ), "arreglo automático" );
-        igual( "pide un valor", d.tabla.getItem( 0 ).getText( 5 ), "arreglo con valor" );
+        igual( "con confirmación", d.tabla.getItem( 0 ).getText( 5 ), "arreglo que cambia una ruta" );
         igual( "pide un valor", d.tabla.getItem( 2 ).getText( 5 ), "auto que pide un valor: no es automático" );
-        igual( "Aplicar arreglos automáticos (1)", d.aplicar.getText(), "un arreglo automático" );
+        igual( "receta: Filas malas a un archivo de rechazos", d.tabla.getItem( 3 ).getText( 5 ),
+          "robustez: su receta" );
+        cierto( d.tabla.getItem( 1 ).getChecked(), "la automática empieza marcada" );
+        falso( d.tabla.getItem( 0 ).getChecked() || d.tabla.getItem( 3 ).getChecked(), "las demás no" );
+        igual( "Aplicar marcados (1)", d.aplicar.getText(), "un arreglo marcado" );
         cierto( d.aplicar.getEnabled(), "aplicar habilitado" );
         falso( d.silenciar.getEnabled(), "silenciar sin hallazgo elegido" );
-        contiene( d.pie.getText(), "1 comprobaciones sin evaluar: unsorted_input (Agrupar)", "no evaluados" );
+        contiene( d.pie.getText(), "1 comprobaciones sin evaluar: Entrada sin ordenar por la clave («Agrupar»): "
+          + "deep=false", "no evaluados con su motivo" );
         falso( s.profunda.get( 0 ), "primera revisión sin profunda" );
         return null;
       } );
       pantalla( d.shell, "calidad.png" );
 
-      // clic en un hallazgo: el detalle y el step en el lienzo
+      // clic en un hallazgo: el detalle con formato y el step en el lienzo
       ui( () -> {
         d.tabla.setSelection( 1 );
         d.tabla.notifyListeners( SWT.Selection, new Event() );
-        contiene( d.detalle.getText(), "Group by sin ordenar", "detalle: el mensaje" );
-        contiene( d.detalle.getText(), "Cómo arreglarlo: Pon un Sort rows", "detalle: cómo arreglarlo" );
-        contiene( d.detalle.getText(), "· order: desconocido", "detalle: la evidencia" );
-        cierto( d.silenciar.getEnabled(), "silenciar habilitado" );
+        String t = (String) d.detalle.getData( "plano" );
+        contiene( t, "Entrada sin ordenar por la clave", "detalle: el título" );
+        contiene( t, "Qué pasa\nGroup by sin ordenar", "detalle: el mensaje bajo su encabezado" );
+        contiene( t, "Por qué importa", "detalle: por qué importa (catálogo)" );
+        contiene( t, "Cómo arreglarlo\nPon un Sort rows", "detalle: cómo arreglarlo" );
+        contiene( t, "order: desconocido", "detalle: la evidencia" );
+        contiene( t, "Doble clic (o Intro)", "detalle: cómo abrir la ventana" );
+        cierto( d.silenciar.getEnabled() && d.verDetalle.getEnabled(), "silenciar y ver detalle habilitados" );
         return null;
       } );
       igual( Arrays.asList( "Agrupar" ), s.seleccionados, "el step elegido en el lienzo" );
 
-      // arreglos automáticos: apply_lint_fixes y otra revisión
+      // un hallazgo de robustez marcado: su receta va primero y los arreglos se encadenan a ella
+      ui( () -> {
+        d.tabla.getItem( 3 ).setChecked( true );
+        Event e = new Event();
+        e.detail = SWT.CHECK;
+        e.item = d.tabla.getItem( 3 );
+        d.tabla.notifyListeners( SWT.Selection, e );
+        igual( "Aplicar marcados (2)", d.aplicar.getText(), "dos marcados" );
+        // una que pide un valor sin valor no se puede marcar
+        d.tabla.getItem( 2 ).setChecked( true );
+        e = new Event();
+        e.detail = SWT.CHECK;
+        e.item = d.tabla.getItem( 2 );
+        d.tabla.notifyListeners( SWT.Selection, e );
+        falso( d.tabla.getItem( 2 ).getChecked(), "sin valor no se marca" );
+        return null;
+      } );
       clic( d.aplicar );
       esperarUi( () -> !d.ocupado && s.revisiones.get() == 2, "aplicar y revisar otra vez" );
       igual( 1, s.arreglos.get(), "apply_lint_fixes una vez" );
+      igual( Collections.singletonList( "unsorted_input:Agrupar" ), s.keys, "las keys marcadas" );
+      igual( "rejects_on_error|Cargar fecha", s.pares, "la receta del hallazgo de robustez, en su step" );
+      cierto( s.continuar, "los arreglos se encadenan al undo de la receta" );
+      falso( s.ensayo, "no es un ensayo" );
       ui( () -> {
-        contiene( d.estado.getText(), "1 arreglos aplicados (se deshacen con un Ctrl+Z). Puntuación 62 → 70",
+        contiene( d.estado.getText(), "2 arreglos aplicados (se deshacen con un Ctrl+Z). Puntuación 62 → 70",
           "aviso de lo aplicado" );
         return null;
       } );
 
       // silenciar la regla del hallazgo elegido en su step, con motivo
       IdcCalidad.preguntador = ( p, t, x ) -> {
-        contiene( t, "Silenciar «absolute_path»", "título de la pregunta" );
+        contiene( t, "Silenciar «Ruta absoluta»", "título de la pregunta" );
         contiene( x, "Es un error", "avisa que es un error" );
         contiene( x, "el step «Leer ventas»", "dónde" );
         return "  ruta del servidor de la uni  ";
@@ -193,7 +232,7 @@ public class PruebaIdcDialogos {
       igual( Arrays.asList( "absolute_path", "Leer ventas", null, "ruta del servidor de la uni" ), s.silenciado,
         "suppress_lint con regla, step y motivo" );
       ui( () -> {
-        contiene( d.estado.getText(), "«absolute_path» silenciada en el step «Leer ventas»", "aviso" );
+        contiene( d.estado.getText(), "«Ruta absoluta» silenciada en el step «Leer ventas»", "aviso" );
         return null;
       } );
 
@@ -207,7 +246,7 @@ public class PruebaIdcDialogos {
     }
   }
 
-  /** Revisión profunda con robustez, que se cancela; después una que termina con su pie. */
+  /** Revisión profunda con robustez, que se cancela; después una que termina con su pie; y una sin nada que leer. */
   public void pruebaB_CalidadProfundaYCancelar() throws Exception {
     final CalidadFalsa s = new CalidadFalsa();
     final IdcCalidad d = ui( () -> {
@@ -217,7 +256,7 @@ public class PruebaIdcDialogos {
       return x;
     } );
     try {
-      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 3, "primera revisión" );
+      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 4, "primera revisión" );
       s.bloquear = new CountDownLatch( 1 );
       ui( () -> {
         d.profunda.setSelection( true );
@@ -240,7 +279,7 @@ public class PruebaIdcDialogos {
         falso( d.ocupado, "libre" );
         igual( "Revisión cancelada.", d.estado.getText(), "cancelada" );
         falso( d.barra.getVisible(), "sin barra" );
-        igual( 3, d.tabla.getItemCount(), "la tabla de antes sigue" );
+        igual( 4, d.tabla.getItemCount(), "la tabla de antes sigue" );
         return null;
       } );
       cierto( s.profunda.get( 1 ), "pidió profunda" );
@@ -258,6 +297,16 @@ public class PruebaIdcDialogos {
         return null;
       } );
       pantalla( d.shell, "calidad-profunda.png" );
+
+      // una profunda sin nada que leer: lo dice en vez de «0 sondas»
+      s.sondas = 0;
+      clic( d.revisar );
+      esperarUi( () -> !d.ocupado && s.revisiones.get() == 4, "otra revisión profunda" );
+      ui( () -> {
+        noContiene( d.pie.getText(), "0 sondas", "nada de «0 sondas»" );
+        contiene( d.pie.getText(), "Revisión profunda: no había nada que leer", "explica por qué" );
+        return null;
+      } );
     } finally {
       cerrarShell( d.shell );
     }
@@ -275,7 +324,7 @@ public class PruebaIdcDialogos {
       return x;
     } );
     try {
-      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 3, "el plan" );
+      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 3 && d.previa != null, "el plan y la previa" );
       ui( () -> {
         igual( "Robustecer · carga_ventas", d.shell.getText(), "título" );
         igual( "Robustez ahora: 35/100 · D", d.puntaje.getText(), "robustez antes" );
@@ -287,7 +336,17 @@ public class PruebaIdcDialogos {
         falso( d.tabla.getItem( 2 ).getChecked(), "manual sin marcar" );
         cierto( d.tabla.getItem( 2 ).getGrayed(), "manual en gris" );
         igual( "Aplicar (1)", d.aplicar.getText(), "una marcada" );
-        contiene( d.detalle.getText(), "Escribir rechazos", "detalle de la primera: el diff" );
+        String t = (String) d.detalle.getData( "plano" );
+        contiene( t, "Cambios\n+ step Escribir rechazos", "detalle de la primera: los cambios" );
+        contiene( t, "Un solo Ctrl+Z deshace todo esto", "y cómo se deshacen" );
+        // antes de probar: qué hará, sin una tabla vacía
+        falso( d.resultados.getVisible(), "sin tabla de comprobaciones antes de probar" );
+        cierto( d.queHara.getVisible(), "qué hará, a la vista" );
+        String q = (String) d.queHara.getData( "plano" );
+        contiene( q, "Qué hará la prueba", "encabezado" );
+        contiene( q, "«Leer ventas»: 50 filas de base, 4 campos", "las entradas que ensuciará" );
+        contiene( q, "Todo junto: cada tipo de fila rota en un mismo archivo", "las variantes en castellano" );
+        contiene( q, "Todo listo", "va a poder correr" );
         return null;
       } );
       pantalla( d.shell, "robustecer-plan.png" );
@@ -300,8 +359,9 @@ public class PruebaIdcDialogos {
         e.item = d.tabla.getItem( 2 );
         d.tabla.notifyListeners( SWT.Selection, e );
         falso( d.tabla.getItem( 2 ).getChecked(), "la manual vuelve a desmarcarse" );
-        contiene( d.detalle.getText(), "A mano: Pentaho Live no la aplica", "detalle de la manual" );
-        contiene( d.detalle.getText(), "Cómo hacerlo:", "cómo hacerlo" );
+        String t = (String) d.detalle.getData( "plano" );
+        contiene( t, "Cómo hacerlo a mano\nUsa un Combination lookup/update", "detalle de la manual: cómo hacerlo" );
+        contiene( t, "Pentaho Live no puede arreglarlo solo", "y que se lo puede pedir a Claude" );
         // marcar la confirm, desmarcar la auto
         d.tabla.getItem( 1 ).setChecked( true );
         d.tabla.getItem( 0 ).setChecked( false );
@@ -359,20 +419,24 @@ public class PruebaIdcDialogos {
         cierto( d.entorno.getVisible(), "el entorno aparte" );
         contiene( d.entorno.getText(), "Problema del entorno (no es un fallo de robustez): the database file "
           + "dw.sqlite does not exist", "problema del entorno" );
+        cierto( d.resultados.getVisible(), "ahora sí la tabla" );
+        falso( d.queHara.getVisible(), "y ya no el «qué hará»" );
         igual( 4, d.comprobaciones.getItemCount(), "3 comprobaciones de combined + empty_file sin evaluar" );
         igual( "No aborta", d.comprobaciones.getItem( 0 ).getText( 1 ), "comprobación en castellano" );
         igual( "falla", d.comprobaciones.getItem( 1 ).getText( 2 ), "estado en castellano" );
         igual( "sin evaluar", d.comprobaciones.getItem( 3 ).getText( 2 ), "variante sin evaluar" );
-        contiene( d.mensajes.getText(), "2 pasan · 0 avisos · 1 fallan", "resumen" );
-        contiene( d.mensajes.getText(), "Siguiente paso: harden_etl recipes=[required_fields]", "siguiente" );
-        contiene( d.mensajes.getText(), "· Not a security sandbox", "notas" );
+        String m = (String) d.mensajes.getData( "plano" );
+        contiene( m, "2 pasan · 0 avisos · 1 fallan", "resumen" );
+        contiene( m, "Siguiente paso: harden_etl recipes=[required_fields]", "siguiente" );
+        contiene( m, "•  Not a security sandbox", "notas" );
         // una comprobación elegida: su mensaje entero arriba del resumen
         Event e = new Event();
         e.item = d.comprobaciones.getItem( 1 );
         d.comprobaciones.notifyListeners( SWT.Selection, e );
-        cierto( d.mensajes.getText().startsWith( "combined · No pierde filas en silencio: 3 rows lost in Filtrar" ),
-          "mensaje de la comprobación: " + d.mensajes.getText() );
-        contiene( d.mensajes.getText(), "2 pasan · 0 avisos · 1 fallan", "y el resumen debajo" );
+        m = (String) d.mensajes.getData( "plano" );
+        cierto( m.startsWith( "combined · No pierde filas en silencio · falla\n3 rows lost in Filtrar" ),
+          "mensaje de la comprobación: " + m );
+        contiene( m, "2 pasan · 0 avisos · 1 fallan", "y el resumen debajo" );
         return null;
       } );
       pantalla( d.shell, "robustecer-veredicto.png" );
@@ -380,6 +444,177 @@ public class PruebaIdcDialogos {
       cerrarShell( d.shell );
     }
   }
+
+  /** «Probar con datos sucios» cuando no va a poder correr: lo dice antes, y después no deja una tabla vacía. */
+  public void pruebaG_RobustecerSinPoderProbar() throws Exception {
+    final RobustezFalsa s = new RobustezFalsa();
+    s.conBaseMysql = true;
+    final IdcRobustez d = ui( () -> {
+      IdcRobustez x = new IdcRobustez( host, s, r, "T1" );
+      mostrar( x.shell );
+      x.cargarPlan();
+      return x;
+    } );
+    try {
+      esperarUi( () -> !d.ocupado && d.previa != null, "el plan y la previa" );
+      ui( () -> {
+        String q = (String) d.queHara.getData( "plano" );
+        contiene( q, "No se va a poder ejecutar", "lo avisa antes" );
+        contiene( q, "bases de datos que no son archivos SQLite/H2 (GYM_DW (MYSQL)", "con el porqué" );
+        contiene( q, "haz una copia de la transformación que cargue en una base SQLite", "y qué hacer" );
+        return null;
+      } );
+      clic( d.probar );
+      esperarUi( () -> !d.ocupado && d.prueba != null, "la prueba que no corre" );
+      ui( () -> {
+        falso( d.resultados.getVisible(), "sin tabla vacía" );
+        cierto( d.queHara.getVisible(), "el texto con el porqué" );
+        contiene( (String) d.queHara.getData( "plano" ), "Motivo: la transformación usa bases de datos",
+          "el motivo" );
+        contiene( d.veredicto.getText(), "NO SE EJECUTÓ", "veredicto" );
+        return null;
+      } );
+      pantalla( d.shell, "robustecer-sin-probar.png" );
+
+      // la ventana de detalle de una receta: doble clic, sus acciones y el pedido para Claude
+      final String[] copiado = new String[ 1 ];
+      IdcDetalle.portapapeles = ( dis, t ) -> copiado[ 0 ] = t;
+      ui( () -> {
+        d.tabla.setSelection( 2 );
+        d.tabla.notifyListeners( SWT.DefaultSelection, new Event() );
+        return null;
+      } );
+      esperarUi( () -> d.ventana != null && d.ventana.shell.isVisible(), "la ventana de detalle" );
+      ui( () -> {
+        igual( "Claves subrogadas estables", d.ventana.titulo.getText(), "título: la receta" );
+        contiene( d.ventana.insignia.getText(), "a mano", "insignia: el nivel" );
+        falso( d.ventana.aplicar.getVisible(), "una manual no se aplica" );
+        d.ventana.claude.notifyListeners( SWT.Selection, new Event() );
+        contiene( copiado[ 0 ], "Robustecer (harden_etl) propone esta receta", "el pedido" );
+        contiene( copiado[ 0 ], "Usa un Combination lookup/update", "con el cómo" );
+        contiene( d.ventana.estado.getText(), "Pedido copiado", "lo dice" );
+        return null;
+      } );
+      pantalla( d.ventana.shell, "robustecer-detalle.png" );
+      ui( () -> {
+        d.tabla.setSelection( 1 );
+        d.abrirDetalle();
+        cierto( d.ventana.aplicar.getVisible() && d.ventana.aplicar.getEnabled(), "una confirm sí se aplica" );
+        d.ventana.irAlStep.notifyListeners( SWT.Selection, new Event() );
+        return null;
+      } );
+      igual( Collections.singletonList( "Leer ventas" ), s.seleccionados, "ir al step" );
+      clic( d.ventana.aplicar );
+      esperarUi( () -> !d.ocupado && s.planes.get() == 2, "aplicar esta receta y plan nuevo" );
+      igual( new LinkedHashSet<String>( Collections.singletonList( "required_fields:Leer ventas" ) ), s.confirmar,
+        "solo esa" );
+      igual( new LinkedHashSet<String>( Collections.singletonList( "rejects_on_error:Cargar ventas" ) ), s.excluir,
+        "las demás auto, excluidas" );
+    } finally {
+      IdcDetalle.portapapeles = PORTAPAPELES;
+      cerrarShell( d.shell );
+    }
+  }
+
+  /** La ventana de detalle de un hallazgo: contenido, valor editable, ensayo, aplicar solo ese y pedírselo a Claude. */
+  public void pruebaF_CalidadDetalle() throws Exception {
+    final CalidadFalsa s = new CalidadFalsa();
+    final String[] copiado = new String[ 1 ];
+    IdcDetalle.portapapeles = ( dis, t ) -> copiado[ 0 ] = t;
+    final IdcCalidad d = ui( () -> {
+      IdcCalidad x = new IdcCalidad( host, s, r, "T1" );
+      mostrar( x.shell );
+      x.revisar();
+      return x;
+    } );
+    try {
+      esperarUi( () -> !d.ocupado && d.tabla.getItemCount() == 4, "primera revisión" );
+      // la contraseña: confirm con la variable propuesta, y dónde ponerla
+      ui( () -> {
+        d.tabla.setSelection( 0 );
+        d.tabla.notifyListeners( SWT.Selection, new Event() );
+        d.tabla.notifyListeners( SWT.DefaultSelection, new Event() );
+        return null;
+      } );
+      esperarUi( () -> d.ventana != null && d.ventana.shell.isVisible(), "la ventana de detalle" );
+      esperarUi( () -> d.ventana.cuerpo.getText().contains( "Qué cambiará" ) && !d.ventana.cuerpo.getText()
+        .contains( "Calculando" ), "el ensayo del arreglo" );
+      ui( () -> {
+        igual( "Ruta absoluta", d.ventana.titulo.getText(), "título" );
+        contiene( d.ventana.insignia.getText(), "Error", "insignia" );
+        contiene( d.ventana.donde.getText(), "Regla absolute_path · el step «Leer ventas»", "dónde" );
+        cierto( d.ventana.irAlStep.getVisible(), "ir al step" );
+        cierto( d.ventana.filaValor.getVisible(), "el valor editable" );
+        igual( "Ruta nueva:", d.ventana.etiquetaValor.getText(), "etiqueta del valor" );
+        igual( "${Internal.Entry.Current.Directory}/datos/ventas.csv", d.ventana.valor.getText(), "la propuesta" );
+        String t = d.ventana.cuerpo.getText();
+        contiene( t, "Qué pasa", "qué pasa" );
+        contiene( t, "Por qué importa", "por qué" );
+        contiene( t, "•  In 'Leer ventas', filename: C:\\datos -> ${Internal.Entry.Current.Directory}/datos/ventas.csv",
+          "los cambios exactos del ensayo" );
+        contiene( t, "Puntuación: 62 → 70", "la puntuación que tendría" );
+        contiene( d.ventana.enlace.getText(), "06-calidad.md · absolute_path", "el enlace al manual" );
+        cierto( d.ventana.aplicar.getEnabled(), "aplicar habilitado (con la propuesta)" );
+        return null;
+      } );
+      cierto( s.ensayo, "fue un ensayo" );
+      igual( "${Internal.Entry.Current.Directory}/datos/ventas.csv", s.valores.get( "absolute_path:Leer ventas" ),
+        "con el valor propuesto" );
+      pantalla( d.ventana.shell, "calidad-detalle.png" );
+
+      // otro valor: «Ver cambios» hace otro ensayo con él
+      ui( () -> {
+        d.ventana.valor.setText( "${DIR}/ventas.csv" );
+        d.ventana.verCambios.notifyListeners( SWT.Selection, new Event() );
+        return null;
+      } );
+      esperar( () -> "${DIR}/ventas.csv".equals( s.valores.get( "absolute_path:Leer ventas" ) ), "ensayo con el valor" );
+      ui( () -> {
+        cierto( d.tabla.getItem( 0 ).getText( 5 ).equals( "con valor elegido" ), "la fila lo refleja" );
+        return null;
+      } );
+
+      // pedírselo a Claude: el pedido con todo
+      ui( () -> {
+        d.ventana.claude.notifyListeners( SWT.Selection, new Event() );
+        return null;
+      } );
+      contiene( copiado[ 0 ], "Tengo abierta en Spoon la transformación «ventas_por_producto»", "el pedido" );
+      contiene( copiado[ 0 ], "- Regla: Ruta absoluta (absolute_path)", "la regla" );
+      contiene( copiado[ 0 ], "- Key: absolute_path:Leer ventas", "la key" );
+      contiene( copiado[ 0 ], "espera a que te lo confirme", "pide confirmación" );
+
+      // aplicar este arreglo: solo esa key, con el valor elegido
+      clic( d.ventana.aplicar );
+      esperarUi( () -> !d.ocupado && s.revisiones.get() == 2, "aplicar y revisar otra vez" );
+      igual( 1, s.arreglos.get(), "esta vez de verdad" );
+      igual( Collections.singletonList( "absolute_path:Leer ventas" ), s.keysAplicadas, "solo esa key" );
+      igual( "${DIR}/ventas.csv", s.valoresAplicados.get( "absolute_path:Leer ventas" ), "con el valor elegido" );
+      ui( () -> {
+        contiene( d.ventana.estado.getText(), "arreglos aplicados", "el resultado en la ventana" );
+        return null;
+      } );
+
+      // un hallazgo sin arreglo: los pasos a mano y Claude
+      ui( () -> {
+        d.tabla.setSelection( 2 );
+        d.abrirDetalle();
+        return null;
+      } );
+      ui( () -> {
+        String t = d.ventana.cuerpo.getText();
+        contiene( t, "Este arreglo necesita un valor", "pide el valor" );
+        falso( d.ventana.aplicar.getEnabled(), "sin valor no se aplica" );
+        return null;
+      } );
+    } finally {
+      IdcDetalle.portapapeles = PORTAPAPELES;
+      cerrarShell( d.shell );
+    }
+  }
+
+  /** Lo que copia al portapapeles de verdad (las pruebas lo cambian y lo devuelven). */
+  private static final java.util.function.BiConsumer<Display, String> PORTAPAPELES = IdcDetalle.portapapeles;
 
   // ================================================================ barra y menú
 
@@ -512,6 +747,14 @@ public class PruebaIdcDialogos {
     volatile boolean conRobustez;
     volatile boolean enEspera;
     volatile int score = 62;
+    volatile int sondas = 2;
+    volatile List<String> keys;
+    volatile Map<String, String> valores = new LinkedHashMap<String, String>();
+    volatile boolean ensayo;
+    volatile boolean continuar;
+    volatile List<String> keysAplicadas;
+    volatile Map<String, String> valoresAplicados;
+    volatile String pares;
 
     @Override
     public String nombre() {
@@ -536,10 +779,11 @@ public class PruebaIdcDialogos {
       o.put( "document", "T1" ).put( "score", score ).put( "grade", score >= 75 ? "B" : "C" );
       o.putObject( "counts" ).put( "error", 1 ).put( "warning", 1 ).put( "info", 1 );
       ArrayNode f = o.putArray( "findings" );
-      ObjectNode valor = McpHttpServer.JSON.createObjectNode().put( "kind", "set" ).put( "auto", false )
-        .put( "confirm", true ).put( "needs_value", true );
+      // cambia una ruta: confirm, con la ruta propuesta (se puede editar en el detalle)
+      ObjectNode ruta = McpHttpServer.JSON.createObjectNode().put( "kind", "replace_value" ).put( "auto", true )
+        .put( "confirm", true ).put( "preview", "${Internal.Entry.Current.Directory}/datos/ventas.csv" );
       f.add( hallazgo( "error", "absolute_path", "Leer ventas", "Ruta absoluta C:\\datos\\ventas.csv",
-        "Usa ${Internal.Entry.Current.Directory}", valor ) );
+        "Usa ${Internal.Entry.Current.Directory}", ruta ) );
       ObjectNode auto = McpHttpServer.JSON.createObjectNode().put( "kind", "rename" ).put( "auto", true )
         .put( "confirm", false );
       ObjectNode g = hallazgo( "warning", "unsorted_input", "Agrupar", "Group by sin ordenar antes",
@@ -551,6 +795,13 @@ public class PruebaIdcDialogos {
         .put( "confirm", false ).put( "needs_value", true );
       f.add( hallazgo( "info", "default_step_name", "Dummy (do nothing)", "Nombre por defecto",
         "Dale un nombre que diga qué hace", autoConValor ) );
+      // robustez: se arregla con su receta de harden_etl
+      ObjectNode rb = hallazgo( "warning", "no_rejects_on_load", "Cargar fecha", "La carga para con una fila mala",
+        "harden_etl recipes=[rejects_on_error] steps=[Cargar fecha]: manejo de errores hacia un archivo de rechazos",
+        null );
+      rb.put( "category", "robustness" );
+      rb.putObject( "evidence" ).put( "recipe", "rejects_on_error" ).put( "anchor", "Cargar fecha" );
+      f.add( rb );
       o.putArray( "suppressed" ).addObject().put( "rule", "x" );
       o.putArray( "not_evaluated" ).addObject().put( "rule", "unsorted_input" ).put( "step", "Agrupar" )
         .put( "reason", "deep=false" );
@@ -559,7 +810,10 @@ public class PruebaIdcDialogos {
       }
       ObjectNode d = o.putObject( "deep" ).put( "ran", prof );
       if ( prof ) {
-        d.put( "ms", 1500 ).put( "probes", 2 ).put( "raised", 1 ).put( "lowered", 0 ).put( "not_evaluated", 1 );
+        d.put( "ms", 1500 ).put( "probes", sondas ).put( "raised", 1 ).put( "lowered", 0 ).put( "not_evaluated", 1 );
+        if ( sondas == 0 ) {
+          d.put( "reason", "nothing to check" );
+        }
       } else {
         d.put( "reason", "deep=false" );
       }
@@ -567,12 +821,47 @@ public class PruebaIdcDialogos {
     }
 
     @Override
-    public ObjectNode arreglarAuto() {
-      arreglos.incrementAndGet();
+    public ObjectNode arreglar( Collection<String> k, Map<String, String> v, boolean ens, boolean cont ) {
+      keys = new ArrayList<String>( k );
+      valores = new LinkedHashMap<String, String>( v );
+      ensayo = ens;
+      continuar = cont;
+      if ( !ens ) {
+        arreglos.incrementAndGet();
+        keysAplicadas = new ArrayList<String>( k );
+        valoresAplicados = new LinkedHashMap<String, String>( v );
+      }
       ObjectNode o = McpHttpServer.JSON.createObjectNode();
-      o.putArray( "applied" ).addObject().put( "key", "unsorted_input:Agrupar" ).put( "change", "x" );
+      ArrayNode a = o.putArray( "applied" );
+      for ( String x : k ) {
+        a.addObject().put( "key", x ).put( "change", x.startsWith( "absolute_path" ) ? "In 'Leer ventas', filename: "
+          + "C:\\datos -> " + v.get( x ) : "x" );
+      }
+      o.putArray( "skipped" );
       o.put( "undo_steps", 1 ).put( "score_before", 62 ).put( "score_after", 70 );
-      score = 70;
+      if ( !ens ) {
+        score = 70;
+      }
+      return o;
+    }
+
+    @Override
+    public ObjectNode recetas( List<String[]> p, boolean ens ) {
+      StringBuilder b = new StringBuilder();
+      for ( String[] x : p ) {
+        b.append( b.length() == 0 ? "" : ";" ).append( x[ 0 ] ).append( '|' ).append( x[ 1 ] );
+      }
+      pares = b.toString();
+      ObjectNode o = McpHttpServer.JSON.createObjectNode();
+      if ( ens ) {
+        ObjectNode pr = o.putArray( "proposals" ).addObject().put( "key", "harden:rejects_on_error:Cargar fecha" )
+          .put( "recipe", "rejects_on_error" ).put( "level", "auto" ).put( "step", "Cargar fecha" );
+        pr.putArray( "changes" ).addObject().put( "op", "add_step" );
+        pr.put( "diff", "+ Escribir rechazos (Text file output)" );
+        return o;
+      }
+      o.putArray( "applied" ).addObject().put( "key", "harden:rejects_on_error:Cargar fecha" );
+      o.putArray( "not_applied" );
       return o;
     }
 
@@ -590,10 +879,15 @@ public class PruebaIdcDialogos {
 
   static final class RobustezFalsa implements IdcRobustez.Servicio {
     final AtomicInteger planes = new AtomicInteger();
+    final List<String> seleccionados = new ArrayList<String>();
     volatile Set<String> confirmar;
     volatile Set<String> excluir;
     volatile boolean bloquear;
+    volatile boolean conBaseMysql;
     volatile EstresProcesos.Corte corte;
+
+    static final String NO_CORRE = "la transformación usa bases de datos que no son archivos SQLite/H2 (GYM_DW (MYSQL) "
+      + "used by Cargar fecha): stress_test nunca se conecta a ellas";
 
     @Override
     public String nombre() {
@@ -636,8 +930,36 @@ public class PruebaIdcDialogos {
     }
 
     @Override
+    public ObjectNode previa() {
+      ObjectNode o = McpHttpServer.JSON.createObjectNode();
+      o.putArray( "inputs" ).addObject().put( "step", "Leer ventas" ).put( "type", "CsvInput" ).put( "base_rows", 50 )
+        .put( "fields", 4 );
+      ArrayNode v = o.putArray( "variants" );
+      v.add( "combined" ).add( "empty_file" ).add( "header_only" );
+      o.putArray( "file_outputs" );
+      ArrayNode db = o.putArray( "databases_not_files" );
+      if ( conBaseMysql ) {
+        db.add( "GYM_DW (MYSQL) used by Cargar fecha" );
+        o.put( "will_run", false ).put( "not_run_reason", NO_CORRE );
+      } else {
+        o.put( "will_run", true );
+      }
+      return o;
+    }
+
+    @Override
+    public void seleccionar( String step ) {
+      seleccionados.add( step );
+    }
+
+    @Override
     public ObjectNode probar( EstresProcesos.Corte c ) throws Exception {
       corte = c;
+      if ( conBaseMysql ) {
+        ObjectNode o = McpHttpServer.JSON.createObjectNode();
+        o.put( "document", "T1" ).put( "ran", false ).put( "verdict", "not_run" ).put( "not_run_reason", NO_CORRE );
+        return o;
+      }
       if ( bloquear ) {
         long fin = System.currentTimeMillis() + 30000;
         while ( !c.pedido() && System.currentTimeMillis() < fin ) {

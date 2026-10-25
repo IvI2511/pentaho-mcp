@@ -90,10 +90,12 @@ nothing and opens no dialogs.
   instead of 10", or info when the data is fine). It reads real data: say so, and ask first with big or
   production databases.
 - **Fixing**: `apply_lint_fixes` with `keys: ["all_auto"]` applies the safe fixes (proposed names, START,
-  Calculator operands). Fixes with `confirm: true` (Sort rows, paths, decimal symbol, copy mode, Abort…):
-  **ask the person first**, then pass their keys. `needs_value` fixes take `values[key]` (a name, `.` or
-  `,`, a `${VARIABLE}` for a password, never the password itself). One Ctrl+Z in a transformation; `save`
-  afterwards.
+  Calculator operands). Fixes with `confirm: true` (Sort rows, paths, decimal symbol, copy mode, Abort, a
+  password moved to `${DB_PASSWORD_<CONNECTION>}`, a disabled hop enabled, a loose step deleted…): **ask the
+  person first**, then pass their keys. `needs_value` fixes take `values[key]` (a name, `.` or `,`, a
+  parameter default; never a password). One Ctrl+Z in a transformation, parameters included; `save`
+  afterwards. A request pasted from the IDC menu's **Ask Claude** button names the rule, the step and the
+  key: run `lint_etl`, show what you will change, wait for the yes, fix it and check again.
 - **Silencing**: `suppress_lint` (`rule`, `step`/`entry`, `reason`) when a finding is deliberate; it
   travels inside the file. Ask before silencing an error.
 - **In reports**: the `quality` section of `build_report` (on by default) and `quality_deep: true`.

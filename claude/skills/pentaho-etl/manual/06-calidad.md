@@ -6,7 +6,13 @@ outputs without fields…), with a **0-100 score** that says where every lost po
 `apply_lint_fixes` applies the fixes it proposes as one Ctrl+Z, and `suppress_lint` silences a rule where it is
 a deliberate choice. The Reports have the same check as the **Technical quality** section (`quality`).
 By hand, the person has it in Spoon's **IDC** menu (next to the perspective switcher) > **Check quality…**: the same
-`lint_etl` / `apply_lint_fixes all_auto` / `suppress_lint`, with the deep check as a checkbox.
+`lint_etl` / `apply_lint_fixes` / `suppress_lint`, with the deep check as a checkbox. Since 0.7.0 every finding has
+a checkbox (automatic fixes start checked; the ones that change what the ETL does and the robustness findings, whose
+`harden_etl` recipe is applied, are checked by the person) and a details window (double click or Enter): what
+happens, why it matters, the **exact changes** of its fix (a dry run), an editable value when the fix takes one, and
+its actions: apply this fix, silence this rule here, or **Ask Claude**, which copies a ready-made request to the
+clipboard. When the person pastes one of those requests, it names the rule, the step and the key: run `lint_etl`,
+show the plan, wait for the confirmation and fix it.
 
 If `lint_etl` is not among the tools, the Spoon plugin is older than 0.6.0: use `validate`, `preview_step` and
 the checklist in `03-errores-comunes.md` §E.
@@ -108,11 +114,11 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | Rule | Sev | What it catches | Fix | See |
 |---|---|---|---|---|
 | `cycle` | E | Hop loop: runs forever (it is checked first: with a cycle the rules that need fields do not run) | by hand | D2 |
-| `duplicate_step_name` | E | Two steps with the same name, **ignoring case**: one disappears on load (read from the saved file) | by hand | D1 |
+| `duplicate_step_name` | E | Two steps with the same name, **ignoring case**: one disappears on load (read from the saved file, also when the document has unsaved changes, and from memory) | by hand | D1 |
 | `broken_hop` | E | Hop with an end that does not exist | by hand | C2 |
 | `missing_plugin` | E | Step or entry whose plugin is not installed | by hand | C1 |
-| `disabled_hop` | W | Disabled hop: the step after it never gets rows (in a job, never runs that way) | by hand | D7 |
-| `orphan_step`, `orphan_entry` | W | A drawn step or entry with no hops: it never runs | by hand | D7 |
+| `disabled_hop` | W | Disabled hop: the step after it never gets rows (in a job, never runs that way) | confirm: enable it (or delete it by hand) | D7 |
+| `orphan_step`, `orphan_entry` | W | A drawn step or entry with no hops: it never runs | confirm: delete it (Ctrl+Z brings it back) | D7 |
 | `unreachable_entry` | W | Job entry that cannot be reached from START through enabled hops | by hand | — |
 | `distribute_multiple_outputs` | W (I) | 2+ outputs in distribute mode: each gets part of the rows (I when all outputs are the same step type) | confirm: copy mode | — |
 | `unsorted_input` | W (E with proof) | Group by, Merge join, Unique rows, Merge rows, Row denormaliser, Analytic query or Sorted merge gets rows not sorted by its key (E when a Data grid visibly is not, or the deep mode proves it) | confirm: insert a Sort rows (or `ORDER BY`) | D5, D6 |
@@ -124,15 +130,15 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `relative_path` | E | Relative path without a variable: resolved against PDI's folder | confirm: prefix `${Internal.Entry.Current.Directory}/` | C15 |
 | `job_variable_in_transformation` | W | `${Internal.Job.*}` inside a `.ktr` | confirm | D11 |
 | `missing_input_file` | W, env | Input file that does not exist on this computer | by hand | C13 |
-| `password_in_file` | E / W | Password in the file: in plain text (E) or `Encrypted …`, which is reversible (W) | value: a `${VARIABLE}`, never a password | — |
+| `password_in_file` | E / W | Password in the file: in plain text (E) or `Encrypted …`, which is reversible (W) | confirm: the proposed `${DB_PASSWORD_<CONNECTION>}` (or another `${VARIABLE}` in `values`), never a password | — |
 | `failure_branch_ends_in_success` | E / W | A job's red branch ends in Success: Kitchen returns 0 (E direct, W through unconditional hops). Not for conditions (File exists…), whose red branch is the "else" | E: confirm, point it to an Abort; W: by hand | D10 |
 | `start_not_named_start` | E | The start entry has another name: the job does not start | auto: rename to START | C24 |
 | `job_without_start` | E | Job without a START entry | by hand | C24 |
 | `default_step_name`, `default_entry_name` | I | "Text file output 2": the diagram documents nothing | auto when a name is proposed (about half); otherwise value; confirm for Mapping input/output and Injector, which another file names | — |
-| `no_description` | I | No description and no notes | value: a description | — |
-| `select_star` | I | Table input with `SELECT *` | by hand | — |
+| `no_description` | I | No description and no notes | confirm: a proposed description (what it reads and writes, or what a job runs); `values` to write another | — |
+| `select_star` | I | Table input with `SELECT *` | confirm when it is `SELECT * FROM` one table: name the columns the query gives today (computed against the database); otherwise by hand | — |
 | `undeclared_variable` | I, env | `${X}` that is not a parameter nor defined here | value: a parameter default | C14 |
-| `parameter_without_default` | I | Parameter without a default (credentials excluded) | by hand | — |
+| `parameter_without_default` | I | Parameter without a default (credentials excluded) | value: the default | — |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
 | the robustness family (below) | W / I | **Off by default** in `lint_etl`: `robustness: true` runs them with a score of their own (the reports' `quality` section always does, §9) | `harden_etl` | `09-robustez.md` |
 | `kettle_check` | E / W | What Spoon's Verify says (`include_kettle_checks`), listed apart | — | — |
@@ -202,10 +208,12 @@ messages can quote values it read (a group key, `2.50`): mind it if the data is 
 2. `keys: ["all_auto"]` applies the safe fixes: proposed names, START renamed, Calculator operands swapped. They
    do not change rows, formats, paths or steps.
 3. For every fix with `confirm: true` (Sort rows or ORDER BY, copy mode, paths, decimal symbol, output fields,
-   failure hop to Abort) **ask the person**, showing `fix.preview`; then pass its key.
-4. Fixes with `needs_value: true` need `values[key]`: a better step name, `.` or `,`, a description, a
-   `${VARIABLE}` for a password, a parameter default. `values[key]` also replaces a proposal (a better name than
-   "Leer ventas 2").
+   failure hop to Abort, a password moved to `${DB_PASSWORD_<CONNECTION>}`, a disabled hop enabled, a loose step
+   or entry deleted, the columns of a `SELECT *`, the proposed description) **ask the person**, showing
+   `fix.preview` (a `dry_run` with only that key shows the exact change); then pass its key.
+4. Fixes with `needs_value: true` need `values[key]`: a better step name, `.` or `,`, a description, a parameter
+   default. `values[key]` also replaces a proposal (a better name than "Leer ventas 2", another variable for a
+   password).
 5. `dry_run: true` first if the user wants to see what would change and the new score.
 6. Apply, then tell the user `score_before` → `score_after`, what was `skipped` and why, and the `notes`.
 7. Nothing is saved: `save` afterwards.
@@ -219,13 +227,15 @@ messages can quote values it read (a group key, `2.50`): mind it if the data is 
 - It runs the rules again before touching anything: a key that no longer appears goes to `skipped` ("no longer
   found"), so use the keys of a recent `lint_etl`. If the document changes during the analysis the call fails:
   repeat it.
-- **Undo**: in a transformation everything is **one Ctrl+Z**; in a job each change is its own Ctrl+Z
-  (`undo_steps` says how many). Not undoable (the response says it per key): connection passwords in jobs,
-  slave server passwords, the document description and added parameters.
+- **Undo**: in a transformation everything is **one Ctrl+Z**, declared parameters, parameter defaults and the
+  document description included (since 0.7.0); in a job each change is its own Ctrl+Z (`undo_steps` says how
+  many). Not undoable (the response says it per key): connection passwords in jobs and slave server passwords.
+- `change`, `reason` and `notes` come in `language` (English by default).
 - Renames update the references (Filter rows targets, Stream lookup `<from>`, Merge join `step1`/`step2`, error
   handling), never references from other files (Mapping, Metadata injection).
-- Passwords: it only accepts a variable (`${DB_PASSWORD}`); never pass or write the password itself. Tell the
-  user to define it in `kettle.properties`.
+- Passwords: it only accepts a variable (`${DB_PASSWORD_GYM_DW}`); never pass, write, print or log the password
+  itself. Tell the user to add the line `DB_PASSWORD_GYM_DW=<their password>` to `kettle.properties` (Spoon: Edit >
+  Edit the kettle.properties file) before running: the connection fails until they do.
 - `insert_sort` normally adds a Sort rows; it adds `ORDER BY` to the query instead only when a simple Table input
   feeds a grouping step directly.
 - The deep mode is not repeated: for a decimal fix pass the symbol the deep run showed in `fix.preview`.
@@ -269,7 +279,8 @@ its counts do not include them.
 
 | What you see | What to do |
 |---|---|
-| `not_evaluated` with code `unsaved` or `no_file` (`duplicate_step_name`) | That rule reads the saved file (in memory Kettle has already merged the two steps): `save`, then run `lint_etl` again. Until then a password is judged in memory, where Spoon keeps it `Encrypted`: warning, never the plain-text error |
+| `not_evaluated` with code `no_file` (`duplicate_step_name`) | The saved file could not be read (moved or deleted): reopen it from its folder. With unsaved changes the rule still reads the file on disk (since 0.7.0); a password, though, is judged in memory until it is saved, where Spoon keeps it `Encrypted`: warning, never the plain-text error |
+| Deep check with no probes | It only confirms `unsorted_input` and `empty_decimal_symbol` with data: without those findings there is nothing to read (the Check quality window says so instead of "0 probes") |
 | `not_evaluated` with code `fields` ("fields unknown…") | A database step could not answer: `test_connection`; the rules that need field types skip that step |
 | `not_evaluated` with code `order_unknown` | A JavaScript, UDJC, Join rows or similar step is in the way: check the order by hand, or with `deep=true` |
 | `deep_not_read_only` / `deep_budget` | The probe would have run a step that is not read-only / ran out of time (raise `deep_timeout_s`). The finding keeps its static severity |

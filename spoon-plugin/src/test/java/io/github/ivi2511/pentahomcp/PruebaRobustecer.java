@@ -213,7 +213,8 @@ public class PruebaRobustecer {
     contiene( en.toString(), "One row that cannot be converted stops the whole run.", "inglés por defecto" );
     contiene( es.toString(), "Una fila que no se puede convertir para toda la ejecución.", "castellano" );
     contiene( pt.toString(), "Uma linha que não pode ser convertida para a execução inteira.", "portugués" );
-    contiene( es.toString(), "Los parámetros quedan fuera del deshacer de Spoon", "aviso en castellano" );
+    noContiene( es.toString(), "quedan fuera del deshacer", "el parámetro ya se deshace: sin aviso" );
+    noContiene( en.toString(), "not undoable", "ni en el diff" );
     noContiene( es.toString(), "is a counter", "nada en inglés en es" );
     igual( en.path( "proposals" ).size(), es.path( "proposals" ).size(), "mismas propuestas" );
     for ( int i = 0; i < en.path( "proposals" ).size(); i++ ) {

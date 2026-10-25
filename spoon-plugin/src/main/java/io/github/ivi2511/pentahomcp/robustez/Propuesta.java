@@ -81,7 +81,7 @@ public final class Propuesta {
       parametro |= Cambio.ADD_PARAMETER.equals( c.op );
     }
     if ( parametro ) {
-      o.put( "undoable", false );
+      o.put( "undoable", true ); // desde 0.7.0 el parámetro entra en el mismo Ctrl+Z (UndoEfecto)
     }
     if ( comoHacerlo != null ) {
       o.put( "how_to", comoHacerlo );

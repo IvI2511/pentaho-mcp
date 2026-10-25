@@ -184,6 +184,73 @@ final class EstresTools {
     return RunMotor.json( r );
   }
 
+  /**
+   * Lo que haría stress_test, sin correr nada (el diálogo «Robustecer…» lo muestra antes de la prueba): las entradas
+   * que ensuciaría (y las que no puede leer), las variantes, las salidas de archivo y si va a poder correr o por qué no
+   * (bases que no son archivo, steps que no pueden correr en el sandbox, ninguna entrada). Sobre una copia, en un hilo
+   * de trabajo.
+   */
+  static ObjectNode previa( JsonNode a ) throws Exception {
+    final Pedido p = pedido( a );
+    final Rotulos t = Balance.textos( p.lang );
+    final Object[] copia = Docs.ui( () -> {
+      AbstractMeta m = Docs.resolverSinActivar( a );
+      if ( !( m instanceof TransMeta ) ) {
+        throw new ToolError( t.s( "not_transformation" ) );
+      }
+      Spoon sp = Docs.spoon();
+      AbstractMeta c = ReportTools.clonar( m );
+      c.setRepository( sp.getRepository() );
+      c.setMetaStore( sp.getMetaStore() );
+      return new Object[] { c };
+    } );
+    return RunMotor.enSegundoPlano( () -> previa( (TransMeta) copia[ 0 ], p ), 60000L, null, "The stress test plan" );
+  }
+
+  /** {@link #previa(JsonNode)} sin Spoon (pruebas). */
+  static ObjectNode previa( TransMeta tm, Pedido p ) throws Exception {
+    Rotulos t = Balance.textos( p.lang );
+    EstresSandbox.Analisis a = EstresSandbox.analizar( tm, p.filas, p.entradas, p.obligatorios, p.lang );
+    boolean hayBd = !a.bdArchivo.isEmpty() && !a.tablas.isEmpty();
+    ObjectNode o = McpHttpServer.JSON.createObjectNode();
+    ArrayNode ins = o.putArray( "inputs" );
+    int sucias = 0;
+    for ( EstresSandbox.Entrada e : a.entradas ) {
+      ObjectNode x = ins.addObject().put( "step", e.paso ).put( "type", e.tipo );
+      if ( e.noEvaluada != null ) {
+        x.put( "not_evaluated", e.noEvaluada );
+      } else {
+        x.put( "base_rows", e.base.filas.size() ).put( "fields", e.base.campos.size() );
+        sucias++;
+      }
+    }
+    ArrayNode vs = o.putArray( "variants" );
+    for ( String id : Variantes.expandir( p.variantes, hayBd, p.lang ) ) {
+      vs.add( id );
+    }
+    ArrayNode outs = o.putArray( "file_outputs" );
+    for ( EstresSandbox.Salida s : a.salidas ) {
+      outs.addObject().put( "step", s.paso ).put( "rejects", s.rechazo );
+    }
+    ArrayNode dbs = o.putArray( "databases_not_files" );
+    for ( String x : a.bdNoArchivo ) {
+      dbs.add( x );
+    }
+    String noCorre = null;
+    if ( !a.bdNoArchivo.isEmpty() ) {
+      noCorre = t.f( "not_run_dbs", String.join( "; ", a.bdNoArchivo ) );
+    } else if ( !a.bloqueos.isEmpty() ) {
+      noCorre = t.f( "not_run_blocked", String.join( "; ", a.bloqueos ) );
+    } else if ( sucias == 0 ) {
+      noCorre = t.s( "not_run_no_inputs" );
+    }
+    o.put( "will_run", noCorre == null );
+    if ( noCorre != null ) {
+      o.put( "not_run_reason", noCorre );
+    }
+    return o;
+  }
+
   /** «The stress test did not finish in N s and was stopped» (lo arma RunMotor en inglés) en el idioma pedido. */
   static ToolError traducirVencida( ToolError e, Rotulos t ) {
     java.util.regex.Matcher m = java.util.regex.Pattern.compile( "^The stress test did not finish in (\\d+) s and "

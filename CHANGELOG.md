@@ -7,6 +7,48 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Details window** in the IDC menu's **Check quality…** and **Harden…** dialogs: a double click (or Enter, or
+  the new *Details…* button) on a finding or a recipe opens it in its own resizable window, with the title, a
+  severity or level badge, where it is with **Go to step**, what happens, why it matters, how to fix it with the
+  concrete values, the data of the finding, the **exact changes** its fix would make (a dry run of
+  `apply_lint_fixes` with only that key, or of `harden_etl` with only that recipe, with the score it would get),
+  an editable value when the fix takes one (a name, a path, a description, a parameter default, the variable of a
+  password), a link to the manual section, and its actions: **Apply this fix / recipe** (one Ctrl+Z), **Silence
+  this rule here** and **Ask Claude**, which copies to the clipboard a ready-made request with the rule, the step,
+  the message and the key. Rules with no automatic fix show step-by-step instructions.
+- **Check quality…**: every finding has a checkbox and the button is **Apply checked (n)**. Automatic fixes start
+  checked; the ones that change what the ETL does (confirm), the ones with a proposed or chosen value and the
+  robustness findings (with *Include robustness*, applying their `harden_etl` recipe) can be checked. The recipes
+  are applied first and the fixes are chained to them: still one Ctrl+Z.
+- New automatic fixes (with confirmation) in `apply_lint_fixes`: `disabled_hop` enables the hop,
+  `orphan_step` / `orphan_entry` delete the loose step or entry, `parameter_without_default` sets the default
+  (value), `select_star` names the columns of a `SELECT * FROM <one table>` (computed against the database),
+  and `no_description` proposes a description (what the transformation reads and writes, or what the job runs).
+- **Harden… > Test with dirty data** says before running what it will do: the inputs it will dirty (with their
+  base rows), the variants, the checks, and whether it can run at all; when it cannot (a database that is not a
+  SQLite/H2 file, such as MySQL) it says why and what to do, instead of an empty grid.
+- The windows remember their size and the width of their columns (per user, in Spoon's properties); table cells
+  show their full text as a tooltip.
+
+### Changed
+
+- Parameters and the document description are undoable: the parameter that `harden_etl`'s
+  `input_file_parameter` recipe declares, and `apply_lint_fixes`' parameters, parameter defaults and description,
+  go into the same Ctrl+Z as the rest of the call (and Ctrl+Y puts them back). The plan no longer says
+  "[not undoable with Ctrl+Z]"; `undoable` is now true for those proposals and fixes.
+- `password_in_file` proposes `${DB_PASSWORD_<CONNECTION>}` (was `${<CONNECTION>_PASSWORD}`) and is a confirm fix
+  instead of asking for a value: the dialog shows the exact line to add to kettle.properties. The password itself
+  is never read, copied, printed or logged.
+- `duplicate_step_name` is evaluated when the document has unsaved changes too (it reads the file on disk, and
+  the document in memory) instead of being listed as not evaluated.
+- The texts of `apply_lint_fixes` (`change`, `reason`, `notes`) come in the requested `language` (English by
+  default, as before). The dialogs show everything in Spoon's language, the diff lines of the `harden_etl` plan
+  included (through MCP they stay in English, the same in every language).
+- A deep check with nothing to read says so ("it only confirms unsorted input and the empty decimal symbol with
+  data") instead of "0 probes in 0.0 s"; the checks that could not be evaluated show their reason.
+
 ## [0.6.2] - 2026-10-25
 
 ### Added
