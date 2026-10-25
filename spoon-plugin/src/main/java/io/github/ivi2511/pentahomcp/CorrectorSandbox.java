@@ -70,6 +70,11 @@ import io.github.ivi2511.pentahomcp.lint.Rutas;
  * {@code name}, {@code description} y {@code type} del step, las hojas de los subarboles de datos
  * ({@link #NO_SE_TOCAN}: campos, filas de un Data grid, condiciones...) ni los valores que son el nombre de un step
  * (P14). Los temporales en {@code %%java.io.tmpdir%%} pasan a {@code tmp/} del caso.</li>
+ * <li><b>Temporales</b> ({@link #TEMPORALES}): la carpeta de temporales de Sort rows, Join Rows, Group by y Blocking
+ * step (la que sea: {@code %%java.io.tmpdir%%}, una del alumno o vacia) pasa a la ruta <b>local</b> de {@code tmp/}
+ * del caso, que existe, cuenta en {@code max_output_mb} y se borra con el sandbox. No puede ser
+ * {@code ${Internal.Entry.Current.Directory}/tmp}: al correr esa variable es una URL ({@code file:///C:/...}) y Join
+ * Rows y Group by crean sus temporales con {@code java.io.File} («Error creating temporary file(s)», 0.7.0).</li>
  * <li><b>Salidas a archivo</b> ({@link #SALIDAS}): {@code file/name} → {@code ${...}/salida/<nombre base>}; si dos
  * chocan, sufijo {@code _<step>}. La que toma el nombre de un campo bloquea ({@code unexpected_output}).</li>
  * <li><b>Conexiones</b>: con base en el pack, toda conexion SQLite usada pasa a {@code db/<plantilla>} (ruta absoluta,
@@ -107,6 +112,8 @@ final class CorrectorSandbox {
   /** Salidas a archivo cuyo {@code file/name} se redirige a salida/ (ids de plugin, sin mayusculas). */
   static final Set<String> SALIDAS = conjunto( "textfileoutput", "exceloutput", "typeexitexcelwriterstep",
     "jsonoutput", "xmloutput" );
+  /** Steps con carpeta de temporales ({@code <directory>}): van siempre a tmp/ del caso (ids de plugin). */
+  static final Set<String> TEMPORALES = conjunto( "sortrows", "joinrows", "groupby", "blockingstep" );
   /** Subarboles de un step que son datos, no rutas: ni se reescriben ni se revisan (§3, excepciones). */
   static final Set<String> NO_SE_TOCAN = conjunto( "fields", "data", "compare", "condition", "cases", "calculation",
     "group", "lookup", "attributes", "GUI", "partitioning", "remotesteps" );
@@ -315,6 +322,13 @@ final class CorrectorSandbox {
       if ( SALIDAS.contains( CorrectorPolitica.canonico( tipo ).toLowerCase( Locale.ROOT ) ) ) {
         redirigirSalida( s, nombre, tipo, vars, archivosSalida, hechos, p );
       }
+      if ( TEMPORALES.contains( CorrectorPolitica.canonico( tipo ).toLowerCase( Locale.ROOT ) ) ) {
+        Element d = Nodos.hijo( s, "directory" );
+        if ( d != null ) {
+          d.setTextContent( local( p.tmp ) );
+          hechos.add( d );
+        }
+      }
       reescribirHojas( s, s, nombre, entradas, nombresSteps, hechos, p );
     }
 
@@ -422,7 +436,7 @@ final class CorrectorSandbox {
         continue; // un valor que es el nombre de un step es una referencia a el (send_true_to, lookup...): P14
       }
       if ( t.equalsIgnoreCase( "%%java.io.tmpdir%%" ) || t.equalsIgnoreCase( "${java.io.tmpdir}" ) ) {
-        h.setTextContent( DIR_ACTUAL + "/" + TMP ); // los temporales de Sort rows cuentan en max_output_mb
+        h.setTextContent( local( p.tmp ) ); // cuentan en max_output_mb; ruta local, no la URL del directorio actual
         continue;
       }
       String nuevo = redirigirEntrada( t, entradas );
@@ -1225,6 +1239,11 @@ final class CorrectorSandbox {
       v.setVariable( d.getKey(), d.getValue() );
     }
     return v;
+  }
+
+  /** La ruta local de una carpeta con «/» ("C:/.../tmp"): la entienden java.io.File y VFS. */
+  static String local( File f ) {
+    return f.getAbsolutePath().replace( '\\', '/' );
   }
 
   /** La hoja esta en un subarbol de datos del step ({@link #NO_SE_TOCAN}). */

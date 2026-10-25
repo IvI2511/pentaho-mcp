@@ -404,9 +404,15 @@ de ejercicios…» por overlay XUL [NP].
   `spoon.openFile` (como `open_file`).
 - **Volver a corregir con…** (permitir steps o modo confianza; queda registrado) y **ajustar nota**
   (celda editable + comentario → columnas `ajuste`/`comentario` de la planilla).
-- **Crear pack desde esta transformación** (botón y acción sobre la pestaña activa): asistente de 4
-  pasos (entradas detectadas, step de salida y claves, reglas sugeridas, rúbrica) que llama a lo mismo
-  que `create_exercise_pack` y muestra la salida esperada antes de guardar.
+- **Crear pack desde esta transformación** (botón y acción sobre la pestaña activa): asistente que llama a
+  lo mismo que `create_exercise_pack` y muestra la salida esperada antes de guardar. Desde 0.7.0, 5 pasos
+  con la lista a la izquierda (Solución y salida → Datos de prueba → Qué se compara → Reglas y nota →
+  Revisar y guardar), ayuda con un ejemplo bajo cada campo, errores en rojo al lado del campo, la clave y
+  las columnas ignoradas como casillas por columna, «Guardar pack» desde el paso 3 y un resumen antes de
+  guardar. Con bases de datos: los .sql junto a la solución se proponen solos (`CorrectorScripts`),
+  «Probar conexión» solo crea y borra la base de prueba (`CorrectorBases.Sesion#probar`) y «Generar el
+  script desde la base actual» lee la original en solo lectura (`CorrectorVolcado`: conexión read-only,
+  solo SELECT/SHOW y metadatos).
 - **Alumno**: con la copia para alumnos, «Corregir» sobre la pestaña activa da la devolución del caso
   visible. A evaluar: una pestaña «Corrección» en `TransGraph.extraViewTabFolder`, como «Lección» de
   Modo clase, para no salir del lienzo.

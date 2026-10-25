@@ -1083,6 +1083,33 @@ final class CorrectorBases {
       return f;
     }
 
+    /**
+     * «Probar conexion» del asistente (0.7.0): crea cada base de prueba (como antes de un caso, sin scripts) y la
+     * vuelve a borrar (en H2 la deja vacia: por TCP no se puede borrar el archivo). No toca ninguna otra base: las
+     * reglas de seguridad ya se miraron al armar la sesion. Lanza {@link Falla} con lo que no se pudo.
+     */
+    void probar() throws Falla {
+      for ( Destino d : destinos.values() ) {
+        try {
+          vaciar( d );
+          if ( !BaseDePrueba.H2.equals( d.base.tipoNormal() ) ) {
+            String q = d.base.esMysql() ? "`" : "\"";
+            String admin = d.base.esMysql() ? "" : vacio( d.base.baseAdmin ) ? "postgres" : d.base.baseAdmin.trim();
+            Database db = conectar( d, admin );
+            try {
+              ejecutar( db, "DROP DATABASE IF EXISTS " + q + BaseDePrueba.nombreSolo( d.nombre ) + q );
+            } finally {
+              db.disconnect();
+            }
+          }
+        } catch ( Falla f ) {
+          throw f;
+        } catch ( Throwable t ) {
+          throw new Falla( new Mensaje( "db.err.recreate", d.describir(), RunMotor.primeraLinea( t ) ) );
+        }
+      }
+    }
+
     /** DROP + CREATE de la base (MySQL, PostgreSQL) o DROP ALL OBJECTS (H2). */
     private void vaciar( Destino d ) throws Exception {
       String tipo = d.base.tipoNormal();

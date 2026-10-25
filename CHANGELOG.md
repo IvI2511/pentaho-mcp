@@ -99,6 +99,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - On the repository examples (31 files) and PDI's samples (208): no hop through a step, no covered note
     and no overlapping names after arranging; hop crossings 0.6.2 → now: 31 → 2 (repo) and 38 → 30 (PDI
     samples, as drawn by hand: 39).
+### Changed
+
+- Exercise grader: **Create pack from this transformation…** redesigned for a teacher who is not a Pentaho expert.
+  Five steps with the step list on the left (current, done, pending; click a done step to go back): **Solution and
+  output**, **Test data**, **What is compared**, **Rules and grade**, **Review and save**. Every field has a line of
+  help with an example under it, and what is wrong is shown in red right under the field instead of one long error at
+  the bottom. Smart defaults: the title, the pack folder next to the solution, the capture in plain words (*the tables
+  it loads into the database*, *the file written by the step «X»*, *the rows coming out of the last step*), so the
+  common case is open, Next, Next, **Save pack** (it already works from step 3). The key and the columns not to
+  compare are now boxes per column (**Identifies the row**, **Do not compare**), a table can be left out, and the rules
+  and their points share one page with the total. The last step summarises what will be compared, the cases, the test
+  databases, the grade and what students get. Spanish (tú), English and Portuguese. The pack format and the MCP tools
+  do not change.
+- Exercises with a database, in the wizard: one sentence explains why a test database is needed; the `.sql` scripts
+  next to the solution are found and filled in by themselves (by the database or the tables each script names, the
+  ones that create tables first, hidden-case scripts apart); **Test connection** only creates and drops the test
+  database and says why it fails; **Generate the script from the current database…** reads the original database
+  **read-only** (read-only connection, only `SELECT`/`SHOW` and JDBC metadata, a read-only user is enough) and writes a
+  script with its tables in foreign-key order and their rows — the tables the solution loads go empty — for the
+  teacher to review; the password is the one typed, kept in memory only.
+- A case that does not finish cleanly (`finished_with_errors`, `init_failed`, `solution_failed` when creating a pack)
+  now shows the whole Kettle error of the first step that failed — «Step»: message: cause, without the stack trace —
+  instead of a single, often empty, line.
+
+### Fixed
+
+- Exercise grader: a solution or submission with **Join Rows (cartesian product)** or **Group by** («include all
+  rows») failed inside the grader with «Error creating temporary file(s)»: the sandbox pointed their temporary folder
+  to `${Internal.Entry.Current.Directory}/tmp`, which at run time is a `file:///` URL that `java.io.File` does not
+  understand (Sort rows, which uses VFS, worked). The temporary folder of Sort rows, Join Rows, Group by and Blocking
+  step now always goes to the local path of the case's `tmp/` folder, which exists, counts towards `max_output_mb`
+  and is deleted with the sandbox, whatever the submission had (`%%java.io.tmpdir%%`, a folder of the student's or
+  nothing).
 
 ## [0.6.2] - 2026-10-25
 

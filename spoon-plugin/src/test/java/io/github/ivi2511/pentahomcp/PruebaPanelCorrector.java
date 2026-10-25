@@ -487,7 +487,11 @@ public class PruebaPanelCorrector {
     igual( "no se pudo abrir", f[ 2 ], "la entrega vacia" );
   }
 
-  /** El asistente de 4 pasos de punta a punta: analizar, ver la salida esperada, quitar una regla y guardar. */
+  /**
+   * El asistente de 5 pasos de punta a punta (0.7.0): lista de pasos a la izquierda, validacion en linea (titulo vacio,
+   * destino relativo, caso oculto que no existe), Siguiente ejecuta la solucion, la salida esperada y las columnas que
+   * identifican la fila, quitar una regla, el resumen y guardar. Capturas de cada paso.
+   */
   public void pruebaJ_Asistente() throws Exception {
     memoria();
     File profe = new File( dir, "profe" );
@@ -505,46 +509,112 @@ public class PruebaPanelCorrector {
     esperar( "abre el asistente", () -> panel().asistente() != null && !panel().asistente().cerrado(), 5000 );
     final AsistentePack a = panel().asistente();
     igual( 0, a.pagina(), "paso 1" );
-    contiene( ui( () -> ( (Label) a.buscar( "as_paso" ) ).getText() ), "Paso 1 de 4", "rotulo del paso" );
+    contiene( ui( () -> ( (Label) a.buscar( "as_paso" ) ).getText() ), "Paso 1 de 5", "rotulo del paso" );
+    contiene( ui( () -> ( (Label) a.buscar( "as_paso" ) ).getText() ), "Solución y salida", "su nombre" );
+    contiene( ui( () -> ( (Label) a.buscar( "as_lista:1" ) ).getText() ), "▶", "el actual en la lista" );
+    contiene( ui( () -> ( (Label) a.buscar( "as_lista:3" ) ).getText() ), "Qué se compara", "los 5 pasos" );
     igual( "03_ventas_por_producto", ui( () -> ( (Text) a.buscar( "as_titulo" ) ).getText() ), "titulo propuesto" );
+    contiene( ui( () -> ( (Text) a.buscar( "as_destino" ) ).getText() ), "pack-03_ventas_por_producto",
+      "destino propuesto junto a la solucion" );
+    contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "archivo", "la captura en palabras" );
+    contiene( ui( () -> ( (Label) a.buscar( "as_solucion" ) ).getText() ), "03_ventas_por_producto.ktr",
+      "la solucion" );
+    archivo( pantallaShell( a.shell, "asistente-1-solucion.png" ), 2000, "captura del paso 1" );
+
+    // validacion en linea
+    ui( () -> {
+      ( (Text) a.buscar( "as_titulo" ) ).setText( "  " );
+      ( (Text) a.buscar( "as_destino" ) ).setText( "relativa/pack" );
+      return null;
+    } );
+    clicEn( a, "as_siguiente" );
+    igual( 0, a.pagina(), "no avanza" );
+    contiene( ui( () -> a.errorDe( "as_titulo" ) ), "Escribe un título", "el error al lado del titulo" );
+    contiene( ui( () -> a.errorDe( "as_destino" ) ), "absoluta", "y al lado del destino" );
+    contiene( ui( () -> a.estado() ), "rojo", "el pie lo dice" );
+    archivo( pantallaShell( a.shell, "asistente-1-errores.png" ), 2000, "captura de los errores" );
+    // los pasos 3 a 5 no se pueden abrir todavia
+    ui( () -> {
+      a.buscar( "as_lista:3" ).notifyListeners( SWT.MouseUp, new Event() );
+      return null;
+    } );
+    igual( 0, a.pagina(), "sin ejecutar no se salta al paso 3" );
+
     final File destino = new File( dir, "packs/creado-ui" );
     ui( () -> {
       ( (Text) a.buscar( "as_titulo" ) ).setText( "Ejercicio 3 - Ventas por producto" );
       ( (Text) a.buscar( "as_destino" ) ).setText( destino.getPath() );
+      return null;
+    } );
+    clicEn( a, "as_siguiente" );
+    igual( 1, a.pagina(), "paso 2" );
+    igual( "", ui( () -> a.errorDe( "as_titulo" ) ), "sin error" );
+    ui( () -> {
+      ( (Text) a.buscar( "as_oculto" ) ).setText( new File( profe, "no-existe" ).getPath() );
+      return null;
+    } );
+    clicEn( a, "as_siguiente" );
+    igual( 1, a.pagina(), "el caso oculto no existe: no ejecuta" );
+    contiene( ui( () -> a.errorDe( "as_oculto" ) ), "No existe", "el error al lado" );
+    ui( () -> {
       ( (Text) a.buscar( "as_oculto" ) ).setText( new File( profe, "oculto" ).getPath() );
       return null;
     } );
+    archivo( pantallaShell( a.shell, "asistente-2-datos.png" ), 2000, "captura del paso 2" );
     long t0 = System.currentTimeMillis();
     clicEn( a, "as_siguiente" );
-    esperar( "analiza", () -> a.pagina() == 1 && !a.trabajando(), 240000 );
+    esperar( "ejecuta la solucion", () -> a.pagina() == 2 && !a.trabajando(), 240000 );
     System.out.println( "  asistente, analizar: " + ( System.currentTimeMillis() - t0 ) + " ms" );
     falso( destino.exists(), "analizar no guarda nada en el destino" );
     contiene( ui( () -> ( (Label) a.buscar( "as_entradas" ) ).getText() ), "ventas.csv", "entradas detectadas" );
     igual( "Escribir totales", ui( () -> ( (Combo) a.buscar( "as_salida" ) ).getText() ), "step de salida" );
-    igual( "producto", ui( () -> ( (Text) a.buscar( "as_claves" ) ).getText() ), "clave" );
+    igual( Collections.singletonList( "producto" ), ui( () -> a.claves( null ) ), "clave" );
+    cierto( ui( () -> ( (Button) a.buscar( "as_col_clave:producto" ) ).getSelection() ), "su casilla marcada" );
+    falso( ui( () -> ( (Button) a.buscar( "as_col_clave:importe_medio" ) ).getSelection() ), "las demas no" );
     contiene( ui( () -> ( (Label) a.buscar( "as_columnas" ) ).getText() ), "importe_medio (Number", "columnas" );
     igual( 4, ui( () -> ( (Table) a.buscar( "as_esperada" ) ).getItemCount() ), "salida esperada: 4 filas" );
     igual( 6, ui( () -> ( (Table) a.buscar( "as_esperada" ) ).getColumnCount() ), "6 columnas" );
-    archivo( pantallaShell( a.shell, "corrector-asistente-paso2.png" ), 2000, "captura del paso 2" );
+    contiene( ui( () -> ( (Label) a.buscar( "as_lista:2" ) ).getText() ), "✓", "paso 2 hecho" );
+    archivo( pantallaShell( a.shell, "asistente-3-compara.png" ), 2000, "captura del paso 3" );
 
     clicEn( a, "as_siguiente" );
-    igual( 2, a.pagina(), "paso 3: reglas" );
+    igual( 3, a.pagina(), "paso 4: reglas y nota" );
     List<String> reglas = ui( () -> a.reglasMarcadas() );
     cierto( reglas.contains( "usa_group_by" ), "sugiere usa_group_by: " + reglas );
-    String quitar = reglas.get( reglas.size() - 1 );
+    final String quitar = reglas.get( reglas.size() - 1 );
     ui( () -> {
-      ( (Button) a.buscar( "as_regla:" + quitar ) ).setSelection( false );
+      Button b = (Button) a.buscar( "as_regla:" + quitar );
+      b.setSelection( false );
+      b.notifyListeners( SWT.Selection, new Event() );
       return null;
     } );
-    clicEn( a, "as_siguiente" );
-    igual( 3, a.pagina(), "paso 4: rubrica" );
     List<String> rub = ui( () -> a.rubrica() );
     falso( rub.toString().contains( "rule:" + quitar ), "sin la regla quitada: " + rub );
     cierto( rub.contains( "values=4" ), "values 4: " + rub );
+    falso( ui( () -> a.buscar( "as_puntos:rule:" + quitar ).getEnabled() ), "sus puntos, deshabilitados" );
+    ui( () -> {
+      ( (Text) a.buscar( "as_puntos:values" ) ).setText( "abc" );
+      return null;
+    } );
+    clicEn( a, "as_guardar" );
+    contiene( ui( () -> a.errorDe( "as_puntos:values" ) ), "número", "puntos invalidos: al lado" );
+    igual( null, a.guardado(), "no guarda" );
     ui( () -> {
       ( (Text) a.buscar( "as_puntos:values" ) ).setText( "5" );
       return null;
     } );
+    contiene( ui( () -> ( (Label) a.buscar( "as_total" ) ).getText() ), "Total:", "el total" );
+    archivo( pantallaShell( a.shell, "asistente-4-nota.png" ), 2000, "captura del paso 4" );
+
+    clicEn( a, "as_siguiente" );
+    igual( 4, a.pagina(), "paso 5: revisar" );
+    String res = ui( () -> a.resumen() );
+    contiene( res, "Ejercicio 3 - Ventas por producto", "resumen: titulo" );
+    contiene( res, "Escribir totales", "resumen: que se compara" );
+    contiene( res, "producto", "resumen: la clave" );
+    contiene( res, "Oculto", "resumen: el caso oculto" );
+    contiene( res, "creado-ui-alumnos.zip", "resumen: lo que reciben los alumnos" );
+    archivo( pantallaShell( a.shell, "asistente-5-resumen.png" ), 2000, "captura del paso 5" );
     t0 = System.currentTimeMillis();
     clicEn( a, "as_guardar" );
     esperar( "guarda", () -> a.guardado() != null && !a.trabajando(), 300000 );
@@ -552,6 +622,7 @@ public class PruebaPanelCorrector {
       .estado() ) );
     contiene( ui( () -> a.estado() ), "Pack guardado", "estado del asistente" );
     contiene( ui( () -> a.estado() ), "creado-ui-alumnos.zip", "la copia para alumnos" );
+    archivo( pantallaShell( a.shell, "asistente-5-guardado.png" ), 2000, "captura guardado" );
     try ( CorrectorPack cp = CorrectorPack.abrir( destino ) ) {
       cierto( cp.valido(), "el pack guardado valida: " + cp.textoProblemas( "es" ) );
       Pack p = cp.pack();
@@ -578,9 +649,11 @@ public class PruebaPanelCorrector {
 
   /**
    * El asistente con una solucion que lee y escribe un servidor (H2 en TCP dentro de esta JVM: ningun MySQL de la
-   * maquina): la «Base de prueba» de cada conexion viene con la base _correccion, la captura ofrece las tablas, una
-   * base que es la original se rechaza con el mensaje en español, y el analisis corre la solucion contra las bases de
-   * prueba y muestra la clave y la salida esperada de la tabla. Despues, el dialogo de contraseñas del panel.
+   * maquina), el caso comun: los scripts junto a la solucion ya vienen puestos (el del caso oculto aparte), «Probar
+   * conexion» crea y borra la base de prueba, una base de prueba que es la original se marca en rojo al lado del campo
+   * sin ejecutar nada, Siguiente ejecuta contra las bases de prueba, las casillas «Identifica la fila» y «No comparar»
+   * de la tabla, y «Guardar pack» directamente desde el paso 3 (abrir, Siguiente, Siguiente, Guardar). Despues, el
+   * dialogo de contraseñas del panel.
    */
   public void pruebaJb_AsistenteBaseDePrueba() throws Exception {
     memoria();
@@ -588,15 +661,30 @@ public class PruebaPanelCorrector {
     try {
       File profe = new File( dir, "profe-bd" );
       File sol = h2.guardar( BasesH2.Variante.SOLUCION, new File( profe, "carga_dw.ktr" ) );
-      File crearOrigen = BasesH2.escribir( new File( profe, "crear_origen.sql" ), BasesH2.CREAR_ORIGEN );
-      File datos = BasesH2.escribir( new File( profe, "datos_visible.sql" ), BasesH2.DATOS_VISIBLE );
-      File crearDw = BasesH2.escribir( new File( profe, "crear_dw.sql" ), BasesH2.CREAR_DW );
-      File oculto = BasesH2.escribir( new File( profe, "datos_oculto.sql" ), "DELETE FROM clientes;\n"
+      BasesH2.escribir( new File( profe, "crear_origen.sql" ), BasesH2.CREAR_ORIGEN );
+      BasesH2.escribir( new File( profe, "datos_visible.sql" ), BasesH2.DATOS_VISIBLE );
+      BasesH2.escribir( new File( profe, "crear_dw.sql" ), BasesH2.CREAR_DW );
+      BasesH2.escribir( new File( profe, "scripts/datos_oculto.sql" ), "DELETE FROM clientes;\n"
         + "DELETE FROM ciudades;\n" + BasesH2.DATOS_OCULTO );
       servicio.solucion = sol;
       clic( "crear_pack" );
       esperar( "abre el asistente", () -> panel().asistente() != null && !panel().asistente().cerrado(), 5000 );
       final AsistentePack a = panel().asistente();
+      List<String> caps = ui( () -> a.itemsCaptura() );
+      igual( "tables", caps.get( 0 ), "la captura propuesta: las tablas (" + caps + ")" );
+      contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "DIM_CLIENTE", "el combo nombra la tabla" );
+      contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "base de datos", "en palabras" );
+      cierto( caps.contains( "step" ), "y las filas del step" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_solucion" ) ).getText() ), "GYM_DW", "la solucion usa una base" );
+      final File destino = new File( dir, "packs/creado-bd" );
+      ui( () -> {
+        ( (Text) a.buscar( "as_destino" ) ).setText( destino.getPath() );
+        return null;
+      } );
+      clicEn( a, "as_siguiente" );
+      igual( 1, a.pagina(), "paso 2: datos de prueba" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_base_por_que" ) ).getText() ), "copia desechable",
+        "por que hace falta una base de prueba" );
       igual( "gym_dw_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).getText() ),
         "la base de prueba propuesta" );
       igual( "gym_oltp_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:GYM_OLTP" ) ).getText() ),
@@ -605,47 +693,85 @@ public class PruebaPanelCorrector {
       igual( String.valueOf( h2.puerto ), ui( () -> ( (Text) a.buscar( "as_base_puerto:GYM_DW" ) ).getText() ),
         "el puerto" );
       igual( "", ui( () -> ( (Text) a.buscar( "as_base_clave:GYM_DW" ) ).getText() ), "la contraseña, vacia" );
-      List<String> caps = ui( () -> a.itemsCaptura() );
-      igual( "tables", caps.get( 0 ), "la captura propuesta: las tablas (" + caps + ")" );
-      contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "DIM_CLIENTE", "el combo nombra la tabla" );
-      cierto( caps.contains( "step" ), "y las filas del step" );
-      final File destino = new File( dir, "packs/creado-bd" );
+      String so = ui( () -> ( (Text) a.buscar( "as_base_scripts:GYM_OLTP" ) ).getText() );
+      cierto( so.indexOf( "crear_origen.sql" ) >= 0 && so.indexOf( "crear_origen.sql" ) < so.indexOf(
+        "datos_visible.sql" ), "los scripts del origen, ya puestos y en orden: " + so );
+      contiene( ui( () -> ( (Text) a.buscar( "as_base_scripts:GYM_DW" ) ).getText() ), "crear_dw.sql", "el del DW" );
+      contiene( ui( () -> ( (Text) a.buscar( "as_base_oculto:GYM_OLTP" ) ).getText() ), "datos_oculto.sql",
+        "el del caso oculto, aparte" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_base_detectados:GYM_DW" ) ).getText() ), "Encontrados",
+        "dice que los encontro" );
       ui( () -> {
-        ( (Text) a.buscar( "as_destino" ) ).setText( destino.getPath() );
         for ( String cx : new String[] { "GYM_OLTP", "GYM_DW" } ) {
           ( (Text) a.buscar( "as_base_clave:" + cx ) ).setText( BasesH2.CLAVE );
         }
-        ( (Text) a.buscar( "as_base_scripts:GYM_OLTP" ) ).setText( crearOrigen.getPath() + "; " + datos.getPath() );
-        ( (Text) a.buscar( "as_base_scripts:GYM_DW" ) ).setText( crearDw.getPath() );
-        ( (Text) a.buscar( "as_base_oculto:GYM_OLTP" ) ).setText( oculto.getPath() );
         ( (Button) a.buscar( "as_dos_veces" ) ).setSelection( true );
+        return null;
+      } );
+      // probar conexion: crea y borra (en H2, vacia) solo la base de prueba
+      clicEn( a, "as_base_probar:GYM_DW" );
+      esperar( "prueba la conexion", () -> !a.trabajando() && a.resultadoBase( "GYM_DW", false ).contains(
+        "Conexión correcta" ), 60000 );
+      cierto( h2.existe( "gym_dw_correccion" ), "la de prueba si" );
+      falso( h2.existe( "gym_dw" ), "la original no" );
+      // la base original como base de prueba: en rojo al lado, sin ejecutar
+      ui( () -> {
         ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).setText( "gym_dw" );
         return null;
       } );
       clicEn( a, "as_siguiente" );
-      esperar( "rechaza la base original", () -> !a.trabajando() && a.estado().contains( "base de prueba" ), 20000 );
-      contiene( ui( () -> a.estado() ), "es una base de la solución", "en español: " + ui( () -> a.estado() ) );
-      noContiene( ui( () -> a.estado() ), "the grader", "nada en ingles" );
-      igual( 0, a.pagina(), "sigue en el paso 1" );
-      falso( h2.existe( "gym_dw" ), "la original no se toco" );
+      igual( 1, a.pagina(), "sigue en el paso 2" );
+      falso( a.trabajando(), "no ejecuto nada" );
+      contiene( ui( () -> a.errorDe( "as_base_nombre:GYM_DW" ) ), "es una base de la solución", "en rojo al lado" );
+      noContiene( ui( () -> a.errorDe( "as_base_nombre:GYM_DW" ) ), "the grader", "nada en ingles" );
+      archivo( pantallaShell( a.shell, "asistente-base-2-error.png" ), 2000, "captura del error en linea" );
       ui( () -> {
         ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).setText( "gym_dw_correccion" );
         return null;
       } );
-      archivo( pantallaShell( a.shell, "corrector-asistente-base-paso1.png" ), 2000, "captura del paso 1" );
+      archivo( pantallaShell( a.shell, "asistente-base-2-datos.png" ), 2000, "captura del paso 2" );
       long t0 = System.currentTimeMillis();
       clicEn( a, "as_siguiente" );
-      esperar( "analiza contra las bases de prueba", () -> a.pagina() == 1 && !a.trabajando(), 240000 );
+      esperar( "ejecuta contra las bases de prueba", () -> a.pagina() == 2 && !a.trabajando(), 240000 );
       System.out.println( "  asistente con base de prueba, analizar: " + ( System.currentTimeMillis() - t0 ) + " ms" );
-      igual( "ID_CLIENTE", ui( () -> ( (Text) a.buscar( "as_tabla_claves:DIM_CLIENTE" ) ).getText() ),
+      igual( Collections.singletonList( "ID_CLIENTE" ), ui( () -> a.claves( "DIM_CLIENTE" ) ),
         "la clave del Insert/Update" );
+      cierto( ui( () -> ( (Button) a.buscar( "as_col_clave:DIM_CLIENTE:ID_CLIENTE" ) ).getSelection() ),
+        "su casilla" );
       igual( "DIM_CLIENTE", ui( () -> ( (Combo) a.buscar( "as_tabla_vista" ) ).getText() ), "la tabla que se ve" );
       igual( 3, ui( () -> ( (Table) a.buscar( "as_esperada" ) ).getItemCount() ), "3 clientes del caso visible" );
       contiene( ui( () -> ( (Label) a.buscar( "as_esperada_titulo" ) ).getText() ), "DIM_CLIENTE", "el titulo" );
       contiene( ui( () -> ( (Label) a.buscar( "as_columnas" ) ).getText() ), "DIM_CLIENTE (3 columnas)", "las tablas" );
-      archivo( pantallaShell( a.shell, "corrector-asistente-base-paso2.png" ), 2000, "captura del paso 2" );
+      falso( ui( () -> a.buscar( "as_salida" ).getVisible() ), "con tablas no se elige el paso" );
+      ui( () -> {
+        Button b = (Button) a.buscar( "as_col_ignorar:DIM_CLIENTE:CIUDAD" );
+        b.setSelection( true );
+        b.notifyListeners( SWT.Selection, new Event() );
+        return null;
+      } );
+      igual( Collections.singletonList( "CIUDAD" ), ui( () -> a.ignoradas( "DIM_CLIENTE" ) ), "no comparar CIUDAD" );
+      archivo( pantallaShell( a.shell, "asistente-base-3-tablas.png" ), 2000, "captura del paso 3" );
       falso( h2.existe( "gym_dw" ) || h2.existe( "gym_oltp" ), "las originales nunca" );
-      cierto( h2.existe( "gym_dw_correccion" ), "la de prueba si" );
+      // el caso comun: Guardar ya desde el paso 3
+      t0 = System.currentTimeMillis();
+      clicEn( a, "as_guardar" );
+      esperar( "guarda", () -> a.guardado() != null && !a.trabajando(), 300000 );
+      System.out.println( "  asistente con base de prueba, guardar: " + ( System.currentTimeMillis() - t0 ) + " ms" );
+      igual( 4, a.pagina(), "muestra el resumen" );
+      String res = ui( () -> a.resumen() );
+      contiene( res, "DIM_CLIENTE", "resumen: la tabla" );
+      contiene( res, "no se compara: CIUDAD", "resumen: lo que no se compara" );
+      contiene( res, "gym_dw_correccion", "resumen: la base de prueba" );
+      contiene( res, "dos veces", "resumen: dos ejecuciones" );
+      archivo( pantallaShell( a.shell, "asistente-base-5-guardado.png" ), 2000, "captura guardado" );
+      try ( CorrectorPack cp = CorrectorPack.abrir( destino ) ) {
+        cierto( cp.valido(), "valida: " + cp.textoProblemas( "es" ) );
+        Pack p = cp.pack();
+        igual( Collections.singletonList( "CIUDAD" ), p.salida.tablas.get( 0 ).ignorar, "ignorar CIUDAD" );
+        igual( 2, p.casos.size(), "visible y oculto (por su script)" );
+        igual( Integer.valueOf( 2 ), p.casos.get( 0 ).ejecuciones, "dos ejecuciones" );
+      }
+      falso( h2.existe( "gym_dw" ) || h2.existe( "gym_oltp" ), "las originales nunca" );
       ui( () -> {
         a.cerrar();
         return null;
@@ -673,6 +799,72 @@ public class PruebaPanelCorrector {
       cierto( ok[ 0 ], "acepto" );
       cierto( CorrectorBases.recordada( b ), "recordada en memoria" );
       igual( "secreta", CorrectorBases.clave( b, null ), "la que se escribio" );
+    } finally {
+      h2.parar();
+    }
+  }
+
+  /**
+   * «Generar el script desde la base actual» desde el asistente: lee la base ORIGINAL (H2) con la contraseña escrita,
+   * sin cambiarla, lo pone el primero en «Scripts» con un enlace para abrirlo; y el error de la solucion que no termina
+   * bien sale entero en el recuadro rojo.
+   */
+  public void pruebaJc_AsistenteGenerarScript() throws Exception {
+    memoria();
+    BasesH2 h2 = new BasesH2( new File( dir, "h2-generar" ) );
+    try {
+      // la base original del docente (la crea la prueba: la del ejercicio en chico)
+      try ( java.sql.Connection c = java.sql.DriverManager.getConnection( "jdbc:h2:tcp://localhost:" + h2.puerto
+        + "/gym_oltp", BasesH2.USUARIO, BasesH2.CLAVE ); java.sql.Statement st = c.createStatement() ) {
+        for ( String x : CorrectorBases.sentencias( BasesH2.CREAR_ORIGEN + BasesH2.DATOS_VISIBLE, false ) ) {
+          st.execute( x );
+        }
+      }
+      File profe = new File( dir, "profe-generar" );
+      File sol = h2.guardar( BasesH2.Variante.SOLUCION, new File( profe, "carga_dw.ktr" ) );
+      BasesH2.escribir( new File( profe, "crear_dw.sql" ), BasesH2.CREAR_DW );
+      servicio.solucion = sol;
+      clic( "crear_pack" );
+      esperar( "abre el asistente", () -> panel().asistente() != null && !panel().asistente().cerrado(), 5000 );
+      final AsistentePack a = panel().asistente();
+      clicEn( a, "as_siguiente" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_base_detectados:GYM_OLTP" ) ).getText() ), "No encontré",
+        "sin scripts del origen" );
+      final File script = new File( profe, "gym_oltp_generado.sql" );
+      ui( () -> {
+        ( (Text) a.buscar( "as_base_clave:GYM_OLTP" ) ).setText( BasesH2.CLAVE );
+        ( (Text) a.buscar( "as_base_clave:GYM_DW" ) ).setText( BasesH2.CLAVE );
+        a.generarScript( "GYM_OLTP", script );
+        return null;
+      } );
+      esperar( "genera el script", () -> !a.trabajando() && a.resultadoBase( "GYM_OLTP", true ).contains(
+        "Script generado" ), 60000 );
+      cierto( script.isFile(), "el script" );
+      contiene( new String( Files.readAllBytes( script.toPath() ), StandardCharsets.UTF_8 ), "'Bruno'",
+        "con los datos" );
+      contiene( ui( () -> a.resultadoBase( "GYM_OLTP", true ) ), "<a>gym_oltp_generado.sql</a>", "enlace" );
+      cierto( ui( () -> ( (Text) a.buscar( "as_base_scripts:GYM_OLTP" ) ).getText() ).startsWith( script.getPath() ),
+        "el primero en Scripts" );
+      igual( 3L, h2.contar( "gym_oltp", "SELECT COUNT(*) FROM CLIENTES" ), "la original igual" );
+      archivo( pantallaShell( a.shell, "asistente-base-2-generado.png" ), 2000, "captura del script generado" );
+
+      // una solucion que no termina bien: el error entero, con el step, en el recuadro rojo
+      ui( () -> {
+        ( (Text) a.buscar( "as_base_scripts:GYM_DW" ) ).setText( "" );
+        return null;
+      } );
+      clicEn( a, "as_siguiente" );
+      esperar( "falla la solucion", () -> !a.trabajando() && a.estado().contains( "recuadro rojo" ), 240000 );
+      igual( 1, a.pagina(), "sigue en el paso 2" );
+      String e = ui( () -> a.estado() );
+      System.out.println( "  el error en el asistente: " + e );
+      contiene( e, "«Cargar dim_cliente»", "nombra el step" );
+      contiene( e.toUpperCase( Locale.ROOT ), "DIM_CLIENTE", "y lo que le falta" );
+      archivo( pantallaShell( a.shell, "asistente-base-2-fallo.png" ), 2000, "captura del error de la solucion" );
+      ui( () -> {
+        a.cerrar();
+        return null;
+      } );
     } finally {
       h2.parar();
     }
@@ -719,6 +911,10 @@ public class PruebaPanelCorrector {
     }
     for ( int i = 1; i <= AsistentePack.PAGINAS; i++ ) {
       usadas.add( "ui.as_paso" + i );
+      usadas.add( "ui.as_intro" + i );
+    }
+    for ( String c : io.github.ivi2511.pentahomcp.corrector.modelo.ItemRubrica.DE_SALIDA ) {
+      usadas.add( "ui.as_desc." + c );
     }
     cierto( usadas.size() > 100, "las claves del codigo (" + usadas.size() + ")" );
     for ( String k : usadas ) {

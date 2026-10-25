@@ -300,7 +300,8 @@ public class PruebaCorrectorSandbox {
     String xml = texto( p.ktr );
     contiene( xml, "<filename>" + DIR + "/datos/ventas.csv</filename>", "ana: entrada" );
     contiene( xml, "<name>" + DIR + "/salida/resultado</name>", "ana: salida" );
-    contiene( xml, "<directory>" + DIR + "/tmp</directory>", "ana: temporales de Sort rows al tmp/ del caso" );
+    contiene( xml, "<directory>" + CorrectorSandbox.local( p.tmp ) + "</directory>",
+      "ana: temporales de Sort rows al tmp/ del caso (ruta local, 0.7.0)" );
     noContiene( xml, "Escritorio", "ana: no queda ninguna ruta de su PC" );
     igual( 1, p.salidas.size(), "ana: una salida" );
     SalidaRedirigida sr = p.salidas.get( 0 );

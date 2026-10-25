@@ -376,7 +376,7 @@ final class CorrectorMotor {
         } catch ( Exception e ) {
           run.estado = ResultadoCaso.FALLO_INIT;
           run.errores = (long) Math.max( 1, t.getErrors() );
-          run.detalle = enLaVez( RunMotor.errorDeLog( canal, e ), vez, veces );
+          run.detalle = enLaVez( errorCompleto( canal, e ), vez, veces );
           run.metricas = RunMotor.metricas( t );
           run.log = RunMotor.colaLog( canal, true );
           return;
@@ -394,7 +394,7 @@ final class CorrectorMotor {
         } catch ( Exception e ) {
           run.estado = ResultadoCaso.FALLO_ARRANQUE;
           run.errores = (long) Math.max( 1, t.getErrors() );
-          run.detalle = enLaVez( RunMotor.errorDeLog( canal, e ), vez, veces );
+          run.detalle = enLaVez( errorCompleto( canal, e ), vez, veces );
           parar( t, fin );
           run.metricas = RunMotor.metricas( t );
           run.log = RunMotor.colaLog( canal, true );
@@ -415,7 +415,7 @@ final class CorrectorMotor {
         if ( run.estado == null ) {
           run.estado = errores > 0 ? ResultadoCaso.TERMINO_CON_ERRORES : ResultadoCaso.TERMINO;
           if ( errores > 0 ) {
-            run.detalle = enLaVez( RunMotor.errorDeLog( canal, null ), vez, veces );
+            run.detalle = enLaVez( errorCompleto( canal, null ), vez, veces );
           }
         }
         if ( !ultima && !ResultadoCaso.TERMINO.equals( run.estado ) ) {
@@ -464,6 +464,97 @@ final class CorrectorMotor {
         RunMotor.liberarLog( canal );
       }
     }
+  }
+
+  /** Lineas de un log de Kettle: [fecha] hora - sujeto.copia - [ERROR (version ...) :] mensaje. */
+  private static final java.util.regex.Pattern LINEA_LOG = java.util.regex.Pattern.compile(
+    "^(?:\\d{4}/\\d{2}/\\d{2} )?\\d{2}:\\d{2}:\\d{2} - (.*?)\\.(\\d+) - (ERROR(?: \\(version [^)]*\\))? ?: ?)?(.*)$" );
+  /** Lineas que no dicen nada: la pila, «Unexpected error», el nombre de una excepcion de Kettle sola. */
+  private static final java.util.regex.Pattern RUIDO = java.util.regex.Pattern.compile( "(?i)^(at .*|\\.\\.\\. \\d+ "
+    + "more|unexpected error.*|because of an error,? this step can'?t continue:?|errors detected!?|finished processing .*|"
+    + "sql statement:?|(caused by: )?"
+    + "org\\.pentaho\\.di\\.core\\.exception\\.[A-Za-z]+:?)$" );
+  /** Tope del error completo (el detalle del caso). */
+  static final int MAX_ERROR = 1200;
+
+  /**
+   * El error de la corrida para el detalle del caso: el del primer step que fallo, entero ({@link #errorDeStep}); si
+   * el log no tiene un error de step, el de {@link RunMotor#errorDeLog}.
+   */
+  static String errorCompleto( String canal, Throwable e ) {
+    String log;
+    try {
+      log = canal == null ? "" : org.pentaho.di.core.logging.KettleLogStore.getAppender().getBuffer( canal, false )
+        .toString();
+    } catch ( Throwable x ) {
+      log = "";
+    }
+    String d = errorDeStep( log );
+    return d != null ? d : RunMotor.errorDeLog( canal, e );
+  }
+
+  /**
+   * «Step»: mensaje: causa — de las lineas del primer step con ERROR en el log de Kettle: sus mensajes de varias
+   * lineas (el de la excepcion y el de su causa), sin la pila, sin repetir, sin el nombre de las excepciones de Kettle
+   * («KettleException:») y con el de las de Java, sin el paquete («IllegalArgumentException: ...»). null si ningun
+   * step tiene un ERROR.
+   */
+  static String errorDeStep( String log ) {
+    if ( log == null || log.isEmpty() ) {
+      return null;
+    }
+    String step = null;
+    List<String> partes = new ArrayList<String>();
+    for ( String linea : log.split( "\\r?\\n" ) ) {
+      java.util.regex.Matcher m = LINEA_LOG.matcher( linea );
+      if ( !m.matches() ) {
+        continue;
+      }
+      String sujeto = m.group( 1 ).trim() + "." + m.group( 2 );
+      if ( step == null ) {
+        if ( m.group( 3 ) == null ) {
+          continue;
+        }
+        step = sujeto;
+      } else if ( !step.equals( sujeto ) ) {
+        if ( !partes.isEmpty() ) {
+          break; // otro step u otra copia: ya esta el primero
+        }
+        continue;
+      }
+      String x = m.group( 4 ).trim();
+      if ( x.isEmpty() || RUIDO.matcher( x ).matches() ) {
+        continue;
+      }
+      x = x.replaceFirst( "^(?i)caused by: ", "" )
+        .replaceFirst( "^org\\.pentaho\\.di\\.core\\.exception\\.[A-Za-z]+: ?", "" )
+        .replaceFirst( "^(?:[a-z][a-z0-9_]*\\.)+([A-Z][A-Za-z0-9_$]*(?:Exception|Error)): ?", "$1: " )
+        .trim().replaceAll( "[\\s:]+$", "" );
+      String sinClase = x.replaceFirst( "^[A-Z][A-Za-z0-9_$]*(?:Exception|Error): ?", "" ).toLowerCase( Locale.ROOT );
+      boolean repetida = x.isEmpty();
+      for ( String p : partes ) {
+        if ( !sinClase.isEmpty() && p.toLowerCase( Locale.ROOT ).contains( sinClase ) ) {
+          repetida = true;
+        }
+      }
+      if ( !repetida ) {
+        partes.add( x );
+      }
+    }
+    if ( step == null || partes.isEmpty() ) {
+      return null;
+    }
+    StringBuilder b = new StringBuilder( "«" + step.replaceFirst( "\\.0$", "" ) + "»: " );
+    for ( int i = 0; i < partes.size(); i++ ) {
+      if ( i > 0 ) {
+        b.append( ": " );
+      }
+      b.append( partes.get( i ) );
+      if ( b.length() > MAX_ERROR ) {
+        return b.substring( 0, MAX_ERROR ) + "...";
+      }
+    }
+    return b.toString().replaceAll( "[\\s.]+$", "" );
   }
 
   /** "Ejecucion 2 de 2: " delante del error si la entrega corre varias veces (el error es de Kettle, en ingles). */
