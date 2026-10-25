@@ -22,9 +22,11 @@ import io.github.ivi2511.pentahomcp.lint.Textos;
  * {@code pentaho-live init} (0.7, X1): la plantilla de un proyecto de equipo. Crea SOLO lo que falta (nunca pisa un
  * archivo ni toca uno que ya existe): etl/, datasets/, tests/, contracts/ y env/ (con dev.properties de ejemplo), el
  * .gitignore (secretos, salidas de las corridas, SQLite), el .gitattributes (con las líneas del driver de diff de
- * Pentaho Live, comentadas si este plugin todavía no trae {@code pentaho-live textconv}), el perfil del linter
+ * Pentaho Live, activas desde 0.7: {@code pentaho-live textconv} es {@link #CLASE_TEXTCONV}), el perfil del linter
  * (.pentaho-live/lint.yaml, «curso», y su JSON Schema), un README.md con las convenciones y el workflow de CI
- * (.github/workflows/pentaho-live.yml: el linter con el min_score del perfil sobre etl/).
+ * (.github/workflows/pentaho-live.yml: el linter con el min_score del perfil sobre etl/, las pruebas con datasets
+ * dorados con {@code pentaho-live test --all} y, en una pull request, el diff semántico contra la rama base con
+ * {@code pentaho-live diff --rev origin/<base>} en el resumen del job y, si se pide, como comentario).
  * <p>
  * La usan {@link ProyectoMain} (línea de comandos), la herramienta MCP project_init ({@link LintTools}) y el diálogo
  * «Preparar proyecto…» del menú IDC ({@link IdcProyecto}). Sin Spoon ni Kettle. Las plantillas están en

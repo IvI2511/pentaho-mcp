@@ -8,11 +8,11 @@ Proyecto de ETL con Pentaho Data Integration 9.4 y [Pentaho Live](https://github
 |---|---|
 | `etl/` | Las transformaciones (`.ktr`) y los jobs (`.kjb`). |
 | `datasets/` | Datos de entrada pequeños para desarrollar y probar (CSV, Excel, SQLite de prueba). |
-| `tests/` | Pruebas con datos de entrada fijos y su salida esperada. |
+| `tests/` | Pruebas con datasets dorados (`*.test.json`): datos de entrada fijos y la salida esperada (`test_create` con Claude, o IDC > Pruebas… en Spoon; también `tests/` junto a una `.ktr`). |
 | `contracts/` | Contratos de datos de las salidas (columnas, tipos, reglas). |
 | `env/` | Variables por entorno: `dev.properties` es el ejemplo compartido; tus valores y contraseñas, en `env/local.properties` (no se sube). |
 | `.pentaho-live/` | El perfil del linter (`lint.yaml`) y su esquema. |
-| `.github/workflows/` | La integración continua: el linter en cada pull request. |
+| `.github/workflows/` | La integración continua: el linter, las pruebas y el diff semántico en cada pull request. |
 
 ## Convenciones
 
@@ -29,14 +29,16 @@ Las fija `.pentaho-live/lint.yaml` y las comprueban, sin configurar nada, Claude
 ```sh
 pentaho-live lint etl              # usa .pentaho-live/lint.yaml; sale con 1 si alguno no llega al mínimo
 pentaho-live lint etl --format json
+pentaho-live test --all            # cada *.test.json; sale con 1 si alguna falla
+pentaho-live diff --rev main --format markdown   # qué cambió en cada .ktr/.kjb desde main, por significado
 ```
 
 En Spoon: menú **IDC > Revisar calidad…** muestra «Perfil: {{NAME}}» y los hallazgos de las convenciones con su arreglo.
 
 ## Integración continua
 
-`.github/workflows/pentaho-live.yml` instala PDI CE 9.4 con Pentaho Live (con caché) y pasa el linter con el perfil a todo `etl/` en cada pull request. Los pasos marcados `TODO` (pruebas con datos dorados y diff semántico) llegan con próximas versiones de Pentaho Live.
+`.github/workflows/pentaho-live.yml` instala PDI CE 9.4 con Pentaho Live (con caché) y, en cada pull request y push a `main`, pasa el linter con el perfil a todo `etl/`, corre las pruebas con datasets dorados y escribe en el resumen del job el diff semántico de los `.ktr`/`.kjb` cambiados contra la rama base. El mismo diff puede ir como comentario en la pull request: pon `PENTAHO_LIVE_PR_COMMENT: "true"` y descomenta `pull-requests: write` en el workflow.
 
 ## Diff legible en git
 
-Con Pentaho Live 0.7 o posterior, `pentaho-live git-setup` imprime las líneas para que `git diff` muestre los cambios de un `.ktr` por step y no como XML (ver `.gitattributes`).
+`.gitattributes` ya manda los `.ktr`/`.kjb` al driver de diff `kettle`; corre una vez en cada clon las líneas que imprime `pentaho-live git-setup` (`git config diff.kettle.textconv "pentaho-live textconv"`) y `git diff` muestra los cambios por step y no como XML. `pentaho-live normalize` escribe los `.ktr`/`.kjb` en forma canónica: dos guardados sin cambios reales no dan diff.

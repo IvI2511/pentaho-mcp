@@ -155,7 +155,17 @@ final class McpResources {
       "How to see what changed by meaning between two versions of a .ktr/.kjb (diff_documents, IDC > Compare... "
         + "with badges on the canvas, the changes report section), how to read the result, and how to set up git: "
         + "pentaho-live normalize, the textconv driver for readable git diffs and the optional pre-commit hook.",
-      "manual/11-versiones.md" )
+      "manual/11-versiones.md" ),
+    new Doc( "pentaho://guide/tests", "tests", "Tests with golden datasets (test_create, test_run, test_run_all)",
+      "How to freeze what a transformation produces today and catch a change that alters it: when to create a test, "
+        + "test_create from a checked preview, the test file (datasets, golden CSV, tweaks, test databases), reading "
+        + "a failure from its row diff, IDC > Tests... with run on save, and pentaho-live test without Spoon.",
+      "manual/12-pruebas.md" ),
+    new Doc( "pentaho://guide/team-projects", "team-projects", "Team projects (lint profile, project_init, CI)",
+      "The project's lint profile .pentaho-live/lint.yaml (rules, severities, min_score, naming prefixes, required "
+        + "variables, team rules) and lint_profile; project_init / pentaho-live init; pentaho-live lint, test and "
+        + "diff on the command line; the GitHub Actions workflow (lint, golden-dataset tests, semantic diff of a pull "
+        + "request); the grader's lint:profile line.", "manual/13-proyecto.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

@@ -564,6 +564,13 @@ public final class Salidas {
       return this;
     }
 
+    /** Un valor ya escrito como JSON (el de {@link Salidas#json} de un archivo). */
+    Json crudo( String json ) {
+      separar();
+      sb.append( json.trim() );
+      return this;
+    }
+
     Json valor( String v ) {
       separar();
       if ( v == null ) {

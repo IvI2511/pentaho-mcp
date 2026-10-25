@@ -276,4 +276,55 @@ public class PruebaDiffGit {
     igual( "HEAD", Diff.revision( "HEAD" ), "HEAD solo" );
     igual( null, Diff.revision( "C:/x.ktr" ), "una ruta" );
   }
+
+  /**
+   * {@code pentaho-live diff --rev REV} sin un archivo (P4, el paso de la CI de una pull request): cada .ktr/.kjb que
+   * cambió desde la revisión, el nuevo y el borrado con una línea; markdown y JSON; códigos 0, 1 y 2.
+   */
+  public void pruebaF_DiffDeLosCambiados() throws Exception {
+    String x = PruebaDiff.ejemplo( "manual/ejemplos/06_errores_y_parametros.ktr" );
+    File borrar = new File( repo, "etl/borrar.ktr" );
+    EntornoKettle.escribir( borrar, x );
+    git( "add", "etl/borrar.ktr" );
+    commit( "uno para borrar" );
+    Files.delete( borrar.toPath() );
+    EntornoKettle.escribir( new File( repo, "etl/nuevo.ktr" ), x );
+    git( "add", "etl/nuevo.ktr" );
+    EntornoKettle.escribir( new File( repo, "notas/leeme.txt" ), "sin ETL" );
+
+    Object[] r = cli( "diff", "--rev", "HEAD", "--format", "markdown", "--lang", "en" );
+    igual( 1, r[ 0 ], "con cambios: " + r[ 2 ] );
+    String md = (String) r[ 1 ];
+    contiene( md, "## Pentaho Live: semantic diff against HEAD", "título" );
+    contiene( md, "3 .ktr/.kjb files changed.", "cuántos" );
+    contiene( md, "`etl/02_filtrar_clientes.ktr`\n\n### Changes in the transformation", "el cambiado, por significado" );
+    contiene( md, "Columnas finales", "con el renombre" );
+    contiene( md, "### `etl/nuevo.ktr`\n\nNew transformation with", "el nuevo en una línea" );
+    contiene( md, "### `etl/borrar.ktr`\n\nTransformation removed.", "el borrado" );
+    noContiene( md, "&gt;", "sin XML" );
+
+    r = cli( "diff", "--rev", "HEAD", "--format", "json", "etl" );
+    igual( 1, r[ 0 ], "json: " + r[ 2 ] );
+    JsonNode j = McpHttpServer.JSON.readTree( (String) r[ 1 ] );
+    igual( 3, j.path( "count" ).asInt(), "tres archivos" );
+    List<String> estados = new ArrayList<String>();
+    for ( JsonNode f : j.path( "files" ) ) {
+      estados.add( f.path( "file" ).asText() + "=" + f.path( "status" ).asText() );
+    }
+    igual( Arrays.asList( "etl/02_filtrar_clientes.ktr=modified", "etl/borrar.ktr=removed", "etl/nuevo.ktr=added" ),
+      estados, "estados" );
+    igual( "renamed", j.path( "files" ).get( 0 ).path( "diff" ).path( "changes" ).get( 0 ).path( "change" ).asText(),
+      "el diff del cambiado, el de diff_documents" );
+
+    r = cli( "diff", "--rev", "HEAD", "--lang", "es", "notas" );
+    igual( 0, r[ 0 ], "carpeta sin .ktr cambiados: 0" );
+    contiene( (String) r[ 1 ], "Ningún .ktr/.kjb cambió respecto de HEAD.", "lo dice" );
+    igual( 1, cli( "diff" )[ 0 ], "sin argumentos: contra HEAD" );
+    igual( 2, cli( "diff", "--rev", "no-existe", "etl" )[ 0 ], "revisión que no existe" );
+    igual( 2, cli( "diff", "--rev", "HEAD", "no-existe" )[ 0 ], "ruta que no existe" );
+
+    git( "rm", "-q", "--cached", "etl/nuevo.ktr" );
+    Files.delete( new File( repo, "etl/nuevo.ktr" ).toPath() );
+    EntornoKettle.borrar( new File( repo, "notas" ).toPath() );
+  }
 }

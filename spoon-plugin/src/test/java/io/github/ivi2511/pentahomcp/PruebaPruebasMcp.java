@@ -116,6 +116,53 @@ public class PruebaPruebasMcp {
     lanza( ToolError.class, () -> PruebasTools.listar( b ), "ruta relativa" );
   }
 
+  /**
+   * {@code pentaho-live test} (P4, la CI de init): la prueba en rojo de pruebaA da código 1, la anotación de GitHub y el
+   * resumen Markdown; arreglada, código 0 y el JSON de test_run; sin pruebas, 0; un error de uso, 2.
+   */
+  public void pruebaD_LineaDeComandos() throws Exception {
+    File resumen = new File( base, "resumen-pruebas.md" );
+    Object[] r = cli( dir, "test", "--all", "--format", "github", "--summary", resumen.getAbsolutePath() );
+    igual( 1, r[ 0 ], "la del Group by cambiado falla: " + r[ 1 ] + r[ 2 ] );
+    contiene( (String) r[ 1 ], "::error file=tests/ventas.test.json,title=pentaho-live test ventas::", "anotación" );
+    contiene( (String) r[ 1 ], "FAIL  ventas  failed", "en texto" );
+    contiene( (String) r[ 1 ], "output \"Totales por producto\":", "qué salida" );
+    contiene( (String) r[ 1 ], "1 test(s): 0 passed, 1 failed", "el total" );
+    String md = EntornoKettle.leer( resumen );
+    contiene( md, "## Pentaho Live tests", "resumen" );
+    contiene( md, "| ventas | `tests/ventas.test.json` | **failed** |", "una fila por prueba" );
+
+    String ktr = EntornoKettle.leer( new File( dir, "03_ventas_por_producto.ktr" ) );
+    EntornoKettle.escribir( new File( dir, "03_ventas_por_producto.ktr" ), ktr.replaceFirst(
+      "<subject>importe</subject>\n        <type>MAX</type>", "<subject>importe</subject>\n        <type>SUM</type>" ) );
+    r = cli( base, "test", "proyecto/03_ventas_por_producto.ktr", "--format", "json" );
+    igual( 0, r[ 0 ], "arreglada: pasa: " + r[ 1 ] + r[ 2 ] );
+    JsonNode j = McpHttpServer.JSON.readTree( (String) r[ 1 ] );
+    igual( 1, j.path( "passed" ).asInt(), "json: una pasa" );
+    igual( ResultadoPrueba.PASO, j.path( "tests" ).get( 0 ).path( "status" ).asText(), "su estado" );
+    igual( "proyecto/tests/ventas.test.json", j.path( "tests" ).get( 0 ).path( "test_file" ).asText(), "relativa" );
+
+    File vacia = new File( base, "sin-pruebas" );
+    vacia.mkdirs();
+    r = cli( vacia, "test" );
+    igual( 0, r[ 0 ], "sin pruebas: 0" );
+    contiene( (String) r[ 1 ], "nothing to run", "lo dice" );
+    igual( 2, cli( dir, "test", "--format", "xml" )[ 0 ], "uso: --format" );
+    igual( 2, cli( dir, "test", "no-existe.test.json" )[ 0 ], "uso: no existe" );
+    igual( 2, cli( dir, "test", "03_ventas_por_producto.kjb_no" )[ 0 ], "uso: no existe" );
+  }
+
+  private static Object[] cli( File cwd, String... args ) throws Exception {
+    java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+    java.io.ByteArrayOutputStream e = new java.io.ByteArrayOutputStream();
+    ProyectoMain m = new ProyectoMain( new java.io.PrintStream( o, true, "UTF-8" ), new java.io.PrintStream( e, true,
+      "UTF-8" ) );
+    m.cwd = cwd.getAbsoluteFile();
+    m.kettleListo = true;
+    int c = m.correr( args );
+    return new Object[] { c, o.toString( "UTF-8" ), e.toString( "UTF-8" ) };
+  }
+
   /** Cancelar antes de que arranque la JVM: todo queda cancelado. */
   public void pruebaC_Cancelar() throws Exception {
     List<PruebasProcesos.Tarea> t = new ArrayList<PruebasProcesos.Tarea>();

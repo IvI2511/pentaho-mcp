@@ -9,7 +9,7 @@
 *.sqlite binary
 
 # Readable diffs of .ktr/.kjb: steps, hops and settings instead of raw XML.
-# Needs Pentaho Live 0.7+ (`pentaho-live textconv`) and, once in each clone:
+# Needs `pentaho-live textconv` (Pentaho Live 0.7+) and, once in each clone:
 #   git config diff.kettle.textconv "pentaho-live textconv"
 #   git config diff.kettle.cachetextconv true
 # (`pentaho-live git-setup` prints these lines; `pentaho-live normalize` puts .ktr/.kjb in canonical form.)

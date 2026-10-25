@@ -111,6 +111,18 @@ after each save, only the tests the change affects — a changed step that is a 
 one, stopping at datasets; all of them when unsure — and shows **✓ 12/12** or **✗ 1** on the IDC button,
 with a balloon when one fails. `test_list` with `show_in_spoon: true` opens the window when the person asks.
 
+**Without Spoon** (a terminal, or the CI that `pentaho-live init` writes, `manual/13-proyecto.md` §5):
+
+```sh
+pentaho-live test --all                       # every *.test.json under the current folder
+pentaho-live test etl/ventas.ktr              # the tests of one transformation
+pentaho-live test tests/ventas.test.json --format json
+pentaho-live test --all --format github --summary "$GITHUB_STEP_SUMMARY"
+```
+
+Same engine and JVM as `test_run_all`; exit code 0 when every test passed (or there are none), 1 when one did
+not, 2 for a usage error.
+
 ## 6. Troubleshooting
 
 | Symptom | Cause and fix |

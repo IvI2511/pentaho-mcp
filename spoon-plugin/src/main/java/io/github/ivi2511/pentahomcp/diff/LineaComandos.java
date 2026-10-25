@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
+
 /**
  * Los comandos de git y de consola de Pentaho Live (diseño E2), sin Spoon ni Kettle: solo el jar del plugin y Java.
  * Los lanza {@code pentaho-live <comando>} (launcher/pentaho-live.cmd y launcher/pentaho-live):
@@ -22,6 +24,7 @@ import java.util.Locale;
  *   pentaho-live normalize [--check] [--stdout] archivo-o-carpeta...
  *   pentaho-live diff [--format text|markdown|json] [--positions] [--lang en|es|pt] antes.ktr despues.ktr
  *   pentaho-live diff [--rev REV] archivo.ktr              (la revisión de git, HEAD por defecto, contra el archivo)
+ *   pentaho-live diff [--rev REV] [carpetas]               (cada .ktr/.kjb que cambió desde REV: la CI de una PR)
  *   pentaho-live textconv [--positions] [--lang en|es|pt] archivo.ktr   (para git: diff.kettle.textconv)
  *   pentaho-live pre-commit                                (lo llama el hook de pre-commit)
  *   pentaho-live git-setup                                 (las líneas de .gitattributes y git config)
@@ -204,6 +207,9 @@ public final class LineaComandos {
     if ( !Arrays.asList( "text", "markdown", "md", "json" ).contains( formato ) ) {
       throw new Uso( "--format is text, markdown or json" );
     }
+    if ( args.isEmpty() || rev != null && ( args.size() > 1 || archivo( args.get( 0 ) ).isDirectory() ) ) {
+      return diffCambios( rev == null ? "HEAD" : rev, args, formato, idioma, posiciones );
+    }
     try {
       Diff.Fuente antes;
       Diff.Fuente despues;
@@ -237,6 +243,161 @@ public final class LineaComandos {
       err.println( "pentaho-live diff: " + e.getMessage() );
       return ERROR;
     }
+  }
+
+  /** Un .ktr/.kjb que cambió entre la revisión y la carpeta de trabajo. */
+  static final class Cambio {
+    /** A (nuevo), D (borrado) o M (cambiado; también T). */
+    final char estado;
+    /** Relativa a la raíz del repositorio, con «/». */
+    final String ruta;
+
+    Cambio( char estado, String ruta ) {
+      this.estado = estado;
+      this.ruta = ruta;
+    }
+  }
+
+  /**
+   * {@code pentaho-live diff [--rev REV] [carpetas o archivos]} sin un archivo solo: cada .ktr/.kjb que cambió entre la
+   * revisión (HEAD por defecto) y la carpeta de trabajo, como en una pull request. Lo usa el workflow de CI que crea
+   * {@code pentaho-live init}: {@code pentaho-live diff --rev origin/main --format markdown}. Los archivos nuevos y los
+   * borrados van con una línea (sin listar cada step). Códigos: 0 sin cambios, 1 con cambios, 2 error.
+   */
+  int diffCambios( String rev, List<String> rutas, String formato, String idioma, boolean posiciones ) {
+    if ( !Git.REVISION.matcher( rev ).matches() ) {
+      err.println( "pentaho-live diff: not a valid git revision: " + rev );
+      return ERROR;
+    }
+    File dir = cwd != null ? cwd.getAbsoluteFile() : new File( "." ).getAbsoluteFile();
+    Rotulos t = Salidas.rotulos( idioma );
+    List<Cambio> cambios;
+    File repo;
+    try {
+      Git.Salida top = Git.correr( dir, "rev-parse", "--show-toplevel" );
+      if ( top.codigo != 0 ) {
+        err.println( "pentaho-live diff: not in a git repository (" + dir + ")" );
+        return ERROR;
+      }
+      repo = new File( new String( top.salida, StandardCharsets.UTF_8 ).trim() );
+      Git.Salida v = Git.correr( dir, "rev-parse", "--verify", "--quiet", rev + "^{commit}" );
+      if ( v.codigo != 0 ) {
+        err.println( "pentaho-live diff: unknown git revision '" + rev + "'. In a shallow CI checkout fetch it first, "
+          + "for example: git fetch --depth=1 origin main:refs/remotes/origin/main" );
+        return ERROR;
+      }
+      List<String> cmd = new ArrayList<String>( Arrays.asList( "diff", "--name-status", "-z", "--no-renames", rev,
+        "--" ) );
+      for ( String r : rutas ) {
+        File f = archivo( r );
+        if ( !f.exists() ) {
+          err.println( "pentaho-live diff: not found: " + f );
+          return ERROR;
+        }
+        cmd.add( f.getPath() );
+      }
+      Git.Salida d = Git.correr( dir, cmd.toArray( new String[ 0 ] ) );
+      if ( d.codigo != 0 ) {
+        err.println( "pentaho-live diff: git diff failed: " + Git.primeraLinea( d.error.trim() ) );
+        return ERROR;
+      }
+      cambios = cambios( new String( d.salida, StandardCharsets.UTF_8 ) );
+    } catch ( IOException e ) {
+      err.println( "pentaho-live diff: git is not available (" + e.getMessage() + ")" );
+      return ERROR;
+    }
+    boolean json = formato.equals( "json" );
+    boolean md = formato.startsWith( "m" );
+    StringBuilder sb = new StringBuilder();
+    Salidas.Json j = new Salidas.Json();
+    if ( json ) {
+      j.abrir().campo( "revision", rev ).campo( "count", cambios.size() ).nombre( "files" ).abrirLista();
+    } else if ( md ) {
+      sb.append( "## " ).append( Salidas.md( t.f( "files.title", rev ) ) ).append( "\n\n" );
+    } else {
+      sb.append( t.f( "files.title", rev ) ).append( '\n' );
+    }
+    if ( cambios.isEmpty() && !json ) {
+      sb.append( t.f( "files.none", rev ) ).append( '\n' );
+    } else if ( !json ) {
+      sb.append( t.f( cambios.size() == 1 ? "files.count.1" : "files.count", cambios.size() ) ).append( '\n' );
+    }
+    int errores = 0;
+    for ( Cambio c : cambios ) {
+      File f = new File( repo, c.ruta );
+      String estado = c.estado == 'A' ? "added" : c.estado == 'D' ? "removed" : "modified";
+      String linea = null;
+      ResultadoDiff r = null;
+      try {
+        if ( c.estado == 'A' || c.estado == 'D' ) {
+          byte[] xml = c.estado == 'A' ? Files.readAllBytes( f.toPath() ) : mostrar( repo, rev, c.ruta );
+          Documento doc = Documento.leer( xml );
+          boolean trans = Documento.TRANSFORMACION.equals( doc.tipo );
+          linea = c.estado == 'D' ? t.s( trans ? "files.removed_transformation" : "files.removed_job" )
+            : t.f( trans ? "files.added_transformation" : "files.added_job", doc.nodos.size() );
+        } else {
+          Diff.Fuente antes = new Diff.Fuente( mostrar( repo, rev, c.ruta ), rev + ":" + c.ruta );
+          Diff.Fuente despues = new Diff.Fuente( Files.readAllBytes( f.toPath() ), c.ruta );
+          r = Diff.comparar( antes, despues, !posiciones );
+        }
+      } catch ( Exception e ) {
+        errores++;
+        linea = t.f( "files.unreadable", e.getMessage() );
+        estado = "error";
+      }
+      if ( json ) {
+        j.abrir().campo( "file", c.ruta ).campo( "status", estado );
+        if ( r != null ) {
+          j.nombre( "diff" ).crudo( Salidas.json( r, idioma ) );
+        } else {
+          j.campo( "message", linea );
+        }
+        j.cerrar();
+      } else if ( md ) {
+        sb.append( '\n' );
+        if ( r != null ) {
+          sb.append( "`" ).append( c.ruta.replace( "`", "" ) ).append( "`\n\n" ).append( Salidas.markdown( r, idioma ) );
+        } else {
+          sb.append( "### `" ).append( c.ruta.replace( "`", "" ) ).append( "`\n\n" ).append( Salidas.md( linea ) )
+            .append( '\n' );
+        }
+      } else {
+        sb.append( '\n' ).append( "== " ).append( c.ruta ).append( '\n' );
+        sb.append( r != null ? Salidas.texto( r, idioma ) : "  " + linea + "\n" );
+      }
+    }
+    if ( json ) {
+      j.cerrarLista().cerrar();
+      out.println( j.toString() );
+    } else {
+      out.print( sb );
+    }
+    return errores > 0 ? ERROR : cambios.isEmpty() ? OK : DIFERENTE;
+  }
+
+  /** La salida de {@code git diff --name-status -z}: solo los .ktr/.kjb, en orden. */
+  static List<Cambio> cambios( String z ) {
+    List<Cambio> l = new ArrayList<Cambio>();
+    String[] p = z.split( "\u0000" );
+    for ( int i = 0; i + 1 < p.length; i += 2 ) {
+      String est = p[ i ].trim();
+      String ruta = p[ i + 1 ];
+      if ( est.isEmpty() || !esKettle( ruta ) ) {
+        continue;
+      }
+      char e = Character.toUpperCase( est.charAt( 0 ) );
+      l.add( new Cambio( e == 'A' || e == 'D' ? e : 'M', ruta ) );
+    }
+    return l;
+  }
+
+  /** El contenido de una ruta del repositorio en una revisión ({@code git show REV:ruta}, desde la raíz). */
+  private static byte[] mostrar( File repo, String rev, String ruta ) throws IOException, Git.GitError {
+    Git.Salida s = Git.correr( repo, "show", rev + ":" + ruta );
+    if ( s.codigo != 0 ) {
+      throw new Git.GitError( "git show " + rev + ":" + ruta + " failed: " + Git.primeraLinea( s.error.trim() ) );
+    }
+    return s.salida;
   }
 
   // ================================================================ textconv
@@ -351,6 +512,7 @@ public final class LineaComandos {
     out.println( "  pentaho-live normalize [--check] [--stdout] <files or folders>   canonical XML of .ktr/.kjb" );
     out.println( "  pentaho-live diff [--format text|markdown|json] [--positions] [--lang en|es|pt] <before> <after>" );
     out.println( "  pentaho-live diff [--rev REV] <file>      the git revision (HEAD by default) against the file" );
+    out.println( "  pentaho-live diff [--rev REV] [--format markdown] [<folders>]   every .ktr/.kjb changed since REV" );
     out.println( "  pentaho-live textconv [--positions] <file> semantic text of one file, for git's textconv" );
     out.println( "  pentaho-live pre-commit                    what the optional pre-commit hook runs" );
     out.println( "  pentaho-live git-setup                     the .gitattributes and git config lines" );

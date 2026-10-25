@@ -19,6 +19,7 @@ rem  Git and console commands (no Spoon; Java and the plugin jar of that PDI):
 rem      pentaho-live normalize [--check] <files or folders>
 rem      pentaho-live diff [--format text|markdown|json] <before> <after>
 rem      pentaho-live diff [--rev REV] <file>
+rem      pentaho-live diff [--rev REV] [folders]  every .ktr/.kjb changed since REV
 rem      pentaho-live textconv <file>        (git: diff.kettle.textconv)
 rem      pentaho-live pre-commit             (the optional pre-commit hook)
 rem      pentaho-live git-setup              (the .gitattributes and git config lines)
@@ -46,6 +47,7 @@ rem  Project commands (no Spoon; block [0.7 project] at the end of this file):
 rem      pentaho-live init [folder]         team project template (only what is missing)
 rem      pentaho-live lint <files|folders>  lint with the project's profile; exit 1 below its min_score
 rem      pentaho-live profile [folder]      the lint profile that applies there
+rem      pentaho-live test [--all] [paths]  golden-dataset tests in a separate JVM; exit 1 if one fails
 rem ===========================================================================
 setlocal EnableExtensions DisableDelayedExpansion
 
@@ -53,11 +55,12 @@ set "PL_BIN=%~dp0"
 for %%I in ("%~dp0..") do set "PL_APP=%%~fI"
 set "PL_PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 
-rem --- [0.7 project] init / lint / profile: they skip the options below and go to :pl_proyecto
+rem --- [0.7 project] init / lint / profile / test: they skip the options below and go to :pl_proyecto
 set "PL_PROYECTO="
 if /i "%~1"=="init" set "PL_PROYECTO=1"
 if /i "%~1"=="lint" set "PL_PROYECTO=1"
 if /i "%~1"=="profile" set "PL_PROYECTO=1"
+if /i "%~1"=="test" set "PL_PROYECTO=1"
 if defined PL_PROYECTO goto :args_done
 
 rem --- Options (anything else is ignored)
@@ -229,13 +232,13 @@ if exist "%IDC_LAUNCHER_READY_FILE%" exit /b 0
 exit /b 0
 
 rem ===========================================================================
-rem  [0.7 project] pentaho-live init | lint | profile
+rem  [0.7 project] pentaho-live init | lint | profile | test
 rem  io.github.ivi2511.pentahomcp.ProyectoMain, without Spoon: the classpath is
 rem  data-integration\lib plus the plugin (plugins\pentaho-mcp), Kettle's own
 rem  plugins come from data-integration\plugins. The arguments go as they are.
 rem  Java: <install folder>\jre (full install), else PENTAHO_JAVA_HOME, JAVA_HOME
 rem  or the java of the PATH. Exit code: the one of ProyectoMain (0 ok, 1 a file
-rem  below the minimum score, 2 usage or profile error).
+rem  below the minimum score or a test that fails, 2 usage or profile error).
 rem ===========================================================================
 :pl_proyecto
 if not exist "%PL_PDI%\plugins\pentaho-mcp" goto :pl_proyecto_sin_plugin

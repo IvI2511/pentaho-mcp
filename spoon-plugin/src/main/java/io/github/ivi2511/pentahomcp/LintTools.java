@@ -138,11 +138,12 @@ final class LintTools {
       "Prepares a team ETL project in a folder (pentaho-live init): creates ONLY what is missing and never overwrites "
         + "or edits an existing file: etl/, datasets/, tests/, contracts/, env/ with an example dev.properties (no "
         + "secrets), .gitignore (secrets, run outputs, salida/, SQLite outputs), .gitattributes (the readable diff "
-        + "driver for .ktr/.kjb, commented if this Pentaho Live has no textconv command), the lint profile "
+        + "driver for .ktr/.kjb for pentaho-live textconv), the lint profile "
         + ".pentaho-live/lint.yaml (a sensible default 'course' profile: min_score 75, IN_/OUT_/LKP_/FLT_ prefixes, "
         + "required ${DIR_DATOS}/${DB_HOST} variables, a team rule) with its JSON Schema, a README.md with the "
         + "conventions and .github/workflows/pentaho-live.yml (CI: PDI CE 9.4 + Pentaho Live cached, lint of etl/ "
-        + "with the profile's min_score, TODO steps for tests and semantic diff). Returns created and existing. "
+        + "with the profile's min_score, the golden-dataset tests and, on a pull request, the semantic diff of the "
+        + "changed .ktr/.kjb against the base branch in the job summary). Returns created and existing. "
         + "dry_run=true only lists what it would create. Ask the person before creating files in a folder they did not "
         + "name. No Spoon needed.",
       Tools.schema()

@@ -109,7 +109,7 @@ Creates **only what is missing**, never overwrites or edits a file:
 | `etl/`, `datasets/`, `tests/`, `contracts/` | with a `.gitkeep` (git does not keep empty folders) |
 | `env/dev.properties` | the shared example of the environment variables (`DIR_DATOS`, `DB_HOST`…), no secrets |
 | `.gitignore` | `env/local.properties` and `*.secret.properties`, `kettle.properties`, `salida/`, logs, `runs.sqlite`, `*.sqlite` except under `datasets/` and `tests/` |
-| `.gitattributes` | `.ktr`/`.kjb` as text, binaries, and the readable-diff driver `diff=kettle` (commented while this Pentaho Live has no `pentaho-live textconv`) |
+| `.gitattributes` | `.ktr`/`.kjb` as text, binaries, and the readable-diff driver `diff=kettle` for `pentaho-live textconv` (each clone runs the two `git config` lines of `pentaho-live git-setup` once; `manual/11-versiones.md`) |
 | `.pentaho-live/lint.yaml` | the default **course profile**: `min_score: 75`, `absolute_path` and `password_in_file` as errors, `default_step_name` as a warning, `IN_`/`OUT_`/`LKP_`/`FLT_` and `TR_`/`JB_`, `${DIR_DATOS}`/`${Internal.Entry.Current.Directory}` and `${DB_HOST}`, one team rule |
 | `.pentaho-live/lint.schema.json` | the JSON Schema of the profile |
 | `README.md` | the folders, the conventions and how to check them |
@@ -119,7 +119,7 @@ Creates **only what is missing**, never overwrites or edits a file:
 `existing`. **Ask the person before creating files in a folder they did not name.** In Spoon, **IDC > Prepare
 project…** shows the same list (what will be created, what is already there) before creating anything.
 
-## 5. `pentaho-live lint` and CI
+## 5. `pentaho-live lint`, `test`, `diff` and CI
 
 ```sh
 pentaho-live lint etl                       # every .ktr/.kjb under etl/, each with the profile found above it
@@ -127,6 +127,9 @@ pentaho-live lint a.ktr b.kjb --min-score 80 --lang es
 pentaho-live lint etl --format json         # the lint_etl result of every file
 pentaho-live lint etl --format github --summary "$GITHUB_STEP_SUMMARY"
 pentaho-live profile [folder]               # the effective profile (JSON)
+pentaho-live test --all                     # every *.test.json under the current folder (manual/12-pruebas.md)
+pentaho-live test etl/ventas.ktr --format github --summary "$GITHUB_STEP_SUMMARY"
+pentaho-live diff --rev origin/main --format markdown   # every .ktr/.kjb changed since that revision
 ```
 
 Exit code: **0** every file reaches the minimum (`--min-score`, else the profile's `min_score`, else none);
@@ -135,16 +138,36 @@ Exit code: **0** every file reaches the minimum (`--min-score`, else the profile
 needed: the launcher runs `io.github.ivi2511.pentahomcp.ProyectoMain` with PDI's `lib/` and the plugin's jar.
 On macOS/Linux, `launcher/pentaho-live` does the same with `PDI_HOME` (default `~/pentaho/data-integration`).
 
+`pentaho-live test [--all] [tests, .ktr files or folders]` runs the golden-dataset tests like `test_run_all`, in a
+separate JVM with its own empty Kettle settings: with no paths (or `--all`) every `*.test.json` under the current
+folder (hidden folders such as `.git` skipped); a `.ktr` runs the tests of its `tests/` folders. `--format text`
+(default), `json` (the `test_run` result of each test) or `github` (an `::error` annotation on the file of each test
+that does not pass, plus the text); `--summary file.md` appends a table; `--timeout` seconds for the whole run
+(default 1800). Exit code: **0** every test passed, or there are none; **1** one failed, had an error or did not
+finish in time; **2** a usage error.
+
+`pentaho-live diff --rev REV [folders]` (no single file) compares every `.ktr`/`.kjb` that changed between the git
+revision `REV` (default `HEAD`) and the working folder, by meaning, as text, `--format markdown` or `json`; new and
+removed files get one line. Exit code: 0 nothing changed, 1 something changed, 2 an error (an unknown revision: in
+a shallow CI checkout, fetch the base branch first).
+
 The workflow that `init` writes (GitHub Actions, `ubuntu-24.04`):
 
 1. Java 11 (Temurin); PDI CE 9.4 **with the plugin of the same version** from the release
    (`pdi-ce-9.4-con-pentaho-mcp.zip`), kept in `actions/cache` (about 400 MB, downloaded once per version);
-2. `ProyectoMain lint etl --format github --summary $GITHUB_STEP_SUMMARY`: each finding becomes an annotation on
+2. a `pentaho-live` command on the `PATH` (the same as `launcher/pentaho-live` on Linux, with that PDI);
+3. `pentaho-live lint etl --format github --summary $GITHUB_STEP_SUMMARY`: each finding becomes an annotation on
    the file, a table goes to the job summary, and the job **fails** if a file is below the profile's `min_score`;
-3. two `TODO(...)` steps, commented: golden-dataset tests in `tests/` and the semantic diff of the changed
-   `.ktr`/`.kjb` as a pull-request comment, for when those commands exist.
+4. `pentaho-live test --all --format github --summary $GITHUB_STEP_SUMMARY`: the golden-dataset tests, also when
+   the lint step failed; a test that does not pass is an annotation on its `.test.json` and fails the job;
+5. on a pull request, `git fetch` of the base branch and `pentaho-live diff --rev origin/<base> --format markdown`
+   into the job summary: what changed in each `.ktr`/`.kjb` by meaning, never passwords;
+6. optional, off by default: the same diff as a comment on the pull request (`gh pr comment`, it edits its own
+   comment on later pushes). Turn it on with `PENTAHO_LIVE_PR_COMMENT: "true"` and `pull-requests: write` in the
+   job's permissions; on pull requests from forks the token is read-only and the comment is skipped.
 
-To try the same check before pushing: `pentaho-live lint etl`.
+To try the same checks before pushing: `pentaho-live lint etl`, `pentaho-live test --all` and
+`pentaho-live diff --rev main --format markdown`.
 
 ## 6. The grader: `lint:profile`
 
@@ -163,3 +186,5 @@ computer. Without a profile in the pack the line is `evaluated: false`.
 | `required_variable` on a path that already has a variable | It must **start** with one of `required_variables.paths`: add that variable to the list or change the path |
 | CI: `ClassNotFoundException: ...ProyectoMain` | The PDI zip of that version has a plugin older than 0.7.0: set `PENTAHO_LIVE_VERSION` in the workflow to a release with it |
 | CI is slow on the first run | It downloads PDI once; later runs use the cache until `PENTAHO_LIVE_VERSION` changes |
+| CI: `unknown git revision 'origin/main'` in the diff step | The checkout is shallow: the workflow fetches the base branch first; keep that `git fetch` line if you edit the step |
+| CI: a test passes on your computer and fails in CI | The test runs with its `environment` (locale, time zone, encoding) in both places; look for paths or variables only your computer has (`test_list` shows its datasets and tweaks) |

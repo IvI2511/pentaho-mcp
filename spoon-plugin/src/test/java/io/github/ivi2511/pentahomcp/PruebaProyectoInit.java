@@ -69,13 +69,21 @@ public class PruebaProyectoInit {
       contiene( gi, x, ".gitignore: " + x );
     }
     String ga = EntornoKettle.leer( new File( p, ".gitattributes" ) );
-    contiene( ga, ProyectoInit.hayTextconv() ? "\n*.ktr diff=kettle" : "# *.ktr diff=kettle", "driver de diff" );
+    cierto( ProyectoInit.hayTextconv(), "el plugin trae pentaho-live textconv (" + ProyectoInit.CLASE_TEXTCONV + ")" );
+    contiene( ga, "\n*.ktr diff=kettle\n*.kjb diff=kettle", "driver de diff activo" );
+    noContiene( ga, "# *.ktr diff=kettle", "sin comentar" );
     String wf = EntornoKettle.leer( new File( p, ".github/workflows/pentaho-live.yml" ) );
-    contiene( wf, "io.github.ivi2511.pentahomcp.ProyectoMain lint etl", "el linter con el perfil" );
+    contiene( wf, "io.github.ivi2511.pentahomcp.ProyectoMain \"$@\"", "pentaho-live con ProyectoMain" );
+    contiene( wf, "io.github.ivi2511.pentahomcp.diff.LineaComandos \"$@\"", "y con los comandos de git" );
+    contiene( wf, "run: pentaho-live lint etl --format github --summary \"$GITHUB_STEP_SUMMARY\"", "el linter" );
     contiene( wf, "actions/cache", "PDI en caché" );
     contiene( wf, "v" + ProyectoInit.version() + "/pdi-ce-9.4-con-pentaho-mcp.zip", "PDI de esta versión" );
-    contiene( wf, "TODO(pentaho-live tests)", "TODO de las pruebas" );
-    contiene( wf, "TODO(pentaho-live diff)", "TODO del diff" );
+    contiene( wf, "run: pentaho-live test --all --format github --summary \"$GITHUB_STEP_SUMMARY\"", "las pruebas" );
+    contiene( wf, "pentaho-live diff --rev \"origin/$BASE_REF\" --format markdown", "el diff contra la rama base" );
+    contiene( wf, "git fetch --no-tags --depth=1 origin", "trae la rama base" );
+    contiene( wf, "PENTAHO_LIVE_PR_COMMENT: \"false\"", "comentario apagado por defecto" );
+    contiene( wf, "# pull-requests: write", "permiso comentado" );
+    noContiene( wf, "TODO", "sin pasos pendientes" );
     noContiene( wf, "{{VERSION}}", "sin marcadores sin llenar" );
     String dev = EntornoKettle.leer( new File( p, "env/dev.properties" ) );
     noContiene( dev.replaceAll( "(?m)^#.*$", "" ), "DB_PASSWORD", "sin contraseñas" );

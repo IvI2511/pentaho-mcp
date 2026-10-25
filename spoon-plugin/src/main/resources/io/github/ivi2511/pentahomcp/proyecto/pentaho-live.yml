@@ -1,7 +1,13 @@
 # Pentaho Live CI (created by `pentaho-live init`, Pentaho Live {{VERSION}}).
-# On every pull request and push to main: installs PDI CE 9.4 with the Pentaho Live plugin (cached),
-# lints every .ktr/.kjb under etl/ with the project's profile (.pentaho-live/lint.yaml) and fails
-# if one is below its min_score. The steps marked TODO are added by later Pentaho Live versions.
+# On every pull request and push to main: installs PDI CE 9.4 with the Pentaho Live plugin (cached), then
+#  1. lints every .ktr/.kjb under etl/ with the project's profile (.pentaho-live/lint.yaml) and fails if one
+#     is below its min_score (`pentaho-live lint etl`);
+#  2. runs the golden-dataset tests (every *.test.json, see `test_create`) in a separate JVM and fails if one
+#     does not pass (`pentaho-live test --all`);
+#  3. on a pull request, writes the semantic diff of the changed .ktr/.kjb against the base branch to the job
+#     summary (`pentaho-live diff --rev origin/<base> --format markdown`): steps, settings, hops and
+#     connections that changed, never passwords. Optionally also as a comment on the pull request.
+# The three steps are the same commands you can run on your computer with Pentaho Live installed.
 name: pentaho-live
 
 on:
@@ -17,12 +23,19 @@ env:
   PENTAHO_LIVE_VERSION: "{{VERSION}}"
   # PDI CE 9.4 with the plugin already inside (the same zip as the release's installers)
   PDI_ZIP_URL: https://github.com/IvI2511/pentaho-mcp/releases/download/v{{VERSION}}/pdi-ce-9.4-con-pentaho-mcp.zip
+  # "true" also posts the semantic diff as a comment on the pull request (it updates its own comment).
+  # It needs `pull-requests: write` in the job's permissions below; pull requests from forks get a read-only
+  # token, so there the comment is skipped and the diff stays in the job summary.
+  PENTAHO_LIVE_PR_COMMENT: "false"
 
 jobs:
-  lint:
-    name: Lint .ktr/.kjb (project profile)
+  check:
+    name: Lint, tests and semantic diff
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      # pull-requests: write   # uncomment with PENTAHO_LIVE_PR_COMMENT: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -47,27 +60,59 @@ jobs:
           rm "$RUNNER_TEMP/pdi.zip"
           ls "$RUNNER_TEMP/pdi/data-integration/plugins/pentaho-mcp"
 
-      - name: Lint with the project profile
+      - name: Put the pentaho-live command on the PATH
+        id: setup
         run: |
           PDI="$RUNNER_TEMP/pdi/data-integration"
-          export KETTLE_HOME="$RUNNER_TEMP/kettle-home"
-          mkdir -p "$KETTLE_HOME/.kettle"
-          # the same as `pentaho-live lint etl` on a computer with Pentaho Live installed
-          java -Xmx1g \
+          mkdir -p "$RUNNER_TEMP/bin" "$RUNNER_TEMP/kettle-home/.kettle"
+          # the same as Pentaho Live's launcher/pentaho-live on Linux, with this PDI
+          cat > "$RUNNER_TEMP/bin/pentaho-live" <<'EOF'
+          #!/bin/sh
+          pdi="$PDI_HOME"
+          case "$1" in
+            normalize|diff|textconv|pre-commit|git-setup)
+              exec java -Xmx512m -Dfile.encoding=UTF-8 -cp "$pdi/plugins/pentaho-mcp/*" \
+                io.github.ivi2511.pentahomcp.diff.LineaComandos "$@" ;;
+          esac
+          exec java -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 \
             --add-opens java.base/java.net=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED \
             --add-opens java.base/sun.net.www.protocol.jar=ALL-UNNAMED \
-            -Djava.awt.headless=true -DKETTLE_PLUGIN_BASE_FOLDERS="$PDI/plugins" \
-            -cp "$PDI/lib/*:$PDI/plugins/pentaho-mcp/*:$PDI/plugins/pentaho-mcp/lib/*:$PDI/classes" \
-            io.github.ivi2511.pentahomcp.ProyectoMain lint etl \
-            --format github --summary "$GITHUB_STEP_SUMMARY"
+            -DKETTLE_PLUGIN_BASE_FOLDERS="$pdi/plugins" \
+            -cp "$pdi/lib/*:$pdi/plugins/pentaho-mcp/*:$pdi/plugins/pentaho-mcp/lib/*:$pdi/classes" \
+            io.github.ivi2511.pentahomcp.ProyectoMain "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/pentaho-live"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          echo "PDI_HOME=$PDI" >> "$GITHUB_ENV"
+          echo "KETTLE_HOME=$RUNNER_TEMP/kettle-home" >> "$GITHUB_ENV"
 
-      # TODO(pentaho-live tests): run the golden-dataset tests in tests/ with Pan when
-      # `pentaho-live test` is available (Pentaho Live roadmap P1), for example:
-      # - name: Tests with golden datasets
-      #   run: java ... io.github.ivi2511.pentahomcp.ProyectoMain test tests
+      - name: Lint with the project profile
+        run: pentaho-live lint etl --format github --summary "$GITHUB_STEP_SUMMARY"
 
-      # TODO(pentaho-live diff): semantic diff of the .ktr/.kjb changed in the pull request
-      # against the base branch (roadmap E1/P4), posted as a comment with the score before and after:
-      # - name: Semantic diff
-      #   if: github.event_name == 'pull_request'
-      #   run: java ... io.github.ivi2511.pentahomcp.diff.LineaComandos diff --format markdown ...
+      - name: Tests with golden datasets
+        # runs even when the lint step failed, so one push shows everything
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: pentaho-live test --all --format github --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Semantic diff against the base branch
+        id: diff
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && github.event_name == 'pull_request' }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+          # exit code: 0 no changes, 1 changes, 2 error
+          status=0
+          pentaho-live diff --rev "origin/$BASE_REF" --format markdown > "$RUNNER_TEMP/pentaho-live-diff.md" || status=$?
+          cat "$RUNNER_TEMP/pentaho-live-diff.md" >> "$GITHUB_STEP_SUMMARY"
+          [ "$status" -le 1 ]
+
+      - name: Comment the semantic diff on the pull request
+        if: ${{ !cancelled() && steps.diff.outcome == 'success' && env.PENTAHO_LIVE_PR_COMMENT == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/pentaho-live-diff.md" --edit-last --create-if-none \
+            || gh pr comment "$PR" --body-file "$RUNNER_TEMP/pentaho-live-diff.md"

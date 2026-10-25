@@ -2,20 +2,20 @@
 # pentaho-live for Git Bash / MSYS2 (where Claude Code runs its commands on Windows): bash does not
 # run a .cmd file by its bare name, so this forwards to pentaho-live.cmd, next to this file.
 #
-# [0.7 project] init / lint / profile on macOS and Linux (no cmd.exe): Java + the PDI of PDI_HOME
+# [0.7 project] init / lint / profile / test on macOS and Linux (no cmd.exe): Java + the PDI of PDI_HOME
 # (default ~/pentaho/data-integration, where instalar.sh --instalar-pdi puts it). On Windows they go to the .cmd.
 #
 # The git and console commands run here directly, with Java and the Pentaho Live jar (no Spoon, and
 # no cmd.exe in between, so paths with spaces arrive intact), on Windows, macOS and Linux:
 #   pentaho-live normalize [--check] <files or folders>
-#   pentaho-live diff [--format text|markdown|json] <before> <after>   |   diff [--rev REV] <file>
+#   pentaho-live diff [--format text|markdown|json] <before> <after>   |   diff [--rev REV] [<file or folders>]
 #   pentaho-live textconv <file>     pentaho-live pre-commit     pentaho-live git-setup
 # The jar: PENTAHO_LIVE_JAR (a jar or a folder of jars), or <PDI>/plugins/pentaho-mcp with PDI from
 # PENTAHO_LIVE_PDI, PDI_HOME, a pdi-home.txt next to this file or <install folder>/data-integration.
 # Java: <install folder>/jre, PENTAHO_JAVA_HOME, JAVA_HOME or the PATH.
 # Exit codes: 0 ok, 1 differences or not normalized, 2 error.
 case "$1" in
-  init|lint|profile)
+  init|lint|profile|test)
     if ! command -v cmd.exe >/dev/null 2>&1; then
       pdi="${PDI_HOME:-$HOME/pentaho/data-integration}"
       if [ ! -d "$pdi/plugins/pentaho-mcp" ]; then
@@ -42,7 +42,7 @@ case "$1" in
       [ -f "$cmd_file" ] || cmd_file="pentaho-live.cmd"
       exec cmd.exe //c "$cmd_file" "$@"
     fi
-    echo "pentaho-live: on macOS and Linux this script runs the project commands (init, lint, profile)" >&2
+    echo "pentaho-live: on macOS and Linux this script runs the project commands (init, lint, profile, test)" >&2
     echo "  and the git and console commands (normalize, diff, textconv, pre-commit, git-setup);" >&2
     echo "  start Spoon with PDI's spoon.sh." >&2
     exit 2 ;;

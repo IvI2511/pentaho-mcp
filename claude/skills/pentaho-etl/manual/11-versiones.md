@@ -93,6 +93,7 @@ the `launcher/pentaho-live` script with `PDI_HOME` (or `PENTAHO_LIVE_JAR`) set.
 ```text
 pentaho-live diff ventas.ktr                       # git HEAD against the file (exit 1 if they differ)
 pentaho-live diff --rev HEAD~3 ventas.ktr
+pentaho-live diff --rev origin/main --format markdown   # every .ktr/.kjb changed since origin/main (a PR's CI)
 pentaho-live diff --format markdown antes.ktr despues.ktr
 pentaho-live normalize etl/                        # rewrite every .ktr/.kjb canonically
 pentaho-live normalize --check etl/                # CI: exit 1 if something is not normalized
