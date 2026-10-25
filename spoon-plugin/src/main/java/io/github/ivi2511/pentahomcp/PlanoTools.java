@@ -344,7 +344,8 @@ final class PlanoTools {
     for ( Seccion s : inf.secciones ) {
       for ( Bloque b : s.bloques ) {
         if ( b instanceof Diagrama ) {
-          diag.put( s.id.replace( "plan_", "" ), ( (Diagrama) b ).mermaid );
+          // dataflow (o dataflow-<transformación> si hay varias), activity, components
+          diag.put( b.id.replace( "plan-", "" ), ( (Diagrama) b ).mermaid );
         }
       }
     }

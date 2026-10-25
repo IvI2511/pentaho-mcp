@@ -7,8 +7,8 @@
 | Archivo | Qué es |
 |---|---|
 | `grano-de-oro.plan.yaml` | El plano: objetivo, grano, fuentes, destinos, reglas, 29 etapas en 5 transformaciones, el job, el entorno, riesgos y decisiones. Lo escribe `plan_create` y lo valida el esquema `docs/plano.schema.json` |
-| `grano-de-oro.html`, `grano-de-oro.md` | El documento del plano (`plan_get formats=["html","md"]`): las tres vistas, las tablas y la revisión |
-| `grano-de-oro_imagenes/` | Los tres diagramas en PNG y SVG: flujo de datos, actividad UML del job, componentes y despliegue |
+| `grano-de-oro.html`, `grano-de-oro.md` (+ `grano-de-oro_archivos/`) | El documento del plano (`plan_get formats=["html","md"]`): las tres vistas (el flujo de datos, una por transformación), las tablas y la revisión |
+| `grano-de-oro_imagenes/` | Los diagramas en PNG y SVG (`formats=["images"]`): flujo de datos de cada transformación, actividad UML del job, componentes y despliegue |
 | `04_hechos_ventas_mapeo.xlsx`, `04_hechos_ventas_mapeo.md` | La hoja de mapeo origen-destino de la transformación de hechos (`mapping_export`), una fila por campo destino |
 
 Cómo se usa con Claude y Spoon abierto:

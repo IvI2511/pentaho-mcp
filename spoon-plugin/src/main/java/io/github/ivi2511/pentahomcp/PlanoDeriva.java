@@ -205,13 +205,19 @@ final class PlanoDeriva {
           }
         }
       }
-      if ( "reject".equals( e.siFalta ) && !hayHopError && !rechazoConstruido( p, e, deEtapa, esMarcador ) ) {
+      if ( "reject".equals( e.siFalta ) && !hayHopError && !rechazoConstruido( p, e, deEtapa, esMarcador )
+        && !rechazoPendiente( p, e, esMarcador ) ) {
         res.hallazgos.add( new Hallazgo( "orphans_not_rejected", AVISO, gn, e.id, r.f( "der.huerfanos", e.nombre ) ) );
       }
     }
-    // el plan de rechazos de las fuentes que lee esta transformacion
+    // el plan de rechazos de las fuentes que lee esta transformacion (si su etapa de rechazos sigue pendiente, ya
+    // se avisó como marcador)
+    boolean rechazoPendiente = false;
+    for ( Etapa e : etapas ) {
+      rechazoPendiente |= "reject".equals( e.clase ) && !Boolean.FALSE.equals( esMarcador.get( e.id ) );
+    }
     for ( Fuente f : p.fuentes ) {
-      if ( PlanoRevision.vacio( f.rechazos ) || !leeLaFuente( etapas, f, esMarcador ) ) {
+      if ( rechazoPendiente || PlanoRevision.vacio( f.rechazos ) || !leeLaFuente( etapas, f, esMarcador ) ) {
         continue;
       }
       String clave = claveRecurso( f.rechazos, null );
@@ -220,10 +226,14 @@ final class PlanoDeriva {
           f.rechazos ) ) );
       }
     }
-    // steps que el plano no conoce
+    // steps que el plano no conoce (los de una cadena que reemplazó a un marcador sí los conoce)
+    List<StepMeta> conocidos = new ArrayList<StepMeta>( deEtapa.values() );
+    for ( Etapa e : etapas ) {
+      conocidos.addAll( enlazados( tm, e ) );
+    }
     List<String> extra = new ArrayList<String>();
     for ( StepMeta s : tm.getSteps() ) {
-      if ( !deEtapa.containsValue( s ) ) {
+      if ( !conocidos.contains( s ) ) {
         extra.add( s.getName() );
       }
     }
@@ -358,15 +368,35 @@ final class PlanoDeriva {
     return -1;
   }
 
-  /** El step de la etapa: el que la reemplazó, su marcador o uno con su nombre. */
+  /**
+   * El step de la etapa: entre los enlazados a ella (la cadena que reemplazó al marcador, o el marcador), el que se
+   * llama como la etapa, si no el del tipo pedido, si no el primero; sin enlace, uno con su nombre.
+   */
   static StepMeta buscar( TransMeta tm, Etapa e, Map<String, String> reg ) {
-    for ( StepMeta s : tm.getSteps() ) {
-      if ( e.id.equals( s.getAttribute( ReglasBoceto.GRUPO, ReglasBoceto.K_ETAPA ) ) || e.id.equals( s.getAttribute(
-        ReglasBoceto.GRUPO, ReglasBoceto.K_MARCADOR ) ) ) {
+    List<StepMeta> l = enlazados( tm, e );
+    for ( StepMeta s : l ) {
+      if ( s.getName().equalsIgnoreCase( e.nombre ) ) {
         return s;
       }
     }
-    return tm.findStep( e.nombre );
+    for ( StepMeta s : l ) {
+      if ( e.tipoStep != null && e.tipoStep.equalsIgnoreCase( s.getStepID() ) ) {
+        return s;
+      }
+    }
+    return l.isEmpty() ? tm.findStep( e.nombre ) : l.get( 0 );
+  }
+
+  /** Los steps enlazados a la etapa por los atributos del boceto. */
+  static List<StepMeta> enlazados( TransMeta tm, Etapa e ) {
+    List<StepMeta> l = new ArrayList<StepMeta>();
+    for ( StepMeta s : tm.getSteps() ) {
+      if ( e.id.equals( s.getAttribute( ReglasBoceto.GRUPO, ReglasBoceto.K_ETAPA ) ) || e.id.equals( s.getAttribute(
+        ReglasBoceto.GRUPO, ReglasBoceto.K_MARCADOR ) ) ) {
+        l.add( s );
+      }
+    }
+    return l;
   }
 
   /** Todo el XML de los steps en minúsculas (para buscar si alguno nombra un archivo o una tabla). */
@@ -456,6 +486,24 @@ final class PlanoDeriva {
       vistos.add( x.id );
       if ( "reject".equals( x.clase ) && deEtapa.containsKey( x.id ) && Boolean.FALSE.equals( esMarcador.get(
         x.id ) ) ) {
+        return true;
+      }
+      cola.addAll( PlanoRevision.siguientes( p, x ) );
+    }
+    return false;
+  }
+
+  /** Hay una etapa de rechazos después de e que todavía no está construida (ya se avisa como marcador). */
+  private static boolean rechazoPendiente( Plano p, Etapa e, Map<String, Boolean> esMarcador ) {
+    List<Etapa> cola = new ArrayList<Etapa>( PlanoRevision.siguientes( p, e ) );
+    List<String> vistos = new ArrayList<String>();
+    while ( !cola.isEmpty() ) {
+      Etapa x = cola.remove( 0 );
+      if ( vistos.contains( x.id ) ) {
+        continue;
+      }
+      vistos.add( x.id );
+      if ( "reject".equals( x.clase ) && !Boolean.FALSE.equals( esMarcador.get( x.id ) ) ) {
         return true;
       }
       cola.addAll( PlanoRevision.siguientes( p, x ) );

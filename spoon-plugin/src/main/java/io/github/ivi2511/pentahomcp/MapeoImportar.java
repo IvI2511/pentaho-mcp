@@ -504,11 +504,16 @@ final class MapeoImportar {
       List<StepMeta> nuevos = new ArrayList<StepMeta>();
       List<TransHopMeta> hops = new ArrayList<TransHopMeta>();
       String anterior = previo.getName();
-      int x0 = d.getLocation() == null ? 100 : d.getLocation().x;
-      int y0 = d.getLocation() == null ? 100 : d.getLocation().y;
+      // la cadena va debajo del hop previo -> destino, sin mover nada de lo que ya estaba
+      int xa = previo.getLocation() == null ? 100 : previo.getLocation().x;
+      int xb = d.getLocation() == null ? xa + 200 : d.getLocation().x;
+      int ya = previo.getLocation() == null ? 100 : previo.getLocation().y;
+      int yb = d.getLocation() == null ? ya : d.getLocation().y;
+      int x0 = Math.min( xa, xb ) + 40;
+      int y0 = Math.max( ya, yb ) + 110;
       for ( int i = 0; i < cadena.size(); i++ ) {
         String[] c = cadena.get( i );
-        TransOps.Agregado ag = TransOps.agregarStep( tm, c[ 0 ], c[ 1 ], c[ 2 ], x0 + i * 20, y0 + 90, anterior, null,
+        TransOps.Agregado ag = TransOps.agregarStep( tm, c[ 0 ], c[ 1 ], c[ 2 ], x0 + i * 170, y0, anterior, null,
           ms );
         nuevos.add( ag.step );
         if ( ag.hop != null ) {
@@ -549,12 +554,6 @@ final class MapeoImportar {
       }
     }
     TransOps.resolverReferencias( tm );
-    if ( !out.isEmpty() ) {
-      TransLayout.Movimientos mov = TransLayout.ordenar( tm );
-      if ( !mov.objetos.isEmpty() ) {
-        u.posicion( mov.objetos(), mov.indices(), mov.antes(), mov.despues() );
-      }
-    }
     tm.clearCaches();
     tm.setChanged();
     return out;

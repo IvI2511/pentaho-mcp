@@ -367,6 +367,32 @@ public class PruebaPlano {
     igual( 0, cuenta( hs, PlanoRevision.ERROR ), "el ejemplo no tiene errores: " + codigos( hs ) );
   }
 
+  /**
+   * El documento del ejemplo como lo escribe plan_get formats=["html","md","images"]: queda en
+   * {@code <prueba>\salida\ejemplo-plano\} (de ahí se copian los de ejemplo/plano/).
+   */
+  public void pruebaDocumentoDelEjemplo() throws Exception {
+    Plano p = Plano.leer( ejemplo() ).plano;
+    Informe inf = PlanoInforme.armar( p, null, null );
+    File dir = EntornoKettle.salida( "ejemplo-plano" );
+    EntornoKettle.borrar( dir.toPath() ); // las figuras se numeran: nada de una corrida anterior
+    dir.mkdirs();
+    for ( Formato f : new Formato[] { Formato.HTML, Formato.MARKDOWN, Formato.IMAGENES } ) {
+      File destino = InformeServicio.archivo( dir, "grano-de-oro", f );
+      ClassLoader antes = Thread.currentThread().getContextClassLoader();
+      Thread.currentThread().setContextClassLoader( PruebaPlano.class.getClassLoader() );
+      try {
+        InformeServicio.exportar( inf, new Tema(), f, destino, null );
+      } finally {
+        Thread.currentThread().setContextClassLoader( antes );
+      }
+      cierto( destino.exists(), "escrito " + destino );
+    }
+    String md = new String( Files.readAllBytes( new File( dir, "grano-de-oro.md" ).toPath() ), StandardCharsets.UTF_8 );
+    contiene( md, "Componentes y despliegue", "las tres vistas" );
+    falso( md.contains( ":\\" ) || md.contains( "Users" ), "sin rutas absolutas en el Markdown" );
+  }
+
   /** La guía manual/10-plano.md es el recurso pentaho://guide/plan y nombra las herramientas y cada código. */
   public void pruebaGuia() throws Exception {
     McpResources r = new McpResources();

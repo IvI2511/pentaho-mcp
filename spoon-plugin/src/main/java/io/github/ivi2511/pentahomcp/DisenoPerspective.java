@@ -195,13 +195,18 @@ public class DisenoPerspective implements SpoonPerspective {
         + "off, or the plugin is not in data-integration\\plugins\\pentaho-mcp)" );
     }
     File f = plano;
+    AbstractMeta m = IdcMenu.activo();
+    String ruta = m instanceof TransMeta ? PlanoConstruir.planoDe( (TransMeta) m ) : null;
     if ( f == null ) {
-      AbstractMeta m = IdcMenu.activo();
-      String ruta = m instanceof TransMeta ? PlanoConstruir.planoDe( (TransMeta) m ) : null;
       f = ruta == null ? null : new File( ruta );
     }
     if ( f != null ) {
       d.abrirPlano( f );
+      // la transformación activa salió de este plano: elegirla en el combo
+      if ( d.panel != null && ruta != null && new File( ruta ).getAbsoluteFile().equals( f.getAbsoluteFile() ) ) {
+        d.panel.seleccionar( ( (TransMeta) m ).getAttribute( io.github.ivi2511.pentahomcp.lint.reglas.ReglasBoceto.GRUPO,
+          io.github.ivi2511.pentahomcp.lint.reglas.ReglasBoceto.K_TRANS ) );
+      }
     }
     sp.loadPerspective( ID );
   }
@@ -284,7 +289,8 @@ public class DisenoPerspective implements SpoonPerspective {
       etiqueta( fila1, r.s( "ui.plano" ) );
       plano = new Combo( fila1, SWT.DROP_DOWN );
       GridData gp = new GridData( SWT.FILL, SWT.CENTER, true, false );
-      gp.widthHint = 420;
+      gp.widthHint = 300; // con FILL y grab ocupa lo que haya; sin tope, una ruta larga ensanchaba todo el panel
+      gp.minimumWidth = 120;
       plano.setLayoutData( gp );
       plano.setToolTipText( r.s( "ui.plano.tip" ) );
       abrir = boton( fila1, r.s( "ui.abrir" ), r.s( "ui.abrir.tip" ) );
@@ -307,13 +313,18 @@ public class DisenoPerspective implements SpoonPerspective {
       navegador = boton( fila2, r.s( "ui.navegador" ), r.s( "ui.navegador.tip" ) );
 
       estado = new Label( raiz, SWT.WRAP );
-      estado.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
+      GridData ge = new GridData( SWT.FILL, SWT.TOP, true, false );
+      ge.widthHint = 300;
+      estado.setLayoutData( ge );
 
       Browser b = null;
       Label sin = null;
       try {
         b = new Browser( raiz, ESTILO_EDGE );
-        b.setLayoutData( new GridData( SWT.FILL, SWT.FILL, true, true ) );
+        GridData gn = new GridData( SWT.FILL, SWT.FILL, true, true );
+        gn.widthHint = 300;
+        gn.heightHint = 200;
+        b.setLayoutData( gn );
       } catch ( Throwable t ) {
         if ( b != null && !b.isDisposed() ) {
           b.dispose();
@@ -488,6 +499,17 @@ public class DisenoPerspective implements SpoonPerspective {
       }
     }
 
+    /** Elige una transformación del plano en el combo (si está). */
+    void seleccionar( String grupo ) {
+      if ( grupo == null ) {
+        return;
+      }
+      int i = transformacion.indexOf( PlanoConstruir.nombreGrupo( grupo ) );
+      if ( i >= 0 ) {
+        transformacion.select( i );
+      }
+    }
+
     /** El grupo elegido en el combo ("" = la transformación sin nombre). */
     String grupoElegido() {
       if ( actual == null ) {
@@ -523,7 +545,7 @@ public class DisenoPerspective implements SpoonPerspective {
             throw new IllegalStateException( "Spoon did not create the transformation" );
           }
           tm = (TransMeta) n;
-          tm.setName( g == null || g.isEmpty() ? actual.nombre : g );
+          PlanoConstruir.nombrar( sp, tm, g == null || g.isEmpty() ? actual.nombre : g );
         }
         ObjectNode o = PlanoConstruir.construirAhora( sp, tm, actual, g, PlanoConstruir.SKETCH, r.idioma(), sp
           .getMetaStore() );

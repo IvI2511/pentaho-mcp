@@ -14,6 +14,7 @@ import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInterface;
+import org.pentaho.di.trans.steps.databaselookup.DatabaseLookupMeta;
 import org.pentaho.di.trans.steps.insertupdate.InsertUpdateMeta;
 import org.pentaho.di.trans.steps.streamlookup.StreamLookupMeta;
 import org.pentaho.di.trans.steps.tableinput.TableInputMeta;
@@ -257,6 +258,8 @@ final class Mapeo {
       LinajePropio.Nodo o = camino.get( 0 );
       if ( LinajePropio.FUENTE.equals( o.clase ) ) {
         out.add( recursoOrigen( tm, o ) + "." + o.campo );
+      } else if ( LinajePropio.CREA.equals( o.clase ) && busquedaEnTabla( tm, o ) != null ) {
+        out.add( busquedaEnTabla( tm, o ) );
       } else if ( LinajePropio.CREA.equals( o.clase ) ) {
         notas.add( r.f( "map.creado", o.step ) );
       } else {
@@ -264,6 +267,27 @@ final class Mapeo {
       }
     }
     return String.join( "; ", out );
+  }
+
+  /** Un Database lookup que devuelve el campo: "tabla.columna" de donde sale, o null. */
+  static String busquedaEnTabla( TransMeta tm, LinajePropio.Nodo o ) {
+    StepMeta s = tm.findStep( o.step );
+    if ( s == null || !( s.getStepMetaInterface() instanceof DatabaseLookupMeta ) ) {
+      return null;
+    }
+    DatabaseLookupMeta m = (DatabaseLookupMeta) s.getStepMetaInterface();
+    String[] campos = m.getReturnValueField();
+    String[] nuevos = m.getReturnValueNewName();
+    for ( int i = 0; campos != null && i < campos.length; i++ ) {
+      String sale = nuevos != null && i < nuevos.length && nuevos[ i ] != null && !nuevos[ i ].isEmpty() ? nuevos[ i ]
+        : campos[ i ];
+      if ( o.campo.equals( sale ) ) {
+        String t = m.getTableName() == null ? "" : tm.environmentSubstitute( m.getTableName() );
+        String e = m.getSchemaName() == null ? "" : tm.environmentSubstitute( m.getSchemaName() );
+        return ( e.isEmpty() ? t : e + "." + t ) + "." + campos[ i ];
+      }
+    }
+    return null;
   }
 
   /** El recurso de un nodo fuente: la tabla de la consulta, el archivo o el step. */
@@ -291,11 +315,25 @@ final class Mapeo {
     return false;
   }
 
-  /** El valor por defecto que pone un Stream lookup del camino a ese campo, o "". */
+  /** El valor por defecto que pone un Stream lookup o un Database lookup del camino a ese campo, o "". */
   static String defecto( TransMeta tm, LinajePropio.Campo c, String campo ) {
     for ( List<LinajePropio.Nodo> camino : c.caminos ) {
       for ( LinajePropio.Nodo n : camino ) {
         StepMeta s = tm.findStep( n.step );
+        if ( s != null && s.getStepMetaInterface() instanceof DatabaseLookupMeta ) {
+          DatabaseLookupMeta m = (DatabaseLookupMeta) s.getStepMetaInterface();
+          String[] campos = m.getReturnValueField();
+          String[] nuevos = m.getReturnValueNewName();
+          String[] defs = m.getReturnValueDefault();
+          for ( int i = 0; campos != null && i < campos.length; i++ ) {
+            String sale = nuevos != null && i < nuevos.length && nuevos[ i ] != null && !nuevos[ i ].isEmpty()
+              ? nuevos[ i ] : campos[ i ];
+            if ( n.campo.equals( sale ) && defs != null && i < defs.length && defs[ i ] != null && !defs[ i ]
+              .isEmpty() ) {
+              return defs[ i ];
+            }
+          }
+        }
         if ( s != null && s.getStepMetaInterface() instanceof StreamLookupMeta ) {
           StreamLookupMeta sl = (StreamLookupMeta) s.getStepMetaInterface();
           String[] vals = sl.getValue();

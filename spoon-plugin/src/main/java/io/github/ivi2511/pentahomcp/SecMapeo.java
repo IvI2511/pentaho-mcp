@@ -57,7 +57,6 @@ final class SecMapeo implements Recolector {
     Seccion s = new Seccion( id(), titulo );
     Tabla t = Mapeo.tabla( filas, r );
     t.id = "mapping-sheet";
-    t.titulo = r.s( "map.titulo_tabla" );
     t.pie = r.s( "map.pie" );
     s.con( t );
     List<String> pasos = new ArrayList<String>();

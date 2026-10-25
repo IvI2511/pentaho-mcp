@@ -330,7 +330,7 @@ environment:
       path: datos/
     - name: salida
       path: salida/
-  runner: Kitchen · job_carga_dw.kjb (una vez al mes)
+  runner: Kitchen, una vez al mes
 risks:
   - text: El TPV reenvió un lote y hay líneas repetidas.
     mitigation: Ordenar por id_ticket y linea y eliminar duplicados; las copias van a rechazos como DUPLICADO (R6).

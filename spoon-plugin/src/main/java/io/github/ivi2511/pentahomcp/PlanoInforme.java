@@ -141,7 +141,14 @@ final class PlanoInforme {
     // ---- las tres vistas
     Seccion flujo = new Seccion( S_FLUJO, r.s( "sec.flujo" ) );
     flujo.resumen = r.s( "sec.flujo.resumen" );
-    flujo.con( diagramaFlujo( p, r ) );
+    if ( ts.size() > 1 ) {
+      // una vista por transformación: el plano entero en un solo dibujo quedaba partido en pedazos
+      for ( String g : ts ) {
+        flujo.con( diagramaFlujo( p, r, g ) );
+      }
+    } else {
+      flujo.con( diagramaFlujo( p, r, null ) );
+    }
     inf.secciones.add( flujo );
     Seccion act = new Seccion( S_ACTIVIDAD, r.s( "sec.actividad" ) );
     act.resumen = r.s( "sec.actividad.resumen" );
@@ -273,61 +280,96 @@ final class PlanoInforme {
 
   // ================================================================ diagramas
 
-  /** Flujo de datos: fuentes (entrada), etapas (procesos) y destinos (almacenes). */
-  static Diagrama diagramaFlujo( Plano p, Rotulos r ) {
+  /** Flujo de datos de todo el plano (grupo null) o de una transformación: fuentes, etapas y almacenes. */
+  static Diagrama diagramaFlujo( Plano p, Rotulos r, String grupo ) {
+    Vista v = vista( p, grupo );
     Esquema e = new Esquema();
     e.tipo = Diagrama.FLUJO;
-    e.titulo = r.f( "diag.flujo", p.nombre );
-    Set<String> usadas = new LinkedHashSet<String>();
-    for ( Etapa x : p.etapas ) {
-      usadas.addAll( x.lee );
-      if ( x.busca != null ) {
-        usadas.add( x.busca );
-      }
-      usadas.addAll( x.escribe );
-    }
-    for ( Fuente f : p.fuentes ) {
+    e.titulo = r.f( "diag.flujo", grupo == null ? p.nombre : PlanoConstruir.nombreGrupo( grupo ) );
+    for ( Fuente f : v.fuentes ) {
       Esquema.Nodo n = nodo( e, "s_" + f.id, f.nombre );
       n.lineas = lineas( r.f( "diag.fuente", f.formato == null ? r.s( "doc.fuente" ) : r.s( "formato." + f.formato ) ),
         unir( f.volumen, f.frecuencia ) );
       n.inicio = true;
     }
-    for ( Etapa x : p.etapas ) {
+    for ( Etapa x : v.etapas ) {
       Esquema.Nodo n = nodo( e, "e_" + x.id, x.nombre );
-      n.lineas = lineas( x.clase == null ? null : r.s( "clase_etapa." + x.clase ), x.transformacion );
+      n.lineas = lineas( x.clase == null ? null : r.s( "clase_etapa." + x.clase ), grupo == null ? x.transformacion
+        : null );
     }
-    for ( Destino d : p.destinos ) {
+    for ( Destino d : v.destinos ) {
       Esquema.Nodo n = nodo( e, "d_" + d.id, d.nombre );
       n.lineas = lineas( r.f( "diag.almacen", d.clase == null ? r.s( "doc.destino" ) : r.s( "clase_destino."
         + d.clase ) ), d.carga == null ? null : r.s( "carga_destino." + d.carga ) );
     }
-    for ( Etapa x : p.etapas ) {
+    for ( Etapa x : v.etapas ) {
       for ( String s : x.lee ) {
         arista( e, ( p.fuente( s ) != null ? "s_" : "d_" ) + s, "e_" + x.id, null, null );
       }
       for ( String a : x.despues ) {
         Etapa y = p.etapa( a );
-        String clase = "reject".equals( x.clase ) ? "error" : null;
-        String rot = y != null && !mismaTrans( x, y ) ? r.s( "diag.otra_trans" ) : null;
-        arista( e, "e_" + a, "e_" + x.id, clase, rot );
+        if ( y == null || !v.etapas.contains( y ) ) {
+          continue; // viene de otra transformación: lo cuenta la actividad
+        }
+        String rot = !mismaTrans( x, y ) ? r.s( "diag.otra_trans" ) : null;
+        arista( e, "e_" + a, "e_" + x.id, "reject".equals( x.clase ) ? "error" : null, rot );
       }
       if ( x.busca != null ) {
-        String id = p.fuente( x.busca ) != null ? "s_" + x.busca : p.destino( x.busca ) != null ? "d_" + x.busca : "e_"
-          + x.busca;
-        arista( e, id, "e_" + x.id, "info", x.clave.isEmpty() ? r.s( "diag.busca" ) : String.join( ", ", x.clave ) );
+        Etapa y = p.etapa( x.busca );
+        if ( y == null || v.etapas.contains( y ) ) {
+          String id = p.fuente( x.busca ) != null ? "s_" + x.busca : p.destino( x.busca ) != null ? "d_" + x.busca
+            : "e_" + x.busca;
+          arista( e, id, "e_" + x.id, "info", x.clave.isEmpty() ? r.s( "diag.busca" ) : String.join( ", ", x.clave ) );
+        }
       }
       for ( String d : x.escribe ) {
         arista( e, "e_" + x.id, "d_" + d, "reject".equals( x.clase ) ? "error" : null, null );
       }
     }
     Diagrama d = new Diagrama();
-    d.id = "plan-dataflow";
+    d.id = grupo == null ? "plan-dataflow" : "plan-dataflow-" + Plano.slug( grupo.isEmpty() ? "main" : grupo );
     d.clase = Diagrama.FLUJO;
     d.titulo = e.titulo;
     d.grafo = e;
-    d.alt = r.f( "diag.flujo.alt", p.fuentes.size(), p.etapas.size(), p.destinos.size() );
-    d.mermaid = mermaidFlujo( p, r );
+    d.alt = r.f( "diag.flujo.alt", v.fuentes.size(), v.etapas.size(), v.destinos.size() );
+    d.mermaid = mermaidFlujo( p, r, v );
     return d;
+  }
+
+  /** Lo que entra en un diagrama de flujo: las etapas y las fuentes y destinos que usan. */
+  static final class Vista {
+    final List<Etapa> etapas = new ArrayList<Etapa>();
+    final List<Fuente> fuentes = new ArrayList<Fuente>();
+    final List<Destino> destinos = new ArrayList<Destino>();
+  }
+
+  static Vista vista( Plano p, String grupo ) {
+    Vista v = new Vista();
+    v.etapas.addAll( grupo == null ? p.etapas : p.etapasDe( grupo ) );
+    if ( grupo == null ) {
+      v.fuentes.addAll( p.fuentes );
+      v.destinos.addAll( p.destinos );
+      return v;
+    }
+    Set<String> ids = new LinkedHashSet<String>();
+    for ( Etapa x : v.etapas ) {
+      ids.addAll( x.lee );
+      ids.addAll( x.escribe );
+      if ( x.busca != null ) {
+        ids.add( x.busca );
+      }
+    }
+    for ( Fuente f : p.fuentes ) {
+      if ( ids.contains( f.id ) ) {
+        v.fuentes.add( f );
+      }
+    }
+    for ( Destino d : p.destinos ) {
+      if ( ids.contains( d.id ) ) {
+        v.destinos.add( d );
+      }
+    }
+    return v;
   }
 
   /** Actividad (UML) de la orquestación: inicio → transformaciones en orden → fin, y la rama de falla. */
@@ -454,7 +496,7 @@ final class PlanoInforme {
     for ( Fuente f : p.fuentes ) {
       String[] s = sitio( p, f.conexion, f.ubicacion, f.formato, r );
       c.poner( s[ 0 ], s[ 1 ], new String[] { "s_" + f.id, f.nombre, r.s( "doc.fuente" ) } );
-      if ( !PlanoRevision.vacio( f.rechazos ) ) {
+      if ( !PlanoRevision.vacio( f.rechazos ) && destinoEn( p, f.rechazos ) == null ) {
         String[] sr = sitio( p, null, f.rechazos, "text", r );
         c.poner( sr[ 0 ], sr[ 1 ], new String[] { "rj_" + f.id, base( f.rechazos ), r.s( "comp.rechazos" ) } );
       }
@@ -478,7 +520,7 @@ final class PlanoInforme {
       }
     }
     for ( Fuente f : p.fuentes ) {
-      if ( !PlanoRevision.vacio( f.rechazos ) ) {
+      if ( !PlanoRevision.vacio( f.rechazos ) && destinoEn( p, f.rechazos ) == null ) {
         for ( Etapa e : p.etapas ) {
           if ( e.lee.contains( f.id ) ) {
             agregarUso( c, "t" + ts.indexOf( e.transformacion == null ? "" : e.transformacion ), "rj_" + f.id );
@@ -487,12 +529,20 @@ final class PlanoInforme {
         }
       }
     }
-    if ( p.orquestacion != null && p.orquestacion.nombre != null ) {
-      for ( int i = 0; i < ts.size(); i++ ) {
-        agregarUso( c, "job", "t" + i );
+    // job -> transformaciones no se dibuja: viven en el mismo sitio (la actividad ya lo cuenta)
+    return c;
+  }
+
+  /** El destino que está en esa ubicación (el archivo de rechazos declarado también como destino), o null. */
+  static Destino destinoEn( Plano p, String ubicacion ) {
+    String u = ubicacion.trim().replace( '\\', '/' ).toLowerCase( Locale.ROOT );
+    for ( Destino d : p.destinos ) {
+      String x = d.ubicacion == null ? "" : d.ubicacion.trim().replace( '\\', '/' ).toLowerCase( Locale.ROOT );
+      if ( x.equals( u ) ) {
+        return d;
       }
     }
-    return c;
+    return null;
   }
 
   private static void agregarUso( Componentes c, String a, String b ) {
@@ -552,32 +602,35 @@ final class PlanoInforme {
 
   // ================================================================ Mermaid
 
-  static String mermaidFlujo( Plano p, Rotulos r ) {
+  static String mermaidFlujo( Plano p, Rotulos r, Vista v ) {
     StringBuilder sb = new StringBuilder( "flowchart LR\n" );
-    for ( Fuente f : p.fuentes ) {
+    for ( Fuente f : v.fuentes ) {
       sb.append( "  " ).append( mid( "s_" + f.id ) ).append( "[/\"" ).append( esc( f.nombre ) ).append( "<br/>" )
         .append( esc( f.formato == null ? r.s( "doc.fuente" ) : r.s( "formato." + f.formato ) ) ).append( "\"/]\n" );
     }
-    for ( Etapa x : p.etapas ) {
+    for ( Etapa x : v.etapas ) {
       sb.append( "  " ).append( mid( "e_" + x.id ) ).append( "(\"" ).append( esc( x.nombre ) );
       if ( x.clase != null ) {
         sb.append( "<br/>" ).append( esc( r.s( "clase_etapa." + x.clase ) ) );
       }
       sb.append( "\")\n" );
     }
-    for ( Destino d : p.destinos ) {
+    for ( Destino d : v.destinos ) {
       sb.append( "  " ).append( mid( "d_" + d.id ) ).append( "[(\"" ).append( esc( d.nombre ) ).append( "\")]\n" );
     }
-    for ( Etapa x : p.etapas ) {
+    for ( Etapa x : v.etapas ) {
       for ( String s : x.lee ) {
         sb.append( "  " ).append( mid( ( p.fuente( s ) != null ? "s_" : "d_" ) + s ) ).append( " --> " ).append( mid(
           "e_" + x.id ) ).append( '\n' );
       }
       for ( String a : x.despues ) {
+        if ( p.etapa( a ) == null || !v.etapas.contains( p.etapa( a ) ) ) {
+          continue;
+        }
         sb.append( "  " ).append( mid( "e_" + a ) ).append( "reject".equals( x.clase ) ? " -.-> " : " --> " ).append(
           mid( "e_" + x.id ) ).append( '\n' );
       }
-      if ( x.busca != null ) {
+      if ( x.busca != null && ( p.etapa( x.busca ) == null || v.etapas.contains( p.etapa( x.busca ) ) ) ) {
         String id = p.fuente( x.busca ) != null ? "s_" + x.busca : p.destino( x.busca ) != null ? "d_" + x.busca : "e_"
           + x.busca;
         sb.append( "  " ).append( mid( id ) ).append( " -. \"" ).append( esc( x.clave.isEmpty() ? r.s( "diag.busca" )

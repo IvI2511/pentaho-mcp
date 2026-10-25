@@ -156,15 +156,15 @@ few lines, not the JSON.
 
 ## 5. Showing it
 
-- In the chat: `plan_get` and paste the Mermaid of `diagrams_mermaid` (`dataflow`, `activity`, `components`).
+- In the chat: `plan_get` and paste the Mermaid of `diagrams_mermaid` (`dataflow` — or one `dataflow-<transformation>`
+  per transformation when the plan has several —, `activity`, `components`).
 - As files: `plan_get formats=["html","md"]` (default folder: next to the plan). `images` writes PNG and SVG of the
   three diagrams, ready for slides. The Markdown keeps the Mermaid folded, for GitHub and Obsidian.
 - In Spoon: `plan_get show=true` (only when the user asks), or the user opens **Design** from the perspective
   switcher or the IDC menu.
 
-The three views: **data flow** (sources → stages → stores; lookups dotted blue, rejects red), **UML activity**
-of
-the orchestration (start, one action per transformation in order, the failure branch to «log the error» and
+The three views: **data flow** (sources → stages → stores, one diagram per transformation; lookups dotted blue,
+rejects red), **UML activity** of the orchestration (start, one action per transformation in order, the failure branch to «log the error» and
 abort), and **components and deployment** (one box per place — folder, database, the ETL machine — with what
 lives there and who reads or writes what).
 

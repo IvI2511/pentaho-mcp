@@ -214,6 +214,14 @@ public class PruebaPlanoConstruir {
     PlanoConstruir.rellenar( tm, "Leer ventas", ps, false, UndoGrupo.sinSpoon( tm ), null );
     r = PlanoDeriva.revisar( p, docs, null, "es" );
     igual( 1, contar( r, "source_not_referenced" ), "la fuente no se nombra: " + r.json() );
+    // una cadena que reemplaza a un marcador: todos sus steps son de la etapa (ni extra ni de otro tipo)
+    PlanoConstruir.rellenar( tm, "Limpiar", PlanoConstruir.piezas( McpHttpServer.JSON.readTree(
+      "{\"steps\":[{\"type\":\"SortRows\",\"name\":\"Ordenar\"},{\"type\":\"StringOperations\",\"name\":"
+        + "\"Limpiar\"}]}" ) ), false, UndoGrupo.sinSpoon( tm ), null );
+    r = PlanoDeriva.revisar( p, docs, null, "es" );
+    igual( 0, contar( r, "steps_not_in_plan" ), "la cadena no es extra: " + r.json() );
+    igual( "StringOperations", PlanoDeriva.buscar( tm, p.etapa( "limpiar" ), ReglasBoceto.registro( tm ) ).getStepID(),
+      "el step de la etapa es el que lleva su nombre" );
     // se borra un marcador: la etapa queda sin step
     StepMeta c = tm.findStep( "Cargar hechos" );
     for ( TransHopMeta h : TransOps.hopsDe( tm, c ) ) {

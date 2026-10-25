@@ -53,7 +53,7 @@ final class PlanoConstruir {
   static final String SKETCH = "sketch";
   static final String STEPS = "steps";
   /** Caracteres por línea de las notas PENDIENTE (caben en una columna del lienzo ordenado, 170 px). */
-  static final int ANCHO_LINEA = 26;
+  static final int ANCHO_LINEA = 24;
   /** Separación entre las notas y el flujo, y entre notas. */
   static final int AIRE = 14;
 
@@ -368,13 +368,58 @@ final class PlanoConstruir {
    */
   static List<NotePadMeta> notas( TransMeta tm, Plano p, List<Etapa> etapas, String idioma, boolean conTipo,
                                   Medidor m, UndoGrupo u ) {
-    int yMax = 0;
+    // las notas, medidas, en el orden de los steps de izquierda a derecha
+    List<Object[]> l = new ArrayList<Object[]>(); // {etapa, step, texto, w, h}
+    for ( Etapa e : etapas ) {
+      StepMeta s = tm.findStep( e.nombre );
+      if ( s == null || s.getLocation() == null ) {
+        continue;
+      }
+      String texto = textoNota( p, e, idioma, conTipo );
+      Point tam = m.texto( texto, false );
+      l.add( new Object[] { e, s, texto, tam.x + 12, tam.y + 10 } );
+    }
+    if ( l.isEmpty() ) {
+      return new ArrayList<NotePadMeta>();
+    }
+    l.sort( ( a, b ) -> Integer.compare( ( (StepMeta) a[ 1 ] ).getLocation().x, ( (StepMeta) b[ 1 ] ).getLocation().x ) );
+    // una banda arriba del flujo y otra abajo, alternando: con columnas de 170 px una nota de ~220 px no choca
+    // con la de la columna de al lado, y cada nota queda alineada con su step
+    int yMin = Integer.MAX_VALUE;
+    int yMax = Integer.MIN_VALUE;
     for ( StepMeta s : tm.getSteps() ) {
       if ( s.getLocation() != null ) {
+        yMin = Math.min( yMin, s.getLocation().y );
         yMax = Math.max( yMax, s.getLocation().y );
       }
     }
-    int y0 = yMax + 32 + 30 + AIRE; // icono (32) + nombre del step; las notas que ya estaban cuentan como ocupadas
+    int altoArriba = 0;
+    for ( int i = 1; i < l.size(); i += 2 ) {
+      altoArriba = Math.max( altoArriba, (Integer) l.get( i )[ 4 ] );
+    }
+    int bajar = altoArriba == 0 ? 0 : Math.max( 0, altoArriba + 2 * AIRE + 10 - yMin );
+    if ( bajar > 0 ) {
+      // hace sitio arriba: baja todo el flujo (un movimiento mas del mismo Ctrl+Z)
+      List<Object> objs = new ArrayList<Object>();
+      List<Integer> idx = new ArrayList<Integer>();
+      List<Point> antes = new ArrayList<Point>();
+      List<Point> despues = new ArrayList<Point>();
+      for ( StepMeta s : tm.getSteps() ) {
+        Point a = s.getLocation();
+        objs.add( s );
+        idx.add( tm.indexOfStep( s ) );
+        antes.add( new Point( a.x, a.y ) );
+        despues.add( new Point( a.x, a.y + bajar ) );
+        s.setLocation( a.x, a.y + bajar );
+      }
+      int[] ix = new int[ idx.size() ];
+      for ( int i = 0; i < ix.length; i++ ) {
+        ix[ i ] = idx.get( i );
+      }
+      u.posicion( objs.toArray(), ix, antes.toArray( new Point[ 0 ] ), despues.toArray( new Point[ 0 ] ) );
+      yMin += bajar;
+      yMax += bajar;
+    }
     List<int[]> ocupado = new ArrayList<int[]>();
     for ( int i = 0; i < tm.nrNotes(); i++ ) {
       NotePadMeta n = tm.getNote( i );
@@ -383,36 +428,41 @@ final class PlanoConstruir {
           n.getHeight(), 20 ) } );
       }
     }
+    for ( StepMeta s : tm.getSteps() ) {
+      // el icono y el nombre del step tambien ocupan
+      Point a = s.getLocation();
+      ocupado.add( new int[] { a.x - 40, a.y, 112, 32 + 26 } );
+    }
+    int abajo = yMax + 32 + 26 + AIRE;
+    int arriba = yMin - AIRE;
     List<NotePadMeta> creadas = new ArrayList<NotePadMeta>();
-    List<Object> objs = new ArrayList<Object>();
-    for ( Etapa e : etapas ) {
-      StepMeta s = tm.findStep( e.nombre );
-      if ( s == null ) {
-        continue;
-      }
-      String texto = textoNota( p, e, idioma, conTipo );
-      Point tam = m.texto( texto, false );
-      int w = tam.x + 12;
-      int h = tam.y + 10;
-      int x = Math.max( 10, s.getLocation().x - 8 );
-      int y = y0;
+    for ( int i = 0; i < l.size(); i++ ) {
+      Etapa e = (Etapa) l.get( i )[ 0 ];
+      StepMeta s = (StepMeta) l.get( i )[ 1 ];
+      String texto = (String) l.get( i )[ 2 ];
+      int w = (Integer) l.get( i )[ 3 ];
+      int h = (Integer) l.get( i )[ 4 ];
+      int x = Math.max( 10, s.getLocation().x + 16 - w / 2 );
+      boolean sube = i % 2 == 1;
+      int y = sube ? arriba - h : abajo;
       while ( choca( ocupado, x, y, w, h ) ) {
-        y += AIRE;
+        y += sube ? -AIRE : AIRE;
+        if ( sube && y < 0 ) {
+          sube = false; // sin sitio arriba: a la banda de abajo
+          y = abajo;
+        }
       }
       NotePadMeta n = new NotePadMeta( texto, x, y, w, h );
       estilizar( n, e.clase );
       tm.addNote( n );
       ocupado.add( new int[] { x, y, w, h } );
       creadas.add( n );
-      objs.add( n );
     }
-    if ( !creadas.isEmpty() ) {
-      int[] idx = new int[ creadas.size() ];
-      for ( int i = 0; i < idx.length; i++ ) {
-        idx[ i ] = tm.indexOfNote( creadas.get( i ) );
-      }
-      u.nuevo( objs.toArray(), idx );
+    int[] idx = new int[ creadas.size() ];
+    for ( int i = 0; i < idx.length; i++ ) {
+      idx[ i ] = tm.indexOfNote( creadas.get( i ) );
     }
+    u.nuevo( creadas.toArray(), idx );
     return creadas;
   }
 
@@ -692,11 +742,22 @@ final class PlanoConstruir {
         throw new ToolError( "Spoon did not create the transformation" );
       }
       TransMeta tm = (TransMeta) nuevo;
-      tm.setName( grupo == null || grupo.isEmpty() ? p.nombre : grupo );
-      sp.setShellText();
+      nombrar( sp, tm, grupo == null || grupo.isEmpty() ? p.nombre : grupo );
       return tm;
     }
     return Docs.trans( a );
+  }
+
+  /** Le pone nombre a una transformación nueva y refresca la pestaña (como new_transformation name=). (UI) */
+  static void nombrar( Spoon sp, TransMeta tm, String nombre ) {
+    tm.setName( nombre );
+    try {
+      sp.delegates.tabs.renameTabs();
+      sp.refreshTree();
+      sp.setShellText();
+    } catch ( Throwable ignorada ) {
+      // solo el título de la pestaña
+    }
   }
 
   /** La transformación tiene el registro de esta transformación de este plano. */
