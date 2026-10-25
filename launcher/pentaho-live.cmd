@@ -15,6 +15,15 @@ rem  otherwise <install folder>\data-integration (full install).
 rem  Which Java: <install folder>\jre if it exists (full install); otherwise
 rem  PDI's own search (PENTAHO_JAVA_HOME, JAVA_HOME, the PATH...).
 rem
+rem  Git and console commands (no Spoon; Java and the plugin jar of that PDI):
+rem      pentaho-live normalize [--check] <files or folders>
+rem      pentaho-live diff [--format text|markdown|json] <before> <after>
+rem      pentaho-live diff [--rev REV] <file>
+rem      pentaho-live textconv <file>        (git: diff.kettle.textconv)
+rem      pentaho-live pre-commit             (the optional pre-commit hook)
+rem      pentaho-live git-setup              (the .gitattributes and git config lines)
+rem  They exit with Java's code: 0 ok, 1 differences or not normalized, 2 error.
+rem
 rem  Options:
 rem      --gui       report with a message box instead of console text
 rem      --launcher  used by IDCLauncher.exe (implies --gui): creates the
@@ -27,6 +36,8 @@ rem  Environment:
 rem      PENTAHO_LIVE_DRY_RUN=1   only print what it would do; starts nothing
 rem      PENTAHO_MCP_PORT         MCP port to check (default 8765)
 rem      IDC_LAUNCHER_READY_FILE  set by IDCLauncher.exe (used with --launcher)
+rem      PENTAHO_LIVE_JAR         git and console commands: the plugin jar (or a
+rem                               folder of jars) instead of <PDI>\plugins\pentaho-mcp
 rem
 rem  Exit codes: 0 = Spoon is starting, or was already open
 rem              1 = no PDI (data-integration\Spoon.bat) found
@@ -40,6 +51,10 @@ set "PL_PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 rem --- Options (anything else is ignored)
 set "PL_GUI="
 set "PL_LAUNCHER="
+rem     The git and console commands skip the options and go to :tool below.
+set "PL_TOOL="
+for %%C in (normalize diff textconv pre-commit git-setup) do if /i "%~1"=="%%C" set "PL_TOOL=1"
+if defined PL_TOOL goto :args_done
 :next_arg
 if "%~1"=="" goto :args_done
 if /i "%~1"=="--gui" set "PL_GUI=1"
@@ -74,6 +89,7 @@ if not exist "%PL_APP%\jre\bin\javaw.exe" goto :java_done
 set "PENTAHO_JAVA_HOME=%PL_APP%\jre"
 set "PL_JAVA_FROM=%PL_APP%\jre"
 :java_done
+if defined PL_TOOL goto :tool
 
 rem --- Is Spoon with the plugin already open? (the MCP answers /ping)
 set "PL_PORT=8765"
@@ -171,6 +187,7 @@ exit /b 0
 
 :help
 echo Usage: pentaho-live [--gui] [--launcher]
+echo        pentaho-live normalize^|diff^|textconv^|pre-commit^|git-setup ...  (git and console commands, no Spoon)
 echo   Opens Spoon (Pentaho Data Integration 9.4) with the Pentaho Live plugin and returns right away.
 echo   If Spoon is already open (the MCP answers on 127.0.0.1:%%PENTAHO_MCP_PORT%%, default 8765), it does not open another one.
 echo   --gui                   report with a message box
@@ -193,3 +210,30 @@ if not defined PL_SIGNAL exit /b 0
 if exist "%IDC_LAUNCHER_READY_FILE%" exit /b 0
 (type nul > "%IDC_LAUNCHER_READY_FILE%") 2>nul
 exit /b 0
+
+rem --- Git and console commands: Pentaho Live's jar with Java, without Spoon or a
+rem     console window of its own. Java: the bundled JRE, PENTAHO_JAVA_HOME,
+rem     JAVA_HOME, then the PATH. The jar: PENTAHO_LIVE_JAR or the plugin folder of
+rem     the PDI above. The console shows the UTF-8 output with code page 65001,
+rem     put back afterwards.
+:tool
+set "PL_JAVA="
+if exist "%PL_APP%\jre\bin\java.exe" set "PL_JAVA=%PL_APP%\jre\bin\java.exe"
+if not defined PL_JAVA if defined PENTAHO_JAVA_HOME if exist "%PENTAHO_JAVA_HOME%\bin\java.exe" set "PL_JAVA=%PENTAHO_JAVA_HOME%\bin\java.exe"
+if not defined PL_JAVA if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "PL_JAVA=%JAVA_HOME%\bin\java.exe"
+if not defined PL_JAVA set "PL_JAVA=java"
+set "PL_CP=%PL_PDI%\plugins\pentaho-mcp\*"
+if defined PENTAHO_LIVE_JAR set "PL_CP=%PENTAHO_LIVE_JAR%"
+if defined PENTAHO_LIVE_JAR goto :tool_run
+if exist "%PL_PDI%\plugins\pentaho-mcp" goto :tool_run
+echo Pentaho Live: no plugin in "%PL_PDI%\plugins\pentaho-mcp". Reinstall Pentaho Live, or set PENTAHO_LIVE_JAR to its pentaho-mcp-core jar. 1>&2
+exit /b 2
+:tool_run
+set "PL_CP_OLD="
+for /f "tokens=2 delims=:." %%C in ('chcp') do set "PL_CP_OLD=%%C"
+if defined PL_CP_OLD set "PL_CP_OLD=%PL_CP_OLD: =%"
+chcp 65001 >nul 2>&1
+"%PL_JAVA%" -Xmx512m -Dfile.encoding=UTF-8 -cp "%PL_CP%" io.github.ivi2511.pentahomcp.diff.LineaComandos %*
+set "PL_EXIT=%ERRORLEVEL%"
+if defined PL_CP_OLD chcp %PL_CP_OLD% >nul 2>&1
+exit /b %PL_EXIT%

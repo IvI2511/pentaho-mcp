@@ -67,7 +67,10 @@ public class McpLifecycleListener implements LifecycleListener {
       + "(one Ctrl+Z each; notes the user wrote are never touched). To teach, lesson_start sends a whole lesson "
       + "script (steps with what/why) that Spoon plays one step at a time (pace guided, auto or manual with "
       + "lesson_next); follow the class with lesson_status wait_s and steer it with lesson_control. The handout "
-      + "to share afterwards is build_report with sections=[\"lesson\"].";
+      + "to share afterwards is build_report with sections=[\"lesson\"]. To review what changed in a transformation "
+      + "or job (its unsaved changes, a git revision or another file) use diff_documents: the changes by meaning, "
+      + "never as XML lines and never with passwords; format=markdown for a pull request, show_on_canvas=true to "
+      + "mark them on Spoon's canvas, and build_report with compare_with for a changes section.";
 
   private McpHttpServer server;
 
@@ -130,6 +133,7 @@ public class McpLifecycleListener implements LifecycleListener {
       LessonTools.register( server );
       RobustezTools.register( server );
       EstresTools.register( server );
+      DiffTools.register( server );
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("

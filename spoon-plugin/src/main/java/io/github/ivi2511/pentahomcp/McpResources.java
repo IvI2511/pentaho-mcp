@@ -150,7 +150,12 @@ final class McpResources {
       "How to make a load tolerate dirty data: every bad row to a rejects file with its reason, nothing lost in "
         + "silence, stable keys and re-runnable loads; the fast path with the tools, each recipe by hand with "
         + "its PDI 9.4 XML (tested in pattern 06), declared drops, pitfalls and how to read stress_test.",
-      "manual/09-robustez.md" )
+      "manual/09-robustez.md" ),
+    new Doc( "pentaho://guide/versions", "versions", "Versions (diff_documents, normalize, git textconv)",
+      "How to see what changed by meaning between two versions of a .ktr/.kjb (diff_documents, IDC > Compare... "
+        + "with badges on the canvas, the changes report section), how to read the result, and how to set up git: "
+        + "pentaho-live normalize, the textconv driver for readable git diffs and the optional pre-commit hook.",
+      "manual/11-versiones.md" )
   };
 
   /** Texto por ruta del classpath (relativa a RAIZ). */

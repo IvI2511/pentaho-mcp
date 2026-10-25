@@ -82,6 +82,8 @@ final class IdcMenu {
   static final String CALIDAD = "quality";
   static final String ROBUSTECER = "harden";
   static final String ORDENAR = "arrange";
+  /** «Comparar…»: el diff semántico (IdcComparar); sus textos están en diff_*.properties. */
+  static final String COMPARAR = "compare";
   static final String LECCION = "lesson";
   static final String ACERCA = "about";
   /** Prefijo de los ids de las entradas de perspectiva: "perspective:" + id de la perspectiva. */
@@ -153,6 +155,9 @@ final class IdcMenu {
       : r.s( "menu_harden" ), trans, false, trans ? r.s( "menu_harden_tip" ) : hay ? r.s( "r_only_trans" )
       : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, ORDENAR, r.s( "menu_arrange" ), hay, false, hay ? r.s( "menu_arrange_tip" )
+      : r.s( "no_document" ) ) );
+    Rotulos rd = Rotulos.de( io.github.ivi2511.pentahomcp.diff.Salidas.AREA, r.idioma() );
+    l.add( new Entrada( Tipo.ACCION, COMPARAR, rd.s( "menu_compare" ), hay, false, hay ? rd.s( "menu_compare_tip" )
       : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, LECCION, c.leccion ? r.s( "menu_lesson_show" ) : r.s( "menu_lesson" ), true,
       false, null ) );
@@ -451,6 +456,8 @@ final class IdcMenu {
       if ( ORDENAR.equals( id ) ) {
         Docs.activar( m );
         OrdenarLienzo.ejecutar( sp, m );
+      } else if ( COMPARAR.equals( id ) ) {
+        IdcComparar.abrir( sp.getShell(), m, r.idioma() );
       } else if ( CALIDAD.equals( id ) ) {
         IdcCalidad.abrir( sp.getShell(), m, r );
       } else if ( ROBUSTECER.equals( id ) ) {

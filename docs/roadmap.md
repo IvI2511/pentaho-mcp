@@ -85,8 +85,17 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
 
 ## 0.7.0 · Trabajo en equipo y datos
 
-- **Diff visual** entre dos versiones de una transformación (agregado / borrado / cambiado, marcado en
-  el lienzo).
+- **Diff semántico y visual** (E1, hecho en `feat/070-diff`): `diff_documents` compara el documento abierto
+  o un archivo con su archivo guardado, una revisión de git u otro archivo por significado (steps
+  añadidos, quitados y renombrados por tipo, configuración y vecinos; condiciones legibles, listas de
+  campos, SQL por líneas, saltos, manejo de errores, conexiones sin contraseñas, parámetros, notas),
+  en JSON, texto o Markdown; «IDC › Comparar…» con insignias + / − / ~ en el lienzo (extensiones
+  `TransPainterEnd`/`JobPainterEnd`, solo dibujo) o dos pestañas, y la lista de cambios; la sección
+  `changes` de los Informes (`compare_with`).
+- **Git que entiende Kettle** (E2 sin el merge, hecho en `feat/070-diff`): `pentaho-live normalize`
+  (XML canónico, probado con Kettle: mismo `getXML()`, mismos avisos y mismas corridas en todos los
+  ejemplos y patrones), `pentaho-live diff`, `pentaho-live textconv` para `git diff` y el hook de
+  pre-commit opcional. Manual `11-versiones.md`. El **merge de 3 vías por step** queda para 0.8.0.
 - **Pruebas de regresión** — datos de entrada fijos y salida esperada; se corren todas con un botón o
   con Pan en CI.
 - **Generador de datos «sucios»** para practicar limpieza (nulos, duplicados, fechas y decimales mal

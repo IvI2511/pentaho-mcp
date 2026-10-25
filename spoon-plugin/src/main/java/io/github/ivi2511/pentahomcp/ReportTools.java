@@ -411,7 +411,9 @@ final class ReportTools {
       + "with Table output or Insert/Update), profile, metrics, validation, quality (technical quality: the lint_etl "
       + "rules, score and findings, plus the robustness rules with their own score; it does not repeat what "
       + "validation shows), lesson (class mode: the handout of the "
-      + "lesson played on this transformation, never by default), connections, narrative. Default: the "
+      + "lesson played on this transformation, never by default), changes (what changed by meaning against the "
+      + "saved file, a git revision or another file: see compare_with; never by default), connections, "
+      + "narrative. Default: the "
       + "sections marked by default in the user's settings that apply to this document (metrics only if it ran "
       + "in Spoon"
       + ( modo == Modo.CONSTRUIR ? " or with metrics=run_copy; profile only with profile_step; narrative only "
@@ -457,6 +459,11 @@ final class ReportTools {
     sc.bool( "quality_deep", "The quality section also runs lint_etl's deep mode: it reads up to 5000 rows of the "
       + "sources (only when every step involved is known to be read-only; it never writes) to confirm or rule out "
       + "unsorted input and decimal symbol findings. Adds the quality section. Default false.", false );
+    if ( modo != Modo.MOSTRAR ) {
+      sc.str( "compare_with", "For the changes section: what to compare the document with: 'saved' (its file "
+        + "on disk), 'git:REV' (git:HEAD, git:HEAD~1, a branch) or the path of another .ktr/.kjb. Default: the "
+        + "saved file if there are unsaved changes, otherwise git:HEAD. Adds the changes section.", false );
+    }
     if ( modo == Modo.CONSTRUIR ) {
       sc.str( "lineage_step", "Step whose output fields the lineage traces back to their origin. Default: "
         + "every final step that writes.", false );
@@ -533,6 +540,10 @@ final class ReportTools {
       p.secciones = ordenar( secciones );
     }
     p.calidadProfunda = Tools.optBool( a, "quality_deep", false );
+    p.compararCon = sinBlancos( Tools.optStr( a, "compare_with", null ) );
+    if ( p.compararCon != null && p.secciones != null && !p.secciones.contains( SeccionId.CAMBIOS ) ) {
+      p.secciones = ordenar( mas( p.secciones, SeccionId.CAMBIOS ) ); // compare_with = quiere los cambios
+    }
     if ( p.calidadProfunda && p.secciones != null && !p.secciones.contains( SeccionId.CALIDAD ) ) {
       p.secciones = ordenar( mas( p.secciones, SeccionId.CALIDAD ) ); // quality_deep = quiere la calidad
     }

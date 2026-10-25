@@ -83,8 +83,18 @@ perspectivas, con todo lo anterior a mano sin pedírselo a Claude: **Revisar cal
 hallazgos con cómo arreglarlos, clic en uno para ver su step en el lienzo, los arreglos automáticos con un
 solo Ctrl+Z, silenciar una regla donde es deliberada y una revisión profunda opcional que lee datos),
 **Robustecer…** (el plan con casillas, aplicarlo con un solo Ctrl+Z y la prueba con datos sucios con su
-veredicto), **Ordenar lienzo**, **Lección**, el cambio a Data Integration, Informes o Corrector y **Acerca de
-Pentaho Live**.
+veredicto), **Ordenar lienzo**, **Comparar…**, **Lección**, el cambio a Data Integration, Informes o Corrector y
+**Acerca de Pentaho Live**.
+
+**Versiones.** Mira qué cambió entre dos versiones de una transformación o un job *por significado*, no como
+líneas de XML: steps añadidos, quitados o renombrados, `Filter rows: saldo > 1000 → saldo >= 1000`, listas de
+campos, SQL línea a línea, saltos, conexiones (nunca sus contraseñas) y parámetros. Compara el documento abierto
+con su archivo guardado, una revisión de git u otro archivo; en Spoon (**IDC › Comparar…**) los cambios se marcan
+en el lienzo con insignias + / − / ~ y una lista donde un clic selecciona el step; Claude recibe lo mismo en texto
+o en Markdown para un pull request, y los informes tienen una sección **Cambios**. Para los repositorios de
+equipo, `pentaho-live normalize` escribe los `.ktr`/`.kjb` siempre igual (dos guardados sin cambios reales dan
+cero diferencias) y `pentaho-live textconv` hace que `git diff` muestre la vista semántica; lo tienes en
+[`manual/11-versiones.md`](claude/skills/pentaho-etl/manual/11-versiones.md).
 
 ¿No tienes Spoon abierto? La skill igual sirve: Claude escribe el `.ktr` / `.kjb` y lo prueba con Pan o
 Kitchen.
@@ -98,6 +108,7 @@ Kitchen.
 | *"Conéctate a mi base PostgreSQL y carga este archivo en la tabla `clientes`."* | agrega la conexión (la contraseña la escribes tú en Spoon), lista tablas y columnas y mapea los campos |
 | *"Haz un job que ejecute estas dos transformaciones en orden y que pare si falla la primera."* | arma el job con sus entradas y los hops de éxito / error |
 | *"El lienzo es un lío, ordénalo."* | acomoda los steps de izquierda a derecha, sin líneas cruzadas |
+| *"¿Qué cambié desde el último commit? Márcalo en el lienzo."* | enumera los cambios por significado (steps, condiciones, campos, saltos) y los marca en el lienzo |
 | *"¿Por qué este `.ktr` falla en Pan?"* | lo lee, encuentra el problema con la lista de errores verificados y lo corrige |
 | *"Revisa las buenas prácticas de esta transformación antes de que la entregue y arregla lo que sea seguro."* | corre la revisión de calidad, te explica cada hallazgo, aplica los arreglos seguros con un Ctrl+Z y te pregunta antes del resto |
 | *"Da la lección de Stream lookup paso a paso, nivel principiante."* | la construye un step por cada clic en Siguiente ▶, con una nota numerada en el lienzo por step y las filas que produce |
@@ -127,7 +138,7 @@ flowchart LR
 ```
 
 - El **plugin de Spoon** es un plugin de ciclo de vida de Kettle. Cuando abre Spoon, levanta un servidor
-  MCP en `127.0.0.1:8765` con 73 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
+  MCP en `127.0.0.1:8765` con 74 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
   con deshacer. El mismo jar agrega las perspectivas **Informes** y **Corrector** al selector de
   perspectivas de Spoon.
 - El **plugin de Claude Code `pentaho-live`** conecta a Claude con ese servidor y suma la skill
@@ -218,6 +229,7 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Bases de datos | Listar tipos de conexión; agregar, probar y borrar conexiones; ver tablas y columnas; correr consultas SQL (solo lectura salvo que pidas escribir) |
 | Parámetros | Listar, definir y borrar parámetros |
 | Lienzo | Agregar notas, seleccionar steps, ordenar el lienzo, sacar una imagen del lienzo |
+| Versiones | Comparar una transformación o un job con su archivo guardado, una revisión de git u otro archivo por significado (steps, propiedades, saltos, conexiones sin contraseñas), en JSON, texto o Markdown, y marcarlo en el lienzo |
 | Corrector | Armar un pack de ejercicio desde una solución (casos, casos ocultos, salida esperada, reglas, rúbrica, copia para alumnos), validarlo, corregir una entrega o una carpeta entera en JVMs aparte, seguir el lote, y obtener la planilla y la devolución de cada alumno |
 | Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imágenes, JSON), solo o con varios documentos combinados, con linaje, diccionario de datos, métricas, calidad técnica y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
 

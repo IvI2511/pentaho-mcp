@@ -83,8 +83,18 @@ perspectivas, com tudo isso à mão sem pedir ao Claude: **Revisar qualidade…*
 corrigi-los, clique em um para ver o seu step na tela, as correções automáticas com um único Ctrl+Z,
 silenciar uma regra onde ela é deliberada e uma revisão profunda opcional que lê dados), **Robustecer…** (o
 plano com caixas de seleção, aplicá-lo com um único Ctrl+Z e o teste com dados sujos com o seu veredito),
-**Organizar tela**, **Lição**, a troca para Data Integration, Relatórios ou Corretor e **Sobre o Pentaho
-Live**.
+**Organizar tela**, **Comparar…**, **Lição**, a troca para Data Integration, Relatórios ou Corretor e **Sobre o
+Pentaho Live**.
+
+**Versões.** Veja o que mudou entre duas versões de uma transformação ou de um job *pelo significado*, não como
+linhas de XML: steps adicionados, removidos ou renomeados, `Filter rows: saldo > 1000 → saldo >= 1000`, listas de
+campos, SQL linha a linha, saltos, conexões (nunca as senhas) e parâmetros. Compare o documento aberto com o
+arquivo salvo, uma revisão do git ou outro arquivo; no Spoon (**IDC › Comparar…**) as alterações aparecem na tela
+com marcas + / − / ~ e uma lista em que um clique seleciona o step; o Claude recebe o mesmo em texto ou em
+Markdown para um pull request, e os relatórios ganham uma seção **Alterações**. Para repositórios de equipe,
+`pentaho-live normalize` escreve os `.ktr`/`.kjb` sempre do mesmo jeito (dois salvamentos sem mudanças reais dão
+zero diferenças) e `pentaho-live textconv` faz o `git diff` mostrar a vista semântica; veja
+[`manual/11-versiones.md`](claude/skills/pentaho-etl/manual/11-versiones.md).
 
 Sem o Spoon aberto? A skill continua útil: o Claude escreve o `.ktr` / `.kjb` e testa com o Pan ou o
 Kitchen.
@@ -98,6 +108,7 @@ Kitchen.
 | *"Conecte no meu banco PostgreSQL e carregue este arquivo na tabela `clientes`."* | cria a conexão (você digita a senha no Spoon), lista tabelas e colunas e mapeia os campos |
 | *"Crie um job que rode estas duas transformações em sequência e pare se a primeira falhar."* | monta o job com as entradas e os hops de sucesso / falha |
 | *"O canvas está uma bagunça, organize."* | alinha os steps da esquerda para a direita, sem linhas cruzadas |
+| *"O que eu mudei desde o último commit? Marque na tela."* | lista as alterações pelo significado (steps, condições, campos, saltos) e marca na tela |
 | *"Por que este `.ktr` falha no Pan?"* | lê o arquivo, encontra o problema na lista de erros verificados e corrige |
 | *"Revise as boas práticas desta transformação antes de eu entregar e corrija o que for seguro."* | roda a revisão de qualidade, explica cada achado, aplica as correções seguras com um Ctrl+Z e pergunta antes do resto |
 | *"Dê a lição de Stream lookup passo a passo, nível iniciante, em português."* | monta um step a cada clique em Próximo ▶, com uma nota numerada no canvas por step e as linhas que ele produz |
@@ -127,7 +138,7 @@ flowchart LR
 ```
 
 - O **plugin do Spoon** é um plugin de ciclo de vida do Kettle. Quando o Spoon abre, ele sobe um servidor
-  MCP em `127.0.0.1:8765` com 73 ferramentas e aplica cada alteração na thread de interface do
+  MCP em `127.0.0.1:8765` com 74 ferramentas e aplica cada alteração na thread de interface do
   Spoon, com desfazer. O mesmo jar acrescenta as perspectivas **Relatórios** e **Corretor** ao seletor de
   perspectivas do Spoon.
 - O **plugin do Claude Code `pentaho-live`** conecta o Claude a esse servidor e inclui a skill
@@ -218,6 +229,7 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Bancos de dados | Listar tipos de conexão; criar, testar e excluir conexões; ver tabelas e colunas; rodar consultas SQL (somente leitura, a menos que você peça escrita) |
 | Parâmetros | Listar, definir e excluir parâmetros |
 | Canvas | Adicionar notas, selecionar steps, organizar o layout, tirar uma imagem do canvas |
+| Versões | Comparar uma transformação ou um job com o arquivo salvo, uma revisão do git ou outro arquivo pelo significado (steps, propriedades, saltos, conexões sem senhas), em JSON, texto ou Markdown, e marcar na tela |
 | Corretor | Montar um pacote de exercício a partir de uma solução (casos, casos ocultos, saída esperada, regras, rubrica, cópia para alunos), validá-lo, corrigir uma entrega ou uma pasta inteira em JVMs à parte, acompanhar o lote e obter a planilha e a devolutiva de cada aluno |
 | Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imagens, JSON), sozinho ou com vários documentos combinados, com linhagem, dicionário de dados, métricas, qualidade técnica e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
 

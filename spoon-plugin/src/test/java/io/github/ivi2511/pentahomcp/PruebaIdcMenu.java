@@ -63,7 +63,7 @@ public class PruebaIdcMenu {
   public void pruebaA_Transformacion() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( IdcMenu.TRANSFORMACION, false, "001-spoon-jobs",
       "001-spoon-jobs", "Data Integration", "pentaho-live-reports", "Informes", "pentaho-live-grader", "Corrector" ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "perspective:001-spoon-jobs",
+    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "lesson", "---", "perspective:001-spoon-jobs",
       "perspective:pentaho-live-reports", "perspective:pentaho-live-grader", "---", "about" ), ids( l ),
       "orden del menú" );
     for ( Entrada e : l ) {
@@ -72,6 +72,8 @@ public class PruebaIdcMenu {
     igual( "Revisar calidad…", de( l, "quality" ).texto, "texto calidad" );
     igual( "Robustecer…", de( l, "harden" ).texto, "texto robustecer" );
     igual( "Ordenar lienzo", de( l, "arrange" ).texto, "texto ordenar" );
+    igual( "Comparar…", de( l, "compare" ).texto, "texto comparar" );
+    contiene( de( l, "compare" ).ayuda, "revisión de git", "ayuda de comparar" );
     igual( "Lección…", de( l, "lesson" ).texto, "sin lección cargada" );
     igual( "Acerca de Pentaho Live", de( l, "about" ).texto, "texto acerca" );
     cierto( de( l, "perspective:001-spoon-jobs" ).marcada, "Data Integration marcada" );
@@ -97,11 +99,12 @@ public class PruebaIdcMenu {
   /** Nada abierto: solo Lección, perspectivas y Acerca habilitadas. Sin perspectivas, un solo separador. */
   public void pruebaC_SinDocumento() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( null, false, null ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "---", "about" ), ids( l ),
+    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "lesson", "---", "about" ), ids( l ),
       "sin perspectivas no hay bloque ni separador de más" );
     falso( de( l, "quality" ).habilitada, "calidad" );
     falso( de( l, "harden" ).habilitada, "robustecer" );
     falso( de( l, "arrange" ).habilitada, "ordenar" );
+    falso( de( l, "compare" ).habilitada, "comparar" );
     cierto( de( l, "lesson" ).habilitada, "lección explica cómo empezar una" );
     cierto( de( l, "about" ).habilitada, "acerca" );
     igual( es.s( "no_document" ), de( l, "quality" ).ayuda, "ayuda: abre un documento" );
@@ -118,6 +121,7 @@ public class PruebaIdcMenu {
     List<Entrada> pt = IdcMenu.modelo( Rotulos.de( IdcMenu.AREA, "pt" ), contexto( IdcMenu.JOB, false, null ) );
     igual( "Robustecer… (só transformações)", de( pt, "harden" ).texto, "en portugués" );
     igual( "Sobre o Pentaho Live", de( pt, "about" ).texto, "en portugués" );
+    igual( "Compare…", de( en, "compare" ).texto, "comparar en inglés" );
   }
 
   /** Las perspectivas del selector: sin las ocultas ni las que el selector no tiene; sin datos, todas. */

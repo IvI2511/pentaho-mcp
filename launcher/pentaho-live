@@ -1,6 +1,54 @@
 #!/bin/sh
 # pentaho-live for Git Bash / MSYS2 (where Claude Code runs its commands on Windows): bash does not
 # run a .cmd file by its bare name, so this forwards to pentaho-live.cmd, next to this file.
-cmd_file="$(cygpath -w "$0" 2>/dev/null).cmd"
-[ -f "$cmd_file" ] || cmd_file="pentaho-live.cmd"
-exec cmd.exe //c "$cmd_file" "$@"
+#
+# The git and console commands run here directly, with Java and the Pentaho Live jar (no Spoon, and
+# no cmd.exe in between, so paths with spaces arrive intact), on Windows, macOS and Linux:
+#   pentaho-live normalize [--check] <files or folders>
+#   pentaho-live diff [--format text|markdown|json] <before> <after>   |   diff [--rev REV] <file>
+#   pentaho-live textconv <file>     pentaho-live pre-commit     pentaho-live git-setup
+# The jar: PENTAHO_LIVE_JAR (a jar or a folder of jars), or <PDI>/plugins/pentaho-mcp with PDI from
+# PENTAHO_LIVE_PDI, PDI_HOME, a pdi-home.txt next to this file or <install folder>/data-integration.
+# Java: <install folder>/jre, PENTAHO_JAVA_HOME, JAVA_HOME or the PATH.
+# Exit codes: 0 ok, 1 differences or not normalized, 2 error.
+case "$1" in
+  normalize|diff|textconv|pre-commit|git-setup) ;;
+  *)
+    if command -v cmd.exe >/dev/null 2>&1; then
+      cmd_file="$(cygpath -w "$0" 2>/dev/null).cmd"
+      [ -f "$cmd_file" ] || cmd_file="pentaho-live.cmd"
+      exec cmd.exe //c "$cmd_file" "$@"
+    fi
+    echo "pentaho-live: on macOS and Linux this script runs the git and console commands" >&2
+    echo "  (normalize, diff, textconv, pre-commit, git-setup); start Spoon with PDI's spoon.sh." >&2
+    exit 2 ;;
+esac
+
+dir="$(cd "$(dirname "$0")" && pwd)"
+app="$(cd "$dir/.." && pwd)"
+pdi="${PENTAHO_LIVE_PDI:-$PDI_HOME}"
+if [ -z "$pdi" ] && [ -f "$dir/pdi-home.txt" ]; then
+  pdi="$(head -n 1 "$dir/pdi-home.txt" | tr -d '\r' | sed 's/^\xEF\xBB\xBF//')"
+  command -v cygpath >/dev/null 2>&1 && pdi="$(cygpath -u "$pdi")"
+fi
+[ -z "$pdi" ] && pdi="$app/data-integration"
+if [ -n "$PENTAHO_LIVE_JAR" ]; then
+  cp="$PENTAHO_LIVE_JAR"
+elif [ -d "$pdi/plugins/pentaho-mcp" ]; then
+  cp="$pdi/plugins/pentaho-mcp/*"
+  command -v cygpath >/dev/null 2>&1 && cp="$(cygpath -w "$pdi/plugins/pentaho-mcp")\\*"
+else
+  echo "pentaho-live: Pentaho Live's jar was not found in $pdi/plugins/pentaho-mcp. Set PENTAHO_LIVE_JAR" >&2
+  echo "  to the pentaho-mcp-core jar, or PDI_HOME to the data-integration folder that has the plugin." >&2
+  exit 2
+fi
+if [ -x "$app/jre/bin/java" ] || [ -x "$app/jre/bin/java.exe" ]; then
+  java="$app/jre/bin/java"
+elif [ -n "$PENTAHO_JAVA_HOME" ] && { [ -x "$PENTAHO_JAVA_HOME/bin/java" ] || [ -x "$PENTAHO_JAVA_HOME/bin/java.exe" ]; }; then
+  java="$PENTAHO_JAVA_HOME/bin/java"
+elif [ -n "$JAVA_HOME" ] && { [ -x "$JAVA_HOME/bin/java" ] || [ -x "$JAVA_HOME/bin/java.exe" ]; }; then
+  java="$JAVA_HOME/bin/java"
+else
+  java=java
+fi
+exec "$java" -Xmx512m -Dfile.encoding=UTF-8 -cp "$cp" io.github.ivi2511.pentahomcp.diff.LineaComandos "$@"
