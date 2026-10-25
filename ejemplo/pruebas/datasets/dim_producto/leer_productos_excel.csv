@@ -1,0 +1,29 @@
+codigo_producto,nombre,categoria,precio_venta
+CAF-001,"  Espresso",café,1.5
+CAF-002,Cortado,CAFÉ,1.7
+CAF-003,Café con leche,CAFÉ,2.1
+CAF-004,"  Cappuccino"," Café",2.6
+CAF-005,Latte,Café,2.8
+CAF-006,Flat white,Café,3.0
+CAF-007,"Americano ",café,1.9
+CAF-008,"  Café bombón",Café,2.2
+INF-001,Té verde,Infusiones,2.0
+INF-002,Té negro,infusiones,2.0
+INF-003,Rooibos,infusiones,2.2
+INF-004,Chai latte,"INFUSIONES ",3.2
+INF-005,Matcha latte,"INFUSIONES ",3.5
+BOL-001,Croissant,BOLLERÍA,1.8
+BOL-002,Napolitana de chocolate,"Bollería  ",2.1
+BOL-003,"Magdalena ",BOLLERÍA,1.4
+BOL-004,Tarta de queso (porción),"Bollería  ",3.9
+BOL-005,Cookie,BOLLERÍA,2.3
+BOL-006,"Bizcocho de limón ",bollería,2.5
+SAL-001,Tostada con tomate," salado ",2.8
+SAL-002,Bocadillo de jamón,salado,4.5
+SAL-003,Sándwich mixto,Salado,3.8
+SAL-004,Pincho de tortilla,Salado,3.2
+SAL-005,"Quiche de verduras ",Salado,4.2
+BEB-001,Zumo de naranja,Bebidas,3.0
+BEB-002,Agua mineral,Bebidas,1.5
+BEB-003,Limonada casera,Bebidas,2.9
+BEB-004,"Smoothie de frutos rojos ",Bebidas,4.2

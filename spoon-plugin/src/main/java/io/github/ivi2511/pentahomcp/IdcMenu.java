@@ -81,6 +81,8 @@ final class IdcMenu {
 
   static final String CALIDAD = "quality";
   static final String ROBUSTECER = "harden";
+  /** «Pruebas…» (0.7.0): PruebasDialogo; sus textos estan en el area de las pruebas. */
+  static final String PRUEBAS = "tests";
   static final String ORDENAR = "arrange";
   static final String LECCION = "lesson";
   static final String PROYECTO = "project";
@@ -155,6 +157,9 @@ final class IdcMenu {
       : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, ORDENAR, r.s( "menu_arrange" ), hay, false, hay ? r.s( "menu_arrange_tip" )
       : r.s( "no_document" ) ) );
+    Rotulos rp = Rotulos.de( PruebasDialogo.AREA, r.idioma() );
+    l.add( new Entrada( Tipo.ACCION, PRUEBAS, rp.s( "menu_tests" ), trans, false, trans ? rp.s( "menu_tests_tip" )
+      : hay ? r.s( "r_only_trans" ) : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, LECCION, c.leccion ? r.s( "menu_lesson_show" ) : r.s( "menu_lesson" ), true,
       false, null ) );
     l.add( new Entrada( Tipo.ACCION, PROYECTO, r.s( "menu_project" ), true, false, r.s( "menu_project_tip" ) ) );
@@ -459,6 +464,12 @@ final class IdcMenu {
         OrdenarLienzo.ejecutar( sp, m );
       } else if ( CALIDAD.equals( id ) ) {
         IdcCalidad.abrir( sp.getShell(), m, r );
+      } else if ( PRUEBAS.equals( id ) ) {
+        if ( m instanceof TransMeta ) {
+          PruebasDialogo.abrir( sp.getShell(), (TransMeta) m, PruebasDialogo.rotulos() );
+        } else {
+          aviso( sp.getShell(), r, r.s( "r_only_trans" ) );
+        }
       } else if ( ROBUSTECER.equals( id ) ) {
         if ( m instanceof TransMeta ) {
           IdcRobustez.abrir( sp.getShell(), (TransMeta) m, r );

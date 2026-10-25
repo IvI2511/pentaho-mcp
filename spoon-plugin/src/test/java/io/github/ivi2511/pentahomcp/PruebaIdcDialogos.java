@@ -675,16 +675,18 @@ public class PruebaIdcDialogos {
         final List<String> elegidos = new ArrayList<String>();
         IdcMenu.llenar( m, IdcMenu.modelo( r, c ), elegidos::add );
         MenuItem[] items = m.getItems();
-        igual( 10, items.length, "5 acciones (con Preparar proyecto), 2 separadores, 2 perspectivas y acerca" );
+        igual( 11, items.length,
+          "6 acciones (con Pruebas… y Preparar proyecto…), 2 separadores, 2 perspectivas y acerca" );
         igual( "Revisar calidad…", items[ 0 ].getText(), "primera" );
         falso( items[ 1 ].getEnabled(), "robustecer con un job" );
-        igual( "Preparar proyecto…", items[ 4 ].getText(), "preparar proyecto" );
-        cierto( ( items[ 5 ].getStyle() & SWT.SEPARATOR ) != 0, "separador" );
-        cierto( ( items[ 7 ].getStyle() & SWT.RADIO ) != 0, "perspectiva como radio" );
-        cierto( items[ 7 ].getSelection(), "Informes marcada" );
+        falso( items[ 3 ].getEnabled(), "pruebas con un job" );
+        igual( "Preparar proyecto…", items[ 5 ].getText(), "preparar proyecto" );
+        cierto( ( items[ 6 ].getStyle() & SWT.SEPARATOR ) != 0, "separador" );
+        cierto( ( items[ 8 ].getStyle() & SWT.RADIO ) != 0, "perspectiva como radio" );
+        cierto( items[ 8 ].getSelection(), "Informes marcada" );
         items[ 0 ].notifyListeners( SWT.Selection, new Event() );
-        items[ 7 ].notifyListeners( SWT.Selection, new Event() );
-        items[ 9 ].notifyListeners( SWT.Selection, new Event() );
+        items[ 8 ].notifyListeners( SWT.Selection, new Event() );
+        items[ 10 ].notifyListeners( SWT.Selection, new Event() );
         igual( Arrays.asList( "quality", "perspective:b", "about" ), elegidos, "cada entrada su id" );
         m.dispose();
         img.dispose();

@@ -132,6 +132,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   step now always goes to the local path of the case's `tmp/` folder, which exists, counts towards `max_output_mb`
   and is deleted with the sandbox, whatever the submission had (`%%java.io.tmpdir%%`, a folder of the student's or
   nothing).
+- **Transformation tests with golden datasets** (0.7.0, P1): `tests/<name>.test.json` next to the `.ktr`
+  (format `pentaho-live-test/1`, JSON Schema in `docs/schemas/pentaho-live-test-1.schema.json`). A test
+  replaces input steps with fixed datasets (CSV in `tests/datasets/`, injected with the original field types
+  and formats), runs the transformation in a separate JVM (only what leads to the captured outputs, like a
+  preview) and compares the output of the chosen steps with golden CSV files (`tests/golden/`) row by row,
+  by key or as a multiset, with ignored columns and tolerances: missing rows, extra rows and changed values.
+  Tweaks: `skip_step` (a Table output that does not write), `remove_step`, `set_variable`, `set_parameter`.
+  Disposable test databases (H2, MySQL, MariaDB, PostgreSQL) recreated from scripts before the run, and
+  tables compared after it, exactly like the grader: the case, compare options, test databases and tables
+  use the grader's pack format and engine (no grader file changed).
+- Four MCP tools (77 in total): `test_create` (snapshot mode: freezes today's input rows as datasets and the
+  chosen outputs as golden data, skipping the steps that write, detecting columns that change between runs,
+  copying the variables the transformation uses), `test_run`, `test_run_all` and `test_list` (with
+  `show_in_spoon`). By default they test what is open in Spoon, unsaved changes included.
+- **IDC › Tests…**: a non-modal window with the tests of the active transformation in green or red, Run /
+  Run all in the background with Cancel, the row diff of a failing test (and its output selected on the
+  canvas) and **Create test from preview…** (the steps selected on the canvas come checked).
+- **Run on save** (0.7.0, P2; off by default, in the Tests… window): when a transformation is saved, only the
+  tests affected by the change (its captured steps and their upstream, stopping at datasets; all of them when
+  unsure) run in the background; the IDC button shows **✓ 12/12** or **✗ 1** with the details in its tooltip,
+  and a balloon warns when one fails.
+- The skill's manual gets `manual/12-pruebas.md`; `ejemplo/pruebas/` has tests for the Grano de Oro example.
 
 ## [0.6.2] - 2026-10-25
 

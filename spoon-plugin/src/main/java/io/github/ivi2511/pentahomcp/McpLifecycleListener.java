@@ -71,7 +71,11 @@ public class McpLifecycleListener implements LifecycleListener {
       + " In a team project, lint_etl uses the project's lint profile (.pentaho-live/lint.yaml, found going up the "
       + "folders; lint_profile shows it) on its own: follow its naming prefixes, required variables and team rules "
       + "when you build, and check 'profile.passed'. project_init prepares a team project (folders, .gitignore, the "
-      + "profile, README, GitHub Actions CI) without overwriting anything.";
+      + "profile, README, GitHub Actions CI) without overwriting anything."
+      + " Regression tests with golden data: test_create freezes what a transformation produces today (input steps "
+      + "as datasets, chosen output steps as golden CSV, in tests/ next to the .ktr), test_run / test_run_all run "
+      + "them in a separate JVM and return the row diff (missing, extra, changed rows), test_list lists them; run "
+      + "them after changing a transformation and explain any failure from its diff.";
 
   private McpHttpServer server;
 
@@ -134,6 +138,7 @@ public class McpLifecycleListener implements LifecycleListener {
       LessonTools.register( server );
       RobustezTools.register( server );
       EstresTools.register( server );
+      PruebasTools.register( server );
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("
@@ -145,6 +150,8 @@ public class McpLifecycleListener implements LifecycleListener {
     OrdenarLienzo.instalarDesde( handler );
     // menu «IDC» en la barra principal, junto al selector de perspectivas (no lanza)
     IdcMenu.instalarDesde( handler );
+    // pruebas al guardar (P2, si esta activado) y su indicador en el boton IDC (no lanza)
+    PruebasGuardado.instalarDesde( handler );
   }
 
   /**

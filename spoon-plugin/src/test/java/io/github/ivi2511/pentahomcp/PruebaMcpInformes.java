@@ -60,9 +60,10 @@ public class PruebaMcpInformes {
    * 54 tools de 0.4.0 + build_report, get_report_data, show_report y set_error_handling (0.5.0) + lint_etl,
    * apply_lint_fixes y suppress_lint (linter) + las 5 del corrector (CorrectorTools) + lesson_notes (modo
    * clase, WP2) + lesson_start, lesson_next, lesson_status y lesson_control (WP3) + harden_etl y
-   * stress_test (robustez) + lint_profile y project_init (0.7, perfil del proyecto y pentaho-live init).
+   * stress_test (robustez) + lint_profile y project_init (0.7, perfil del proyecto y pentaho-live init) +
+   * test_create, test_run, test_run_all y test_list (0.7, pruebas con datasets dorados).
    */
-  private static final int TOOLS = 75;
+  private static final int TOOLS = 79;
 
   private McpHttpServer server;
   private int puerto;
@@ -86,6 +87,7 @@ public class PruebaMcpInformes {
     LessonTools.register( server );
     RobustezTools.register( server );
     EstresTools.register( server );
+    PruebasTools.register( server );
     server.start();
   }
 
@@ -192,6 +194,14 @@ public class PruebaMcpInformes {
     contiene( robustecer.path( "description" ).asText(), "ONE Ctrl+Z", "un solo Ctrl+Z" );
     contiene( instr, "harden_etl", "las instrucciones nombran harden_etl" );
     noNulo( porNombre.get( "stress_test" ), "stress_test registrada" );
+    // 0.7.0: pruebas con datasets dorados
+    for ( String n : new String[] { "test_create", "test_run", "test_run_all", "test_list" } ) {
+      noNulo( porNombre.get( n ), n + " registrada" );
+      cierto( porNombre.get( n ).toString().chars().allMatch( ch -> ch < 128 ), n + " en ingles (ASCII)" );
+    }
+    igual( "[\"name\",\"output_steps\"]", porNombre.get( "test_create" ).path( "inputSchema" ).path( "required" )
+      .toString(), "test_create pide nombre y salidas" );
+    contiene( instr, "test_create", "las instrucciones nombran test_create" );
     for ( JsonNode t : new JsonNode[] { build, datos, mostrar, lint, arreglos, silenciar, robustecer } ) {
       String json = t.toString();
       cierto( json.chars().allMatch( ch -> ch < 128 ), "la tool " + t.path( "name" ).asText() + " esta en ingles "
