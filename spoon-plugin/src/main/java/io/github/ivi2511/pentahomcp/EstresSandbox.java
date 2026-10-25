@@ -33,6 +33,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.lint.Supresiones;
 import io.github.ivi2511.pentahomcp.robustez.Balance;
 import io.github.ivi2511.pentahomcp.robustez.Variantes;
@@ -168,6 +169,13 @@ final class EstresSandbox {
   /** Analiza el clon (no lo modifica salvo variables de parámetros sin valor): entradas, salidas, BD, grafo. */
   static Analisis analizar( TransMeta tm, int filas, Set<String> soloEntradas, List<String> obligatorios )
     throws Exception {
+    return analizar( tm, filas, soloEntradas, obligatorios, "en" );
+  }
+
+  /** Como {@link #analizar(TransMeta, int, Set, List)}, con los motivos (bloqueos, no evaluadas) en {@code idioma}. */
+  static Analisis analizar( TransMeta tm, int filas, Set<String> soloEntradas, List<String> obligatorios,
+                            String idioma ) throws Exception {
+    Rotulos r = Balance.textos( idioma );
     Analisis a = new Analisis();
     if ( tm.getFilename() != null && !tm.getFilename().trim().isEmpty() ) {
       // las rutas relativas al .ktr se resuelven contra la carpeta del ORIGINAL (la copia vive en el sandbox)
@@ -273,13 +281,11 @@ final class EstresSandbox {
       Element x = pasos.get( s.getName() );
       // --- política
       if ( s.isMissing() ) {
-        a.bloqueos.add( s.getName() + " (" + id + "): its plugin is not installed" );
+        a.bloqueos.add( r.f( "blocked_missing", s.getName(), id ) );
       } else if ( BLOQUEAN.contains( id ) ) {
-        a.bloqueos.add( s.getName() + " (" + id + "): it leaves the machine, runs other processes or other "
-          + "transformations" );
+        a.bloqueos.add( r.f( "blocked_external", s.getName(), id ) );
       } else if ( escribeAfuera( id ) ) {
-        a.bloqueos.add( s.getName() + " (" + id + "): it writes or sends data somewhere stress_test cannot redirect "
-          + "to the sandbox" );
+        a.bloqueos.add( r.f( "blocked_writes_out", s.getName(), id ) );
       }
       // --- conexiones
       DatabaseMeta[] usadas = s.getStepMetaInterface().getUsedDatabaseConnections();
@@ -291,7 +297,7 @@ final class EstresSandbox {
         boolean archivo = ( "SQLITE".equals( tipo ) || "H2".equals( tipo ) )
           && dm.getAccessType() == DatabaseMeta.TYPE_ACCESS_NATIVE;
         if ( !archivo ) {
-          String t = dm.getName() + " (" + tipo + ") used by '" + s.getName() + "'";
+          String t = r.f( "db_used_by", dm.getName(), tipo, s.getName() );
           if ( !a.bdNoArchivo.contains( t ) ) {
             a.bdNoArchivo.add( t );
           }
@@ -302,7 +308,7 @@ final class EstresSandbox {
         }
       }
       if ( SQL.contains( id ) && ( usadas == null || usadas.length == 0 ) ) {
-        a.bloqueos.add( s.getName() + " (" + id + "): SQL without a file database" );
+        a.bloqueos.add( r.f( "blocked_sql", s.getName(), id ) );
       }
       // --- tablas (rerun)
       if ( x != null && CARGAS_BD.contains( id ) ) {
@@ -369,13 +375,13 @@ final class EstresSandbox {
       }
       // --- entradas
       if ( x != null && ENTRADAS.contains( id ) ) {
-        Entrada e = entrada( tm, s, x, filas, obligatorios );
+        Entrada e = entrada( tm, s, x, filas, obligatorios, r );
         if ( e.noEvaluada == null ) {
           Variantes.completarTipos( e.base, conversiones );
         }
         n.entradaArchivo = e.noEvaluada == null && ( soloEntradas == null || soloEntradas.contains( s.getName() ) );
         if ( soloEntradas != null && !soloEntradas.contains( s.getName() ) && e.noEvaluada == null ) {
-          e.noEvaluada = "not in 'inputs'";
+          e.noEvaluada = r.s( "input_not_selected" );
         }
         a.entradas.add( e );
       }
@@ -389,7 +395,7 @@ final class EstresSandbox {
         Element file = hijo( x, "file" );
         if ( "Y".equalsIgnoreCase( texto( x, "fileNameInField" ) ) || ( file != null && "Y".equalsIgnoreCase(
           texto( file, "fileNameInField" ) ) ) ) {
-          a.bloqueos.add( s.getName() + " (" + id + "): its file name comes from a field" );
+          a.bloqueos.add( r.f( "blocked_filename_field", s.getName(), id ) );
         }
         if ( "TextFileOutput".equals( id ) ) {
           o.texto = new Variantes.FormatoTexto();
@@ -442,14 +448,15 @@ final class EstresSandbox {
     return null;
   }
 
-  private static Entrada entrada( TransMeta tm, StepMeta s, Element x, int filas, List<String> obligatorios ) {
+  private static Entrada entrada( TransMeta tm, StepMeta s, Element x, int filas, List<String> obligatorios,
+                                  Rotulos r ) {
     Entrada e = new Entrada();
     e.paso = s.getName();
     e.tipo = s.getStepID();
     e.base = new Variantes.Tabla();
     try {
       if ( !tm.findPreviousSteps( s, true ).isEmpty() ) {
-        e.noEvaluada = "it takes its file names from a previous step";
+        e.noEvaluada = r.s( "input_from_previous" );
         return e;
       }
       String nombre;
@@ -460,7 +467,7 @@ final class EstresSandbox {
         nombre = file == null ? null : texto( file, "name" );
       }
       if ( nombre == null || nombre.trim().isEmpty() ) {
-        e.noEvaluada = "no file name";
+        e.noEvaluada = r.s( "input_no_filename" );
         return e;
       }
       e.archivo = new File( tm.environmentSubstitute( nombre ) );
@@ -480,13 +487,13 @@ final class EstresSandbox {
         }
       }
       if ( !e.archivo.isFile() ) {
-        e.noEvaluada = "the file does not exist (" + e.archivo.getName() + ")";
+        e.noEvaluada = r.f( "input_missing_file", e.archivo.getName() );
         return e;
       }
       if ( "CsvInput".equals( e.tipo ) || "TextFileInput".equals( e.tipo ) ) {
         if ( "TextFileInput".equals( e.tipo ) && ( "Fixed".equalsIgnoreCase( texto( x, "file_type" ) )
           || ( file != null && "Fixed".equalsIgnoreCase( texto( file, "type" ) ) ) ) ) {
-          e.noEvaluada = "fixed-width files are not supported yet";
+          e.noEvaluada = r.s( "input_fixed_width" );
           return e;
         }
         e.formato = "text";
@@ -522,7 +529,7 @@ final class EstresSandbox {
       }
       ajustarFilas( e.base );
     } catch ( Exception ex ) {
-      e.noEvaluada = "cannot read it: " + ex.getMessage();
+      e.noEvaluada = r.f( "cannot_read", ex.getMessage() );
     }
     return e;
   }

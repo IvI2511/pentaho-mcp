@@ -122,9 +122,7 @@ final class IdcCalidad {
     String id = Docs.id( m );
     if ( abierto != null && !abierto.shell.isDisposed() ) {
       if ( id.equals( abierto.docId ) ) {
-        if ( IdcMenu.posicionPrueba == null ) {
-          abierto.shell.setActive();
-        }
+        abierto.shell.setActive();
         return;
       }
       abierto.shell.close();
@@ -597,59 +595,6 @@ final class IdcCalidad {
     final Font f = new Font( c.getDisplay(), fd );
     c.addListener( SWT.Dispose, e -> f.dispose() );
     return f;
-  }
-
-  /** Un texto de lo que muestra (pruebas). (UI) */
-  String resumen() {
-    StringBuilder b = new StringBuilder();
-    b.append( "title=" ).append( shell.getText() ).append( "\nscore=" ).append( puntaje.getText() )
-      .append( "\nrobustness=" ).append( robustez.getText() ).append( "\ncounts=" ).append( conteos.getText() )
-      .append( "\nstatus=" ).append( estado.getText() ).append( "\nbusy=" ).append( ocupado )
-      .append( "\nrows=" ).append( tabla.getItemCount() ).append( "\napply=" ).append( aplicar.getText() )
-      .append( aplicar.getEnabled() ? "" : " [off]" ).append( "\nfooter=" ).append( pie.getText() );
-    for ( int i = 0; i < tabla.getItemCount() && i < 40; i++ ) {
-      TableItem it = tabla.getItem( i );
-      b.append( "\n  " ).append( it.getText( 0 ) ).append( " | " ).append( it.getText( 1 ) ).append( " | " )
-        .append( it.getText( 2 ) ).append( " | " ).append( it.getText( 5 ) );
-    }
-    return b.toString();
-  }
-
-  // ---------------------------------------------------------------- gancho de la prueba en vivo
-
-  /** Toca el diálogo abierto (ver {@link IdcMenu#prueba}): estado, profunda, robustez, fila:i, aplicar, silenciar:i, cerrar. (UI) */
-  static String prueba( String que ) {
-    IdcCalidad d = abierto;
-    if ( d == null || d.shell.isDisposed() ) {
-      return "no quality dialog";
-    }
-    if ( que.equals( "profunda" ) || que.equals( "robustez" ) ) {
-      ( que.equals( "profunda" ) ? d.profunda : d.conRobustez ).setSelection( true );
-      d.revisar();
-    } else if ( que.equals( "revisar" ) ) {
-      d.revisar();
-    } else if ( que.equals( "cancelar" ) ) {
-      d.cancelar();
-    } else if ( que.startsWith( "fila:" ) ) {
-      d.tabla.setSelection( Integer.parseInt( que.substring( 5 ) ) );
-      d.elegida( true );
-    } else if ( que.equals( "aplicar" ) ) {
-      d.aplicarAuto();
-    } else if ( que.startsWith( "silenciar:" ) ) {
-      d.tabla.setSelection( Integer.parseInt( que.substring( 10 ) ) );
-      d.elegida( false );
-      Preguntador antes = preguntador;
-      preguntador = ( p, t, x ) -> "IDC live test";
-      try {
-        d.silenciarElegido();
-      } finally {
-        preguntador = antes;
-      }
-    } else if ( que.equals( "cerrar" ) ) {
-      d.shell.close();
-      return "closed";
-    }
-    return d.resumen();
   }
 
   // ---------------------------------------------------------------- el servicio de Spoon

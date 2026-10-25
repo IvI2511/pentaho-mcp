@@ -30,8 +30,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     lesson loaded in the active transformation, or explains how to start one with Claude), the switch to
     every perspective of Spoon's own switcher (Data Integration, Reports, Grader…) and **About Pentaho
     Live** (version and a link to the repository).
-  - The dialogs call the same code as the MCP tools, with the same arguments; MCP behaviour and the 73
-    tools are unchanged.
+  - The dialogs call the same code as the MCP tools, with the same arguments, and show their texts in
+    Spoon's language. Still 73 tools.
+- `harden_etl` and `stress_test` speak the requested language: the plan's why, how_to, warnings, skipped and
+  not_applied reasons and notes (`harden_etl`), and the check messages, summaries, not_run reasons,
+  environment problems, notes and next step (`stress_test`, new optional `language` argument) come in English,
+  Spanish or Portuguese. The default is English, as before; JSON keys, recipe ids, levels, check ids, statuses
+  and verdicts do not change.
+
+### Fixed
+
+- A `harden_etl` dry run no longer touches the open document. It works on a copy, but Kettle's `realClone`
+  shares the changed flag, the undo list, the change listeners, the attributes and the variables with the
+  original, so a plan with proposals marked the transformation as changed in Spoon (and the «Harden…» dialog
+  did the same just by opening). Every copy the tools make (dry runs, previews, runs, reports) now gets its
+  own.
 
 ## [0.6.1] - 2026-10-24
 

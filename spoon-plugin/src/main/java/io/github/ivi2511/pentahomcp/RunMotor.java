@@ -194,12 +194,71 @@ final class RunMotor {
   // ---------------------------------------------------------------- copias
 
   /**
+   * realClone empieza con Object.clone(): el clon COMPARTE con el original el ChangedFlag (final), la lista de deshacer,
+   * los listeners de nombre/archivo/contenido, el mapa de atributos y el VariableSpace (leído del bytecode de 9.4). Así
+   * un ensayo sobre la copia (harden_etl o apply_lint_fixes con dry_run) marcaba el documento vivo como cambiado y le
+   * dejaba acciones de deshacer. Le da al clon los suyos: mismo estado de «cambiado», deshacer vacío, sin listeners,
+   * una copia de los atributos y de las variables. Por reflexión (campos protected de AbstractMeta); si algo falla, lo
+   * deja en el log y sigue.
+   */
+  static void aislar( AbstractMeta c ) {
+    try {
+      boolean cambiado = c.hasChanged();
+      poner( c, "changedFlag", new org.pentaho.di.core.changed.ChangedFlag() );
+      if ( cambiado ) {
+        c.setChanged( true );
+      }
+      poner( c, "undo", new ArrayList<org.pentaho.di.core.undo.TransAction>() );
+      poner( c, "undo_position", -1 );
+      for ( String f : new String[] { "nameChangedListeners", "filenameChangedListeners", "contentChangedListeners",
+        "currentDirectoryChangedListeners" } ) {
+        poner( c, f, new HashSet<Object>() );
+      }
+      Object atr = leer( c, "attributesMap" );
+      if ( atr instanceof Map ) {
+        Map<String, Map<String, String>> copia = new LinkedHashMap<String, Map<String, String>>();
+        for ( Map.Entry<?, ?> e : ( (Map<?, ?>) atr ).entrySet() ) {
+          @SuppressWarnings( "unchecked" )
+          Map<String, String> v = (Map<String, String>) e.getValue();
+          copia.put( (String) e.getKey(), v == null ? null : new LinkedHashMap<String, String>( v ) );
+        }
+        poner( c, "attributesMap", copia );
+      }
+      Object vs = leer( c, "variables" );
+      if ( vs instanceof org.pentaho.di.core.variables.VariableSpace ) {
+        org.pentaho.di.core.variables.VariableSpace viejo = (org.pentaho.di.core.variables.VariableSpace) vs;
+        org.pentaho.di.core.variables.Variables nuevo = new org.pentaho.di.core.variables.Variables();
+        nuevo.setParentVariableSpace( viejo.getParentVariableSpace() );
+        nuevo.copyVariablesFrom( viejo );
+        poner( c, "variables", nuevo );
+      }
+    } catch ( Throwable t ) {
+      McpLifecycleListener.LOG.logDebug( "Pentaho Live: the copy still shares state with the document: " + t );
+    }
+  }
+
+  private static java.lang.reflect.Field campo( String nombre ) throws NoSuchFieldException {
+    java.lang.reflect.Field f = AbstractMeta.class.getDeclaredField( nombre );
+    f.setAccessible( true );
+    return f;
+  }
+
+  private static Object leer( AbstractMeta c, String nombre ) throws ReflectiveOperationException {
+    return campo( nombre ).get( c );
+  }
+
+  private static void poner( AbstractMeta c, String nombre, Object v ) throws ReflectiveOperationException {
+    campo( nombre ).set( c, v );
+  }
+
+  /**
    * realClone(false) clona steps, hops y StepErrorMeta, pero los hops y los StepErrorMeta del clon
    * siguen apuntando a los StepMeta del ORIGINAL (verificado en 9.4). Sin esto, ejecutar la copia
    * recorre los steps vivos del documento y recortarla para el preview los modificaria. Reengancha
    * todo a los steps del clon, por nombre. Llamar en el hilo de UI, justo despues de realClone.
    */
   static void desligar( TransMeta c ) {
+    aislar( c );
     for ( TransHopMeta h : c.getTransHops() ) {
       if ( h.getFromStep() != null ) {
         h.setFromStep( c.findStep( h.getFromStep().getName() ) );
@@ -228,6 +287,7 @@ final class RunMotor {
 
   /** Lo mismo para jobs: los JobHopMeta del clon apuntan a las entradas del original. (UI) */
   static void desligar( JobMeta c ) {
+    aislar( c );
     for ( int i = 0; i < c.nrJobHops(); i++ ) {
       JobHopMeta h = c.getJobHop( i );
       if ( h.getFromEntry() != null ) {

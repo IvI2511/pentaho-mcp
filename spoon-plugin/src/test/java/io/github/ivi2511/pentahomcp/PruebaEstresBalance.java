@@ -3,14 +3,27 @@ package io.github.ivi2511.pentahomcp;
 import static io.github.ivi2511.pentahomcp.Verificador.cierto;
 import static io.github.ivi2511.pentahomcp.Verificador.contiene;
 import static io.github.ivi2511.pentahomcp.Verificador.igual;
+import static io.github.ivi2511.pentahomcp.Verificador.lanza;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.robustez.Balance;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.Corrida;
@@ -317,6 +330,142 @@ public class PruebaEstresBalance {
     contiene( m, "couldn't convert string [31/02/2021]", "y la causa que viene después de la excepción" );
     cierto( !m.contains( "ValueMetaBase.java" ), "sin la pila: " + m );
     cierto( EstresMain.primerError( "2026/10/22 00:03:01 - T - Finished\n" ) == null, "sin errores, null" );
+  }
+
+  /** Los ids y estados de las comprobaciones y las cuentas del balance: lo que no cambia con el idioma. */
+  private static String codigos( Balance.Informe i ) {
+    StringBuilder sb = new StringBuilder();
+    for ( EstresResultado.Comprobacion k : i.comprobaciones ) {
+      sb.append( k.id ).append( '=' ).append( k.estado ).append( ';' );
+    }
+    ObjectNode b = i.json( OM );
+    b.remove( "summary" );
+    b.remove( "not_evaluated" );
+    b.remove( "environment_problem" );
+    return sb.append( b.toString() ).toString();
+  }
+
+  /**
+   * language: el mismo caso da los textos en inglés por defecto (idénticos a los de antes) y en español o portugués
+   * con es/pt; los ids, los estados y las cuentas no cambian.
+   */
+  public void pruebaIdiomas() throws Exception {
+    Corrida c = corrida( true, new Object[] { "Read", "CsvInput", 0, 10, 0 }, new Object[] { "Check", "FilterRows",
+      10, 7, 0 }, new Object[] { "Write", "TextFileOutput", 7, 7, 0, 7 } );
+    Map<String, Integer> lineas = Collections.singletonMap( "Read", 10 );
+    Balance.Informe def = Balance.evaluar( lineal( null ), c, lineas, 3, null, null );
+    Balance.Informe en = Balance.evaluar( lineal( null ), c, lineas, 3, null, null, null, "en" );
+    Balance.Informe es = Balance.evaluar( lineal( null ), c, lineas, 3, null, null, null, "es" );
+    Balance.Informe pt = Balance.evaluar( lineal( null ), c, lineas, 3, null, null, null, "pt" );
+    Balance.Informe otro = Balance.evaluar( lineal( null ), c, lineas, 3, null, null, null, "fr" );
+    igual( def.json( OM ).toString(), en.json( OM ).toString(), "en = sin idioma" );
+    igual( def.json( OM ).toString(), otro.json( OM ).toString(), "otro idioma = en" );
+    igual( "10 read = 7 loaded + 0 rejected + 0 dropped (declared) + 3 lost", def.resumen(), "resumen en" );
+    igual( "step 'Check' (FilterRows) lost 3 row(s): a filter without a false branch drops the rows that do not "
+      + "match; send them to a rejects file with a reason, or declare the drop", def.comprobacion( "no_silent_loss" )
+        .detalles.get( 0 ), "detalle en, igual que antes" );
+    igual( "3 row(s) disappeared without an error hop, a false branch or a declaration", def.comprobacion(
+      "no_silent_loss" ).mensaje, "mensaje en" );
+    igual( "3 broken row(s) were not rejected (3 expected, 0 rejected): they reached the outputs or were lost",
+      def.comprobacion( "bad_rows_rejected" ).mensaje, "bad_rows_rejected en" );
+    igual( "no rejects file in the transformation", def.comprobacion( "rejects_have_reason" ).mensaje,
+      "sin rechazos" );
+
+    igual( "10 leídas = 7 cargadas + 0 rechazadas + 0 descartadas (declaradas) + 3 perdidas", es.resumen(),
+      "resumen es" );
+    contiene( es.comprobacion( "no_silent_loss" ).detalles.get( 0 ), "el step 'Check' (FilterRows) perdió 3 fila(s)",
+      "detalle es" );
+    contiene( es.comprobacion( "no_silent_loss" ).mensaje, "desaparecieron sin un hop de error", "mensaje es" );
+    contiene( es.comprobacion( "bad_rows_rejected" ).mensaje, "no se rechazaron (3 esperadas, 0 rechazadas)",
+      "bad_rows_rejected es" );
+    contiene( es.json( OM ).path( "summary" ).asText(), "10 leídas", "el resumen del JSON también" );
+    igual( "10 lidas = 7 carregadas + 0 rejeitadas + 0 descartadas (declaradas) + 3 perdidas", pt.resumen(),
+      "resumen pt" );
+    contiene( pt.comprobacion( "no_silent_loss" ).detalles.get( 0 ), "o step 'Check' (FilterRows) perdeu 3 linha(s)",
+      "detalle pt" );
+    contiene( pt.comprobacion( "rejects_have_reason" ).mensaje, "arquivo de rejeitos", "pt de Brasil" );
+    String cod = codigos( def );
+    igual( cod, codigos( es ), "es: mismos ids, estados y cuentas" );
+    igual( cod, codigos( pt ), "pt: mismos ids, estados y cuentas" );
+    cierto( cod.contains( "no_silent_loss=fail" ) && cod.contains( "\"lost\":[{\"step\":\"Check\",\"rows\":3}]" ),
+      "códigos en inglés: " + cod );
+    igual( "fragile", Balance.veredicto( Arrays.asList( es ) ), "el veredicto no se traduce" );
+
+    // entorno: el motivo, el resumen y los not_evaluated
+    Corrida ce = corrida( false, new Object[] { "Read", "CsvInput", 0, 0, 0 } );
+    ce.mensajeError = "Table output - no such table: fact_venta";
+    Balance.Informe ie = Balance.evaluar( lineal( null ), ce, null, 0, null, ce, Arrays.asList(
+      "dw.sqlite (conexión dw)" ), "es" );
+    igual( "el archivo de base de datos dw.sqlite (conexión dw) no existe (así que tampoco la tabla fact_venta): "
+      + "ejecuta antes el job que lo crea, o apunta la prueba a una copia preparada", ie.entorno, "entorno es" );
+    contiene( ie.comprobacion( "no_abort" ).mensaje, "problema del entorno, no un fallo de robustez: ",
+      "no_abort es" );
+    contiene( ie.comprobacion( "idempotent" ).mensaje, "problema del entorno: ", "idempotent es" );
+    contiene( ie.resumen(), "sin evaluar (problema del entorno)", "resumen es" );
+    igual( EstresResultado.NO_EVALUADA, estado( ie, "no_abort" ), "el estado no cambia" );
+    igual( "not_run", Balance.veredicto( Arrays.asList( ie ) ), "not_run" );
+    ce.mensajeError = "SQLITE_CANTOPEN";
+    igual( "the database file does not exist: run the job that creates it first, or point the test at a prepared "
+      + "copy", Balance.problemaDeEntorno( ce, null ), "sin nombre, en: igual que antes" );
+    contiene( Balance.problemaDeEntorno( ce, null, "pt" ), "o arquivo de banco de dados não existe",
+      "sin nombre, pt" );
+
+    // los argumentos: language se valida y llega a los mensajes de error
+    igual( "pt", EstresTools.pedido( OM.readTree( "{\"language\":\"pt\"}" ) ).lang, "language=pt" );
+    igual( "en", EstresTools.pedido( OM.readTree( "{}" ) ).lang, "por defecto en" );
+    McpHttpServer.ToolError e = lanza( McpHttpServer.ToolError.class, () -> EstresTools.pedido( OM.readTree(
+      "{\"language\":\"fr\"}" ) ), "language=fr" );
+    igual( "'language' must be en, es or pt, got: fr", e.getMessage(), "el error de language" );
+    e = lanza( McpHttpServer.ToolError.class, () -> EstresTools.pedido( OM.readTree(
+      "{\"language\":\"es\",\"variants\":[\"zzz\"]}" ) ), "variante desconocida" );
+    contiene( e.getMessage(), "variante desconocida 'zzz'; válidas: all, ", "en español" );
+    e = lanza( McpHttpServer.ToolError.class, () -> EstresTools.pedido( OM.readTree( "{\"variants\":[\"zzz\"]}" ) ),
+      "variante desconocida" );
+    contiene( e.getMessage(), "unknown variant 'zzz'; valid: all, ", "en inglés por defecto" );
+    String vencida = "The stress test did not finish in 300 s and was stopped";
+    igual( "La prueba de estrés no terminó en 300 s y se detuvo", EstresTools.traducirVencida(
+      new McpHttpServer.ToolError( vencida ), Balance.textos( "es" ) ).getMessage(), "la de RunMotor, en es" );
+    igual( vencida, EstresTools.traducirVencida( new McpHttpServer.ToolError( vencida ), Balance.textos( "en" ) )
+      .getMessage(), "en: igual" );
+  }
+
+  /** estres_en/es/pt.properties: las mismas claves y los mismos %s/%d en el mismo orden. */
+  public void pruebaTextosMismasClaves() throws Exception {
+    Map<String, Properties> ps = new LinkedHashMap<String, Properties>();
+    for ( String l : new String[] { "en", "es", "pt" } ) {
+      Properties p = new Properties();
+      try ( InputStream in = PruebaEstresBalance.class.getClassLoader().getResourceAsStream( Rotulos.CARPETA
+        + "estres_" + l + ".properties" ) ) {
+        cierto( in != null, "estres_" + l + ".properties en el classpath" );
+        p.load( new InputStreamReader( in, StandardCharsets.UTF_8 ) );
+      }
+      ps.put( l, p );
+    }
+    Set<String> en = new TreeSet<String>( ps.get( "en" ).stringPropertyNames() );
+    cierto( en.size() >= 60, "claves en: " + en.size() );
+    Pattern esp = Pattern.compile( "%[sd%n]" );
+    for ( String l : new String[] { "es", "pt" } ) {
+      igual( en, new TreeSet<String>( ps.get( l ).stringPropertyNames() ), "las claves de " + l );
+      for ( String k : en ) {
+        igual( especificadores( esp, ps.get( "en" ).getProperty( k ) ), especificadores( esp, ps.get( l )
+          .getProperty( k ) ), l + " " + k + ": los mismos especificadores" );
+        cierto( !ps.get( l ).getProperty( k ).trim().isEmpty(), l + " " + k + " no vacío" );
+      }
+    }
+    for ( String x : new String[] { "tenés", "ejecutá", "mirá", "usá", "probá", "fijate", "podés" } ) {
+      for ( String k : en ) {
+        cierto( !ps.get( "es" ).getProperty( k ).contains( x ), "es " + k + ": sin voseo (" + x + ")" );
+      }
+    }
+  }
+
+  private static String especificadores( Pattern p, String texto ) {
+    StringBuilder sb = new StringBuilder();
+    Matcher m = p.matcher( texto );
+    while ( m.find() ) {
+      sb.append( m.group() );
+    }
+    return sb.toString();
   }
 
   public void pruebaColumnaMotivo() {

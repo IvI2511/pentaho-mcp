@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.Comprobacion;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.Corrida;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.PasoCuenta;
@@ -94,6 +95,8 @@ public final class Balance {
 
   /** El balance y las comprobaciones de una variante. */
   public static final class Informe {
+    /** Idioma de los mensajes y del resumen (en | es | pt); las claves y los códigos no cambian. */
+    public String idioma = "en";
     public long leidas;
     public long cargadas;
     public long rechazadas;
@@ -144,25 +147,21 @@ public final class Balance {
 
     /** «31 read = 17 loaded + 12 rejected + 2 dropped (declared) + 0 lost». */
     public String resumen() {
+      Rotulos r = textos( idioma );
       if ( entorno != null ) {
-        return porFila ? "aborted: a bad row stopped the load (and there is an environment problem: " + entorno + ")"
-          : "not evaluated (environment problem): " + entorno;
+        return porFila ? r.f( "summary_env_bad_row", entorno ) : r.f( "summary_env", entorno );
       }
       if ( abortada ) {
-        return "aborted after " + leidas + " rows read (" + cargadas + " loaded, " + rechazadas + " rejected before "
-          + "the stop)";
+        return r.f( "summary_aborted", leidas, cargadas, rechazadas );
       }
       long dd = 0;
       for ( long x : descartesDeclarados.values() ) {
         dd += x;
       }
       if ( leidas == cargadas + rechazadas + dd + perdidasTotal() ) {
-        return leidas + " read = " + cargadas + " loaded + " + rechazadas + " rejected + " + dd
-          + " dropped (declared) + " + perdidasTotal() + " lost";
+        return r.f( "summary_balance", leidas, cargadas, rechazadas, dd, perdidasTotal() );
       }
-      return leidas + " read; " + cargadas + " reached the loads, " + rechazadas + " rejected, " + dd
-        + " dropped (declared), " + perdidasTotal() + " lost (rows fan out to several loads or are merged: see "
-        + "aggregates)";
+      return r.f( "summary_fanout", leidas, cargadas, rechazadas, dd, perdidasTotal() );
     }
 
     public ObjectNode json( ObjectMapper om ) {
@@ -212,8 +211,20 @@ public final class Balance {
    */
   public static Informe evaluar( List<Nodo> nodos, Corrida c, Map<String, Integer> lineas, int debenRechazarse,
                                  List<Rechazo> rechazos, Corrida segunda, Collection<String> bdsQueFaltan ) {
+    return evaluar( nodos, c, lineas, debenRechazarse, rechazos, segunda, bdsQueFaltan, "en" );
+  }
+
+  /**
+   * Como {@link #evaluar(List, Corrida, Map, int, List, Corrida, Collection)}, con los mensajes, los detalles y el
+   * resumen en {@code idioma} (en | es | pt; otro = en). Los ids y los estados no cambian.
+   */
+  public static Informe evaluar( List<Nodo> nodos, Corrida c, Map<String, Integer> lineas, int debenRechazarse,
+                                 List<Rechazo> rechazos, Corrida segunda, Collection<String> bdsQueFaltan,
+                                 String idioma ) {
+    Rotulos r = textos( idioma );
     Informe inf = new Informe();
-    String entorno = problemaDeEntorno( c, bdsQueFaltan );
+    inf.idioma = r.idioma();
+    String entorno = problemaDeEntorno( c, bdsQueFaltan, idioma );
     if ( entorno != null ) {
       inf.abortada = true;
       inf.entorno = entorno;
@@ -221,29 +232,26 @@ public final class Balance {
       List<PasoCuenta> porFila = abortosPorFila( c );
       Comprobacion k;
       if ( porFila.isEmpty() ) {
-        k = new Comprobacion( "no_abort", EstresResultado.NO_EVALUADA, "environment problem, not a robustness failure: "
-          + entorno );
+        k = new Comprobacion( "no_abort", EstresResultado.NO_EVALUADA, r.f( "environment_reason", entorno ) );
         if ( c.mensajeError != null ) {
-          k.detalles.add( "error: " + recortar( c.mensajeError ) );
+          k.detalles.add( r.f( "detail_error", recortar( c.mensajeError ) ) );
         }
       } else {
         inf.porFila = true;
-        k = new Comprobacion( "no_abort", EstresResultado.FALLA, "a bad row stopped the load (besides the environment "
-          + "problem: " + entorno + ")" );
+        k = new Comprobacion( "no_abort", EstresResultado.FALLA, r.f( "no_abort_env_bad_row", entorno ) );
         for ( PasoCuenta p : porFila ) {
-          k.detalles.add( "step '" + p.nombre + "' (" + p.tipo + ") failed with " + p.errores + " error(s): "
-            + recortar( p.mensaje ) );
+          k.detalles.add( r.f( "step_failed_msg", p.nombre, p.tipo, p.errores, recortar( p.mensaje ) ) );
         }
       }
       inf.comprobaciones.add( k );
       for ( String id : new String[] { "input_complete", "no_silent_loss", "rejects_have_reason",
         "bad_rows_rejected" } ) {
-        inf.comprobaciones.add( new Comprobacion( id, EstresResultado.NO_EVALUADA, ( inf.porFila ? "the run "
-          + "aborted; " : "" ) + "environment problem: " + entorno ) );
+        inf.comprobaciones.add( new Comprobacion( id, EstresResultado.NO_EVALUADA, r.f( inf.porFila
+          ? "env_problem_aborted" : "env_problem", entorno ) ) );
       }
       if ( segunda != null ) {
-        inf.comprobaciones.add( new Comprobacion( "idempotent", EstresResultado.NO_EVALUADA, "environment problem: "
-          + entorno ) );
+        inf.comprobaciones.add( new Comprobacion( "idempotent", EstresResultado.NO_EVALUADA, r.f( "env_problem",
+          entorno ) ) );
       }
       return inf;
     }
@@ -258,12 +266,11 @@ public final class Balance {
     inf.abortada = abortada;
     if ( abortada ) {
       Comprobacion k = new Comprobacion( "no_abort", EstresResultado.FALLA,
-        c.vencida ? "the run did not finish in time (timeout)" : "the transformation aborted with " + c.errores
-          + " error(s): a bad row stopped the load" + ( c.mensajeError != null ? ": " + recortar( c.mensajeError )
-          : "" ) );
+        c.vencida ? r.s( "no_abort_timeout" ) : c.mensajeError != null ? r.f( "no_abort_aborted_msg", c.errores,
+          recortar( c.mensajeError ) ) : r.f( "no_abort_aborted", c.errores ) );
       for ( PasoCuenta p : cuentas.values() ) {
         if ( p.errores > 0 ) {
-          k.detalles.add( "step '" + p.nombre + "' (" + p.tipo + ") failed with " + p.errores + " error(s)" );
+          k.detalles.add( r.f( "step_failed", p.nombre, p.tipo, p.errores ) );
         }
       }
       inf.comprobaciones.add( k );
@@ -284,9 +291,7 @@ public final class Balance {
         Integer esperadas = lineas == null ? null : lineas.get( n.nombre );
         if ( esperadas != null && !abortada && sale < esperadas ) {
           completa.estado = EstresResultado.AVISO;
-          completa.detalles.add( "'" + n.nombre + "' produced " + sale + " rows from " + esperadas
-            + " data lines: the input swallowed " + ( esperadas - sale ) + " (open enclosure or a cut line joined "
-            + "to the next one)" );
+          completa.detalles.add( r.f( "input_swallowed", n.nombre, sale, esperadas, esperadas - sale ) );
         }
       }
       if ( n.carga && !n.enRechazo ) {
@@ -321,12 +326,12 @@ public final class Balance {
       }
       long recibidas = Math.max( p.recibidas, p.leidas );
       if ( !evaluable ) {
-        inf.noEvaluados.add( n.nombre + ": its info source sends rows to several steps" );
+        inf.noEvaluados.add( r.f( "not_eval_info_shared", n.nombre ) );
         continue;
       }
       long entra = recibidas - info;
       if ( entra < 0 ) {
-        inf.noEvaluados.add( n.nombre + ": could not separate its main and info rows" );
+        inf.noEvaluados.add( r.f( "not_eval_info_split", n.nombre ) );
         continue;
       }
       if ( entra > sale && !abortada ) {
@@ -343,18 +348,16 @@ public final class Balance {
     // --- no_silent_loss
     if ( abortada ) {
       inf.comprobaciones.add( new Comprobacion( "no_silent_loss", EstresResultado.NO_EVALUADA,
-        "the run aborted: the row counts are partial" ) );
+        r.s( "loss_partial" ) ) );
     } else if ( inf.perdidas.isEmpty() ) {
       inf.comprobaciones.add( new Comprobacion( "no_silent_loss", EstresResultado.PASA, null ) );
     } else {
-      Comprobacion k = new Comprobacion( "no_silent_loss", EstresResultado.FALLA, inf.perdidasTotal()
-        + " row(s) disappeared without an error hop, a false branch or a declaration" );
+      Comprobacion k = new Comprobacion( "no_silent_loss", EstresResultado.FALLA, r.f( "loss",
+        inf.perdidasTotal() ) );
       for ( Map.Entry<String, Long> e : inf.perdidas.entrySet() ) {
         Nodo n = porNombre.get( e.getKey() );
-        k.detalles.add( "step '" + e.getKey() + "' (" + ( n == null ? "?" : n.tipo ) + ") lost " + e.getValue()
-          + " row(s)" + ( n != null && "FilterRows".equals( n.tipo ) ? ": a filter without a false branch "
-            + "drops the rows that do not match; send them to a rejects file with a reason, or declare the drop"
-            : "" ) );
+        k.detalles.add( r.f( n != null && "FilterRows".equals( n.tipo ) ? "loss_step_filter" : "loss_step",
+          e.getKey(), n == null ? "?" : n.tipo, e.getValue() ) );
       }
       inf.comprobaciones.add( k );
     }
@@ -362,18 +365,16 @@ public final class Balance {
     // --- rejects_have_reason
     if ( rechazos == null || rechazos.isEmpty() ) {
       inf.comprobaciones.add( new Comprobacion( "rejects_have_reason", debenRechazarse > 0 && !abortada
-        ? EstresResultado.AVISO : EstresResultado.NO_EVALUADA, "no rejects file in the transformation" ) );
+        ? EstresResultado.AVISO : EstresResultado.NO_EVALUADA, r.s( "no_rejects_file" ) ) );
     } else {
       Comprobacion k = new Comprobacion( "rejects_have_reason", EstresResultado.PASA, null );
-      for ( Rechazo r : rechazos ) {
-        if ( r.sinColumnaMotivo && r.filas > 0 ) {
+      for ( Rechazo x : rechazos ) {
+        if ( x.sinColumnaMotivo && x.filas > 0 ) {
           k.estado = EstresResultado.AVISO;
-          k.detalles.add( "'" + r.paso + "' writes " + r.filas + " rejected row(s) without a reason column "
-            + "(motivo/reason)" );
-        } else if ( r.sinMotivo > 0 ) {
+          k.detalles.add( r.f( "reject_no_column", x.paso, x.filas ) );
+        } else if ( x.sinMotivo > 0 ) {
           k.estado = EstresResultado.AVISO;
-          k.detalles.add( "'" + r.paso + "': " + r.sinMotivo + " of " + r.filas + " rejected row(s) have an empty "
-            + "reason" );
+          k.detalles.add( r.f( "reject_empty_reason", x.paso, x.sinMotivo, x.filas ) );
         }
       }
       inf.comprobaciones.add( k );
@@ -382,16 +383,15 @@ public final class Balance {
     // --- bad_rows_rejected
     if ( abortada || debenRechazarse <= 0 ) {
       inf.comprobaciones.add( new Comprobacion( "bad_rows_rejected", EstresResultado.NO_EVALUADA,
-        abortada ? "the run aborted" : "the variant has no rows that must be rejected" ) );
+        abortada ? r.s( "bad_rows_aborted" ) : r.s( "bad_rows_none" ) ) );
     } else {
       long dd = 0;
       for ( long x : inf.descartesDeclarados.values() ) {
         dd += x;
       }
       long fuera = debenRechazarse - inf.rechazadas - dd;
-      inf.comprobaciones.add( fuera > 0 ? new Comprobacion( "bad_rows_rejected", EstresResultado.AVISO, fuera
-        + " broken row(s) were not rejected (" + debenRechazarse + " expected, " + inf.rechazadas
-        + " rejected): they reached the outputs or were lost" )
+      inf.comprobaciones.add( fuera > 0 ? new Comprobacion( "bad_rows_rejected", EstresResultado.AVISO, r.f(
+        "bad_rows_not_rejected", fuera, debenRechazarse, inf.rechazadas ) )
         : new Comprobacion( "bad_rows_rejected", EstresResultado.PASA, null ) );
     }
 
@@ -401,11 +401,11 @@ public final class Balance {
       boolean segundaAborta = !segunda.terminada || segunda.errores > 0 || segunda.vencida;
       if ( segundaAborta ) {
         k.estado = EstresResultado.FALLA;
-        k.mensaje = "the second run on the same database aborted"
-          + ( segunda.mensajeError != null ? ": " + recortar( segunda.mensajeError ) : "" );
+        k.mensaje = segunda.mensajeError != null ? r.f( "idem_second_aborted_msg", recortar( segunda.mensajeError ) )
+          : r.s( "idem_second_aborted" );
       } else if ( c.tablas.isEmpty() ) {
         k.estado = EstresResultado.NO_EVALUADA;
-        k.mensaje = "no database table to compare";
+        k.mensaje = r.s( "idem_no_table" );
       } else {
         Map<String, TablaCuenta> t2 = new LinkedHashMap<String, TablaCuenta>();
         for ( TablaCuenta t : segunda.tablas ) {
@@ -418,17 +418,16 @@ public final class Balance {
           }
           if ( b.filas > t.filas ) {
             k.estado = EstresResultado.FALLA;
-            k.detalles.add( "table " + t.tabla + ": " + t.filas + " rows after the 1st run, " + b.filas
-              + " after the 2nd (re-running duplicates rows)" );
+            k.detalles.add( r.f( "idem_duplicates", t.tabla, t.filas, b.filas ) );
           } else if ( t.huellaClaves != null && !t.huellaClaves.equals( b.huellaClaves ) ) {
             if ( !EstresResultado.FALLA.equals( k.estado ) ) {
               k.estado = EstresResultado.AVISO;
             }
-            k.detalles.add( "table " + t.tabla + ": same rows but the keys changed (unstable surrogate keys)" );
+            k.detalles.add( r.f( "idem_keys_changed", t.tabla ) );
           }
         }
         if ( !k.detalles.isEmpty() ) {
-          k.mensaje = "re-running the load is not idempotent";
+          k.mensaje = r.s( "idem_not_idempotent" );
         }
       }
       inf.comprobaciones.add( k );
@@ -452,9 +451,6 @@ public final class Balance {
     return entorno ? "not_run" : "robust";
   }
 
-  /** Lo que se pide para arreglar el entorno. */
-  static final String ARREGLO_ENTORNO = ": run the job that creates it first, or point the test at a prepared copy";
-
   /** Tabla que no existe, por motor: SQLite, H2, MySQL/MariaDB, PostgreSQL, Oracle, SQL Server. */
   private static final Pattern[] SIN_TABLA = {
     Pattern.compile( "(?i)no such table:?\\s*([\\w.$\"`\\[\\]]+)" ),
@@ -476,6 +472,11 @@ public final class Balance {
    * de la prueba (el motivo los nombra).
    */
   public static String problemaDeEntorno( Corrida c, Collection<String> bdsQueFaltan ) {
+    return problemaDeEntorno( c, bdsQueFaltan, "en" );
+  }
+
+  /** Como {@link #problemaDeEntorno(Corrida, Collection)}, con el motivo en {@code idioma} (en | es | pt). */
+  public static String problemaDeEntorno( Corrida c, Collection<String> bdsQueFaltan, String idioma ) {
     if ( c == null || c.vencida || ( c.terminada && c.errores == 0 ) ) {
       return null;
     }
@@ -484,7 +485,7 @@ public final class Balance {
     for ( Pattern p : SIN_BD ) {
       Matcher m = p.matcher( texto );
       if ( m.find() ) {
-        bd = m.group( 1 ).isEmpty() ? "file" : m.group( 1 );
+        bd = m.group( 1 );
         break;
       }
     }
@@ -499,15 +500,16 @@ public final class Balance {
     if ( bd == null && tabla == null ) {
       return null;
     }
+    Rotulos r = textos( idioma );
     if ( bdsQueFaltan != null && !bdsQueFaltan.isEmpty() ) {
-      return "the database file " + String.join( ", ", bdsQueFaltan ) + " does not exist"
-        + ( tabla != null && !tabla.isEmpty() ? " (so neither does the table " + tabla + ")" : "" ) + ARREGLO_ENTORNO;
+      String bds = String.join( ", ", bdsQueFaltan );
+      return tabla != null && !tabla.isEmpty() ? r.f( "env_db_files_table", bds, tabla ) : r.f( "env_db_files", bds );
     }
     if ( bd != null ) {
-      return "the database " + bd + " does not exist" + ARREGLO_ENTORNO;
+      // un patrón sin grupo (unable to open database file, SQLITE_CANTOPEN): no se sabe el nombre
+      return bd.isEmpty() ? r.s( "env_db_unnamed" ) : r.f( "env_db", bd );
     }
-    return "the database or table " + ( tabla.isEmpty() ? "it reads or loads" : tabla ) + " does not exist"
-      + ARREGLO_ENTORNO;
+    return tabla.isEmpty() ? r.s( "env_table_unnamed" ) : r.f( "env_table", tabla );
   }
 
   /** ¿El mensaje habla de una BD o una tabla que no existe? */
@@ -628,6 +630,11 @@ public final class Balance {
     return n.equals( "motivo" ) || n.equals( "reason" ) || n.startsWith( "motivo_" ) || n.endsWith( "_motivo" )
       || n.equals( "error_description" ) || n.equals( "error_desc" ) || n.equals( "errordescription" )
       || n.equals( "reject_reason" ) || n.equals( "motivo_rechazo" ) || n.equals( "motivo_do_rejeito" );
+  }
+
+  /** Los textos de stress_test (área «estres») en {@code idioma} (en | es | pt; otro = en). */
+  public static Rotulos textos( String idioma ) {
+    return Rotulos.de( "estres", idioma );
   }
 
   static String recortar( String s ) {

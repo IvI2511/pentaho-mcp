@@ -90,12 +90,6 @@ final class IdcMenu {
   static final String TRANSFORMACION = "transformation";
   static final String JOB = "job";
 
-  /**
-   * Solo para la prueba en vivo: con una posición, los diálogos se abren ahí y sin activarse (setVisible en lugar de
-   * open), para no quitarle el foco a quien usa el PC. null en uso normal.
-   */
-  static volatile Point posicionPrueba;
-
   private static Image icono;
   private static Menu ultimo;
 
@@ -228,7 +222,7 @@ final class IdcMenu {
     }
   }
 
-  private static ToolBar barraPrincipal( XulDomContainer c ) {
+  static ToolBar barraPrincipal( XulDomContainer c ) {
     if ( c == null || c.getDocumentRoot() == null ) {
       return null;
     }
@@ -501,10 +495,6 @@ final class IdcMenu {
   }
 
   static void aviso( Shell padre, Rotulos r, String texto ) {
-    if ( posicionPrueba != null ) {
-      McpLifecycleListener.LOG.logBasic( "Pentaho Live (IDC test): " + texto );
-      return; // la prueba en vivo no abre cuadros modales
-    }
     MessageBox mb = new MessageBox( padre, SWT.ICON_INFORMATION | SWT.OK );
     mb.setText( r.s( "info_title" ) );
     mb.setMessage( texto );
@@ -515,6 +505,13 @@ final class IdcMenu {
 
   /** «Acerca de Pentaho Live»: símbolo, versión, autor y enlace al repositorio. Modal sobre Spoon. (UI) */
   static Shell acerca( Shell padre, Rotulos r ) {
+    Shell s = crearAcerca( padre, r );
+    abrirShell( s, padre );
+    return s;
+  }
+
+  /** La ventana «Acerca de», armada y sin abrir (las pruebas la muestran fuera de la pantalla). (UI) */
+  static Shell crearAcerca( Shell padre, Rotulos r ) {
     final Shell s = new Shell( padre, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL );
     s.setText( r.s( "about_title" ) );
     GridLayout gl = new GridLayout( 2, false );
@@ -556,18 +553,11 @@ final class IdcMenu {
     cerrar.addListener( SWT.Selection, e -> s.close() );
     s.setDefaultButton( cerrar );
     s.pack();
-    abrirShell( s, padre );
     return s;
   }
 
-  /** Centra la Shell sobre su padre y la abre (o, en la prueba en vivo, la muestra sin activarla donde se pidió). */
+  /** Centra la Shell sobre su padre y la abre. (UI) */
   static void abrirShell( Shell s, Shell padre ) {
-    Point prueba = posicionPrueba;
-    if ( prueba != null ) {
-      s.setLocation( prueba );
-      s.setVisible( true );
-      return;
-    }
     if ( padre != null && !padre.isDisposed() ) {
       Rectangle p = padre.getBounds();
       Point t = s.getSize();
@@ -583,8 +573,61 @@ final class IdcMenu {
     if ( icono != null && !icono.isDisposed() && icono.getDevice() == d ) {
       return icono;
     }
-    icono = imagenPng( d, 28 );
+    try {
+      icono = new Image( d, new ImageData( new ByteArrayInputStream( pngBarra() ) ) );
+    } catch ( Throwable t ) {
+      icono = null;
+    }
     return icono;
+  }
+
+  /**
+   * El icono de la barra ocupa el hueco de 16 x 16 de los demás (la ToolBar de Windows usa un solo tamaño de imagen
+   * para todos sus botones y estiraría uno más ancho). Celdas de 3 x 3 px con 1 de separación: 15 x 11, centrado.
+   */
+  static final int LADO = 16;
+  static final int CELDA = 3;
+  static final int HUECO = 1;
+  /**
+   * Las celdas apagadas en la barra: un gris medio opaco con contraste de 3:1 o más sobre fondo claro (#f0f0f0) y
+   * sobre fondo oscuro (#2b2b2b), como las encendidas (las del manual, #d6deea y #202b3c, desaparecen a 16 px sobre
+   * el fondo contrario).
+   */
+  static final int[] GRIS_BARRA = { 0x7a, 0x84, 0x96 };
+
+  /** Origen de la rejilla dentro de los 16 x 16 (x, y). */
+  static int[] origenBarra() {
+    int w = SimboloIdc.COLUMNAS * CELDA + ( SimboloIdc.COLUMNAS - 1 ) * HUECO;
+    int h = SimboloIdc.FILAS * CELDA + ( SimboloIdc.FILAS - 1 ) * HUECO;
+    return new int[] { ( LADO - w ) / 2, ( LADO - h ) / 2 };
+  }
+
+  /**
+   * El símbolo IDC para la barra de Spoon: 16 x 16 px, todas las celdas opacas y alineadas al píxel (sin
+   * antialiasing, que a este tamaño las desdibuja), las encendidas con los colores de la marca y las apagadas en
+   * {@link #GRIS_BARRA}; el resto transparente. PNG con alfa.
+   */
+  static byte[] pngBarra() throws java.io.IOException {
+    int[] o = origenBarra();
+    java.awt.image.BufferedImage img = new java.awt.image.BufferedImage( LADO, LADO,
+      java.awt.image.BufferedImage.TYPE_INT_ARGB );
+    java.awt.Graphics2D g = img.createGraphics();
+    try {
+      for ( int f = 0; f < SimboloIdc.FILAS; f++ ) {
+        for ( int c = 0; c < SimboloIdc.COLUMNAS; c++ ) {
+          String t = SimboloIdc.tipo( f, c );
+          int[] rgb = SimboloIdc.APAGADA.equals( t ) ? GRIS_BARRA
+            : io.github.ivi2511.pentahomcp.informes.tema.Paleta.rgb( SimboloIdc.color( SimboloIdc.CLARO, t ) );
+          g.setColor( new java.awt.Color( rgb[ 0 ], rgb[ 1 ], rgb[ 2 ] ) );
+          g.fillRect( o[ 0 ] + c * ( CELDA + HUECO ), o[ 1 ] + f * ( CELDA + HUECO ), CELDA, CELDA );
+        }
+      }
+    } finally {
+      g.dispose();
+    }
+    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+    javax.imageio.ImageIO.write( img, "png", bo );
+    return bo.toByteArray();
   }
 
   /** El símbolo IDC (variante clara, la de fondos claros) de anchoPx de ancho como Image SWT; null si falla. */
@@ -647,47 +690,5 @@ final class IdcMenu {
     }
     String m = c.getMessage();
     return m == null || m.isEmpty() ? c.getClass().getSimpleName() : m;
-  }
-
-  // ================================================================ gancho de la prueba en vivo
-
-  /**
-   * Solo para la prueba en vivo (se llama por reflexión desde un agente adjuntado a la JVM de Spoon; nada de Pentaho
-   * Live lo llama): ejecuta una acción del menú en el hilo de UI sin activar ventanas y devuelve un texto con lo que
-   * hizo. accion: "menu" (el modelo y dónde está el botón), un id del menú, o "calidad:&lt;método&gt;" /
-   * "robustez:&lt;método&gt;" para tocar el diálogo abierto (ver {@link IdcCalidad#prueba} e
-   * {@link IdcRobustez#prueba}).
-   */
-  static String prueba( final String accion, final int x, final int y ) throws Exception {
-    posicionPrueba = new Point( x, y );
-    return UiThread.call( () -> {
-      Spoon sp = UiThread.spoon();
-      if ( "menu".equals( accion ) ) {
-        StringBuilder b = new StringBuilder();
-        ToolBar tb = barraPrincipal( sp.getMainSpoonContainer() );
-        if ( tb != null ) {
-          ToolItem[] items = tb.getItems();
-          for ( int i = 0; i < items.length; i++ ) {
-            String t = items[ i ].getToolTipText();
-            b.append( i ).append( ": " ).append( items[ i ].getData( MARCA ) != null ? "[IDC] " : "" )
-              .append( esSelector( items[ i ], textoSelector() ) ? "[perspectives] " : "" )
-              .append( items[ i ].getText() ).append( " | " ).append( t == null ? "" : t.replace( '\n', ' ' ) )
-              .append( '\n' );
-          }
-        }
-        for ( Entrada e : modelo( rotulos(), contexto( sp ) ) ) {
-          b.append( "  " ).append( e ).append( '\n' );
-        }
-        return b.toString();
-      }
-      if ( accion.startsWith( "calidad:" ) ) {
-        return IdcCalidad.prueba( accion.substring( 8 ) );
-      }
-      if ( accion.startsWith( "robustez:" ) ) {
-        return IdcRobustez.prueba( accion.substring( 9 ) );
-      }
-      ejecutar( sp, accion );
-      return "ok " + accion;
-    }, 20000 );
   }
 }

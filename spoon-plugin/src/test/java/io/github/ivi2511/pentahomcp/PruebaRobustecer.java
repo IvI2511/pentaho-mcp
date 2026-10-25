@@ -167,6 +167,91 @@ public class PruebaRobustecer {
   }
 
   /**
+   * harden_etl dry_run (MCP y «Robustecer…» del menú IDC): con propuestas, el documento vivo queda igual: mismo XML,
+   * sin marca de cambiado y sin acciones nuevas de deshacer. Es el mismo camino que RobustezTools.robustecer con
+   * dry_run=true: copia, puntaje, análisis, elección y ensayo sobre la copia.
+   */
+  public void pruebaEnsayoNoTocaElDocumento() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    // como un documento abierto en Spoon: hops y steps sin la marca de cambiados
+    tm.clearChanged();
+    String xml = tm.getXML();
+    falso( tm.hasChanged(), "recién abierto" );
+    // con algo ya en el deshacer, como un documento editado a mano
+    tm.addUndo( new Object[] { tm.findStep( "Leer ventas" ).clone() }, new Object[] { tm.findStep( "Leer ventas" ) },
+      new int[] { 0 }, null, null, TransMeta.TYPE_UNDO_CHANGE, false );
+    tm.clearChanged();
+    int deshacer = tm.getUndoSize();
+    org.pentaho.di.core.undo.TransAction tope = tm.viewThisUndo();
+    RobustecerAnalisis.Pedido p = pedido( "{\"recipes\":[\"all\"],\"language\":\"es\"}" );
+    ObjectNode o = RobustezTools.ensayoSobreCopia( tm, p, false );
+    cierto( o.path( "would_apply" ).size() > 0, "hay propuestas que se aplicarían: " + o.path( "would_apply" ) );
+    falso( tm.hasChanged(), "el ensayo no marca el documento como cambiado" );
+    igual( xml, tm.getXML(), "el ensayo no cambia el XML del documento" );
+    igual( deshacer, tm.getUndoSize(), "el ensayo no agrega acciones de deshacer" );
+    cierto( tope == tm.viewThisUndo(), "el próximo Ctrl+Z sigue siendo el de antes" );
+    // la copia tiene su propio estado: marcarla no marca el documento
+    TransMeta c = (TransMeta) ReportTools.clonar( tm );
+    c.setChanged();
+    falso( tm.hasChanged(), "la copia no comparte la marca de cambiado" );
+    c.addUndo( new Object[] { c.getStep( 0 ) }, null, new int[] { 0 }, null, null, TransMeta.TYPE_UNDO_NEW, false );
+    igual( deshacer, tm.getUndoSize(), "ni la lista de deshacer" );
+  }
+
+  /**
+   * Los textos del plan en el idioma pedido: sin language, en inglés (como siempre); con es/pt, por qué, cómo
+   * hacerlo, avisos y motivos traducidos, con las mismas keys, recetas, niveles y diffs. Los tres archivos de textos
+   * tienen las mismas claves y los mismos %s.
+   */
+  public void pruebaTextosEnTresIdiomas() throws Exception {
+    TransMeta tm = antes( "dw.sqlite" );
+    ObjectNode en = RobustezTools.ensayoSobreCopia( tm, pedido( "{\"recipes\":[\"all\"]}" ), false );
+    ObjectNode es = RobustezTools.ensayoSobreCopia( tm, pedido( "{\"recipes\":[\"all\"],\"language\":\"es\"}" ),
+      false );
+    ObjectNode pt = RobustezTools.ensayoSobreCopia( tm, pedido( "{\"recipes\":[\"all\"],\"language\":\"pt\"}" ),
+      false );
+    contiene( en.toString(), "One row that cannot be converted stops the whole run.", "inglés por defecto" );
+    contiene( es.toString(), "Una fila que no se puede convertir para toda la ejecución.", "castellano" );
+    contiene( pt.toString(), "Uma linha que não pode ser convertida para a execução inteira.", "portugués" );
+    contiene( es.toString(), "Los parámetros quedan fuera del deshacer de Spoon", "aviso en castellano" );
+    noContiene( es.toString(), "is a counter", "nada en inglés en es" );
+    igual( en.path( "proposals" ).size(), es.path( "proposals" ).size(), "mismas propuestas" );
+    for ( int i = 0; i < en.path( "proposals" ).size(); i++ ) {
+      JsonNode a = en.path( "proposals" ).get( i );
+      JsonNode b = es.path( "proposals" ).get( i );
+      igual( a.path( "key" ).asText(), b.path( "key" ).asText(), "misma key" );
+      igual( a.path( "level" ).asText(), b.path( "level" ).asText(), "mismo nivel" );
+      igual( a.path( "recipe" ).asText(), b.path( "recipe" ).asText(), "misma receta" );
+      igual( a.path( "diff" ).asText(), b.path( "diff" ).asText(), "mismo diff (los nombres siguen al documento)" );
+    }
+    // las claves de los tres archivos
+    java.util.Map<String, java.util.Properties> ps = new java.util.LinkedHashMap<String, java.util.Properties>();
+    for ( String l : new String[] { "en", "es", "pt" } ) {
+      java.util.Properties p = new java.util.Properties();
+      try ( java.io.InputStream in = PruebaRobustecer.class.getResourceAsStream(
+        "/io/github/ivi2511/pentahomcp/informes/textos/harden_" + l + ".properties" ) ) {
+        p.load( new java.io.InputStreamReader( in, StandardCharsets.UTF_8 ) );
+      }
+      ps.put( l, p );
+    }
+    for ( String l : new String[] { "es", "pt" } ) {
+      igual( new java.util.TreeSet<Object>( ps.get( "en" ).keySet() ), new java.util.TreeSet<Object>( ps.get( l )
+        .keySet() ), "mismas claves en harden_" + l );
+      for ( String k : ps.get( "en" ).stringPropertyNames() ) {
+        igual( ps.get( "en" ).getProperty( k ).split( "%s", -1 ).length, ps.get( l ).getProperty( k ).split( "%s",
+          -1 ).length, "mismos %s en " + l + " " + k );
+      }
+    }
+    for ( String k : ps.get( "es" ).stringPropertyNames() ) {
+      String v = " " + ps.get( "es" ).getProperty( k ) + " ";
+      for ( String voseo : new String[] { " usá", " poné", " agregá", " insertá", " cambiá", " sacá", " corregí",
+        " pasá", " preguntale", " hacé " } ) {
+        noContiene( v, voseo, "sin voseo en harden_es " + k );
+      }
+    }
+  }
+
+  /**
    * Menú IDC, «Robustecer…»: una propuesta auto que la persona desmarcó (Pedido.excluir) no se elige; las demás auto
    * sí, y una confirm marcada entra. Desde MCP excluir queda vacío y el plan elige lo mismo que antes.
    */

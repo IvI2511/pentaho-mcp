@@ -180,6 +180,11 @@ public final class Variantes {
 
   /** {@code ["all"]} = cada tipo por separado + las de por defecto; null o vacío = las de por defecto. */
   public static List<String> expandir( Collection<String> pedidas, boolean hayBdArchivo ) {
+    return expandir( pedidas, hayBdArchivo, "en" );
+  }
+
+  /** Como {@link #expandir(Collection, boolean)}, con el error de una variante desconocida en {@code idioma}. */
+  public static List<String> expandir( Collection<String> pedidas, boolean hayBdArchivo, String idioma ) {
     Set<String> s = new LinkedHashSet<String>();
     if ( pedidas == null || pedidas.isEmpty() ) {
       s.addAll( POR_DEFECTO );
@@ -197,7 +202,8 @@ public final class Variantes {
         } else if ( ids().contains( x ) ) {
           s.add( x );
         } else {
-          throw new IllegalArgumentException( "unknown variant '" + p + "'; valid: all, " + String.join( ", ", ids() ) );
+          throw new IllegalArgumentException( Balance.textos( idioma ).f( "unknown_variant", p, String.join( ", ",
+            ids() ) ) );
         }
       }
     }

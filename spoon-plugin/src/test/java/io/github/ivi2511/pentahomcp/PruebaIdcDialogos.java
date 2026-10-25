@@ -28,7 +28,6 @@ import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.ImageLoader;
-import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Button;
@@ -51,7 +50,7 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * los MenuItem del modelo.
  * <p>
  * Como PruebaPanelSwt: las ventanas se abren fuera de la pantalla (-20000, -20000), sin activarse
- * ({@link IdcMenu#posicionPrueba}), nunca arriba de todo, y las capturas salen con {@code Control.print(GC)} en
+ * (se arman con su constructor y se muestran con setVisible, no con open()), nunca arriba de todo, y las capturas salen con {@code Control.print(GC)} en
  * {@code <prueba>\salida\idc\}.
  */
 public class PruebaIdcDialogos {
@@ -71,7 +70,6 @@ public class PruebaIdcDialogos {
     capturas = EntornoKettle.salida( "idc" );
     r = Rotulos.de( IdcMenu.AREA, "es" );
     preguntadorAntes = IdcCalidad.preguntador;
-    IdcMenu.posicionPrueba = new Point( PruebaPanelSwt.X, PruebaPanelSwt.Y );
     final CountDownLatch listo = new CountDownLatch( 1 );
     hiloUi = new Thread( () -> {
       display = new Display();
@@ -101,7 +99,6 @@ public class PruebaIdcDialogos {
 
   public void cerrar() {
     IdcCalidad.preguntador = preguntadorAntes;
-    IdcMenu.posicionPrueba = null;
     try {
       ui( () -> {
         if ( host != null && !host.isDisposed() ) {
@@ -130,7 +127,8 @@ public class PruebaIdcDialogos {
     final CalidadFalsa s = new CalidadFalsa();
     final IdcCalidad d = ui( () -> {
       IdcCalidad x = new IdcCalidad( host, s, r, "T1" );
-      x.abrir();
+      mostrar( x.shell );
+      x.revisar();
       return x;
     } );
     try {
@@ -214,7 +212,8 @@ public class PruebaIdcDialogos {
     final CalidadFalsa s = new CalidadFalsa();
     final IdcCalidad d = ui( () -> {
       IdcCalidad x = new IdcCalidad( host, s, r, "T1" );
-      x.abrir();
+      mostrar( x.shell );
+      x.revisar();
       return x;
     } );
     try {
@@ -271,7 +270,8 @@ public class PruebaIdcDialogos {
     final RobustezFalsa s = new RobustezFalsa();
     final IdcRobustez d = ui( () -> {
       IdcRobustez x = new IdcRobustez( host, s, r, "T1" );
-      x.abrir();
+      mostrar( x.shell );
+      x.cargarPlan();
       return x;
     } );
     try {
@@ -283,6 +283,7 @@ public class PruebaIdcDialogos {
         falso( d.tabla.getItem( 1 ).getChecked(), "confirm que cambia la carga desmarcada" );
         igual( "⚠ cambia la carga", d.tabla.getItem( 1 ).getText( 5 ), "y marcada con ⚠" );
         igual( "confirmar", d.tabla.getItem( 1 ).getText( 2 ), "nivel" );
+        igual( "Filas malas a un archivo de rechazos", d.tabla.getItem( 0 ).getText( 1 ), "receta con su título" );
         falso( d.tabla.getItem( 2 ).getChecked(), "manual sin marcar" );
         cierto( d.tabla.getItem( 2 ).getGrayed(), "manual en gris" );
         igual( "Aplicar (1)", d.aplicar.getText(), "una marcada" );
@@ -397,9 +398,30 @@ public class PruebaIdcDialogos {
         new ToolItem( tb, SWT.PUSH ).setToolTipText( "Otro" );
         igual( 4, IdcMenu.posicion( tb.getItems(), "Perspectivas de mentira" ), "después del selector" );
         igual( 5, IdcMenu.posicion( tb.getItems(), "no existe" ), "sin selector: al final" );
-        Image img = IdcMenu.imagenPng( display, 28 );
-        cierto( img != null, "el símbolo IDC como imagen" );
-        igual( 16, img.getBounds().height, "16 px de alto" );
+        Image img = new Image( display, new ImageData( new java.io.ByteArrayInputStream( IdcMenu.pngBarra() ) ) );
+        igual( 16, img.getBounds().height, "16 px de alto, como los demás iconos de la barra" );
+        igual( 16, img.getBounds().width, "16 px de ancho (la barra usa un solo tamaño de imagen)" );
+        int[] o = IdcMenu.origenBarra();
+        // todas las celdas opacas y con contraste sobre fondo claro (#f0f0f0) y oscuro (#2b2b2b)
+        ImageData id = img.getImageData();
+        int celdas = 0;
+        for ( int f = 0; f < 3; f++ ) {
+          for ( int c = 0; c < 4; c++ ) {
+            int x = o[ 0 ] + c * 4 + 1;
+            int y = o[ 1 ] + f * 4 + 1;
+            igual( 255, id.getAlpha( x, y ), "celda " + f + "," + c + " opaca" );
+            org.eclipse.swt.graphics.RGB rgb = id.palette.getRGB( id.getPixel( x, y ) );
+            double l = luminancia( rgb.red, rgb.green, rgb.blue );
+            double claro = ( luminancia( 0xf0, 0xf0, 0xf0 ) + 0.05 ) / ( l + 0.05 );
+            double oscuro = ( l + 0.05 ) / ( luminancia( 0x2b, 0x2b, 0x2b ) + 0.05 );
+            cierto( claro >= 3 && oscuro >= 3, "celda " + f + "," + c + " con contraste 3:1 en fondo claro ("
+              + claro + ") y oscuro (" + oscuro + "): " + rgb );
+            celdas++;
+          }
+        }
+        igual( 12, celdas, "12 celdas" );
+        igual( 0, id.getAlpha( o[ 0 ] + 3, o[ 1 ] + 1 ), "el hueco entre celdas es transparente" );
+        guardar( img, "icono-barra.png" );
         ToolItem it = IdcMenu.agregarBoton( tb, r, img, "Perspectivas de mentira" );
         igual( 4, tb.indexOf( it ), "IDC justo a la derecha del selector" );
         igual( "IDC", it.getText(), "texto" );
@@ -439,7 +461,11 @@ public class PruebaIdcDialogos {
 
   /** «Acerca de»: versión y enlace; se cierra con su botón. */
   public void pruebaE_Acerca() throws Exception {
-    final Shell s = ui( () -> IdcMenu.acerca( host, r ) );
+    final Shell s = ui( () -> {
+      Shell a = IdcMenu.crearAcerca( host, r );
+      mostrar( a );
+      return a;
+    } );
     try {
       ui( () -> {
         igual( "Acerca de Pentaho Live", s.getText(), "título" );
@@ -639,6 +665,30 @@ public class PruebaIdcDialogos {
   }
 
   // ================================================================ utilidades
+
+  /** Fuera de la pantalla y sin activarla (nunca open(), forceActive ni ON_TOP). (UI) */
+  private static void mostrar( Shell s ) {
+    s.setLocation( PruebaPanelSwt.X, PruebaPanelSwt.Y );
+    s.setVisible( true );
+  }
+
+  /** Luminancia relativa (WCAG 2) de un color sRGB. */
+  private static double luminancia( int r, int g, int b ) {
+    double[] c = { r / 255.0, g / 255.0, b / 255.0 };
+    for ( int i = 0; i < 3; i++ ) {
+      c[ i ] = c[ i ] <= 0.03928 ? c[ i ] / 12.92 : Math.pow( ( c[ i ] + 0.055 ) / 1.055, 2.4 );
+    }
+    return 0.2126 * c[ 0 ] + 0.7152 * c[ 1 ] + 0.0722 * c[ 2 ];
+  }
+
+  /** Guarda una imagen como PNG en las capturas. */
+  private void guardar( Image img, String nombre ) {
+    ImageLoader il = new ImageLoader();
+    il.data = new ImageData[] { img.getImageData() };
+    File f = new File( capturas, nombre );
+    il.save( f.getPath(), SWT.IMAGE_PNG );
+    System.out.println( "  captura: " + f );
+  }
 
   private void clic( final Button b ) throws Exception {
     ui( () -> {

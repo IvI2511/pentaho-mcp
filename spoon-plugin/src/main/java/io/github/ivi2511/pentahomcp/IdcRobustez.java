@@ -34,7 +34,7 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * Casillas: las propuestas auto van marcadas; las confirm y las que cambian la semántica de la carga
  * (semantics_change) van desmarcadas y con ⚠; las manuales no se pueden marcar (muestran cómo hacerlo). Al aplicar,
  * las confirm marcadas van en {@code confirm} y las auto desmarcadas en la lista de excluidas de
- * {@link RobustezTools#robustecer(com.fasterxml.jackson.databind.JsonNode, Set)}: el mismo camino que harden_etl
+ * {@link RobustezTools#robustecer(com.fasterxml.jackson.databind.JsonNode, Set, String)}: el mismo camino que harden_etl
  * dry_run=false. La prueba con datos sucios es {@link EstresTools#probar(com.fasterxml.jackson.databind.JsonNode,
  * EstresProcesos.Corte)}: el veredicto, los problemas del entorno aparte (no son fallos de robustez), cada comprobación
  * por variante y los mensajes. (UI)
@@ -102,14 +102,12 @@ final class IdcRobustez {
     String id = Docs.id( m );
     if ( abierto != null && !abierto.shell.isDisposed() ) {
       if ( id.equals( abierto.docId ) ) {
-        if ( IdcMenu.posicionPrueba == null ) {
-          abierto.shell.setActive();
-        }
+        abierto.shell.setActive();
         return;
       }
       abierto.shell.close();
     }
-    abierto = new IdcRobustez( padre, new ServicioSpoon( id, Docs.nombre( m ) ), r, id );
+    abierto = new IdcRobustez( padre, new ServicioSpoon( id, Docs.nombre( m ), r.idioma() ), r, id );
     abierto.abrir();
   }
 
@@ -293,6 +291,12 @@ final class IdcRobustez {
     }, e -> libre( r.f( "r_plan_error", IdcMenu.mensaje( e ) ) ) );
   }
 
+  /** El título de la receta en el idioma del diálogo (informes/textos/harden_*.properties), o su id. */
+  String receta( String id ) {
+    Rotulos h = RobustecerAnalisis.textos( r.idioma() );
+    return h.tiene( "recipe_" + id ) ? h.s( "recipe_" + id ) : id;
+  }
+
   /** Marcable: no manual y con cambios (Propuesta.aplicable). */
   static boolean marcable( JsonNode p ) {
     return p != null && !"manual".equals( p.path( "level" ).asText() ) && p.path( "changes" ).size() > 0;
@@ -320,7 +324,8 @@ final class IdcRobustez {
       it.setData( p );
       String nivel = p.path( "level" ).asText();
       boolean sem = p.path( "semantics_change" ).asBoolean();
-      it.setText( new String[] { "", p.path( "recipe" ).asText(), r.s( "level_" + nivel ), p.path( "step" ).asText(),
+      it.setText( new String[] { "", receta( p.path( "recipe" ).asText() ), r.s( "level_" + nivel ),
+        p.path( "step" ).asText(),
         IdcCalidad.una( p.path( "why" ).asText() ), sem || "confirm".equals( nivel ) ? r.s( "r_semantics" )
           : "" } );
       it.setChecked( marcadaAlEmpezar( p ) );
@@ -352,7 +357,8 @@ final class IdcRobustez {
     }
     JsonNode p = propuestas.get( i );
     StringBuilder b = new StringBuilder();
-    b.append( p.path( "recipe" ).asText() ).append( " · " ).append( p.path( "step" ).asText() ).append( "\n" )
+    b.append( receta( p.path( "recipe" ).asText() ) ).append( " (" ).append( p.path( "recipe" ).asText() )
+      .append( ") · " ).append( p.path( "step" ).asText() ).append( "\n" )
       .append( p.path( "why" ).asText() );
     if ( "manual".equals( p.path( "level" ).asText() ) ) {
       b.append( "\n\n" ).append( r.s( "r_manual_note" ) );
@@ -404,7 +410,7 @@ final class IdcRobustez {
     return n;
   }
 
-  private void contar() {
+  void contar() {
     int n = marcadas();
     aplicar.setText( r.f( "r_apply", n ) );
     aplicar.setEnabled( n > 0 && !ocupado );
@@ -593,63 +599,19 @@ final class IdcRobustez {
     estado.getParent().layout( true );
   }
 
-  String resumen() {
-    StringBuilder b = new StringBuilder();
-    b.append( "title=" ).append( shell.getText() ).append( "\nscore=" ).append( puntaje.getText() )
-      .append( "\nstatus=" ).append( estado.getText() ).append( "\nbusy=" ).append( ocupado )
-      .append( "\napply=" ).append( aplicar.getText() ).append( aplicar.getEnabled() ? "" : " [off]" );
-    for ( TableItem it : tabla.getItems() ) {
-      b.append( "\n  [" ).append( it.getChecked() ? "x" : " " ).append( "] " ).append( it.getText( 1 ) )
-        .append( " | " ).append( it.getText( 2 ) ).append( " | " ).append( it.getText( 3 ) ).append( " | " )
-        .append( it.getText( 5 ) );
-    }
-    b.append( "\nverdict=" ).append( veredicto.getText() ).append( "\nenvironment=" ).append( entorno.getVisible()
-      ? entorno.getText() : "" );
-    for ( TableItem it : comprobaciones.getItems() ) {
-      b.append( "\n  " ).append( it.getText( 0 ) ).append( " | " ).append( it.getText( 1 ) ).append( " | " )
-        .append( it.getText( 2 ) );
-    }
-    b.append( "\nmessages=" ).append( mensajes.getText() );
-    return b.toString();
-  }
-
-  /** Toca el diálogo abierto (ver {@link IdcMenu#prueba}): estado, fila:i, marcar:i, desmarcar:i, aplicar, probar, cancelar, cerrar. (UI) */
-  static String prueba( String que ) {
-    IdcRobustez d = abierto;
-    if ( d == null || d.shell.isDisposed() ) {
-      return "no harden dialog";
-    }
-    if ( que.startsWith( "fila:" ) ) {
-      d.tabla.setSelection( Integer.parseInt( que.substring( 5 ) ) );
-      d.elegida();
-    } else if ( que.startsWith( "marcar:" ) || que.startsWith( "desmarcar:" ) ) {
-      int i = Integer.parseInt( que.substring( que.indexOf( ':' ) + 1 ) );
-      TableItem it = d.tabla.getItem( i );
-      it.setChecked( que.startsWith( "marcar:" ) && marcable( (JsonNode) it.getData() ) );
-      d.contar();
-    } else if ( que.equals( "aplicar" ) ) {
-      d.aplicarPlan();
-    } else if ( que.equals( "probar" ) ) {
-      d.probar();
-    } else if ( que.equals( "cancelar" ) ) {
-      d.cancelarPrueba();
-    } else if ( que.equals( "cerrar" ) ) {
-      d.shell.close();
-      return "closed";
-    }
-    return d.resumen();
-  }
-
   // ---------------------------------------------------------------- el servicio de Spoon
 
   /** Llama a harden_etl y stress_test (los mismos métodos, los mismos argumentos). */
   static final class ServicioSpoon implements Servicio {
     final String doc;
     final String nombre;
+    /** El idioma de Spoon: el de los textos del plan y de la prueba (los nombres de steps siguen al documento). */
+    final String lang;
 
-    ServicioSpoon( String doc, String nombre ) {
+    ServicioSpoon( String doc, String nombre, String lang ) {
       this.doc = doc;
       this.nombre = nombre;
+      this.lang = lang;
     }
 
     @Override
@@ -661,7 +623,7 @@ final class IdcRobustez {
     public ObjectNode plan() throws Exception {
       ObjectNode a = Tools.obj().put( "document", doc ).put( "dry_run", true );
       a.putArray( "recipes" ).add( "all" );
-      return (ObjectNode) McpHttpServer.JSON.readTree( (String) RobustezTools.robustecer( a ) );
+      return (ObjectNode) McpHttpServer.JSON.readTree( (String) RobustezTools.robustecer( a, null, lang ) );
     }
 
     @Override
@@ -674,12 +636,12 @@ final class IdcRobustez {
           c.add( k );
         }
       }
-      return (ObjectNode) McpHttpServer.JSON.readTree( (String) RobustezTools.robustecer( a, excluir ) );
+      return (ObjectNode) McpHttpServer.JSON.readTree( (String) RobustezTools.robustecer( a, excluir, lang ) );
     }
 
     @Override
     public ObjectNode probar( EstresProcesos.Corte corte ) throws Exception {
-      ObjectNode a = Tools.obj().put( "document", doc );
+      ObjectNode a = Tools.obj().put( "document", doc ).put( "language", lang );
       return (ObjectNode) McpHttpServer.JSON.readTree( (String) EstresTools.probar( a, corte ) );
     }
   }

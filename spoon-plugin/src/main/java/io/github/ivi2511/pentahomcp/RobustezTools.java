@@ -67,10 +67,11 @@ final class RobustezTools {
         .strList( "confirm", "Keys of confirm proposals the person accepted (or [\"all\"]): only these are applied",
           false )
         .bool( "dry_run", "Only return the plan and what would be applied; change nothing (default true)", false )
-        .strEnum( "language", "Language of the names of the steps it creates and of the reasons in the rejects. "
-          + "Default: the document's language, detected from its step names and notes (Spanish names give "
-          + "'Limpiar motivo ...', 'Escribir rechazos ...'); if it cannot tell, the Reports language", false, "en",
-          "es", "pt" ).build(),
+        .strEnum( "language", "Language of the names of the steps it creates, of the reasons in the rejects and of "
+          + "the texts of the plan (why, how_to, warnings, skipped and not_applied reasons, notes; keys and recipe "
+          + "ids do not change). Default: the names follow the document's language, detected from its step names "
+          + "and notes (Spanish names give 'Limpiar motivo ...', 'Escribir rechazos ...'; if it cannot tell, the "
+          + "Reports language), and the texts are in English", false, "en", "es", "pt" ).build(),
       a -> robustecer( a ) ) );
   }
 
@@ -116,6 +117,7 @@ final class RobustezTools {
     if ( p.lang != null && !"en".equals( p.lang ) && !"es".equals( p.lang ) && !"pt".equals( p.lang ) ) {
       throw new ToolError( "'language' must be en, es or pt, got: " + p.lang );
     }
+    p.textos = p.lang; // los textos del plan: el idioma pedido o, sin language, inglés
     return p;
   }
 
@@ -200,17 +202,22 @@ final class RobustezTools {
 
   /** harden_etl. */
   static Object robustecer( JsonNode a ) throws Exception {
-    return robustecer( a, null );
+    return robustecer( a, null, null );
   }
 
   /**
    * harden_etl con, además, propuestas auto que la persona desmarcó en el diálogo «Robustecer…» del menú IDC
-   * ({@link IdcRobustez}): no se aplican (excluir; null en MCP, que aplica todas las auto pedidas).
+   * ({@link IdcRobustez}): no se aplican (excluir; null en MCP, que aplica todas las auto pedidas). textos: el idioma
+   * de los textos del plan cuando no viene 'language' (el de Spoon en el diálogo; null = el de 'language' o inglés):
+   * los nombres de los steps siguen el idioma del documento.
    */
-  static Object robustecer( JsonNode a, Set<String> excluir ) throws Exception {
+  static Object robustecer( JsonNode a, Set<String> excluir, String textos ) throws Exception {
     final RobustecerAnalisis.Pedido p = pedido( a );
     if ( excluir != null ) {
       p.excluir.addAll( excluir );
+    }
+    if ( textos != null && p.textos == null ) {
+      p.textos = textos;
     }
     final Object[] copia = Docs.ui( () -> {
       AbstractMeta m = Docs.resolverSinActivar( a );
@@ -241,7 +248,7 @@ final class RobustezTools {
     final TransMeta[] despues = new TransMeta[ 1 ];
     if ( p.ensayo ) {
       h = RunMotor.enSegundoPlano( () -> RobustecerAplicar.aplicar( clon, elegidas, UndoGrupo.sinSpoon( clon ),
-        clon.getMetaStore() ), MS_ANALISIS, null, "The dry run" );
+        clon.getMetaStore(), p.textos ), MS_ANALISIS, null, "The dry run" );
       despues[ 0 ] = clon;
     } else {
       final ObjectNode ref = Tools.obj().put( "document", id );
@@ -255,7 +262,7 @@ final class RobustezTools {
         }
         Spoon sp = Docs.spoon();
         RobustecerAplicar.Hecho hh = RobustecerAplicar.aplicar( (TransMeta) m, elegidas, new UndoGrupo( sp, m ),
-          sp.getMetaStore() );
+          sp.getMetaStore(), p.textos );
         if ( hh.cambios > 0 ) {
           Docs.touched( m );
           AbstractMeta c = ReportTools.clonar( m );
@@ -279,6 +286,31 @@ final class RobustezTools {
       }
     }
     return RunMotor.json( o );
+  }
+
+  /**
+   * harden_etl dry_run sin Spoon (pruebas): lo mismo que {@link #robustecer} con dry_run=true sobre una copia de m
+   * (puntaje, análisis, elección y ensayo), sin tocar m. Devuelve la respuesta de la herramienta.
+   */
+  static ObjectNode ensayoSobreCopia( TransMeta m, RobustecerAnalisis.Pedido p, boolean sinGuardar ) throws Exception {
+    final TransMeta clon = (TransMeta) ReportTools.clonar( m );
+    clon.setRepository( m.getRepository() );
+    clon.setMetaStore( m.getMetaStore() );
+    if ( p.lang == null ) {
+      String d = RobustecerAnalisis.idiomaDe( clon );
+      p.lang = d != null ? d : "en";
+    }
+    ObjectNode antes = puntaje( clon, p.lang, sinGuardar );
+    RobustecerAnalisis.Plan plan = RobustecerAnalisis.analizar( clon, p );
+    List<Propuesta> elegidas = RobustecerAnalisis.elegir( plan, p );
+    RobustecerAplicar.Hecho h = RobustecerAplicar.aplicar( clon, elegidas, UndoGrupo.sinSpoon( clon ),
+      clon.getMetaStore(), p.textos );
+    ObjectNode o = respuesta( "T", plan, p, elegidas, h );
+    o.put( "language", p.lang );
+    if ( antes != null ) {
+      o.set( "robustness_before", antes );
+    }
+    return o;
   }
 
   /**

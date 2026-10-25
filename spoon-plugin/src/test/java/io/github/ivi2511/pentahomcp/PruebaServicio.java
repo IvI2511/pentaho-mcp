@@ -466,7 +466,10 @@ public class PruebaServicio {
       InformeServicio.vistaPrevia( inf, new Tema(), true, cancelado );
       falla( "una vista previa cancelada no termina" );
     } catch ( java.util.concurrent.CancellationException e ) {
-      cierto( System.currentTimeMillis() - t0 < 5000, "corta rapido: " + ( System.currentTimeMillis() - t0 ) + " ms" );
+      // lo que se mide incluye matar el navegador (taskkill /T y el barrido de los procesos con ese perfil), que con
+      // el PC cargado tarda de 7 a 11 s (también en c7f56eb): el tope es muy inferior a los 60 s que esto evita
+      cierto( System.currentTimeMillis() - t0 < 20000, "corta rapido: " + ( System.currentTimeMillis() - t0 )
+        + " ms" );
     }
     // carpeta relativa en los ajustes: desde la carpeta del documento, nunca desde data-integration
     Captura c = EntornoKettle.captura( "03" );

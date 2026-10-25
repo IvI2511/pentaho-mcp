@@ -23,6 +23,7 @@ import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.ui.spoon.Spoon;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.robustez.Balance;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado;
 import io.github.ivi2511.pentahomcp.robustez.EstresResultado.Comprobacion;
@@ -78,6 +79,8 @@ final class EstresTools {
     File base;
     /** Para cancelar desde el menú IDC (null desde MCP). */
     EstresProcesos.Corte corte;
+    /** Idioma de los mensajes, motivos y notas (en | es | pt); las claves y los códigos no cambian. */
+    String lang = "en";
   }
 
   static void register( McpHttpServer s ) {
@@ -95,15 +98,22 @@ final class EstresTools {
         .str( "export_variants", "Folder where the broken files are written (one subfolder per variant, with a "
           + "manifest), without overwriting anything; works also when the test cannot run", false )
         .bool( "keep_sandbox", "Keep the temporary folder with the copies, outputs and logs (default false)", false )
+        .strEnum( "language", "Language of the messages, reasons and notes (default en). Keys and codes do not change",
+          false, "en", "es", "pt" )
         .build(),
       a -> probar( a ) ) );
   }
 
   static Pedido pedido( JsonNode a ) throws ToolError {
     Pedido p = new Pedido();
+    String lang = Tools.optStr( a, "language", null );
+    if ( lang != null && !"en".equals( lang ) && !"es".equals( lang ) && !"pt".equals( lang ) ) {
+      throw new ToolError( "'language' must be en, es or pt, got: " + lang );
+    }
+    p.lang = lang == null ? "en" : lang;
     p.variantes = lista( a, "variants" );
     try {
-      Variantes.expandir( p.variantes, true );
+      Variantes.expandir( p.variantes, true, p.lang );
     } catch ( IllegalArgumentException e ) {
       throw new ToolError( e.getMessage() );
     }
@@ -150,10 +160,11 @@ final class EstresTools {
   static Object probar( JsonNode a, EstresProcesos.Corte corte ) throws Exception {
     final Pedido p = pedido( a );
     p.corte = corte;
+    final Rotulos t = Balance.textos( p.lang );
     final Object[] copia = Docs.ui( () -> {
       AbstractMeta m = Docs.resolverSinActivar( a );
       if ( !( m instanceof TransMeta ) ) {
-        throw new ToolError( "stress_test works on transformations (.ktr), not on jobs" );
+        throw new ToolError( t.s( "not_transformation" ) );
       }
       Spoon sp = Docs.spoon();
       AbstractMeta c = ReportTools.clonar( m );
@@ -163,9 +174,22 @@ final class EstresTools {
     } );
     final List<String> ids = Variantes.expandir( p.variantes, true );
     long presupuesto = MS_ARRANQUE + 2L * ids.size() * p.timeoutS * 1000L + 180000L;
-    ObjectNode r = RunMotor.enSegundoPlano( () -> ejecutar( (TransMeta) copia[ 0 ], (String) copia[ 1 ], p ),
-      presupuesto, null, "The stress test" );
+    ObjectNode r;
+    try {
+      r = RunMotor.enSegundoPlano( () -> ejecutar( (TransMeta) copia[ 0 ], (String) copia[ 1 ], p ), presupuesto,
+        null, "The stress test" );
+    } catch ( ToolError e ) {
+      throw traducirVencida( e, t );
+    }
     return RunMotor.json( r );
+  }
+
+  /** «The stress test did not finish in N s and was stopped» (lo arma RunMotor en inglés) en el idioma pedido. */
+  static ToolError traducirVencida( ToolError e, Rotulos t ) {
+    java.util.regex.Matcher m = java.util.regex.Pattern.compile( "^The stress test did not finish in (\\d+) s and "
+      + "was stopped$" ).matcher( String.valueOf( e.getMessage() ) );
+    return m.matches() && !"en".equals( t.idioma() ) ? new ToolError( t.f( "timeout", Long.parseLong( m.group(
+      1 ) ) ) ) : e;
   }
 
   // ------------------------------------------------------------------ la prueba
@@ -173,11 +197,12 @@ final class EstresTools {
   /** La prueba entera sobre un clon (no se modifica el documento). Sin Spoon. */
   static ObjectNode ejecutar( TransMeta tm, String documento, Pedido p ) throws Exception {
     ObjectMapper om = McpHttpServer.JSON;
+    Rotulos t = Balance.textos( p.lang );
     ObjectNode o = om.createObjectNode();
     o.put( "document", documento );
-    EstresSandbox.Analisis a = EstresSandbox.analizar( tm, p.filas, p.entradas, p.obligatorios );
+    EstresSandbox.Analisis a = EstresSandbox.analizar( tm, p.filas, p.entradas, p.obligatorios, p.lang );
     boolean hayBd = !a.bdArchivo.isEmpty() && !a.tablas.isEmpty();
-    List<String> ids = Variantes.expandir( p.variantes, hayBd );
+    List<String> ids = Variantes.expandir( p.variantes, hayBd, p.lang );
 
     // --- estático
     ObjectNode est = o.putObject( "static" );
@@ -206,8 +231,7 @@ final class EstresTools {
         b.add( x );
       }
     }
-    o.putArray( "notes" ).add( "Not a security sandbox: the transformation's own JavaScript/Java code runs in the "
-      + "child JVM." );
+    o.putArray( "notes" ).add( t.s( "note_not_sandbox" ) );
 
     // --- obligatorios: los que da la persona o los que algún Filter rows exige con IS NOT NULL
     List<String> obligatorios = p.obligatorios != null ? p.obligatorios : a.obligatorios.isEmpty() ? null
@@ -230,27 +254,24 @@ final class EstresTools {
       gen.put( id, m );
     }
     if ( p.exportar != null ) {
-      o.set( "exported", exportar( gen, sucias, new File( p.exportar ), om ) );
+      o.set( "exported", exportar( gen, sucias, new File( p.exportar ), om, t ) );
     }
 
     // --- ¿corre?
     String noCorre = null;
     if ( !a.bdNoArchivo.isEmpty() ) {
-      noCorre = "the transformation uses databases that are not SQLite/H2 files (" + String.join( "; ",
-        a.bdNoArchivo ) + "): stress_test never connects to them. Use export_variants and run the broken files by "
-        + "hand, or test a copy that loads into SQLite";
+      noCorre = t.f( "not_run_dbs", String.join( "; ", a.bdNoArchivo ) );
     } else if ( !a.bloqueos.isEmpty() ) {
-      noCorre = "some steps cannot run in the sandbox: " + String.join( "; ", a.bloqueos );
+      noCorre = t.f( "not_run_blocked", String.join( "; ", a.bloqueos ) );
     } else if ( sucias.isEmpty() ) {
-      noCorre = "no file input that stress_test can dirty (CSV input, Text file input, Excel input, JSON input "
-        + "reading an existing file)";
+      noCorre = t.s( "not_run_no_inputs" );
     }
     File pdi = EstresProcesos.pdi();
     if ( noCorre == null && pdi == null ) {
-      noCorre = "cannot find PDI's data-integration folder to start the test JVM";
+      noCorre = t.s( "not_run_no_pdi" );
     }
     if ( noCorre == null && !memoriaSuficiente() ) {
-      noCorre = "not enough free memory to start the test JVM (needs about 1 GB)";
+      noCorre = t.s( "not_run_memory" );
     }
     if ( noCorre != null ) {
       o.put( "ran", false ).put( "verdict", "not_run" ).put( "not_run_reason", noCorre );
@@ -284,9 +305,9 @@ final class EstresTools {
         x.put( "rounds", r );
         ArrayNode tablas = x.putArray( "tables" );
         for ( int i = 0; i < a.tablas.size(); i++ ) {
-          ObjectNode t = tablas.addObject().put( "connection", a.tablas.get( i )[ 0 ] ).put( "table",
+          ObjectNode tb = tablas.addObject().put( "connection", a.tablas.get( i )[ 0 ] ).put( "table",
             a.tablas.get( i )[ 1 ] );
-          ArrayNode ks = t.putArray( "keys" );
+          ArrayNode ks = tb.putArray( "keys" );
           for ( String k : a.claves.get( i ) ) {
             ks.add( k );
           }
@@ -298,17 +319,17 @@ final class EstresTools {
       File log = new File( new File( sb, "logs" ), "child.log" );
       long t0 = System.currentTimeMillis();
       if ( p.corte != null && p.corte.pedido() ) {
-        throw new ToolError( "The stress test was cancelled" );
+        throw new ToolError( t.s( "cancelled" ) );
       }
       int codigo = EstresProcesos.correr( pdi, sb, fTrabajo, log, MS_ARRANQUE + vueltas * ( p.timeoutS * 1000L
         + 5000L ), p.corte );
       if ( p.corte != null && p.corte.pedido() ) {
-        throw new ToolError( "The stress test was cancelled" );
+        throw new ToolError( t.s( "cancelled" ) );
       }
       o.put( "ran", true ).put( "ms", System.currentTimeMillis() - t0 );
       if ( codigo != 0 ) {
-        o.withArray( "notes" ).add( codigo < 0 ? "the test JVM was stopped (time budget exceeded)"
-          : "the test JVM ended with code " + codigo + ": " + cola( log ) );
+        o.withArray( "notes" ).add( codigo < 0 ? t.s( "child_stopped" ) : t.f( "child_exit", codigo, cola( log,
+          t ) ) );
       }
 
       // --- comprobaciones
@@ -318,18 +339,17 @@ final class EstresTools {
       int avisan = 0;
       int fallan = 0;
       Set<String> siguientes = new LinkedHashSet<String>();
-      List<String> bdsQueFaltan = bdsQueFaltan( a );
+      List<String> bdsQueFaltan = bdsQueFaltan( a, p.lang );
       String entorno = null;
       for ( String id : ids ) {
         ObjectNode vj = vs.addObject().put( "id", id );
         if ( "rerun".equals( id ) && !hayBd ) {
-          vj.put( "status", EstresResultado.NO_EVALUADA ).put( "message", "no SQLite/H2 file database is loaded: "
-            + "nothing to re-run" );
+          vj.put( "status", EstresResultado.NO_EVALUADA ).put( "message", t.s( "rerun_no_db" ) );
           continue;
         }
         File res = new File( new File( sb, "resultado" ), id + ".json" );
-        Corrida c = leer( res, id, log, om );
-        Corrida c2 = "rerun".equals( id ) ? leer( new File( res.getPath() + ".2" ), id, log, om ) : null;
+        Corrida c = leer( res, id, log, om, t );
+        Corrida c2 = "rerun".equals( id ) ? leer( new File( res.getPath() + ".2" ), id, log, om, t ) : null;
         Map<String, Integer> lineas = new LinkedHashMap<String, Integer>();
         int debenRechazarse = 0;
         ObjectNode ij = vj.putObject( "inputs" );
@@ -346,13 +366,14 @@ final class EstresTools {
         List<Balance.Rechazo> rechazos = new ArrayList<Balance.Rechazo>();
         for ( EstresSandbox.Salida s : a.salidas ) {
           if ( s.rechazo ) {
-            Balance.Rechazo r = leerRechazo( s, new File( new File( sb, "salida" ), id ), a.camposMotivo );
+            Balance.Rechazo r = leerRechazo( s, new File( new File( sb, "salida" ), id ), a.camposMotivo, t );
             if ( r != null ) {
               rechazos.add( r );
             }
           }
         }
-        Balance.Informe inf = Balance.evaluar( a.nodos, c, lineas, debenRechazarse, rechazos, c2, bdsQueFaltan );
+        Balance.Informe inf = Balance.evaluar( a.nodos, c, lineas, debenRechazarse, rechazos, c2, bdsQueFaltan,
+          p.lang );
         informes.add( inf );
         if ( inf.entorno != null ) {
           vj.put( "environment_problem", inf.entorno );
@@ -392,13 +413,12 @@ final class EstresTools {
         // no es una falla de robustez: la carga no pudo correr en este entorno
         o.put( "environment_problem", entorno );
         if ( "not_run".equals( veredicto ) ) {
-          o.put( "not_run_reason", "environment problem, not a robustness failure: " + entorno );
+          o.put( "not_run_reason", t.f( "environment_reason", entorno ) );
         }
       }
       o.putObject( "summary" ).put( "passed", pasan ).put( "warned", avisan ).put( "failed", fallan );
       if ( !siguientes.isEmpty() ) {
-        o.put( "next", "harden_etl recipes=" + new ArrayList<String>( siguientes ) + " (see the plan with "
-          + "dry_run=true), then run stress_test again" );
+        o.put( "next", t.f( "next", new ArrayList<String>( siguientes ) ) );
       }
       if ( p.conservar ) {
         o.put( "sandbox", sb.getAbsolutePath() );
@@ -417,12 +437,18 @@ final class EstresTools {
 
   /** Los archivos de BD (SQLite/H2) que la transformación usa y no existen: la prueba correría contra una BD vacía. */
   static List<String> bdsQueFaltan( EstresSandbox.Analisis a ) {
+    return bdsQueFaltan( a, "en" );
+  }
+
+  /** Como {@link #bdsQueFaltan(EstresSandbox.Analisis)}, con «(connection X)» en {@code lang}. */
+  static List<String> bdsQueFaltan( EstresSandbox.Analisis a, String lang ) {
+    Rotulos t = Balance.textos( lang );
     List<String> l = new ArrayList<String>();
     for ( Map.Entry<String, File> b : a.bdArchivo.entrySet() ) {
       File f = b.getValue();
       boolean h2 = "H2".equals( a.bdTipo.get( b.getKey() ) );
       if ( h2 ? !new File( f.getPath() + ".mv.db" ).isFile() && !f.isFile() : !f.isFile() ) {
-        l.add( f.getName() + " (connection " + b.getKey() + ")" );
+        l.add( t.f( "missing_db", f.getName(), b.getKey() ) );
       }
     }
     return l;
@@ -462,7 +488,7 @@ final class EstresTools {
 
   /** export_variants: {@code <dir>/<variante>/<step>.<ext>} + manifest.json, sin pisar nada. */
   private static ObjectNode exportar( Map<String, Map<String, Variantes.Variante>> gen,
-                                      List<EstresSandbox.Entrada> sucias, File dir, ObjectMapper om ) {
+                                      List<EstresSandbox.Entrada> sucias, File dir, ObjectMapper om, Rotulos t ) {
     ObjectNode o = om.createObjectNode();
     o.put( "folder", dir.getAbsolutePath() );
     ArrayNode escritos = o.putArray( "written" );
@@ -477,7 +503,7 @@ final class EstresTools {
         Variantes.Variante v = g.getValue().get( e.paso );
         File f = new File( dv, EstresSandbox.seguro( e.paso ) + "." + e.extension );
         if ( f.exists() ) {
-          salteados.add( g.getKey() + "/" + f.getName() + ": already exists" );
+          salteados.add( t.f( "export_exists", g.getKey() + "/" + f.getName() ) );
           continue;
         }
         try {
@@ -503,7 +529,7 @@ final class EstresTools {
   }
 
   /** El resultado de la hija; si no está (la hija murió o se pasó de tiempo), una corrida abortada con el log. */
-  private static Corrida leer( File f, String id, File log, ObjectMapper om ) {
+  private static Corrida leer( File f, String id, File log, ObjectMapper om, Rotulos t ) {
     if ( f.isFile() ) {
       try {
         return Corrida.desde( om.readTree( f ) );
@@ -515,12 +541,17 @@ final class EstresTools {
     c.variante = id;
     c.terminada = false;
     c.errores = 1;
-    c.mensajeError = "the run did not finish (the test JVM was stopped or crashed): " + cola( log );
+    c.mensajeError = t.f( "run_not_finished", cola( log, t ) );
     return c;
   }
 
   /** Lee un archivo de rechazo con el formato de su step: filas, filas sin motivo y algunos motivos de muestra. */
   static Balance.Rechazo leerRechazo( EstresSandbox.Salida s, File dirSalida, Set<String> camposMotivo ) {
+    return leerRechazo( s, dirSalida, camposMotivo, Balance.textos( "en" ) );
+  }
+
+  /** Como {@link #leerRechazo(EstresSandbox.Salida, File, Set)}, con el error de lectura en el idioma de {@code t}. */
+  static Balance.Rechazo leerRechazo( EstresSandbox.Salida s, File dirSalida, Set<String> camposMotivo, Rotulos t ) {
     Balance.Rechazo r = new Balance.Rechazo();
     r.paso = s.paso;
     File f = s.archivo( dirSalida );
@@ -555,15 +586,15 @@ final class EstresTools {
         if ( m == null || m.trim().isEmpty() ) {
           r.sinMotivo++;
         } else if ( r.muestras.size() < 3 && !r.muestras.contains( m.trim() ) ) {
-          String t = m.trim();
-          r.muestras.add( t.length() > 160 ? t.substring( 0, 160 ) + "..." : t );
+          String mt = m.trim();
+          r.muestras.add( mt.length() > 160 ? mt.substring( 0, 160 ) + "..." : mt );
         }
       }
       if ( r.sinColumnaMotivo ) {
         r.sinMotivo = r.filas;
       }
     } catch ( IOException e ) {
-      r.muestras.add( "cannot read it: " + e.getMessage() );
+      r.muestras.add( t.f( "cannot_read", e.getMessage() ) );
     }
     return r;
   }
@@ -583,13 +614,13 @@ final class EstresTools {
     }
   }
 
-  private static String cola( File log ) {
+  private static String cola( File log, Rotulos t ) {
     try {
       String s = new String( Files.readAllBytes( log.toPath() ), StandardCharsets.UTF_8 );
       String x = s.length() > 1200 ? s.substring( s.length() - 1200 ) : s;
       return x.replaceAll( "\\s+", " " ).trim();
     } catch ( IOException e ) {
-      return "(no log)";
+      return t.s( "no_log" );
     }
   }
 

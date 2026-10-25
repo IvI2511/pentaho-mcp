@@ -34,6 +34,7 @@ import org.w3c.dom.Element;
 
 import io.github.ivi2511.pentahomcp.lint.Nodos;
 import io.github.ivi2511.pentahomcp.lint.reglas.ReglasRobustez;
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.robustez.Cambio;
 import io.github.ivi2511.pentahomcp.robustez.Propuesta;
 import io.github.ivi2511.pentahomcp.robustez.Receta;
@@ -87,6 +88,8 @@ final class RobustecerAnalisis {
     Map<String, List<String>> claves = new HashMap<String, List<String>>();
     Set<String> confirmar = new HashSet<String>();
     boolean confirmarTodo;
+    /** Idioma de los textos (por qué, cómo hacerlo, avisos, motivos): null = en. El de los nombres es lang. */
+    String textos;
     /** Keys que no se aplican aunque sean auto (las que se desmarcaron en el menú IDC; vacío desde MCP). */
     Set<String> excluir = new HashSet<String>();
     boolean ensayo = true;
@@ -146,10 +149,13 @@ final class RobustecerAnalisis {
   /** Los steps nuevos del plan que no son de una cola: {posición, caja} por nombre (pueden ser fuentes de una cola). */
   private final Map<String, int[][]> posNuevos = new HashMap<String, int[][]>();
   private final String lang;
+  /** Los textos para la persona (informes/textos/harden_*.properties), en el idioma de p.textos. */
+  private final Rotulos tx;
 
   private RobustecerAnalisis( TransMeta tm, Pedido p ) {
     this.tm = tm;
     this.p = p;
+    this.tx = textos( p.textos );
     String d = p.lang != null ? p.lang : idiomaDe( tm );
     this.lang = d == null ? "en" : d;
     for ( StepMeta s : tm.getSteps() ) {
@@ -371,6 +377,16 @@ final class RobustecerAnalisis {
   }
 
   // ---------------------------------------------------------------- nombres y posiciones
+
+  /** Los textos de harden_etl en un idioma (en, es, pt; otro o null = en). */
+  static Rotulos textos( String idioma ) {
+    return Rotulos.de( "harden", idioma == null ? "en" : idioma );
+  }
+
+  /** Un texto para la persona, en el idioma de los textos. */
+  private String tr( String clave, Object... args ) {
+    return tx.f( clave, args );
+  }
 
   private String t( String en, String es, String pt ) {
     return "es".equals( lang ) ? es : "pt".equals( lang ) ? pt : en;
@@ -1005,10 +1021,8 @@ final class RobustecerAnalisis {
   /** Los cambios de R01 sobre s (manejo de errores → su cola), o null con el motivo en 'por'. */
   private List<Cambio> aCola( StepMeta s, String[] por ) {
     if ( !s.supportsErrorHandling() ) {
-      por[ 0 ] = "TableOutput".equals( s.getStepID() )
-        ? "Table output cannot send rows to an error hop on this database (SQLite, for example): use Insert/Update "
-          + "(idempotent_load), which can"
-        : "the step does not support error handling";
+      por[ 0 ] = "TableOutput".equals( s.getStepID() ) ? tr( "reason_no_error_handling_table" )
+        : tr( "reason_no_error_handling" );
       return null;
     }
     RowMetaInterface prev;
@@ -1016,11 +1030,11 @@ final class RobustecerAnalisis {
       // una entrada de archivo manda al hop de error su propia fila (sus campos de salida)
       prev = ENTRADAS_ARCHIVO.contains( s.getStepID() ) ? tm.getStepFields( s ) : tm.getPrevStepFields( s );
     } catch ( Exception x ) {
-      por[ 0 ] = "fields unknown: " + RunMotor.primeraLinea( x );
+      por[ 0 ] = tr( "fields_unknown", RunMotor.primeraLinea( x ) );
       return null;
     }
     if ( prev == null || prev.isEmpty() ) {
-      por[ 0 ] = "fields unknown: no fields reach the step";
+      por[ 0 ] = tr( "fields_unknown_none" );
       return null;
     }
     Cola c = cola( conMotivo( prev ), s );
@@ -1050,17 +1064,13 @@ final class RobustecerAnalisis {
         continue;
       }
       Propuesta x = new Propuesta( Receta.REJECTS_ON_ERROR, s.getName() );
-      x.porQue = CARGAS.contains( s.getStepID() )
-        ? "A database error on one row (text too long, value out of range, a constraint) stops the whole load."
-        : "One row that cannot be converted stops the whole run.";
+      x.porQue = CARGAS.contains( s.getStepID() ) ? tr( "why_rejects_load" ) : tr( "why_rejects_convert" );
       x.cambios.addAll( cs );
       if ( "TableOutput".equals( s.getStepID() ) && "Y".equalsIgnoreCase( txt( s, "use_batch" ) ) ) {
-        x.avisos.add( "Table output with batch updates: with error handling Kettle may reject the whole batch; set "
-          + "use_batch=N if single rows must be rejected." );
+        x.avisos.add( tr( "warn_batch" ) );
       }
       if ( tm.isUsingUniqueConnections() ) {
-        x.avisos.add( "The transformation is transactional (unique connections): on some databases a failed row "
-          + "aborts the transaction." );
+        x.avisos.add( tr( "warn_transactional" ) );
       }
       plan.propuestas.add( x );
     }
@@ -1101,7 +1111,7 @@ final class RobustecerAnalisis {
         continue;
       }
       Propuesta x = new Propuesta( Receta.REJECT_REASON, s.getName() );
-      x.porQue = "Its rejected rows carry no reason: nobody can tell why they were rejected.";
+      x.porQue = tr( "why_reject_reason" );
       boolean conCampos = vacio( em.getErrorFieldsValuename() );
       Cambio e = new Cambio( Cambio.SET_ERROR_HANDLING ).con( "step", s.getName() )
         .con( "target", em.getTargetStep().getName() ).con( "description_field", MOTIVO );
@@ -1147,7 +1157,7 @@ final class RobustecerAnalisis {
               rc.diff = "~ " + w.getName() + ": also writes " + String.join( ", ", nuevos );
               x.cambios.add( rc );
             } catch ( Exception ex ) {
-              x.avisos.add( "Add " + String.join( ", ", nuevos ) + " to the fields of '" + w.getName() + "' by hand." );
+              x.avisos.add( tr( "warn_add_fields", String.join( ", ", nuevos ), w.getName() ) );
             }
           }
         }
@@ -1196,8 +1206,8 @@ final class RobustecerAnalisis {
       try {
         campos = tm.getStepFields( in );
       } catch ( Exception x ) {
-        plan.descartadas.add( new String[] { Receta.REQUIRED_FIELDS, in.getName(), "fields unknown: "
-          + RunMotor.primeraLinea( x ) } );
+        plan.descartadas.add( new String[] { Receta.REQUIRED_FIELDS, in.getName(), tr( "fields_unknown",
+          RunMotor.primeraLinea( x ) ) } );
         continue;
       }
       Set<StepMeta> desc = abajo( in );
@@ -1244,8 +1254,7 @@ final class RobustecerAnalisis {
       }
       String fl = flujo( in );
       Propuesta x = new Propuesta( Receta.REQUIRED_FIELDS, in.getName() );
-      x.porQue = "A line with " + String.join( ", ", req ) + " empty (or cut short) reaches the load: it is loaded "
-        + "with a null key or stops it. It goes to the rejects file with the list of missing fields instead.";
+      x.porQue = tr( "why_required", String.join( ", ", req ) );
       x.detectado = Tools.obj();
       ArrayNode an = x.detectado.putArray( "required_fields" );
       for ( String r : req ) {
@@ -1253,22 +1262,19 @@ final class RobustecerAnalisis {
       }
       x.detectado.put( "source", detectados ? "detected: keys used downstream" : "required_fields argument" );
       if ( detectados ) {
-        x.avisos.add( "Required fields detected from the keys used downstream: correct them with "
-          + "required_fields={\"" + in.getName() + "\": [...]} if needed." );
+        x.avisos.add( tr( "warn_required_detected", in.getName() ) );
       }
       List<String> malos = new ArrayList<String>();
       for ( String r : req ) {
         if ( !IDENTIFICADOR.matcher( r ).matches() ) {
           malos.add( r );
         } else if ( campos.indexOfValue( r ) < 0 ) {
-          malos.add( r + " (not a field of the input)" );
+          malos.add( tr( "not_a_field", r ) );
         }
       }
       if ( !malos.isEmpty() ) {
         x.nivel = Receta.MANUAL;
-        x.comoHacerlo = "The reason is built with a User Defined Java Expression, which needs field names that are "
-          + "Java identifiers; these are not: " + String.join( ", ", malos ) + ". Rename them in the input (or use "
-          + "a Filter rows with IS NOT NULL and a Modified Java Script Value for the reason).";
+        x.comoHacerlo = tr( "howto_required_identifiers", String.join( ", ", malos ) );
         plan.propuestas.add( x );
         continue;
       }
@@ -1331,7 +1337,7 @@ final class RobustecerAnalisis {
       if ( MANDAN_POR_NOMBRE.contains( in.getStepID() ) ) {
         x.nivel = Receta.MANUAL;
         x.cambios.clear();
-        x.comoHacerlo = "Insert the Filter rows by hand: '" + in.getName() + "' sends rows by name.";
+        x.comoHacerlo = tr( "howto_required_by_name", in.getName() );
       }
       plan.propuestas.add( x );
     }
@@ -1411,8 +1417,7 @@ final class RobustecerAnalisis {
         continue;
       }
       Propuesta x = new Propuesta( Receta.INPUT_FILE_PARAMETER, in.getName() );
-      x.porQue = "The input file is fixed: to try the load with a broken file (or tomorrow's file) the "
-        + "transformation has to be edited. With a parameter it is run with another file without touching it.";
+      x.porQue = tr( "why_input_parameter" );
       Cambio par = new Cambio( Cambio.ADD_PARAMETER ).con( "name", nombre ).con( "default", base )
         .con( "description", t( "Input file of ", "Archivo de entrada de ", "Arquivo de entrada de " ) + in.getName() );
       par.diff = "+ parameter " + nombre + " (default " + base + ") [not undoable with Ctrl+Z]";
@@ -1421,7 +1426,7 @@ final class RobustecerAnalisis {
       rc.xml = fragmento;
       rc.diff = "~ " + in.getName() + ": file " + ruta + " -> " + nueva;
       x.cambios.add( rc );
-      x.avisos.add( "Parameters are outside Spoon's undo: Ctrl+Z restores the file name, the parameter stays." );
+      x.avisos.add( tr( "warn_parameter_undo" ) );
       plan.propuestas.add( x );
     }
   }
@@ -1461,8 +1466,7 @@ final class RobustecerAnalisis {
         continue;
       }
       Propuesta x = new Propuesta( Receta.STRICT_CONVERSION, s.getName() );
-      x.porQue = "Lenient conversions let badly written values in without an error (31/02 becomes 3 March, "
-        + "'12abc' may be read as 12): the row is loaded wrong. Strict, it is rejected with Kettle's message.";
+      x.porQue = tr( "why_strict" );
       Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", s.getName() );
       rc.xml = fragmento;
       rc.diff = "~ " + s.getName() + ": strict conversion (not lenient) of " + String.join( ", ", laxos );
@@ -1474,7 +1478,7 @@ final class RobustecerAnalisis {
         if ( cs != null ) {
           x.cambios.addAll( cs );
         } else {
-          x.avisos.add( "Without error handling a strict conversion stops the run: " + por[ 0 ] );
+          x.avisos.add( tr( "warn_strict_no_errors", por[ 0 ] ) );
         }
       }
       plan.propuestas.add( x );
@@ -1531,10 +1535,8 @@ final class RobustecerAnalisis {
         }
       }
       if ( contador != null ) {
-        plan.descartadas.add( new String[] { Receta.DEDUPE_BEFORE_LOAD, s.getName(), "the key " + String.join( ", ",
-          claves ) + " comes from the counter '" + contador + "': every row gets a new one, so a dedupe on it removes "
-          + "nothing. Pass keys={\"" + s.getName() + "\": [\"<business key>\"]} to dedupe on the business key, and "
-          + "make the key stable (stable_surrogate_keys)" } );
+        plan.descartadas.add( new String[] { Receta.DEDUPE_BEFORE_LOAD, s.getName(), tr( "skip_dedupe_counter",
+          String.join( ", ", claves ), contador, s.getName() ) } );
         continue;
       }
       List<TransHopMeta> ent = new ArrayList<TransHopMeta>();
@@ -1544,15 +1546,13 @@ final class RobustecerAnalisis {
         }
       }
       Propuesta x = new Propuesta( Receta.DEDUPE_BEFORE_LOAD, s.getName() );
-      x.porQue = "Two rows with the same " + String.join( ", ", claves ) + " reach the load: the second overwrites "
-        + "the first (or breaks the key). The first one wins and the repeated ones are dropped (declared).";
+      x.porQue = tr( "why_dedupe", String.join( ", ", claves ) );
       String tabla = Nodos.txt( Nodos.hijo( xml( s ), "lookup" ), "table" );
       String nombre = unico( t( "Remove duplicate ", "Quitar repetidos ", "Remover repetidos " )
         + ( tabla.isEmpty() ? s.getName() : tabla ) );
       if ( ent.size() != 1 || porNombreSinFiltro( ent.get( 0 ).getFromStep() ) ) {
         x.nivel = Receta.MANUAL;
-        x.comoHacerlo = "Insert a Unique rows (HashSet) by " + String.join( ", ", claves ) + " right before '"
-          + s.getName() + "' (it gets rows from several hops or by name).";
+        x.comoHacerlo = tr( "howto_dedupe", String.join( ", ", claves ), s.getName() );
         plan.propuestas.add( x );
         continue;
       }
@@ -1640,9 +1640,8 @@ final class RobustecerAnalisis {
       Set<StepMeta> desc = abajo( l );
       for ( StepMeta w : faltan ) {
         if ( desc.contains( w ) ) {
-          plan.descartadas.add( new String[] { Receta.WAIT_FOR_LOADS, l.getName(), "would deadlock: '" + w.getName()
-            + "' gets its rows through '" + l.getName() + "' (fine when the lookup finds the existing keys of the rows "
-            + "being loaded, as in stable_surrogate_keys)" } );
+          plan.descartadas.add( new String[] { Receta.WAIT_FOR_LOADS, l.getName(), tr( "skip_wait_deadlock",
+            w.getName(), l.getName() ) } );
           faltan = null;
           break;
         }
@@ -1658,12 +1657,10 @@ final class RobustecerAnalisis {
       }
       String tabla = Nodos.txt( Nodos.hijo( xml( l ), "lookup" ), "table" );
       Propuesta x = new Propuesta( Receta.WAIT_FOR_LOADS, l.getName() );
-      x.porQue = "'" + l.getName() + "' reads " + tabla + " while " + String.join( ", ", nombres ) + " is still "
-        + "writing it (in Kettle every step starts at once): rows can miss keys that are being loaded.";
+      x.porQue = tr( "why_wait", l.getName(), tabla, String.join( ", ", nombres ) );
       if ( ent.size() != 1 || porNombreSinFiltro( ent.get( 0 ).getFromStep() ) ) {
         x.nivel = Receta.MANUAL;
-        x.comoHacerlo = "Insert a Block until steps finish (waiting for " + String.join( ", ", nombres )
-          + ") right before '" + l.getName() + "'.";
+        x.comoHacerlo = tr( "howto_wait", String.join( ", ", nombres ), l.getName() );
         plan.propuestas.add( x );
         continue;
       }
@@ -1698,8 +1695,7 @@ final class RobustecerAnalisis {
           + "<compress>Y</compress>", pb, Receta.WAIT_FOR_LOADS );
         bb.diff = "+ " + buffer + " (Blocking step, all rows, spills to disk: the shared source never waits)";
         x.cambios.add( bb );
-        x.avisos.add( "'" + l.getName() + "' and the load it waits for get rows from the same source: a Blocking step "
-          + "(all rows, spilling to disk) goes before the wait so the source never stalls." );
+        x.avisos.add( tr( "warn_wait_shared", l.getName() ) );
         primero = buffer;
       }
       Cambio b = nuevo( nombre, "BlockUntilStepsFinish", pasos.toString(), pos, Receta.WAIT_FOR_LOADS );
@@ -1756,7 +1752,7 @@ final class RobustecerAnalisis {
     try {
       campos = tm.getStepFields( s );
     } catch ( Exception e ) {
-      pr.avisos.add( "fields unknown: " + RunMotor.primeraLinea( e ) );
+      pr.avisos.add( tr( "fields_unknown", RunMotor.primeraLinea( e ) ) );
       return;
     }
     if ( campos == null || campos.isEmpty() ) {
@@ -1804,7 +1800,7 @@ final class RobustecerAnalisis {
         rc.diff = "~ " + s.getName() + ": eat_row_on_failure=N (rows not found reach the filter)";
         pr.cambios.add( rc );
       } catch ( Exception e ) {
-        pr.avisos.add( "Set eat_row_on_failure=N on '" + s.getName() + "' by hand." );
+        pr.avisos.add( tr( "warn_eat_row", s.getName() ) );
       }
     }
     pr.cambios.add( quitarHop( s.getName(), siguiente.getName() ) );
@@ -1813,8 +1809,7 @@ final class RobustecerAnalisis {
     pr.cambios.add( hop( filtro, motivo, false ) );
     pr.cambios.addAll( c.cambios );
     pr.cambios.add( alimentar( c, motivo, false ) );
-    pr.avisos.add( "If the source SQL joins with an INNER JOIN, the orphans disappear before this filter: make it a "
-      + "LEFT JOIN (by hand)." );
+    pr.avisos.add( tr( "warn_inner_join" ) );
   }
 
   private void manuales() {
@@ -1837,10 +1832,8 @@ final class RobustecerAnalisis {
         }
         if ( deArchivo ) {
           Propuesta pr = new Propuesta( Receta.SAFE_SPLIT, s.getName() );
-          pr.porQue = "A value with fewer or more parts than expected leaves nulls or shifts the columns.";
-          pr.comoHacerlo = "Replace the Field splitter by a Regex evaluation with one capture group per field "
-            + "(allowcapturegroups=Y) and a result field (<field>_ok); a Filter rows on it sends the rows that do "
-            + "not match to the rejects with 'unexpected format of <field>'.";
+          pr.porQue = tr( "why_split" );
+          pr.comoHacerlo = tr( "howto_split" );
           plan.propuestas.add( pr );
         }
       }
@@ -1850,12 +1843,8 @@ final class RobustecerAnalisis {
         for ( StepMeta c : cargas ) {
           if ( abajo( s ).contains( c ) && textoXml( c ).contains( ">" + campo + "<" ) ) {
             Propuesta pr = new Propuesta( Receta.STABLE_SURROGATE_KEYS, s.getName() );
-            pr.porQue = "'" + campo + "' is a counter that starts at 1 on every run: re-running (or a new row in the "
-              + "middle) changes the keys, and the facts already loaded point to another member.";
-            pr.comoHacerlo = "Database lookup of the existing key by the natural key -> Join rows with a Table input "
-              + "'SELECT COALESCE(MAX(pk),0) AS max_pk FROM <dim>' -> Sequence 1..n -> Calculator pk_new = max_pk + n, "
-              + "pk = NVL(existing, pk_new) (remove the temporary fields) -> the load (Insert/Update by the natural "
-              + "key). Or use Dimension lookup/update with a technical key (pattern 04).";
+            pr.porQue = tr( "why_stable_keys", campo );
+            pr.comoHacerlo = tr( "howto_stable_keys" );
             plan.propuestas.add( pr );
             break;
           }
@@ -1881,12 +1870,8 @@ final class RobustecerAnalisis {
         }
         if ( come || carga != null ) {
           Propuesta pr = new Propuesta( Receta.ORPHANS_TO_REJECTS, s.getName() );
-          pr.porQue = come ? "A row whose key is not found disappears without a trace (eat_row_on_failure=Y)."
-            : "A row whose key is not found reaches '" + carga.getName() + "' with a null key.";
-          pr.comoHacerlo = "After the last lookup: Filter rows '<fact> complete?' (IS NOT NULL on the looked-up "
-            + "keys) -> false: a User Defined Java Expression with motivo = \"the <natural key> X is not in <table>\" "
-            + "-> the rejects tail. Set eat_row_on_failure=N. If the source SQL has an INNER JOIN, make it a LEFT JOIN "
-            + "so orphans reach the filter. Or default 0 = an 'unknown' member that exists in the dimension.";
+          pr.porQue = come ? tr( "why_orphans_eat" ) : tr( "why_orphans_null", carga.getName() );
+          pr.comoHacerlo = tr( "howto_orphans" );
           pr.nivel = Receta.MANUAL; // pasa a confirm si se puede aplicar
           huerfanos( s, pr, come );
           plan.propuestas.add( pr );
@@ -1896,10 +1881,8 @@ final class RobustecerAnalisis {
         String tabla = Nodos.txt( x, "table" );
         if ( !STAGING.matcher( tabla ).matches() ) {
           Propuesta pr = new Propuesta( Receta.IDEMPOTENT_LOAD, s.getName() );
-          pr.porQue = "Re-running the load inserts every row again (duplicates, or a primary key error).";
-          pr.comoHacerlo = "Replace it by an Insert/Update with the same name, position and hops: keys = the natural "
-            + "key (fields from the input, not from a sequence or a lookup); update every other column except the "
-            + "surrogate key (update=N). For a staging table, truncate=Y instead.";
+          pr.porQue = tr( "why_idempotent" );
+          pr.comoHacerlo = tr( "howto_idempotent" );
           plan.propuestas.add( pr );
         }
       }
@@ -1910,11 +1893,8 @@ final class RobustecerAnalisis {
         }
         if ( !agrupa ) {
           Propuesta pr = new Propuesta( Receta.AGGREGATE_TO_GRAIN, s.getName() );
-          pr.porQue = "Two rows with the same " + String.join( ", ", clavesDe( s ) ) + " overwrite each other in "
-            + "the Insert/Update (the last one wins).";
-          pr.comoHacerlo = "Memory group by " + String.join( ", ", clavesDe( s ) ) + " right before it, SUM of the "
-            + "measures (ask the person: maybe MAX or AVG), declared with the attribute pentaho-live-robust/drops="
-            + "aggregate.";
+          pr.porQue = tr( "why_aggregate", String.join( ", ", clavesDe( s ) ) );
+          pr.comoHacerlo = tr( "howto_aggregate", String.join( ", ", clavesDe( s ) ) );
           plan.propuestas.add( pr );
         }
       }

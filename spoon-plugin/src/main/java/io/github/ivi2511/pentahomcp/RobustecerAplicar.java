@@ -23,6 +23,7 @@ import org.pentaho.di.trans.step.StepErrorMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.metastore.api.IMetaStore;
 
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.robustez.Cambio;
 import io.github.ivi2511.pentahomcp.robustez.Propuesta;
 
@@ -48,12 +49,18 @@ final class RobustecerAplicar {
   }
 
   static Hecho aplicar( TransMeta tm, List<Propuesta> elegidas, UndoGrupo undo, IMetaStore ms ) {
+    return aplicar( tm, elegidas, undo, ms, null );
+  }
+
+  /** Igual, con los motivos y notas en el idioma de los textos (null = en). */
+  static Hecho aplicar( TransMeta tm, List<Propuesta> elegidas, UndoGrupo undo, IMetaStore ms, String textos ) {
+    Rotulos tx = RobustecerAnalisis.textos( textos );
     Hecho h = new Hecho();
     // 1) resolver: cada propuesta contra el documento tal como está, sin tocarlo
     List<Propuesta> ok = new ArrayList<Propuesta>();
     Map<String, String> hopsQuitados = new HashMap<String, String>();
     for ( Propuesta x : elegidas ) {
-      String motivo = resolver( tm, x, hopsQuitados );
+      String motivo = resolver( tm, x, hopsQuitados, tx );
       if ( motivo != null ) {
         h.saltados.add( new String[] { x.key, motivo } );
         continue;
@@ -78,27 +85,26 @@ final class RobustecerAplicar {
       return h;
     }
     try {
-      ejecutar( tm, new ArrayList<Cambio>( todos.values() ), undo, ms, h );
+      ejecutar( tm, new ArrayList<Cambio>( todos.values() ), undo, ms, h, tx );
       for ( Propuesta x : ok ) {
         ObjectNode o = h.aplicados.addObject();
         o.put( "key", x.key ).put( "recipe", x.receta ).put( "step", x.step );
       }
     } catch ( Exception e ) {
-      h.saltados.add( new String[] { "*", "failed: " + RunMotor.primeraLinea( e ) + " (the changes made so far are "
-        + "one Ctrl+Z)" } );
+      h.saltados.add( new String[] { "*", tx.f( "apply_failed", RunMotor.primeraLinea( e ) ) } );
     }
     h.pasosDeshacer = Math.min( 1, undo.acciones() );
     return h;
   }
 
   /** null si la propuesta se puede aplicar tal cual; si no, el motivo. */
-  private static String resolver( TransMeta tm, Propuesta x, Map<String, String> hopsQuitados ) {
+  private static String resolver( TransMeta tm, Propuesta x, Map<String, String> hopsQuitados, Rotulos tx ) {
     Set<String> nuevos = new HashSet<String>();
     for ( Cambio c : x.cambios ) {
       if ( Cambio.ADD_STEP.equals( c.op ) ) {
         nuevos.add( c.get( "name" ).toLowerCase( Locale.ROOT ) );
         if ( tm.findStep( c.get( "name" ) ) != null ) {
-          return "no longer applies: there is already a step '" + c.get( "name" ) + "' (call harden_etl again)";
+          return tx.f( "skip_step_exists", c.get( "name" ) );
         }
       }
     }
@@ -106,26 +112,25 @@ final class RobustecerAplicar {
       for ( String k : new String[] { "step", "from", "to", "target" } ) {
         String n = c.get( k );
         if ( n != null && !nuevos.contains( n.toLowerCase( Locale.ROOT ) ) && tm.findStep( n ) == null ) {
-          return "no longer applies: there is no step '" + n + "'";
+          return tx.f( "skip_no_step", n );
         }
       }
       if ( Cambio.REMOVE_HOP.equals( c.op ) ) {
         if ( hop( tm, c.get( "from" ), c.get( "to" ) ) == null ) {
-          return "no longer applies: there is no hop '" + c.get( "from" ) + "' -> '" + c.get( "to" ) + "'";
+          return tx.f( "skip_no_hop", c.get( "from" ), c.get( "to" ) );
         }
         String otra = hopsQuitados.get( c.firma() );
         if ( otra != null ) {
-          return "conflicts with " + otra + " (both move the hop '" + c.get( "from" ) + "' -> '" + c.get( "to" )
-            + "'): call harden_etl again after this one";
+          return tx.f( "skip_conflict", otra, c.get( "from" ), c.get( "to" ) );
         }
       }
       if ( Cambio.ADD_HOP.equals( c.op ) && !nuevos.contains( c.get( "from" ).toLowerCase( Locale.ROOT ) )
         && !nuevos.contains( c.get( "to" ).toLowerCase( Locale.ROOT ) )
         && hop( tm, c.get( "from" ), c.get( "to" ) ) != null ) {
-        return "no longer applies: there is already a hop '" + c.get( "from" ) + "' -> '" + c.get( "to" ) + "'";
+        return tx.f( "skip_hop_exists", c.get( "from" ), c.get( "to" ) );
       }
       if ( Cambio.ADD_PARAMETER.equals( c.op ) && LintArreglos.tieneParametro( tm, c.get( "name" ) ) ) {
-        return "no longer applies: the parameter " + c.get( "name" ) + " already exists";
+        return tx.f( "skip_param_exists", c.get( "name" ) );
       }
     }
     return null;
@@ -190,7 +195,8 @@ final class RobustecerAplicar {
     return m instanceof SinManejoDeErrores && ( (SinManejoDeErrores) m ).vacio() ? null : m;
   }
 
-  private static void ejecutar( TransMeta tm, List<Cambio> cambios, UndoGrupo undo, IMetaStore ms, Hecho h )
+  private static void ejecutar( TransMeta tm, List<Cambio> cambios, UndoGrupo undo, IMetaStore ms, Hecho h,
+                                Rotulos tx )
     throws Exception {
     // (1) steps nuevos (construidos todos antes de agregar ninguno: si uno no carga, no se toca nada)
     List<StepMeta> nuevos = new ArrayList<StepMeta>();
@@ -323,8 +329,7 @@ final class RobustecerAplicar {
     for ( Cambio c : cambios ) {
       if ( Cambio.ADD_PARAMETER.equals( c.op ) ) {
         tm.addParameterDefinition( c.get( "name" ), c.get( "default" ), c.get( "description" ) );
-        h.notas.add( "The parameter " + c.get( "name" ) + " is not undone with Ctrl+Z (Spoon does not undo "
-          + "parameters): remove it in the transformation settings if needed." );
+        h.notas.add( tx.f( "note_parameter", c.get( "name" ) ) );
         h.cambios++;
       }
     }

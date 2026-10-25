@@ -97,6 +97,28 @@ public class PruebaEstres {
     throw new AssertionError( "no check " + id + " in " + v );
   }
 
+  /** Las rutas de todas las claves del JSON (sin los valores): no cambian con language. */
+  private static String campos( JsonNode n ) {
+    java.util.TreeSet<String> s = new java.util.TreeSet<String>();
+    juntarCampos( n, "", s );
+    return s.toString();
+  }
+
+  private static void juntarCampos( JsonNode n, String ruta, java.util.Set<String> s ) {
+    if ( n.isObject() ) {
+      java.util.Iterator<Map.Entry<String, JsonNode>> it = n.fields();
+      while ( it.hasNext() ) {
+        Map.Entry<String, JsonNode> e = it.next();
+        s.add( ruta + "/" + e.getKey() );
+        juntarCampos( e.getValue(), ruta + "/" + e.getKey(), s );
+      }
+    } else if ( n.isArray() ) {
+      for ( JsonNode x : n ) {
+        juntarCampos( x, ruta + "[]", s );
+      }
+    }
+  }
+
   public void pruebaFragilFallaConExplicacion() throws Exception {
     Map<String, String> antes = foto( dir );
     ObjectNode o = probar( "fragile_load.ktr", "combined", "missing_fields" );
@@ -168,6 +190,22 @@ public class PruebaEstres {
     // otra vez: no pisa nada
     ObjectNode o2 = EstresTools.ejecutar( tm, "T9", p );
     cierto( o2.path( "exported" ).path( "skipped" ).size() >= 3, "no pisa lo que existe: " + o2.path( "exported" ) );
+    contiene( o2.path( "exported" ).path( "skipped" ).get( 0 ).asText(), ": already exists", "en inglés por defecto" );
+    contiene( o.path( "notes" ).get( 0 ).asText(), "Not a security sandbox", "la nota en inglés" );
+    // language=es/pt: los textos cambian, las claves y los códigos no
+    p.lang = "es";
+    ObjectNode oe = EstresTools.ejecutar( tm, "T9", p );
+    igual( "not_run", oe.path( "verdict" ).asText(), "es: el veredicto no se traduce" );
+    falso( oe.path( "ran" ).asBoolean(), "es: no corre" );
+    contiene( oe.path( "not_run_reason" ).asText(), "dw (MYSQL) usada por 'Load sales'", "es: la conexión" );
+    contiene( oe.path( "not_run_reason" ).asText(), "nunca se conecta a ellas", "es: el motivo" );
+    contiene( oe.path( "notes" ).get( 0 ).asText(), "No es un sandbox de seguridad", "es: la nota" );
+    contiene( oe.path( "exported" ).path( "skipped" ).get( 0 ).asText(), ": ya existe", "es: lo salteado" );
+    igual( campos( o2 ), campos( oe ), "es: las mismas claves" );
+    p.lang = "pt";
+    ObjectNode op = EstresTools.ejecutar( tm, "T9", p );
+    contiene( op.path( "not_run_reason" ).asText(), "nunca se conecta a eles", "pt: el motivo" );
+    igual( campos( o2 ), campos( op ), "pt: las mismas claves" );
     sinRestos();
   }
 
