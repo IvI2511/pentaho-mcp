@@ -78,27 +78,42 @@ public final class ReglasEstructura {
     }
   }
 
-  /** Dos steps con el mismo nombre sin importar mayúsculas: findStep usa equalsIgnoreCase y al cargar uno desaparece. */
+  /**
+   * Dos steps con el mismo nombre sin importar mayúsculas: findStep usa equalsIgnoreCase y al cargar uno desaparece.
+   * Se mira el archivo del disco aunque el documento tenga cambios sin guardar (el step perdido al abrirlo sigue
+   * perdido: guardar lo hace definitivo) y, además, el documento en memoria (un step agregado con el mismo nombre).
+   */
   static final class NombreDuplicado extends ReglaBase {
 
     NombreDuplicado() {
       super( "duplicate_step_name", Sev.ERROR, Regla.STRUCTURE );
-      deArchivo();
     }
 
     @Override
     public void revisar( Ctx ctx, List<Hallazgo> out ) {
-      ArchivoCrudo a = ctx.crudo();
-      if ( a == null || !a.esTransformacion() ) {
-        return;
+      Set<String> dichos = new HashSet<String>();
+      ArchivoCrudo a = ctx.crudoDelDisco();
+      if ( a != null && a.esTransformacion() ) {
+        Set<String> vistos = new HashSet<String>();
+        for ( Element s : Nodos.hijos( a.raiz, "step" ) ) {
+          String nombre = Nodos.crudo( s, "name" ); // sin recortar: "X" y "X " son distintos para Kettle
+          if ( !vistos.add( nombre.toLowerCase( Locale.ROOT ) ) && dichos.add( nombre.toLowerCase( Locale.ROOT ) ) ) {
+            Hallazgo h = ctx.enStep( Sev.ERROR, nombre, "name" );
+            h.message = ctx.t( "duplicate_step_name.msg", "step", nombre );
+            h.evidencia( "type", Nodos.txt( s, "type" ) );
+            h.evidencia( "where", "file" );
+            out.add( h );
+          }
+        }
       }
       Set<String> vistos = new HashSet<String>();
-      for ( Element s : Nodos.hijos( a.raiz, "step" ) ) {
-        String nombre = Nodos.crudo( s, "name" ); // sin recortar: "X" y "X " son distintos para Kettle
-        if ( !vistos.add( nombre.toLowerCase( Locale.ROOT ) ) ) {
+      for ( StepMeta s : ctx.trans().getSteps() ) {
+        String nombre = s.getName() == null ? "" : s.getName();
+        if ( !vistos.add( nombre.toLowerCase( Locale.ROOT ) ) && dichos.add( nombre.toLowerCase( Locale.ROOT ) ) ) {
           Hallazgo h = ctx.enStep( Sev.ERROR, nombre, "name" );
           h.message = ctx.t( "duplicate_step_name.msg", "step", nombre );
-          h.evidencia( "type", Nodos.txt( s, "type" ) );
+          h.evidencia( "type", s.getStepID() );
+          h.evidencia( "where", "memory" );
           out.add( h );
         }
       }
@@ -119,6 +134,7 @@ public final class ReglasEstructura {
           if ( h.getFromStep() != null && h.getToStep() != null && !h.isEnabled() ) {
             Hallazgo x = ctx.enHop( Sev.WARNING, h.getFromStep(), h.getToStep(), "enabled" );
             x.message = ctx.t( "disabled_hop.msg", "from", h.getFromStep().getName(), "to", h.getToStep().getName() );
+            x.fix = Arreglo.conConfirmacion( Arreglo.ENABLE_HOP );
             out.add( x );
           }
         }
@@ -130,6 +146,7 @@ public final class ReglasEstructura {
             Hallazgo x = ctx.enHop( Sev.WARNING, h.getFromEntry(), h.getToEntry(), "enabled" );
             // en un job no pasan filas: la entrada de destino no corre por ese camino
             x.message = ctx.t( "disabled_hop.msg.job", "from", h.getFromEntry().getName(), "to", h.getToEntry().getName() );
+            x.fix = Arreglo.conConfirmacion( Arreglo.ENABLE_HOP );
             out.add( x );
           }
         }
@@ -153,6 +170,7 @@ public final class ReglasEstructura {
         if ( !tm.isStepUsedInTransHops( s ) ) {
           Hallazgo h = ctx.enStep( Sev.WARNING, s, "hops" );
           h.message = ctx.t( "orphan_step.msg", "step", s.getName() );
+          h.fix = Arreglo.conConfirmacion( Arreglo.DELETE_STEP );
           out.add( h );
         }
       }

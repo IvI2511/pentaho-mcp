@@ -90,6 +90,8 @@ final class RobustecerAnalisis {
     boolean confirmarTodo;
     /** Idioma de los textos (por qué, cómo hacerlo, avisos, motivos): null = en. El de los nombres es lang. */
     String textos;
+    /** Las líneas del diff en el idioma de los textos (el menú IDC); desde MCP, en inglés. */
+    boolean diffEnIdioma;
     /** Keys que no se aplican aunque sean auto (las que se desmarcaron en el menú IDC; vacío desde MCP). */
     Set<String> excluir = new HashSet<String>();
     boolean ensayo = true;
@@ -184,6 +186,7 @@ final class RobustecerAnalisis {
     a.conversiones();
     a.erroresACola();
     a.motivos();
+    a.filtrosSinRamaFalsa();
     a.repetidos();
     a.esperas();
     a.manuales();
@@ -381,6 +384,14 @@ final class RobustecerAnalisis {
   /** Los textos de harden_etl en un idioma (en, es, pt; otro o null = en). */
   static Rotulos textos( String idioma ) {
     return Rotulos.de( "harden", idioma == null ? "en" : idioma );
+  }
+
+  /**
+   * Una línea del diff: en inglés para MCP (las mismas en cualquier idioma, como siempre); en el idioma de los textos
+   * para el menú IDC (Pedido.diffEnIdioma).
+   */
+  private String trd( String clave, Object... args ) {
+    return ( p.diffEnIdioma ? tx : textos( "en" ) ).f( clave, args );
   }
 
   /** Un texto para la persona, en el idioma de los textos. */
@@ -921,7 +932,7 @@ final class RobustecerAnalisis {
       .append( regla( MOTIVO, ",\\s*$", "" ) ).append( regla( CAMPOS_ERROR, ",\\s*$", "" ) ).append( "</fields>" );
     Cambio limpiar = nuevo( c.limpiar, "ReplaceString", r.toString(), pl, "rejects tail" );
     c.cambioLimpiar = limpiar;
-    limpiar.diff = "+ " + c.limpiar + " (Replace in string: one line, no blanks at the edges)";
+    limpiar.diff = trd( "diff_clean", c.limpiar );
     c.cambios.add( limpiar );
 
     String ruta = p.rechazos.replace( "{flow}", archivo );
@@ -942,8 +953,7 @@ final class RobustecerAnalisis {
     Cambio escribir = nuevo( c.escribir, "TextFileOutput", salida, pe, "rejects tail" );
     c.cambioEscribir = escribir;
     escribir.p.put( "file", ruta + ( ext.isEmpty() ? "" : "." + ext ) );
-    escribir.diff = "+ " + c.escribir + " (Text file output) " + escribir.p.get( "file" ) + " [" + campos.size()
-      + " fields, created even when empty]";
+    escribir.diff = trd( "diff_write", c.escribir, escribir.p.get( "file" ), campos.size() );
     c.cambios.add( escribir );
     c.cambios.add( hop( c.limpiar, c.escribir, false ) );
     colas.put( firma, c );
@@ -972,18 +982,18 @@ final class RobustecerAnalisis {
     return c;
   }
 
-  private static Cambio hop( String de, String a, boolean error ) {
+  private Cambio hop( String de, String a, boolean error ) {
     Cambio c = new Cambio( Cambio.ADD_HOP ).con( "from", de ).con( "to", a );
     if ( error ) {
       c.p.put( "error", "true" );
     }
-    c.diff = "+ " + ( error ? "error hop " : "hop " ) + de + " -> " + a;
+    c.diff = trd( error ? "diff_add_error_hop" : "diff_add_hop", de, a );
     return c;
   }
 
-  private static Cambio quitarHop( String de, String a ) {
+  private Cambio quitarHop( String de, String a ) {
     Cambio c = new Cambio( Cambio.REMOVE_HOP ).con( "from", de ).con( "to", a );
-    c.diff = "- hop " + de + " -> " + a;
+    c.diff = trd( "diff_remove_hop", de, a );
     return c;
   }
 
@@ -1042,7 +1052,7 @@ final class RobustecerAnalisis {
     l.add( alimentar( c, s.getName(), true ) );
     Cambio e = new Cambio( Cambio.SET_ERROR_HANDLING ).con( "step", s.getName() ).con( "target", c.limpiar )
       .con( "description_field", MOTIVO ).con( "fields_field", CAMPOS_ERROR );
-    e.diff = "~ " + s.getName() + ": error handling -> " + c.limpiar + " (" + MOTIVO + ", " + CAMPOS_ERROR + ")";
+    e.diff = trd( "diff_error_handling", s.getName(), c.limpiar, MOTIVO, CAMPOS_ERROR );
     l.add( e );
     return l;
   }
@@ -1118,7 +1128,7 @@ final class RobustecerAnalisis {
       if ( conCampos ) {
         e.p.put( "fields_field", CAMPOS_ERROR );
       }
-      e.diff = "~ " + s.getName() + ": error rows get " + MOTIVO + ( conCampos ? " and " + CAMPOS_ERROR : "" );
+      e.diff = conCampos ? trd( "diff_error_reason_fields", s.getName(), MOTIVO, CAMPOS_ERROR ) : trd( "diff_error_reason", s.getName(), MOTIVO );
       x.cambios.add( e );
       // El escritor de esa rama, si declara sus campos, tiene que escribir el motivo (si no, no sale en el archivo).
       StepMeta w = em.getTargetStep();
@@ -1154,7 +1164,7 @@ final class RobustecerAnalisis {
               }
               Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", w.getName() );
               rc.xml = nuevo;
-              rc.diff = "~ " + w.getName() + ": also writes " + String.join( ", ", nuevos );
+              rc.diff = trd( "diff_also_writes", w.getName(), String.join( ", ", nuevos ) );
               x.cambios.add( rc );
             } catch ( Exception ex ) {
               x.avisos.add( tr( "warn_add_fields", String.join( ", ", nuevos ), w.getName() ) );
@@ -1168,6 +1178,67 @@ final class RobustecerAnalisis {
 
   private static boolean vacio( String s ) {
     return s == null || s.trim().isEmpty();
+  }
+
+  /**
+   * R02 también para el silent_filter_drop del linter: un Filter rows sin rama falsa antes de una carga o un archivo
+   * descarta sin rastro las filas que no cumplen. Su rama falsa pasa a un User Defined Java Expression que pone el
+   * motivo («No cumple la condición de «X»») y de ahí a la cola de rechazos de ese formato de fila. Se confirma: si
+   * descartarlas era a propósito, lo que toca es silenciar la regla con el motivo.
+   */
+  private void filtrosSinRamaFalsa() {
+    for ( StepMeta f : tm.getSteps() ) {
+      if ( !"FilterRows".equals( f.getStepID() ) || rechazo.contains( f ) || propio( f ) ) {
+        continue;
+      }
+      Element x = xml( f );
+      Element c = Nodos.hijo( Nodos.hijo( x, "compare" ), "condition" );
+      boolean condicion = c != null && ( !Nodos.txt( c, "leftvalue" ).isEmpty() || Nodos.hijo( c, "conditions" ) != null );
+      if ( !Nodos.crudo( x, "send_false_to" ).trim().isEmpty() || txt( f, "send_true_to" ).isEmpty() || !condicion
+        || ReglasRobustez.declaracion( f ) != null ) {
+        continue;
+      }
+      boolean carga = false;
+      for ( StepMeta d : abajo( f ) ) {
+        carga |= CARGAS.contains( d.getStepID() ) || ReglasRobustez.ESCRITORES.contains( d.getStepID() );
+      }
+      if ( !carga ) {
+        continue;
+      }
+      RowMetaInterface campos;
+      try {
+        campos = tm.getPrevStepFields( f );
+      } catch ( Exception e ) {
+        plan.descartadas.add( new String[] { Receta.REJECT_REASON, f.getName(), tr( "fields_unknown", RunMotor
+          .primeraLinea( e ) ) } );
+        continue;
+      }
+      if ( campos == null || campos.isEmpty() ) {
+        plan.descartadas.add( new String[] { Receta.REJECT_REASON, f.getName(), tr( "fields_unknown_none" ) } );
+        continue;
+      }
+      Propuesta p2 = new Propuesta( Receta.REJECT_REASON, f.getName() );
+      p2.nivel = Receta.CONFIRM;
+      p2.porQue = tr( "why_filter_false" );
+      Cola cola = cola( conMotivo( campos ), f );
+      String motivo = unico( t( "Reason ", "Motivo ", "Motivo " ) + f.getName() );
+      int[] pm = libre( f.getLocation().x, f.getLocation().y + 100 );
+      String texto = t( "Does not meet the condition of ", "No cumple la condición de ", "Não cumpre a condição de " )
+        + "«" + f.getName() + "»";
+      String janino = formula( MOTIVO, "\"" + texto.replace( "\\", "\\\\" ).replace( "\"", "\\\"" ) + "\"" )
+        + formula( CAMPOS_ERROR, "\"\"" );
+      Cambio cm = nuevo( motivo, "Janino", janino, pm, Receta.REJECT_REASON );
+      cm.diff = trd( "diff_reason_filter", motivo, MOTIVO, f.getName() );
+      p2.cambios.add( cm );
+      Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", f.getName() );
+      rc.xml = XMLHandler.addTagValue( "send_false_to", motivo, false );
+      rc.diff = trd( "diff_retarget", f.getName(), "send_false_to", motivo );
+      p2.cambios.add( rc );
+      p2.cambios.add( hop( f.getName(), motivo, false ) );
+      p2.cambios.addAll( cola.cambios );
+      p2.cambios.add( alimentar( cola, motivo, false ) );
+      plan.propuestas.add( p2 );
+    }
   }
 
   // ---------------------------------------------------------------- R03 required_fields
@@ -1298,7 +1369,7 @@ final class RobustecerAnalisis {
       String verdadero = varias ? reparto : primero.getName();
       Cambio cf = nuevo( filtro, "FilterRows", XMLHandler.addTagValue( "send_true_to", verdadero, false )
         + XMLHandler.addTagValue( "send_false_to", motivo, false ) + cond, pf, Receta.REQUIRED_FIELDS );
-      cf.diff = "+ " + filtro + " (Filter rows: " + String.join( " AND ", conNotNull( req ) ) + ")";
+      cf.diff = trd( "diff_filter", filtro, String.join( " AND ", conNotNull( req ) ) );
       x.cambios.add( cf );
       StringBuilder ex = new StringBuilder( "\"" + t( "Missing required fields: ", "Faltan campos obligatorios: ",
         "Faltam campos obrigatórios: " ) + "\"" );
@@ -1310,13 +1381,13 @@ final class RobustecerAnalisis {
       }
       String janino = formula( MOTIVO, ex.toString() ) + formula( CAMPOS_ERROR, ec.toString() );
       Cambio cm = nuevo( motivo, "Janino", janino, pm, Receta.REQUIRED_FIELDS );
-      cm.diff = "+ " + motivo + " (User Defined Java Expression: " + MOTIVO + " = the missing fields)";
+      cm.diff = trd( "diff_reason_missing", motivo, MOTIVO );
       x.cambios.add( cm );
       if ( varias ) {
         int[] pr = libre( pf[ 0 ] + 120, pf[ 1 ] );
         Cambio cr = nuevo( reparto, "Dummy", "", pr, Receta.REQUIRED_FIELDS );
         cr.p.put( "distribute", in.isDistributes() ? "true" : "false" );
-        cr.diff = "+ " + reparto + " (Dummy: sends the complete rows where '" + in.getName() + "' sent them)";
+        cr.diff = trd( "diff_dummy", reparto, in.getName() );
         x.cambios.add( cr );
       }
       for ( TransHopMeta h : sal ) {
@@ -1371,7 +1442,7 @@ final class RobustecerAnalisis {
       if ( txt( f, tag ).equalsIgnoreCase( viejo.getName() ) ) {
         Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", f.getName() );
         rc.xml = XMLHandler.addTagValue( tag, nuevo, false );
-        rc.diff = "~ " + f.getName() + ": " + tag + " -> " + nuevo;
+        rc.diff = trd( "diff_retarget", f.getName(), tag, nuevo );
         x.cambios.add( rc );
       }
     }
@@ -1420,13 +1491,12 @@ final class RobustecerAnalisis {
       x.porQue = tr( "why_input_parameter" );
       Cambio par = new Cambio( Cambio.ADD_PARAMETER ).con( "name", nombre ).con( "default", base )
         .con( "description", t( "Input file of ", "Archivo de entrada de ", "Arquivo de entrada de " ) + in.getName() );
-      par.diff = "+ parameter " + nombre + " (default " + base + ") [not undoable with Ctrl+Z]";
+      par.diff = trd( "diff_parameter", nombre, base );
       x.cambios.add( par );
       Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", in.getName() );
       rc.xml = fragmento;
-      rc.diff = "~ " + in.getName() + ": file " + ruta + " -> " + nueva;
+      rc.diff = trd( "diff_file", in.getName(), ruta, nueva );
       x.cambios.add( rc );
-      x.avisos.add( tr( "warn_parameter_undo" ) );
       plan.propuestas.add( x );
     }
   }
@@ -1469,7 +1539,7 @@ final class RobustecerAnalisis {
       x.porQue = tr( "why_strict" );
       Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", s.getName() );
       rc.xml = fragmento;
-      rc.diff = "~ " + s.getName() + ": strict conversion (not lenient) of " + String.join( ", ", laxos );
+      rc.diff = trd( "diff_strict", s.getName(), String.join( ", ", laxos ) );
       x.cambios.add( rc );
       StepErrorMeta em = s.getStepErrorMeta();
       if ( em == null || !em.isEnabled() || em.getTargetStep() == null ) {
@@ -1567,7 +1637,7 @@ final class RobustecerAnalisis {
       Cambio u = nuevo( nombre, "UniqueRowsByHashSet", campos.toString(), pos, Receta.DEDUPE_BEFORE_LOAD );
       u.atributos.put( DROPS, "duplicates" );
       u.atributos.put( REASON, "first row per " + String.join( ", ", claves ) + " wins" );
-      u.diff = "+ " + nombre + " (Unique rows (HashSet) by " + String.join( ", ", claves ) + "; declared drops=duplicates)";
+      u.diff = trd( "diff_unique", nombre, String.join( ", ", claves ) );
       x.cambios.add( u );
       redirigir( f, s, nombre, x );
       x.cambios.add( quitarHop( f.getName(), s.getName() ) );
@@ -1693,13 +1763,13 @@ final class RobustecerAnalisis {
         Cambio bb = nuevo( buffer, "BlockingStep", "<pass_all_rows>Y</pass_all_rows>"
           + "<directory>%%java.io.tmpdir%%</directory><prefix>block</prefix><cache_size>5000</cache_size>"
           + "<compress>Y</compress>", pb, Receta.WAIT_FOR_LOADS );
-        bb.diff = "+ " + buffer + " (Blocking step, all rows, spills to disk: the shared source never waits)";
+        bb.diff = trd( "diff_blocking", buffer );
         x.cambios.add( bb );
         x.avisos.add( tr( "warn_wait_shared", l.getName() ) );
         primero = buffer;
       }
       Cambio b = nuevo( nombre, "BlockUntilStepsFinish", pasos.toString(), pos, Receta.WAIT_FOR_LOADS );
-      b.diff = "+ " + nombre + " (Block until steps finish: " + String.join( ", ", nombres ) + ")";
+      b.diff = trd( "diff_block_until", nombre, String.join( ", ", nombres ) );
       x.cambios.add( b );
       redirigir( f, l, primero, x );
       x.cambios.add( quitarHop( f.getName(), l.getName() ) );
@@ -1774,7 +1844,7 @@ final class RobustecerAnalisis {
     cond.append( "</conditions></condition></compare>" );
     Cambio cf = nuevo( filtro, "FilterRows", XMLHandler.addTagValue( "send_true_to", siguiente.getName(), false )
       + XMLHandler.addTagValue( "send_false_to", motivo, false ) + cond, pf, Receta.ORPHANS_TO_REJECTS );
-    cf.diff = "+ " + filtro + " (Filter rows: " + String.join( " AND ", conNotNull( devueltos ) ) + ")";
+    cf.diff = trd( "diff_filter", filtro, String.join( " AND ", conNotNull( devueltos ) ) );
     String vacio = devueltos.get( 0 ) + " == null";
     StringBuilder ex = new StringBuilder( "\"" + t( "Not in ", "No está en ", "Não está em " ) + tabla + ":\"" );
     StringBuilder ec = new StringBuilder( "\"\"" );
@@ -1785,7 +1855,7 @@ final class RobustecerAnalisis {
     String janino = formula( MOTIVO, "(" + vacio + " ? " + ex + " : \"\")" ) + formula( CAMPOS_ERROR, "(" + vacio
       + " ? " + ec + " : \"\")" );
     Cambio cm = nuevo( motivo, "Janino", janino, pm, Receta.ORPHANS_TO_REJECTS );
-    cm.diff = "+ " + motivo + " (User Defined Java Expression: " + MOTIVO + " = which key is not in " + tabla + ")";
+    cm.diff = trd( "diff_reason_orphan", motivo, MOTIVO, tabla );
     Cola c = cola( conMotivo( campos ), s );
     pr.nivel = Receta.CONFIRM;
     pr.comoHacerlo = null;
@@ -1797,7 +1867,7 @@ final class RobustecerAnalisis {
         LintArreglos.texto( copia, "eat_row_on_failure", "N" );
         Cambio rc = new Cambio( Cambio.RECONFIGURE ).con( "step", s.getName() );
         rc.xml = Xml.texto( copia );
-        rc.diff = "~ " + s.getName() + ": eat_row_on_failure=N (rows not found reach the filter)";
+        rc.diff = trd( "diff_eat_row", s.getName() );
         pr.cambios.add( rc );
       } catch ( Exception e ) {
         pr.avisos.add( tr( "warn_eat_row", s.getName() ) );

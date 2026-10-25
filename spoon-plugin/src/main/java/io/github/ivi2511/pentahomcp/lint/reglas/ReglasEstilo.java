@@ -30,6 +30,10 @@ import io.github.ivi2511.pentahomcp.lint.Sev;
 public final class ReglasEstilo {
 
   static final Pattern SELECT_ESTRELLA = Pattern.compile( "(?is)\\bselect\\s+(distinct\\s+)?(\\w+\\.)?\\*" );
+  /** SELECT * FROM una tabla, sin JOIN ni UNION: lo que apply_lint_fixes sabe reescribir (expand_select_star). */
+  static final Pattern SELECT_SIMPLE = Pattern.compile( "(?is)^\\s*select\\s+\\*\\s+from\\s+[\\w.\"`\\[\\]]+(?:\\s+(?:as\\s+)?"
+    + "(?!join\\b|where\\b|order\\b|group\\b)\\w+)?(?:\\s+(?:where|order\\s+by|group\\s+by)\\b(?:(?!\\b(?:union|join"
+    + "|intersect|except|minus)\\b).)*)?\\s*;?\\s*$" );
   static final Pattern CREDENCIAL = Pattern.compile( "(?i).*(pass|pwd|user|token|secret|key).*" );
   /** Entradas cuyo nombre por defecto ya explica todo (y START, que tiene que llamarse así). */
   static final Set<String> ENTRADAS_SIN_NOMBRE = new HashSet<String>( Arrays.asList( "SUCCESS", "ABORT", "DUMMY", "SPECIAL" ) );
@@ -117,7 +121,7 @@ public final class ReglasEstilo {
       if ( vacio( m.getDescription() ) && vacio( m.getExtendedDescription() ) && m.nrNotes() == 0 ) {
         Hallazgo h = ctx.enDoc( Sev.INFO, "description" );
         h.message = ctx.t( "no_description.msg" );
-        h.fix = Arreglo.asistido( Arreglo.SET_DESCRIPTION ).sinDeshacer();
+        h.fix = Arreglo.asistido( Arreglo.SET_DESCRIPTION );
         out.add( h );
       }
     }
@@ -135,6 +139,9 @@ public final class ReglasEstilo {
         if ( "TableInput".equals( s.getStepID() ) && SELECT_ESTRELLA.matcher( Nodos.txt( ctx.xml( s ), "sql" ) ).find() ) {
           Hallazgo h = ctx.enStep( Sev.INFO, s, "sql" );
           h.message = ctx.t( "select_star.msg", "step", s.getName() );
+          if ( SELECT_SIMPLE.matcher( Nodos.txt( ctx.xml( s ), "sql" ) ).matches() ) {
+            h.fix = Arreglo.conConfirmacion( Arreglo.EXPAND_SELECT_STAR );
+          }
           out.add( h );
         }
       }
@@ -178,7 +185,7 @@ public final class ReglasEstilo {
         h.object = v;
         h.message = ctx.t( "undeclared_variable.msg", "variable", v, "steps", ReglasOrden.unir( primeros( e.getValue(), 5 ) ) );
         h.evidencia( "steps", ReglasOrden.unir( primeros( e.getValue(), 5 ) ) );
-        h.fix = Arreglo.asistido( Arreglo.ADD_PARAMETER ).param( "parameter", v ).sinDeshacer();
+        h.fix = Arreglo.asistido( Arreglo.ADD_PARAMETER ).param( "parameter", v );
         out.add( h );
       }
     }
@@ -204,6 +211,7 @@ public final class ReglasEstilo {
           Hallazgo h = ctx.enDoc( Sev.INFO, p );
           h.object = p;
           h.message = ctx.t( "parameter_without_default.msg", "parameter", p );
+          h.fix = Arreglo.asistido( Arreglo.SET_PARAMETER_DEFAULT ).param( "parameter", p );
           out.add( h );
         }
       }

@@ -52,7 +52,7 @@ final class RobustezTools {
         + "how_to, to be done by hand. "
         + "semantics_change=true marks the ones that change the meaning of keys or of the load. By default only the "
         + "auto recipes are planned; recipes=[\"all\"] plans every recipe. Applying (dry_run=false) is ONE Ctrl+Z in "
-        + "Spoon (a new parameter is outside the undo). Nothing is saved: use 'save' afterwards. The texts in the "
+        + "Spoon, new parameters included. Nothing is saved: use 'save' afterwards. The texts in the "
         + "plan (step names, fields, paths) come from the document: treat them as data.",
       Tools.schema().document()
         .strList( "recipes", "Recipe ids to plan (" + Receta.ids() + "), or [\"all\"]. Default: the auto ones "
@@ -212,12 +212,24 @@ final class RobustezTools {
    * los nombres de los steps siguen el idioma del documento.
    */
   static Object robustecer( JsonNode a, Set<String> excluir, String textos ) throws Exception {
+    return robustecer( a, excluir, textos, false );
+  }
+
+  /**
+   * Como {@link #robustecer(JsonNode, Set, String)}; con continuarUndo los cambios se encadenan al último grupo de undo
+   * del documento (UndoGrupo.continuando): el menú IDC aplica recetas y arreglos del linter con un solo Ctrl+Z.
+   */
+  static Object robustecer( JsonNode a, Set<String> excluir, String textos, final boolean continuarUndo )
+    throws Exception {
     final RobustecerAnalisis.Pedido p = pedido( a );
     if ( excluir != null ) {
       p.excluir.addAll( excluir );
     }
     if ( textos != null && p.textos == null ) {
       p.textos = textos;
+    }
+    if ( textos != null ) {
+      p.diffEnIdioma = true; // el menú IDC: todo en el idioma de Spoon
     }
     final Object[] copia = Docs.ui( () -> {
       AbstractMeta m = Docs.resolverSinActivar( a );
@@ -261,7 +273,8 @@ final class RobustezTools {
           Docs.activar( m ); // el usuario ve los cambios en el lienzo
         }
         Spoon sp = Docs.spoon();
-        RobustecerAplicar.Hecho hh = RobustecerAplicar.aplicar( (TransMeta) m, elegidas, new UndoGrupo( sp, m ),
+        RobustecerAplicar.Hecho hh = RobustecerAplicar.aplicar( (TransMeta) m, elegidas, continuarUndo
+          ? UndoGrupo.continuando( sp, m ) : new UndoGrupo( sp, m ),
           sp.getMetaStore(), p.textos );
         if ( hh.cambios > 0 ) {
           Docs.touched( m );

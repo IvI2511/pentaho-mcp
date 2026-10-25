@@ -36,6 +36,15 @@ import org.pentaho.di.ui.spoon.Spoon;
  */
 final class UndoGrupo {
 
+  /**
+   * La última acción registrada por un grupo y su documento (para {@link #continuando}), por identidad: un WeakHashMap
+   * usaría TransMeta.equals, que compara por nombre (y falla sin nombre). Basta la última: continuando solo encadena si
+   * esa acción sigue arriba del historial de ese mismo documento.
+   */
+  private static final Object CERROJO = new Object();
+  private static java.lang.ref.WeakReference<AbstractMeta> ultimoMeta;
+  private static java.lang.ref.WeakReference<TransAction> ultimaAccion;
+
   private final Spoon sp;
   private final AbstractMeta meta;
   private TransAction ultima;
@@ -44,6 +53,23 @@ final class UndoGrupo {
   UndoGrupo( Spoon sp, AbstractMeta meta ) {
     this.sp = sp;
     this.meta = meta;
+  }
+
+  /**
+   * Un grupo que sigue al último grupo de este documento: su primera acción se encadena a la última de aquel, así que un
+   * Ctrl+Z deshace los dos. Solo si esa acción sigue arriba del historial (nadie hizo nada en medio); si no, es un grupo
+   * nuevo. Lo usa el menú IDC cuando una tanda llama a harden_etl y a apply_lint_fixes. (UI)
+   */
+  static UndoGrupo continuando( Spoon sp, AbstractMeta meta ) {
+    UndoGrupo g = new UndoGrupo( sp, meta );
+    synchronized ( CERROJO ) {
+      AbstractMeta m = ultimoMeta == null ? null : ultimoMeta.get();
+      TransAction u = ultimaAccion == null ? null : ultimaAccion.get();
+      if ( m == meta && u != null && meta.viewThisUndo() == u ) {
+        g.ultima = u;
+      }
+    }
+    return g;
   }
 
   /** Grupo que registra en el meta sin Spoon (pruebas sin GUI). */
@@ -122,6 +148,10 @@ final class UndoGrupo {
     }
     ultima = ta;
     acciones++;
+    synchronized ( CERROJO ) {
+      ultimoMeta = new java.lang.ref.WeakReference<AbstractMeta>( meta );
+      ultimaAccion = new java.lang.ref.WeakReference<TransAction>( ta );
+    }
   }
 
   /** Los pares que Spoon.undoAction/redoAction ya encadenan solos: no hay que marcarlos. */

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -61,25 +62,31 @@ import io.github.ivi2511.pentahomcp.lint.reglas.ReglasSeguridad;
  * <ol>
  * <li>{@link #analizar} (hilo de trabajo, sobre una copia): vuelve a correr las reglas, propone nombres
  * (LintPropuestas) y elige los arreglos pedidos. Sin estado entre llamadas: una key que ya no sale va a skipped. Los
- * campos que hay que declarar (getPrevStepFields, que puede ir a la BD) se calculan acá y no en la UI.</li>
+ * campos que hay que declarar o nombrar (getPrevStepFields, que puede ir a la BD) se calculan acá y no en la UI.</li>
  * <li>{@link #aplicar} (hilo de UI, sobre el documento vivo): resuelve TODAS las keys a objetos (steps, entradas,
  * hops, conexiones) antes de tocar nada; después aplica, con los renombres al final (cambian las keys de esos steps).
- * Cada cambio va al mismo UndoGrupo: un Ctrl+Z en transformaciones; en jobs, uno por acción (Spoon no encadena).</li>
+ * Cada cambio va al mismo UndoGrupo: un Ctrl+Z en transformaciones; en jobs, uno por acción (Spoon no encadena). Los
+ * parámetros y la descripción del documento, que Spoon no deshace, entran con {@link UndoEfecto}.</li>
  * <li>LintTools vuelve a correr las reglas sobre el resultado para score_after.</li>
  * </ol>
  * auto = entra en all_auto (no cambia filas, formatos, rutas ni steps); confirm = el cliente lo confirma con la
  * persona antes de pasar la key (lo dice la descripción de la herramienta); needs_value = falta values[key].
+ * <p>
+ * Los textos de 'change', 'reason' y 'notes' van en el idioma de 'language' (lint_*.properties, claves apply.*; en
+ * por defecto, como siempre).
  */
 final class LintArreglos {
 
   static final String TODOS_AUTO = "all_auto";
-  static final String YA_NO_ESTA = "no longer found: the rules no longer report it (already fixed, or the document "
-    + "changed). Run lint_etl again for the current keys";
   static final Pattern IDENTIFICADOR = Pattern.compile( "[A-Za-z_][A-Za-z0-9_]*" );
   /** Consultas a las que no se les puede agregar un ORDER BY al final sin cambiarles el significado. */
   static final Pattern SQL_NO_ORDENABLE = Pattern.compile( "(?is).*\\b(order\\s+by|limit|offset|fetch|union|intersect"
     + "|except|minus|for\\s+update|into|top)\\b.*" );
   static final Pattern SQL_SELECT = Pattern.compile( "(?is)^\\s*select\\b.*" );
+  /** SELECT * FROM una sola tabla (sin JOIN ni coma): lo único que expand_select_star reescribe. */
+  static final Pattern SELECT_ESTRELLA_SIMPLE = Pattern.compile( "(?is)^(\\s*select\\s+)\\*(\\s+from\\s+[\\w.\"`\\[\\]]+"
+    + "(?:\\s+(?:as\\s+)?\\w+)?(?:\\s+(?:where|order\\s+by|group\\s+by)\\b.*)?\\s*;?\\s*)$" );
+  static final Pattern SQL_UNE = Pattern.compile( "(?is).*\\b(join|union|intersect|except|minus)\\b.*" );
   /** Tags del consumidor que nombran el step del que lee (Merge join, Merge rows): se repuntan al Sort rows nuevo. */
   static final Set<String> TAGS_INFO = new HashSet<String>( Arrays.asList( "step1", "step2", "reference", "compare" ) );
   /** Comparan con RowMeta.compare: el orden de la BD (collation) puede no coincidir, así que siempre Sort rows. */
@@ -87,6 +94,11 @@ final class LintArreglos {
   static final Set<String> SALIDAS_TEXTO = new HashSet<String>( Arrays.asList( "TextFileOutput", "TextFileOutputLegacy" ) );
 
   private LintArreglos() {
+  }
+
+  /** Un texto de apply_lint_fixes en el idioma pedido (lint_*.properties, apply.*). */
+  static String t( String lang, String clave, Object... pares ) {
+    return Textos.de( lang ).t( "apply." + clave, pares );
   }
 
   // ---------------------------------------------------------------- el pedido
@@ -172,6 +184,8 @@ final class LintArreglos {
     final String valor;
     /** declare_output_fields: el <fields> con los campos que llegan (calculado en el hilo de trabajo). */
     String campos;
+    /** expand_select_star: las columnas que da la consulta (calculadas en el hilo de trabajo). */
+    List<String> columnas;
     String sinCampos;
 
     Elegido( Hallazgo h, String valor ) {
@@ -208,7 +222,7 @@ final class LintArreglos {
     for ( String k : p.keys ) {
       Hallazgo h = porClave.get( k );
       if ( h == null ) {
-        an.saltados.add( new String[] { k, YA_NO_ESTA } );
+        an.saltados.add( new String[] { k, t( p.lang, "skip.gone" ) } );
         continue;
       }
       vistas.add( k );
@@ -222,16 +236,20 @@ final class LintArreglos {
         }
       }
     }
-    // los campos a declarar: getPrevStepFields puede conectarse a la BD, nunca en el hilo de UI
+    // los campos a declarar o nombrar: getPrevStepFields puede conectarse a la BD, nunca en el hilo de UI
     for ( Elegido e : an.elegidos ) {
-      if ( Arreglo.DECLARE_OUTPUT_FIELDS.equals( e.h.fix.kind ) && copia instanceof TransMeta ) {
+      boolean declarar = Arreglo.DECLARE_OUTPUT_FIELDS.equals( e.h.fix.kind );
+      boolean expandir = Arreglo.EXPAND_SELECT_STAR.equals( e.h.fix.kind );
+      if ( ( declarar || expandir ) && copia instanceof TransMeta ) {
         StepMeta s = ( (TransMeta) copia ).findStep( e.h.step );
         try {
-          RowMetaInterface rm = s == null ? null : op.entorno.entrada( s );
+          RowMetaInterface rm = s == null ? null : declarar ? op.entorno.entrada( s ) : op.entorno.salida( s );
           if ( rm == null || rm.size() == 0 ) {
-            e.sinCampos = "Kettle computes no fields reaching it (they appear only when it runs)";
-          } else {
+            e.sinCampos = t( p.lang, "no_fields_computed" );
+          } else if ( declarar ) {
             e.campos = camposDeSalida( rm );
+          } else {
+            e.columnas = new ArrayList<String>( Arrays.asList( rm.getFieldNames() ) );
           }
         } catch ( Throwable x ) {
           e.sinCampos = RunMotor.primeraLinea( x );
@@ -244,13 +262,13 @@ final class LintArreglos {
   private static void elegir( Analisis an, Hallazgo h, Pedido p ) {
     Arreglo a = h.fix;
     if ( a == null ) {
-      an.saltados.add( new String[] { h.key, "no automatic fix: " + h.howToFix } );
+      an.saltados.add( new String[] { h.key, t( p.lang, "skip.no_fix", "fix", h.howToFix ) } );
       return;
     }
     String v = p.values.get( h.key );
     if ( v == null && a.needsValue ) {
-      an.saltados.add( new String[] { h.key, "needs a value: pass it in values[\"" + h.key + "\"]"
-        + ( a.preview != null ? " (proposed: " + a.preview + ")" : "" ) } );
+      an.saltados.add( new String[] { h.key, a.preview != null ? t( p.lang, "skip.needs_value.proposed", "key", h.key,
+        "value", a.preview ) : t( p.lang, "skip.needs_value", "key", h.key ) } );
       return;
     }
     an.elegidos.add( new Elegido( h, v != null ? v : a.preview ) );
@@ -306,6 +324,8 @@ final class LintArreglos {
      * así que el segundo consumidor del mismo Table input lleva un Sort rows.
      */
     final Set<String> consultasOrdenadas = new HashSet<String>();
+    /** Steps y entradas que borra esta llamada (no se borran dos veces). */
+    final Set<Object> borrados = new HashSet<Object>();
 
     Aplicacion( AbstractMeta meta, String lang, UndoGrupo undo, Repository rep, IMetaStore ms ) {
       this.meta = meta;
@@ -315,6 +335,22 @@ final class LintArreglos {
       this.undo = undo;
       this.rep = rep;
       this.ms = ms;
+    }
+
+    String t( String clave, Object... pares ) {
+      return LintArreglos.t( lang, clave, pares );
+    }
+
+    /**
+     * Deja deshacible con Ctrl+Z un cambio de parámetros o descripción ya hecho (UndoEfecto). Si no hay dónde colgarlo
+     * (un documento sin steps ni entradas), lo dice en las notas y devuelve false.
+     */
+    boolean deshacerEfecto( UndoEfecto.Foto antes ) {
+      if ( UndoEfecto.registrar( undo, meta, antes ) ) {
+        return true;
+      }
+      notas.add( t( "note.not_undoable" ) );
+      return false;
     }
   }
 
@@ -345,13 +381,18 @@ final class LintArreglos {
     }
     List<Accion> orden = new ArrayList<Accion>();
     for ( Accion a : acciones ) {
-      if ( !a.renombre() ) {
+      if ( !a.renombre() && !a.borra() ) {
         orden.add( a );
       }
     }
     for ( Accion a : acciones ) {
       if ( a.renombre() ) {
         orden.add( a ); // al final: los demás ya tienen su objeto resuelto, el nombre ya no importa
+      }
+    }
+    for ( Accion a : acciones ) {
+      if ( a.borra() ) {
+        orden.add( a ); // lo último: borrar corre los índices de los demás steps
       }
     }
     for ( Accion a : orden ) {
@@ -361,7 +402,7 @@ final class LintArreglos {
         o.put( "key", a.e.h.key ).put( "rule", a.e.h.rule ).put( "change", cambio ).put( "undoable", a.deshacible( ap ) );
         hecho.cambios++;
       } catch ( Exception x ) {
-        hecho.saltados.add( new String[] { a.e.h.key, "failed: " + RunMotor.primeraLinea( x ) } );
+        hecho.saltados.add( new String[] { a.e.h.key, ap.t( "skip.failed", "detail", RunMotor.primeraLinea( x ) ) } );
       }
     }
     hecho.notas.addAll( ap.notas );
@@ -404,7 +445,22 @@ final class LintArreglos {
     if ( Arreglo.ADD_PARAMETER.equals( k ) ) {
       return new Parametro( ap, e );
     }
-    throw new Saltar( "the fix '" + k + "' cannot be applied automatically" );
+    if ( Arreglo.SET_PARAMETER_DEFAULT.equals( k ) ) {
+      return new DefaultDeParametro( ap, e );
+    }
+    if ( Arreglo.ENABLE_HOP.equals( k ) ) {
+      return new HabilitarHop( ap, e );
+    }
+    if ( Arreglo.DELETE_STEP.equals( k ) ) {
+      return new BorrarStep( ap, e );
+    }
+    if ( Arreglo.DELETE_ENTRY.equals( k ) ) {
+      return new BorrarEntrada( ap, e );
+    }
+    if ( Arreglo.EXPAND_SELECT_STAR.equals( k ) ) {
+      return new ExpandirSelect( ap, e );
+    }
+    throw new Saltar( ap.t( "skip.kind", "kind", k ) );
   }
 
   /** Un arreglo ya resuelto contra el documento: los objetos están, todavía no se tocó nada. */
@@ -419,11 +475,16 @@ final class LintArreglos {
       return false;
     }
 
+    /** Borra un step o una entrada: va al final (corre los índices). */
+    boolean borra() {
+      return false;
+    }
+
     boolean deshacible( Aplicacion ap ) {
       return true;
     }
 
-    /** Hace el cambio, lo registra en ap.undo y devuelve qué cambió (para la IA, en inglés). */
+    /** Hace el cambio, lo registra en ap.undo y devuelve qué cambió (en el idioma de ap.lang). */
     abstract String hacer( Aplicacion ap ) throws Exception;
   }
 
@@ -431,22 +492,22 @@ final class LintArreglos {
 
   static StepMeta step( Aplicacion ap, Hallazgo h ) throws Saltar {
     if ( ap.tm == null ) {
-      throw new Saltar( "the document is not a transformation" );
+      throw new Saltar( ap.t( "skip.not_trans" ) );
     }
     StepMeta s = h.step == null ? null : ap.tm.findStep( h.step );
     if ( s == null ) {
-      throw new Saltar( "there is no step '" + h.step + "' in the document" );
+      throw new Saltar( ap.t( "skip.no_step", "step", h.step ) );
     }
     return s;
   }
 
   static JobEntryCopy entrada( Aplicacion ap, Hallazgo h ) throws Saltar {
     if ( ap.jm == null ) {
-      throw new Saltar( "the document is not a job" );
+      throw new Saltar( ap.t( "skip.not_job" ) );
     }
     JobEntryCopy c = h.entry == null ? null : ap.jm.findJobEntry( h.entry, h.entryNr, true );
     if ( c == null ) {
-      throw new Saltar( "there is no entry '" + h.entry + "' in the job" );
+      throw new Saltar( ap.t( "skip.no_entry", "entry", h.entry ) );
     }
     return c;
   }
@@ -526,13 +587,13 @@ final class LintArreglos {
     return p != null && Arrays.asList( m.listParameters() ).contains( p );
   }
 
-  private static String nombreValido( String v ) throws Saltar {
+  private static String nombreValido( Aplicacion ap, String v ) throws Saltar {
     String n = v == null ? "" : v.trim();
     if ( n.isEmpty() ) {
-      throw new Saltar( "no name to use: pass one in values[key]" );
+      throw new Saltar( ap.t( "skip.no_name" ) );
     }
     if ( n.contains( "\n" ) || n.contains( "\r" ) ) {
-      throw new Saltar( "a name cannot have line breaks" );
+      throw new Saltar( ap.t( "skip.name_lines" ) );
     }
     return n;
   }
@@ -562,7 +623,7 @@ final class LintArreglos {
       b = e.h.fix.params.get( "field_b" );
       Element c = calculo( xml( s ), i );
       if ( c == null || a == null || b == null || !Nodos.txt( c, "field_a" ).equals( b ) || !Nodos.txt( c, "field_b" ).equals( a ) ) {
-        throw new Saltar( "calculation " + ( i + 1 ) + " of '" + s.getName() + "' changed since the analysis" );
+        throw new Saltar( ap.t( "skip.calc_changed", "n", i + 1, "step", s.getName() ) );
       }
     }
 
@@ -578,8 +639,7 @@ final class LintArreglos {
       texto( c, "field_a", a );
       texto( c, "field_b", b );
       releer( ap, s, raiz );
-      return "In '" + s.getName() + "', calculation " + ( i + 1 ) + " (" + Nodos.txt( c, "field_name" ) + ") now takes "
-        + a + " as A and " + b + " as B: same result, computed with decimals";
+      return ap.t( "done.swap", "step", s.getName(), "n", i + 1, "field", Nodos.txt( c, "field_name" ), "a", a, "b", b );
     }
   }
 
@@ -591,7 +651,7 @@ final class LintArreglos {
       super( e );
       s = step( ap, e.h );
       if ( !s.isDistributes() ) {
-        throw new Saltar( "'" + s.getName() + "' already copies its rows" );
+        throw new Saltar( ap.t( "skip.already_copies", "step", s.getName() ) );
       }
     }
 
@@ -602,8 +662,7 @@ final class LintArreglos {
       s.setChanged();
       ap.tm.clearCaches();
       ap.undo.cambio( new Object[] { antes }, new Object[] { s.clone() }, new int[] { ap.tm.indexOfStep( s ) } );
-      return "'" + s.getName() + "' now COPIES every row to each of its " + TransOps.salidasNormales( ap.tm, s )
-        + " outputs (it was distributing them)";
+      return ap.t( "done.copy", "step", s.getName(), "n", TransOps.salidasNormales( ap.tm, s ) );
     }
   }
 
@@ -615,19 +674,19 @@ final class LintArreglos {
     RenombrarStep( Aplicacion ap, Elegido e, Set<String> nuevos ) throws Saltar {
       super( e );
       s = step( ap, e.h );
-      nombre = nombreValido( e.valor );
+      nombre = nombreValido( ap, e.valor );
       if ( nombre.equals( s.getName() ) ) {
-        throw new Saltar( "the step is already called '" + nombre + "'" );
+        throw new Saltar( ap.t( "skip.same_name", "name", nombre ) );
       }
       StepMeta otro = ap.tm.findStep( nombre );
       if ( otro != null && otro != s ) {
-        throw new Saltar( "there is already a step named '" + otro.getName() + "'" );
+        throw new Saltar( ap.t( "skip.step_exists", "name", otro.getName() ) );
       }
       if ( "default_step_name".equals( e.h.rule ) && NombresPorDefecto.esDeStep( nombre ) ) {
-        throw new Saltar( "'" + nombre + "' is a default name too: choose one that says what the step does" );
+        throw new Saltar( ap.t( "skip.default_name", "name", nombre ) );
       }
       if ( !nuevos.add( nombre.toLowerCase( Locale.ROOT ) ) ) {
-        throw new Saltar( "another fix of this call already uses the name '" + nombre + "'" );
+        throw new Saltar( ap.t( "skip.name_taken", "name", nombre ) );
       }
     }
 
@@ -652,16 +711,15 @@ final class LintArreglos {
         desde[ i + 1 ] = otros.get( i )[ 0 ];
         hasta[ i + 1 ] = otros.get( i )[ 1 ].clone();
         idx[ i + 1 ] = ap.tm.indexOfStep( otros.get( i )[ 1 ] );
-        refs.add( "'" + otros.get( i )[ 1 ].getName() + "'" );
+        refs.add( ap.t( "word.quoted", "name", otros.get( i )[ 1 ].getName() ) );
       }
       ap.undo.cambio( desde, hasta, idx ); // el step y los que lo nombran: una sola acción, como rename_step
       List<String> quedan = TransOps.nombranTodavia( ap.tm, s, viejo );
       if ( !quedan.isEmpty() ) { // un plugin que guarda el nombre como texto y Kettle no lo actualiza
-        ap.notas.add( String.join( ", ", quedan ) + " still name '" + viejo + "' as text: check that it points to '"
-          + nombre + "' (open it in Spoon), or undo the rename." );
+        ap.notas.add( ap.t( "note.still_named", "steps", String.join( ", ", quedan ), "old", viejo, "new", nombre ) );
       }
-      return "Renamed step '" + viejo + "' to '" + nombre + "'"
-        + ( refs.isEmpty() ? "" : " (references updated in " + String.join( ", ", refs ) + ")" );
+      return refs.isEmpty() ? ap.t( "done.rename", "old", viejo, "new", nombre )
+        : ap.t( "done.rename.refs", "old", viejo, "new", nombre, "refs", String.join( ", ", refs ) );
     }
   }
 
@@ -673,20 +731,20 @@ final class LintArreglos {
     RenombrarEntrada( Aplicacion ap, Elegido e, Set<String> nuevos ) throws Saltar {
       super( e );
       c = entrada( ap, e.h );
-      nombre = nombreValido( e.valor );
+      nombre = nombreValido( ap, e.valor );
       if ( nombre.equals( c.getName() ) ) {
-        throw new Saltar( "the entry is already called '" + nombre + "'" );
+        throw new Saltar( ap.t( "skip.same_name", "name", nombre ) );
       }
       for ( JobEntryCopy x : ap.jm.getJobCopies() ) {
         if ( x.getEntry() != c.getEntry() && x.getName() != null && x.getName().equalsIgnoreCase( nombre ) ) {
-          throw new Saltar( "there is already an entry named '" + x.getName() + "'" );
+          throw new Saltar( ap.t( "skip.entry_exists", "name", x.getName() ) );
         }
       }
       if ( "default_entry_name".equals( e.h.rule ) && NombresPorDefecto.esDeEntrada( nombre ) ) {
-        throw new Saltar( "'" + nombre + "' is a default name too: choose one that says what the entry does" );
+        throw new Saltar( ap.t( "skip.default_name", "name", nombre ) );
       }
       if ( !nuevos.add( nombre.toLowerCase( Locale.ROOT ) ) ) {
-        throw new Saltar( "another fix of this call already uses the name '" + nombre + "'" );
+        throw new Saltar( ap.t( "skip.name_taken", "name", nombre ) );
       }
     }
 
@@ -702,7 +760,7 @@ final class LintArreglos {
       c.setName( nombre );
       c.setChanged();
       ap.undo.cambio( new Object[] { antes }, new Object[] { c.clone() }, new int[] { ap.jm.indexOfJobEntry( c ) } );
-      return "Renamed entry '" + viejo + "' to '" + nombre + "'";
+      return ap.t( "done.rename_entry", "old", viejo, "new", nombre );
     }
   }
 
@@ -726,25 +784,25 @@ final class LintArreglos {
         c = entrada( ap, h );
         s = null;
       } else {
-        throw new Saltar( "only the paths of a step or an entry can be replaced" );
+        throw new Saltar( ap.t( "skip.path_where" ) );
       }
       String t = h.fix.params.get( "tag" );
       tag = t != null ? t : h.attribute;
       n = h.n;
       valor = e.valor == null ? "" : e.valor.trim();
       if ( valor.isEmpty() ) {
-        throw new Saltar( "no new path: pass it in values[key]" );
+        throw new Saltar( ap.t( "skip.no_path" ) );
       }
       Rutas.Ruta r = buscar( s != null ? xml( s ) : xml( c ) );
       if ( r == null ) {
-        throw new Saltar( "the path " + tag + " is no longer in '" + donde() + "'" );
+        throw new Saltar( ap.t( "skip.path_gone", "tag", tag, "where", donde() ) );
       }
       String antes = h.evidence.get( "value" );
       if ( antes != null && !antes.equals( r.valor ) ) {
-        throw new Saltar( "the path " + tag + " of '" + donde() + "' changed since the analysis (now " + r.valor + ")" );
+        throw new Saltar( ap.t( "skip.path_changed", "tag", tag, "where", donde(), "value", r.valor ) );
       }
       if ( valor.equals( r.valor ) ) {
-        throw new Saltar( "the path is already " + valor );
+        throw new Saltar( ap.t( "skip.path_same", "value", valor ) );
       }
       // la propuesta con parámetro: DIR_DATOS = la carpeta del archivo. Si ya existe (o otro arreglo de esta llamada lo
       // toma) para otra carpeta, la ruta quedaría mal: que la elija Claude o la persona
@@ -753,8 +811,7 @@ final class LintArreglos {
       if ( p != null && valor.contains( "${" + p + "}" ) ) {
         String existe = tieneParametro( ap.meta, p ) ? defaultDe( ap.meta, p ) : ap.parametros.get( p );
         if ( existe != null && !existe.equals( porDefecto ) ) {
-          throw new Saltar( "parameter " + p + " is already the folder " + existe + ", not " + porDefecto + ": pass the "
-            + "new path in values[key]" );
+          throw new Saltar( ap.t( "skip.param_folder", "parameter", p, "old", existe, "new", porDefecto ) );
         }
         parametro = tieneParametro( ap.meta, p ) || ap.parametros.containsKey( p ) ? null : p;
         ap.parametros.put( p, porDefecto );
@@ -796,19 +853,23 @@ final class LintArreglos {
       } else {
         releer( ap, c, raiz );
       }
-      String extra = "";
       if ( parametro != null && !tieneParametro( ap.meta, parametro ) ) {
+        UndoEfecto.Foto foto = UndoEfecto.Foto.de( ap.meta );
         ap.meta.addParameterDefinition( parametro, porDefecto, "" );
+        ap.meta.activateParameters();
         ap.meta.setChanged();
-        extra = "; parameter " + parametro + " declared with default " + porDefecto;
-        ap.notas.add( "Ctrl+Z does not remove the parameters that were declared (" + parametro + "): remove them in the "
-          + "document properties if you undo." );
+        ap.deshacerEfecto( foto );
+        return ap.t( "done.path.param", "where", donde(), "tag", tag, "old", viejo, "new", valor, "parameter", parametro,
+          "default", porDefecto );
       }
-      return "In '" + donde() + "', " + tag + ": " + viejo + " -> " + valor + extra;
+      return ap.t( "done.path", "where", donde(), "tag", tag, "old", viejo, "new", valor );
     }
   }
 
-  /** password_in_file: la contraseña pasa a ser una variable (nunca se escribe la clave en otro lado). */
+  /**
+   * password_in_file: la contraseña pasa a ser una variable (nunca se escribe ni se muestra la clave en otro lado). La
+   * clave misma no se lee ni se copia: quien la sabe la pone en kettle.properties.
+   */
   static final class Clave extends Accion {
     DatabaseMeta db;
     SlaveServer ss;
@@ -821,34 +882,33 @@ final class LintArreglos {
       Hallazgo h = e.h;
       valor = e.valor == null ? "" : e.valor.trim();
       if ( !ReglasSeguridad.esVariable( valor ) ) { // entero: «clave${X}» sigue siendo una clave en el archivo
-        throw new Saltar( "the value must be only a variable such as ${DB_PASSWORD} (defined in kettle.properties), "
-          + "with no text around it: a fix never writes a password into the file" );
+        throw new Saltar( ap.t( "skip.password_value" ) );
       }
       if ( Hallazgo.CONNECTION.equals( h.scope ) ) {
         db = ap.meta.findDatabase( h.object );
         if ( db == null ) {
-          throw new Saltar( "there is no connection '" + h.object + "' in the document" );
+          throw new Saltar( ap.t( "skip.no_connection", "name", h.object ) );
         }
         if ( db.isShared() ) {
-          throw new Saltar( "'" + db.getName() + "' is a shared connection (shared.xml): change its password there" );
+          throw new Saltar( ap.t( "skip.shared_connection", "name", db.getName() ) );
         }
       } else if ( Hallazgo.SLAVE.equals( h.scope ) ) {
         ss = ap.meta.findSlaveServer( h.object );
         if ( ss == null ) {
-          throw new Saltar( "there is no slave server '" + h.object + "' in the document" );
+          throw new Saltar( ap.t( "skip.no_slave", "name", h.object ) );
         }
       } else if ( Hallazgo.STEP.equals( h.scope ) ) {
         s = step( ap, h );
         if ( hoja( xml( s ) ) == null ) {
-          throw new Saltar( "'" + s.getName() + "' no longer stores a password in " + h.attribute );
+          throw new Saltar( ap.t( "skip.no_password", "where", s.getName(), "tag", h.attribute ) );
         }
       } else if ( Hallazgo.ENTRY.equals( h.scope ) ) {
         c = entrada( ap, h );
         if ( hoja( xml( c ) ) == null ) {
-          throw new Saltar( "'" + c.getName() + "' no longer stores a password in " + h.attribute );
+          throw new Saltar( ap.t( "skip.no_password", "where", c.getName(), "tag", h.attribute ) );
         }
       } else {
-        throw new Saltar( "this password is not in a connection, a step or an entry: change it by hand" );
+        throw new Saltar( ap.t( "skip.password_where" ) );
       }
     }
 
@@ -874,8 +934,8 @@ final class LintArreglos {
 
     @Override
     String hacer( Aplicacion ap ) throws Exception {
-      ap.notas.add( "Define the variable of each password in kettle.properties (in Spoon: Edit > Edit the "
-        + "kettle.properties file) before running; never in the .ktr/.kjb." );
+      String var = ReglasSeguridad.nombreVariable( valor );
+      ap.notas.add( ap.t( "note.password", "line", ( var == null ? "VARIABLE" : var ) + "=" ) );
       if ( db != null ) {
         DatabaseMeta antes = (DatabaseMeta) db.clone();
         db.setPassword( valor );
@@ -883,22 +943,22 @@ final class LintArreglos {
         if ( ap.tm != null ) {
           ap.undo.cambio( new Object[] { antes }, new Object[] { db.clone() }, new int[] { ap.meta.indexOfDatabase( db ) } );
         }
-        return "Connection '" + db.getName() + "' now takes its password from " + valor;
+        return ap.t( "done.password.connection", "name", db.getName(), "variable", valor );
       }
       if ( ss != null ) {
         ss.setPassword( valor );
         ss.setChanged();
         ap.meta.setChanged();
-        return "Slave server '" + ss.getName() + "' now takes its password from " + valor;
+        return ap.t( "done.password.slave", "name", ss.getName(), "variable", valor );
       }
       Element raiz = s != null ? xml( s ) : xml( c );
       hoja( raiz ).setTextContent( valor );
       if ( s != null ) {
         releer( ap, s, raiz );
-        return "Step '" + s.getName() + "' now takes " + e.h.attribute + " from " + valor;
+        return ap.t( "done.password.step", "name", s.getName(), "tag", e.h.attribute, "variable", valor );
       }
       releer( ap, c, raiz );
-      return "Entry '" + c.getName() + "' now takes " + e.h.attribute + " from " + valor;
+      return ap.t( "done.password.entry", "name", c.getName(), "tag", e.h.attribute, "variable", valor );
     }
   }
 
@@ -915,14 +975,14 @@ final class LintArreglos {
       campo = f != null ? f : e.h.field;
       valor = e.valor == null ? "" : e.valor.trim();
       if ( !valor.equals( "." ) && !valor.equals( "," ) ) {
-        throw new Saltar( "the decimal symbol must be '.' or ',' (as the data has it)" );
+        throw new Saltar( ap.t( "skip.decimal_value" ) );
       }
       Element x = campo( xml( s ) );
       if ( x == null ) {
-        throw new Saltar( "field " + campo + " is no longer in '" + s.getName() + "'" );
+        throw new Saltar( ap.t( "skip.field_gone", "field", campo, "step", s.getName() ) );
       }
       if ( !Nodos.txt( x, "decimal" ).isEmpty() ) {
-        throw new Saltar( "field " + campo + " of '" + s.getName() + "' already has a decimal symbol" );
+        throw new Saltar( ap.t( "skip.decimal_set", "field", campo, "step", s.getName() ) );
       }
     }
 
@@ -940,13 +1000,12 @@ final class LintArreglos {
       Element raiz = xml( s );
       Element f = campo( raiz );
       texto( f, "decimal", valor );
-      String extra = "";
-      if ( valor.equals( Nodos.txt( f, "group" ) ) ) {
+      boolean igual = valor.equals( Nodos.txt( f, "group" ) );
+      if ( igual ) {
         texto( f, "group", "" ); // el mismo símbolo para las dos cosas: Kettle no sabría cuál es cuál
-        extra = " (its grouping symbol was the same, so it was emptied)";
       }
       releer( ap, s, raiz );
-      return "Field " + campo + " of '" + s.getName() + "' now has decimal symbol '" + valor + "'" + extra;
+      return ap.t( igual ? "done.decimal.group" : "done.decimal", "field", campo, "step", s.getName(), "value", valor );
     }
   }
 
@@ -958,14 +1017,14 @@ final class LintArreglos {
       super( e );
       s = step( ap, e.h );
       if ( !SALIDAS_TEXTO.contains( s.getStepID() ) ) {
-        throw new Saltar( "'" + s.getName() + "' is not a Text file output" );
+        throw new Saltar( ap.t( "skip.not_text_output", "step", s.getName() ) );
       }
       if ( !Nodos.hijos( Nodos.hijo( xml( s ), "fields" ), "field" ).isEmpty() ) {
-        throw new Saltar( "'" + s.getName() + "' already declares its fields" );
+        throw new Saltar( ap.t( "skip.fields_declared", "step", s.getName() ) );
       }
       if ( e.campos == null ) {
-        throw new Saltar( "the fields that reach '" + s.getName() + "' could not be computed"
-          + ( e.sinCampos != null ? ": " + e.sinCampos : "" ) );
+        throw new Saltar( e.sinCampos != null ? ap.t( "skip.fields_unknown.why", "step", s.getName(), "why", e.sinCampos )
+          : ap.t( "skip.fields_unknown", "step", s.getName() ) );
       }
     }
 
@@ -980,8 +1039,52 @@ final class LintArreglos {
         raiz.appendChild( nuevo );
       }
       releer( ap, s, raiz );
-      int n = Nodos.hijos( nuevo, "field" ).size();
-      return "'" + s.getName() + "' now declares the " + n + " fields that reach it (Strings with length -1: no padding)";
+      List<String> nombres = new ArrayList<String>();
+      for ( Element f : Nodos.hijos( nuevo, "field" ) ) {
+        String fmt = Nodos.txt( f, "format" );
+        nombres.add( Nodos.txt( f, "name" ) + " (" + Nodos.txt( f, "type" ) + ( fmt.isEmpty() ? "" : " " + fmt ) + ")" );
+      }
+      return ap.t( "done.fields", "step", s.getName(), "n", nombres.size(), "fields", String.join( ", ", nombres ) );
+    }
+  }
+
+  /** select_star: SELECT * FROM una tabla → SELECT con las columnas que da la consulta hoy (calculadas antes). */
+  static final class ExpandirSelect extends Accion {
+    final StepMeta s;
+
+    ExpandirSelect( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      s = step( ap, e.h );
+      String sql = Nodos.txt( xml( s ), "sql" );
+      if ( !SELECT_ESTRELLA_SIMPLE.matcher( sql ).matches() || SQL_UNE.matcher( sql.replaceFirst( "(?is)^\\s*select\\s+\\*",
+        "" ) ).matches() || sql.contains( "${" ) ) {
+        throw new Saltar( ap.t( "skip.star_complex", "step", s.getName() ) );
+      }
+      if ( e.columnas == null || e.columnas.isEmpty() ) {
+        throw new Saltar( e.sinCampos != null ? ap.t( "skip.columns_unknown.why", "step", s.getName(), "why", e.sinCampos )
+          : ap.t( "skip.columns_unknown", "step", s.getName() ) );
+      }
+    }
+
+    private static String columna( String c ) {
+      return IDENTIFICADOR.matcher( c ).matches() ? c : "\"" + c.replace( "\"", "\"\"" ) + "\"";
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) throws Exception {
+      Element raiz = xml( s );
+      Element sql = Nodos.hijo( raiz, "sql" );
+      Matcher m = SELECT_ESTRELLA_SIMPLE.matcher( sql.getTextContent() );
+      if ( !m.matches() ) {
+        throw new Saltar( ap.t( "skip.star_complex", "step", s.getName() ) );
+      }
+      List<String> cols = new ArrayList<String>();
+      for ( String c : e.columnas ) {
+        cols.add( columna( c ) );
+      }
+      sql.setTextContent( m.group( 1 ) + String.join( ", ", cols ) + m.group( 2 ) );
+      releer( ap, s, raiz );
+      return ap.t( "done.star", "step", s.getName(), "columns", String.join( ", ", cols ) );
     }
   }
 
@@ -1024,7 +1127,7 @@ final class LintArreglos {
       Map<String, String> p = e.h.fix.params;
       claves = partir( p.get( "keys" ) );
       if ( claves.isEmpty() ) {
-        throw new Saltar( "no keys to sort by" );
+        throw new Saltar( ap.t( "skip.no_keys" ) );
       }
       if ( "true".equals( p.get( "after_merge" ) ) ) {
         for ( TransHopMeta x : ap.tm.getTransHops() ) {
@@ -1033,29 +1136,28 @@ final class LintArreglos {
           }
         }
         if ( hops.size() < 2 ) {
-          throw new Saltar( "'" + s.getName() + "' no longer gets rows from several hops" );
+          throw new Saltar( ap.t( "skip.not_merge", "step", s.getName() ) );
         }
         tagInfo = null;
       } else {
         StepMeta f = ap.tm.findStep( p.get( "input" ) );
         TransHopMeta x = f == null ? null : ap.tm.findTransHop( f, s, true );
         if ( x == null ) {
-          throw new Saltar( "there is no hop from '" + p.get( "input" ) + "' to '" + s.getName() + "'" );
+          throw new Saltar( ap.t( "skip.no_hop", "from", p.get( "input" ), "to", s.getName() ) );
         }
         hops.add( x );
         tagInfo = TAGS_INFO.contains( e.h.attribute ) ? e.h.attribute : null;
         if ( tagInfo != null && !Nodos.txt( xml( s ), tagInfo ).equalsIgnoreCase( f.getName() ) ) {
-          throw new Saltar( "'" + s.getName() + "' no longer reads " + tagInfo + " from '" + f.getName() + "'" );
+          throw new Saltar( ap.t( "skip.info_changed", "step", s.getName(), "tag", tagInfo, "from", f.getName() ) );
         }
       }
       for ( TransHopMeta x : hops ) {
         StepMeta f = x.getFromStep();
         if ( x.isErrorHop() ) {
-          throw new Saltar( "the hop '" + f.getName() + "' -> '" + s.getName() + "' is an error hop" );
+          throw new Saltar( ap.t( "skip.error_hop", "from", f.getName(), "to", s.getName() ) );
         }
         if ( mandaA( f, s ) ) {
-          throw new Saltar( "'" + f.getName() + "' sends rows to specific targets (Filter rows, Switch/case): insert "
-            + "the Sort rows by hand and point the target to it" );
+          throw new Saltar( ap.t( "skip.targeted", "from", f.getName() ) );
         }
         if ( !fuentes.contains( f ) ) {
           fuentes.add( f );
@@ -1152,10 +1254,11 @@ final class LintArreglos {
       }
       List<String> de = new ArrayList<String>();
       for ( StepMeta x : fuentes ) {
-        de.add( "'" + x.getName() + "'" );
+        de.add( ap.t( "word.quoted", "name", x.getName() ) );
       }
-      return "Inserted Sort rows '" + nombre + "' (by " + String.join( ", ", claves ) + ") between "
-        + String.join( ", ", de ) + " and '" + s.getName() + "'" + ( tagInfo != null ? "; " + tagInfo + " now reads from it" : "" );
+      String r = ap.t( "done.sort", "name", nombre, "keys", String.join( ", ", claves ), "from", String.join( ", ", de ),
+        "to", s.getName() );
+      return tagInfo != null ? r + ap.t( "done.sort.info", "tag", tagInfo ) : r;
     }
 
     /** Entre las fuentes y el consumidor; si el lugar está ocupado, más abajo. */
@@ -1215,12 +1318,11 @@ final class LintArreglos {
       Element sql = Nodos.hijo( raiz, "sql" );
       String q = sql == null ? "" : sql.getTextContent().replaceAll( "[\\s;]+$", "" );
       if ( !SQL_SELECT.matcher( q ).matches() || SQL_NO_ORDENABLE.matcher( q ).matches() ) {
-        throw new Saltar( "the query of '" + t.getName() + "' changed (it already has an ORDER BY, or cannot take "
-          + "one): insert a Sort rows instead" );
+        throw new Saltar( ap.t( "skip.query_changed", "step", t.getName() ) );
       }
       sql.setTextContent( q + "\nORDER BY " + String.join( ", ", claves ) );
       releer( ap, t, raiz );
-      return "Added ORDER BY " + String.join( ", ", claves ) + " to the query of '" + t.getName() + "'";
+      return ap.t( "done.order_by", "keys", String.join( ", ", claves ), "step", t.getName() );
     }
   }
 
@@ -1232,7 +1334,7 @@ final class LintArreglos {
     HopAAbort( Aplicacion ap, Elegido e ) throws Saltar {
       super( e );
       if ( ap.jm == null ) {
-        throw new Saltar( "the document is not a job" );
+        throw new Saltar( ap.t( "skip.not_job" ) );
       }
       Hallazgo h = e.h;
       JobHopMeta encontrado = null;
@@ -1247,7 +1349,7 @@ final class LintArreglos {
         }
       }
       if ( encontrado == null ) {
-        throw new Saltar( "the failure hop " + h.object + " to Success is no longer there" );
+        throw new Saltar( ap.t( "skip.failure_hop_gone", "hop", h.object ) );
       }
       hop = encontrado;
       for ( JobEntryCopy x : ap.jm.getJobCopies() ) {
@@ -1256,8 +1358,7 @@ final class LintArreglos {
         }
       }
       if ( abort != null && ap.jm.findJobHop( hop.getFromEntry(), abort, true ) != null ) {
-        throw new Saltar( "'" + hop.getFromEntry().getName() + "' already has a hop to '" + abort.getName()
-          + "': delete the failure hop to Success by hand" );
+        throw new Saltar( ap.t( "skip.abort_hop_exists", "from", hop.getFromEntry().getName(), "to", abort.getName() ) );
       }
     }
 
@@ -1280,70 +1381,222 @@ final class LintArreglos {
       hop.setToEntry( abort );
       hop.setChanged();
       ap.undo.cambio( new Object[] { antes }, new Object[] { hop.clone() }, new int[] { jm.indexOfJobHop( hop ) } );
-      String r = "The failure hop of '" + hop.getFromEntry().getName() + "' now goes to '" + abort.getName() + "'"
-        + ( nueva ? " (a new Abort job entry)" : "" ) + " instead of '" + exito.getName() + "'";
+      String r = ap.t( nueva ? "done.abort.new" : "done.abort", "from", hop.getFromEntry().getName(), "to", abort.getName(),
+        "old", exito.getName() );
       if ( !jm.isEntryUsedInHops( exito ) ) {
-        r += "; '" + exito.getName() + "' has no hops left: delete it";
+        r += ap.t( "done.abort.lonely", "name", exito.getName() );
       }
       return r;
     }
   }
 
-  /** no_description: la descripción del documento (fuera del undo de Spoon). */
+  /** no_description: la descripción del documento (con UndoEfecto: el mismo Ctrl+Z). */
   static final class Descripcion extends Accion {
     final String valor;
+    boolean deshace = true;
 
     Descripcion( Aplicacion ap, Elegido e ) throws Saltar {
       super( e );
       valor = e.valor == null ? "" : e.valor.trim();
       if ( valor.isEmpty() ) {
-        throw new Saltar( "no description: pass it in values[key]" );
+        throw new Saltar( ap.t( "skip.no_description" ) );
       }
     }
 
     @Override
     boolean deshacible( Aplicacion ap ) {
-      return false;
+      return deshace;
     }
 
     @Override
     String hacer( Aplicacion ap ) {
+      UndoEfecto.Foto foto = UndoEfecto.Foto.de( ap.meta );
       ap.meta.setDescription( valor );
       ap.meta.setChanged();
-      ap.notas.add( "Ctrl+Z does not undo the description: change it again in the document properties if needed." );
-      return "Set the description of the document";
+      deshace = ap.deshacerEfecto( foto );
+      return ap.t( "done.description", "value", valor );
     }
   }
 
-  /** undeclared_variable: la declara como parámetro con el default elegido (fuera del undo de Spoon). */
+  /** undeclared_variable: la declara como parámetro con el default elegido (con UndoEfecto: el mismo Ctrl+Z). */
   static final class Parametro extends Accion {
     final String nombre;
     final String valor;
+    boolean deshace = true;
 
     Parametro( Aplicacion ap, Elegido e ) throws Saltar {
       super( e );
       nombre = e.h.fix.params.get( "parameter" );
       valor = e.valor == null ? "" : e.valor;
       if ( nombre == null || nombre.isEmpty() ) {
-        throw new Saltar( "no parameter name" );
+        throw new Saltar( ap.t( "skip.no_parameter" ) );
       }
-      if ( tieneParametro( ap.meta, nombre ) ) {
-        throw new Saltar( nombre + " is already a parameter" );
+      if ( tieneParametro( ap.meta, nombre ) || ap.parametros.containsKey( nombre ) ) {
+        throw new Saltar( ap.t( "skip.parameter_exists", "parameter", nombre ) );
+      }
+      ap.parametros.put( nombre, valor );
+    }
+
+    @Override
+    boolean deshacible( Aplicacion ap ) {
+      return deshace;
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) throws Exception {
+      UndoEfecto.Foto foto = UndoEfecto.Foto.de( ap.meta );
+      ap.meta.addParameterDefinition( nombre, valor, "" );
+      ap.meta.activateParameters();
+      ap.meta.setChanged();
+      deshace = ap.deshacerEfecto( foto );
+      return ap.t( "done.parameter", "parameter", nombre, "value", valor );
+    }
+  }
+
+  /** parameter_without_default: el default elegido (con UndoEfecto: el mismo Ctrl+Z). */
+  static final class DefaultDeParametro extends Accion {
+    final String nombre;
+    final String valor;
+    boolean deshace = true;
+
+    DefaultDeParametro( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      nombre = e.h.fix.params.get( "parameter" ) != null ? e.h.fix.params.get( "parameter" ) : e.h.object;
+      valor = e.valor == null ? "" : e.valor;
+      if ( nombre == null || !tieneParametro( ap.meta, nombre ) ) {
+        throw new Saltar( ap.t( "skip.no_such_parameter", "parameter", nombre ) );
+      }
+      if ( valor.trim().isEmpty() ) {
+        throw new Saltar( ap.t( "skip.no_default" ) );
       }
     }
 
     @Override
     boolean deshacible( Aplicacion ap ) {
-      return false;
+      return deshace;
     }
 
     @Override
     String hacer( Aplicacion ap ) throws Exception {
-      ap.meta.addParameterDefinition( nombre, valor, "" );
-      ap.meta.setChanged();
-      ap.notas.add( "Ctrl+Z does not remove the parameters that were declared: remove them in the document properties "
-        + "if you undo." );
-      return "Declared parameter " + nombre + " with default '" + valor + "'";
+      UndoEfecto.Foto foto = UndoEfecto.Foto.de( ap.meta );
+      UndoEfecto.Foto nueva = UndoEfecto.Foto.de( ap.meta );
+      String[] d = nueva.parametros.get( nombre );
+      nueva.parametros.put( nombre, new String[] { valor, d == null ? "" : d[ 1 ] } );
+      nueva.descripcion = foto.descripcion;
+      nueva.poner( ap.meta );
+      deshace = ap.deshacerEfecto( foto );
+      return ap.t( "done.parameter_default", "parameter", nombre, "value", valor );
+    }
+  }
+
+  /** disabled_hop: el hop vuelve a estar habilitado (un Ctrl+Z en una transformación). */
+  static final class HabilitarHop extends Accion {
+    TransHopMeta th;
+    JobHopMeta jh;
+    final String de;
+    final String a;
+
+    HabilitarHop( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      String o = e.h.object == null ? "" : e.h.object;
+      int i = o.indexOf( " -> " );
+      de = i < 0 ? "" : o.substring( 0, i );
+      a = i < 0 ? "" : o.substring( i + 4 );
+      if ( ap.tm != null ) {
+        StepMeta f = ap.tm.findStep( de );
+        StepMeta t = ap.tm.findStep( a );
+        th = f == null || t == null ? null : ap.tm.findTransHop( f, t, true );
+        if ( th == null || th.isEnabled() ) {
+          throw new Saltar( ap.t( "skip.hop_enabled", "from", de, "to", a ) );
+        }
+      } else {
+        for ( int k = 0; k < ap.jm.nrJobHops() && jh == null; k++ ) {
+          JobHopMeta x = ap.jm.getJobHop( k );
+          if ( x.getFromEntry() != null && x.getToEntry() != null && x.getFromEntry().getName().equals( de )
+            && x.getToEntry().getName().equals( a ) && !x.isEnabled() ) {
+            jh = x;
+          }
+        }
+        if ( jh == null ) {
+          throw new Saltar( ap.t( "skip.hop_enabled", "from", de, "to", a ) );
+        }
+      }
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) throws Exception {
+      if ( th != null ) {
+        TransHopMeta antes = (TransHopMeta) th.clone();
+        th.setEnabled( true );
+        th.setChanged();
+        ap.tm.clearCaches();
+        ap.undo.cambio( new Object[] { antes }, new Object[] { th.clone() }, new int[] { ap.tm.indexOfTransHop( th ) } );
+      } else {
+        JobHopMeta antes = (JobHopMeta) jh.clone();
+        jh.setEnabled( true );
+        jh.setChanged();
+        ap.undo.cambio( new Object[] { antes }, new Object[] { jh.clone() }, new int[] { ap.jm.indexOfJobHop( jh ) } );
+      }
+      return ap.t( "done.enable_hop", "from", de, "to", a );
+    }
+  }
+
+  /** orphan_step: borra el step suelto (un Ctrl+Z lo devuelve). */
+  static final class BorrarStep extends Accion {
+    final StepMeta s;
+
+    BorrarStep( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      s = step( ap, e.h );
+      if ( ap.tm.isStepUsedInTransHops( s ) ) {
+        throw new Saltar( ap.t( "skip.has_hops", "name", s.getName() ) );
+      }
+      if ( !ap.borrados.add( s ) ) {
+        throw new Saltar( ap.t( "skip.already_deleted", "name", s.getName() ) );
+      }
+    }
+
+    @Override
+    boolean borra() {
+      return true;
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) throws Exception {
+      int i = ap.tm.indexOfStep( s );
+      ap.tm.removeStep( i );
+      ap.undo.borrado( new Object[] { s }, new int[] { i } );
+      TransOps.resolverReferencias( ap.tm );
+      return ap.t( "done.delete_step", "name", s.getName() );
+    }
+  }
+
+  /** orphan_entry: borra la entrada suelta (Ctrl+Z la devuelve). */
+  static final class BorrarEntrada extends Accion {
+    final JobEntryCopy c;
+
+    BorrarEntrada( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      c = entrada( ap, e.h );
+      if ( ap.jm.isEntryUsedInHops( c ) ) {
+        throw new Saltar( ap.t( "skip.has_hops", "name", c.getName() ) );
+      }
+      if ( !ap.borrados.add( c ) ) {
+        throw new Saltar( ap.t( "skip.already_deleted", "name", c.getName() ) );
+      }
+    }
+
+    @Override
+    boolean borra() {
+      return true;
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) throws Exception {
+      int i = ap.jm.indexOfJobEntry( c );
+      ap.jm.removeJobEntry( i );
+      ap.undo.borrado( new Object[] { c }, new int[] { i } );
+      return ap.t( "done.delete_entry", "name", c.getName() );
     }
   }
 
@@ -1366,6 +1619,11 @@ final class LintArreglos {
 
   static ObjectNode respuesta( String doc, Analisis an, Hecho h, Resultado despues, boolean ensayo, boolean sinGuardarAntes,
                                boolean esTrans ) {
+    return respuesta( doc, an, h, despues, ensayo, sinGuardarAntes, esTrans, "en" );
+  }
+
+  static ObjectNode respuesta( String doc, Analisis an, Hecho h, Resultado despues, boolean ensayo, boolean sinGuardarAntes,
+                               boolean esTrans, String lang ) {
     ObjectNode o = Tools.obj();
     if ( doc != null ) {
       o.put( "document", doc );
@@ -1381,17 +1639,15 @@ final class LintArreglos {
     o.put( "score_after", despues.score ).put( "grade_after", despues.grade );
     ArrayNode notas = o.putArray( "notes" );
     if ( ensayo ) {
-      notas.add( "Dry run: nothing was changed. 'applied' is what would change; score_after is the score it would get." );
+      notas.add( t( lang, "note.dry_run" ) );
     }
     if ( h.cambios > 0 ) {
       if ( !sinGuardarAntes ) {
-        notas.add( "score_after is computed on the unsaved document: the rules that read the file (duplicate step "
-          + "names, passwords in plain text) are judged in memory until it is saved." );
+        notas.add( t( lang, "note.unsaved_score" ) );
       }
       if ( !ensayo ) {
-        notas.add( esTrans ? "One Ctrl+Z in Spoon undoes all the changes of this call."
-          : "In a job each change is its own Ctrl+Z in Spoon (undo_steps)." );
-        notas.add( "The changes are not saved yet: use 'save' to keep them." );
+        notas.add( t( lang, esTrans ? "note.one_undo" : "note.job_undo" ) );
+        notas.add( t( lang, "note.not_saved" ) );
       }
     }
     for ( String n : h.notas ) {

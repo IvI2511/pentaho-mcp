@@ -185,6 +185,7 @@ public final class ReglasJob {
         if ( c.isDrawn() && !jm.isEntryUsedInHops( c ) ) {
           Hallazgo h = ctx.enEntrada( Sev.WARNING, c, "hops" );
           h.message = ctx.t( "orphan_entry.msg", "entry", c.getName() );
+          h.fix = Arreglo.conConfirmacion( Arreglo.DELETE_ENTRY );
           out.add( h );
         }
       }

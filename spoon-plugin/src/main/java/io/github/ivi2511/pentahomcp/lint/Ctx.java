@@ -214,6 +214,32 @@ public final class Ctx {
     return null;
   }
 
+  private Object disco;
+
+  /**
+   * El archivo del disco aunque el documento tenga cambios sin guardar (duplicate_step_name: lo que Kettle perdió al
+   * abrirlo sigue perdido). null sin archivo (nunca se guardó: no hay nada que decir); si no se puede leer, null y un no
+   * evaluado con el motivo.
+   */
+  public ArchivoCrudo crudoDelDisco() {
+    if ( meta.getFilename() == null || meta.getFilename().trim().isEmpty() ) {
+      return null;
+    }
+    if ( disco == null ) {
+      try {
+        disco = ArchivoCrudo.leer( meta );
+      } catch ( Throwable e ) {
+        disco = ne( "no_file", t( "ne.read_failed", "detail", primeraLinea( e ) ) );
+      }
+    }
+    if ( disco instanceof ArchivoCrudo ) {
+      return (ArchivoCrudo) disco;
+    }
+    NoEvaluado base = (NoEvaluado) disco;
+    noEvaluado( base.code, null, null, base.reason );
+    return null;
+  }
+
   private NoEvaluado ne( String code, String reason ) {
     NoEvaluado n = new NoEvaluado();
     n.code = code;

@@ -21,6 +21,11 @@ public final class Arreglo {
   public static final String RETARGET_HOP = "retarget_hop";
   public static final String SET_DESCRIPTION = "set_description";
   public static final String ADD_PARAMETER = "add_parameter";
+  public static final String SET_PARAMETER_DEFAULT = "set_parameter_default";
+  public static final String ENABLE_HOP = "enable_hop";
+  public static final String DELETE_STEP = "delete_step";
+  public static final String DELETE_ENTRY = "delete_entry";
+  public static final String EXPAND_SELECT_STAR = "expand_select_star";
 
   public String kind;
   public boolean auto;

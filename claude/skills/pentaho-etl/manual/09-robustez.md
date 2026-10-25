@@ -6,7 +6,10 @@ broken input file proves it. Everything here is taken from `../patrones/06_carga
 with Kitchen 9.4.0.0-343 three times (clean file, clean file again, broken file) and is checked by
 `../patrones/verificar.ps1 -Solo 06`. Tools: `lint_etl robustness=true` (detect), `harden_etl` (apply),
 `stress_test` (prove); by hand they are in Spoon's **IDC** menu > **Harden…** (plan with checkboxes, Apply,
-Test with dirty data). Words used in the files: `motivo` = reason, `campos_error` = failing fields,
+Test with dirty data, which says before running what it will dirty and whether it can run). Each recipe opens in a
+details window (double click or Enter) with its exact changes, Go to step, Apply this recipe and **Ask Claude** (a
+ready-made request on the clipboard). In **Check quality…** with *Include robustness*, a robustness finding can be
+checked to apply its recipe with the other fixes, one Ctrl+Z. Words used in the files: `motivo` = reason, `campos_error` = failing fields,
 `rechazos` = rejects.
 
 ## 1. What "robust" means here
@@ -55,8 +58,8 @@ means *rejected with a reason, in a file that someone reads*.
      and you build it by hand with §4 (`semantics_change: true` marks R07, R09 and R10, which change the
      meaning of keys or of the load: ask first). Do not tell the person a load is re-runnable until R07 and
      R09 are really done.
-3. `harden_etl dry_run=false confirm=[…]`: what it applies is **one Ctrl+Z** in Spoon (the input parameter
-   of R12 is outside the undo, the result says so). Then `validate`.
+3. `harden_etl dry_run=false confirm=[…]`: what it applies is **one Ctrl+Z** in Spoon, the input parameter of
+   R12 included (since 0.7.0). Then `validate`.
 4. `stress_test`: breaks copies of the file inputs (missing fields, bad dates and numbers, duplicates,
    cut lines, extra separators, too long text, out of range, other encoding, empty file, header only),
    runs a **copy** of the transformation in a separate JVM and checks no abort, the per-step balance and

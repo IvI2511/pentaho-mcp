@@ -1,6 +1,7 @@
 package io.github.ivi2511.pentahomcp;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -22,14 +24,17 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
-import org.eclipse.swt.widgets.Text;
 import org.pentaho.di.trans.TransMeta;
 
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
+import io.github.ivi2511.pentahomcp.robustez.Receta;
 
 /**
  * «Robustecer…» del menú IDC ({@link IdcMenu}): el plan de harden_etl (dry_run, todas las recetas) como una lista con
- * casillas, «Aplicar» (un Ctrl+Z) y «Probar con datos sucios…» (stress_test en segundo plano, cancelable).
+ * casillas, el detalle con formato de la receta elegida (por qué, avisos, los cambios exactos, cómo hacerlo), la ventana
+ * de detalle con doble clic o Intro ({@link IdcDetalle.Ventana}: ir al step, aplicar esta receta, pedírselo a Claude),
+ * «Aplicar» (un Ctrl+Z, parámetros nuevos incluidos) y «Probar con datos sucios…» (stress_test en segundo plano,
+ * cancelable), que antes de correr dice qué va a hacer y si va a poder.
  * <p>
  * Casillas: las propuestas auto van marcadas; las confirm y las que cambian la semántica de la carga
  * (semantics_change) van desmarcadas y con ⚠; las manuales no se pueden marcar (muestran cómo hacerlo). Al aplicar,
@@ -41,7 +46,7 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  */
 final class IdcRobustez {
 
-  /** Lo que el diálogo pide afuera; todo corre fuera del hilo de UI. */
+  /** Lo que el diálogo pide afuera; todo corre fuera del hilo de UI salvo seleccionar. */
   interface Servicio {
     String nombre();
 
@@ -53,6 +58,15 @@ final class IdcRobustez {
 
     /** stress_test con un corte para cancelarla. */
     ObjectNode probar( EstresProcesos.Corte corte ) throws Exception;
+
+    /** Lo que haría stress_test, sin correrlo ({@link EstresTools#previa}); null si no se sabe. */
+    default ObjectNode previa() throws Exception {
+      return null;
+    }
+
+    /** select_steps del step en el lienzo. Nunca lanza. (UI) */
+    default void seleccionar( String step ) {
+    }
   }
 
   /** El diálogo abierto (uno a la vez). Solo en el hilo de UI. */
@@ -66,19 +80,23 @@ final class IdcRobustez {
   final Label puntaje;
   final Label intro;
   final Table tabla;
-  final Text detalle;
+  final StyledText detalle;
   final Label estado;
   final ProgressBar barra;
   final Label reloj;
   final Button cancelar;
   final Button aplicar;
+  final Button verDetalle;
   final Button probar;
   final Button cerrar;
   final Group grupoPrueba;
   final Label veredicto;
   final Label entorno;
+  /** Antes de la prueba: qué va a hacer (y si va a poder). Después, se oculta. */
+  final StyledText queHara;
+  final SashForm resultados;
   final Table comprobaciones;
-  final Text mensajes;
+  final StyledText mensajes;
 
   private final Color rojo;
   private final Color ambar;
@@ -89,12 +107,15 @@ final class IdcRobustez {
   final List<JsonNode> propuestas = new ArrayList<JsonNode>();
   ObjectNode plan;
   ObjectNode prueba;
+  ObjectNode previa;
+  IdcDetalle.Ventana ventana;
+  JsonNode enVentana;
   volatile boolean ocupado;
   private int generacion;
   private EstresProcesos.Corte corte;
   private long inicio;
   /** El resumen de la última prueba (lo que muestra la caja de mensajes). */
-  private String resumenPrueba = "";
+  private IdcDetalle.Texto resumenPrueba = new IdcDetalle.Texto();
 
   // ---------------------------------------------------------------- apertura
 
@@ -122,9 +143,9 @@ final class IdcRobustez {
       shell.setImage( ico );
       shell.addListener( SWT.Dispose, e -> ico.dispose() );
     }
-    rojo = new Color( shell.getDisplay(), 190, 30, 30 );
-    ambar = new Color( shell.getDisplay(), 170, 105, 0 );
-    verde = new Color( shell.getDisplay(), 30, 130, 60 );
+    rojo = new Color( shell.getDisplay(), 175, 25, 25 );
+    ambar = new Color( shell.getDisplay(), 150, 90, 0 );
+    verde = new Color( shell.getDisplay(), 25, 115, 50 );
     gris = new Color( shell.getDisplay(), 100, 100, 100 );
     shell.addListener( SWT.Dispose, e -> {
       rojo.dispose();
@@ -132,6 +153,9 @@ final class IdcRobustez {
       verde.dispose();
       gris.dispose();
       cortarPrueba();
+      if ( ventana != null && !ventana.shell.isDisposed() ) {
+        ventana.shell.dispose();
+      }
       if ( abierto == this ) {
         abierto = null;
       }
@@ -153,22 +177,20 @@ final class IdcRobustez {
     SashForm sash = new SashForm( shell, SWT.VERTICAL );
     sash.setLayoutData( new GridData( SWT.FILL, SWT.FILL, true, true ) );
 
-    Composite arriba = new Composite( sash, SWT.NONE );
-    GridLayout ga = new GridLayout( 1, false );
-    ga.marginWidth = 0;
-    ga.marginHeight = 0;
-    arriba.setLayout( ga );
+    // arriba: el plan y el detalle de la receta elegida, lado a lado en altura
+    SashForm arriba = new SashForm( sash, SWT.VERTICAL );
     tabla = new Table( arriba, SWT.BORDER | SWT.CHECK | SWT.FULL_SELECTION | SWT.SINGLE | SWT.V_SCROLL
       | SWT.H_SCROLL );
     tabla.setHeaderVisible( true );
     tabla.setLinesVisible( true );
-    tabla.setLayoutData( new GridData( SWT.FILL, SWT.FILL, true, true ) );
-    columna( tabla, "col_apply", 70 );
-    columna( tabla, "col_recipe", 170 );
+    columna( tabla, "col_apply", 64 );
+    columna( tabla, "col_recipe", 240 );
     columna( tabla, "col_level", 100 );
-    columna( tabla, "col_step", 170 );
-    columna( tabla, "col_why", 400 );
+    columna( tabla, "col_step", 180 );
+    columna( tabla, "col_why", 380 );
     columna( tabla, "col_semantics", 150 );
+    IdcDetalle.columnas( tabla, "harden", 4 );
+    IdcDetalle.tooltips( tabla );
     tabla.addListener( SWT.Selection, e -> {
       if ( e.detail == SWT.CHECK ) {
         TableItem it = (TableItem) e.item;
@@ -180,46 +202,61 @@ final class IdcRobustez {
       }
       elegida( e.item instanceof TableItem ? tabla.indexOf( (TableItem) e.item ) : tabla.getSelectionIndex() );
     } );
-    detalle = new Text( arriba, SWT.BORDER | SWT.MULTI | SWT.WRAP | SWT.READ_ONLY | SWT.V_SCROLL );
-    GridData gd = new GridData( SWT.FILL, SWT.FILL, true, false );
-    gd.heightHint = 90;
-    detalle.setLayoutData( gd );
+    IdcDetalle.alAbrir( tabla, this::abrirDetalle );
+    detalle = IdcDetalle.panel( arriba );
+    detalle.setData( "plano", "" );
+    arriba.setWeights( new int[] { 52, 48 } );
 
+    // abajo: la prueba con datos sucios
     grupoPrueba = new Group( sash, SWT.NONE );
     grupoPrueba.setText( r.s( "r_stress" ).replace( "…", "" ) );
     grupoPrueba.setLayout( new GridLayout( 1, false ) );
     veredicto = new Label( grupoPrueba, SWT.WRAP );
     veredicto.setFont( IdcCalidad.negrita( veredicto, 1.15 ) );
-    veredicto.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
+    GridData gve = new GridData( SWT.FILL, SWT.TOP, true, false );
+    gve.exclude = true;
+    veredicto.setLayoutData( gve );
+    veredicto.setVisible( false );
     entorno = new Label( grupoPrueba, SWT.WRAP );
     GridData ge = new GridData( SWT.FILL, SWT.TOP, true, false );
     ge.exclude = true;
     entorno.setLayoutData( ge );
     entorno.setVisible( false );
-    comprobaciones = new Table( grupoPrueba, SWT.BORDER | SWT.FULL_SELECTION | SWT.SINGLE | SWT.V_SCROLL );
+    queHara = IdcDetalle.panel( grupoPrueba );
+    queHara.setData( "plano", "" );
+    queHara.setLayoutData( new GridData( SWT.FILL, SWT.FILL, true, true ) );
+    IdcDetalle.Texto qh = new IdcDetalle.Texto();
+    qh.parrafo( r.s( "r_stress_what_loading" ), IdcDetalle.Texto.SUAVE );
+    pintar( queHara, qh );
+    resultados = new SashForm( grupoPrueba, SWT.VERTICAL );
+    GridData gk = new GridData( SWT.FILL, SWT.FILL, true, true );
+    gk.exclude = true;
+    resultados.setLayoutData( gk );
+    resultados.setVisible( false );
+    comprobaciones = new Table( resultados, SWT.BORDER | SWT.FULL_SELECTION | SWT.SINGLE | SWT.V_SCROLL );
     comprobaciones.setHeaderVisible( true );
     comprobaciones.setLinesVisible( true );
-    GridData gk = new GridData( SWT.FILL, SWT.FILL, true, true );
-    gk.minimumHeight = 90;
-    gk.heightHint = 120;
-    comprobaciones.setLayoutData( gk );
-    columna( comprobaciones, "col_variant", 140 );
+    columna( comprobaciones, "col_variant", 150 );
     columna( comprobaciones, "col_check", 230 );
     columna( comprobaciones, "col_status", 90 );
-    columna( comprobaciones, "col_msg", 560 );
-    mensajes = new Text( grupoPrueba, SWT.BORDER | SWT.MULTI | SWT.WRAP | SWT.READ_ONLY | SWT.V_SCROLL );
-    GridData gm = new GridData( SWT.FILL, SWT.FILL, true, false );
-    gm.heightHint = 70;
-    mensajes.setLayoutData( gm );
+    columna( comprobaciones, "col_msg", 520 );
+    IdcDetalle.columnas( comprobaciones, "stress", 3 );
+    IdcDetalle.tooltips( comprobaciones );
+    mensajes = IdcDetalle.panel( resultados );
+    mensajes.setData( "plano", "" );
+    resultados.setWeights( new int[] { 55, 45 } );
     comprobaciones.addListener( SWT.Selection, e -> {
       // el mensaje entero de la comprobación elegida, encima del resumen
       Object d = e.item == null ? null : e.item.getData();
       if ( d instanceof String && !( (String) d ).isEmpty() ) {
         TableItem it = (TableItem) e.item;
-        mensajes.setText( it.getText( 0 ) + " · " + it.getText( 1 ) + ": " + d + "\n\n" + resumenPrueba );
+        IdcDetalle.Texto t = new IdcDetalle.Texto();
+        t.seccion( it.getText( 0 ) + " · " + it.getText( 1 ) + " · " + it.getText( 2 ) ).parrafo( (String) d );
+        t.b.append( "\n" );
+        pintar( mensajes, unir( t, resumenPrueba ) );
       }
     } );
-    sash.setWeights( new int[] { 45, 55 } );
+    sash.setWeights( new int[] { 58, 42 } );
 
     Composite pr = new Composite( shell, SWT.NONE );
     pr.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
@@ -244,7 +281,7 @@ final class IdcRobustez {
 
     Composite bo = new Composite( shell, SWT.NONE );
     bo.setLayoutData( new GridData( SWT.FILL, SWT.TOP, true, false ) );
-    GridLayout gbo = new GridLayout( 3, false );
+    GridLayout gbo = new GridLayout( 4, false );
     gbo.marginWidth = 0;
     bo.setLayout( gbo );
     aplicar = new Button( bo, SWT.PUSH );
@@ -252,6 +289,11 @@ final class IdcRobustez {
     aplicar.setToolTipText( r.s( "r_apply_tip" ) );
     aplicar.setEnabled( false );
     aplicar.addListener( SWT.Selection, e -> aplicarPlan() );
+    verDetalle = new Button( bo, SWT.PUSH );
+    verDetalle.setText( r.s( "q_details" ) );
+    verDetalle.setToolTipText( r.s( "r_details_tip" ) );
+    verDetalle.setEnabled( false );
+    verDetalle.addListener( SWT.Selection, e -> abrirDetalle() );
     probar = new Button( bo, SWT.PUSH );
     probar.setText( r.s( "r_stress" ) );
     probar.setToolTipText( r.s( "r_stress_tip" ) );
@@ -263,7 +305,7 @@ final class IdcRobustez {
     cerrar.setLayoutData( gce );
     cerrar.addListener( SWT.Selection, e -> shell.close() );
 
-    shell.setSize( 1100, 800 );
+    IdcDetalle.tamano( shell, "harden", 1120, 820 );
   }
 
   private void columna( Table t, String clave, int ancho ) {
@@ -277,9 +319,27 @@ final class IdcRobustez {
     cargarPlan();
   }
 
+  private static void pintar( StyledText st, IdcDetalle.Texto t ) {
+    IdcDetalle.mostrar( st, t );
+    st.setData( "plano", t.plano() );
+  }
+
+  /** Dos textos seguidos (el segundo sin perder sus estilos). */
+  private static IdcDetalle.Texto unir( IdcDetalle.Texto a, IdcDetalle.Texto b ) {
+    IdcDetalle.Texto t = new IdcDetalle.Texto();
+    t.b.append( a.b );
+    t.estilos.addAll( a.estilos );
+    int base = t.b.length();
+    t.b.append( b.b );
+    for ( int[] x : b.estilos ) {
+      t.estilos.add( new int[] { x[ 0 ] + base, x[ 1 ], x[ 2 ] } );
+    }
+    return t;
+  }
+
   // ---------------------------------------------------------------- plan
 
-  /** harden_etl dry_run con todas las recetas. (UI) */
+  /** harden_etl dry_run con todas las recetas (y, a la vez, lo que haría la prueba con datos sucios). (UI) */
   void cargarPlan() {
     if ( ocupado ) {
       return;
@@ -289,6 +349,16 @@ final class IdcRobustez {
       libre( "" );
       mostrarPlan( o );
     }, e -> libre( r.f( "r_plan_error", IdcMenu.mensaje( e ) ) ) );
+    if ( previa == null && prueba == null ) {
+      IdcMenu.enHilo( shell, "pentaholive-idc-stress-plan", () -> servicio.previa(), o -> mostrarPrevia( o ), e -> {
+        IdcDetalle.Texto t = new IdcDetalle.Texto();
+        queHaraBase( t );
+        t.parrafo( r.f( "r_stress_what_error", IdcMenu.mensaje( e ) ), IdcDetalle.Texto.AMBAR );
+        if ( prueba == null ) {
+          pintar( queHara, t );
+        }
+      } );
+    }
   }
 
   /** El título de la receta en el idioma del diálogo (informes/textos/harden_*.properties), o su id. */
@@ -316,6 +386,7 @@ final class IdcRobustez {
     } else {
       puntaje.setText( "" );
     }
+    String antes = enVentana == null ? null : enVentana.path( "key" ).asText();
     tabla.removeAll();
     propuestas.clear();
     for ( JsonNode p : o.path( "proposals" ) ) {
@@ -324,10 +395,12 @@ final class IdcRobustez {
       it.setData( p );
       String nivel = p.path( "level" ).asText();
       boolean sem = p.path( "semantics_change" ).asBoolean();
-      it.setText( new String[] { "", receta( p.path( "recipe" ).asText() ), r.s( "level_" + nivel ),
-        p.path( "step" ).asText(),
-        IdcCalidad.una( p.path( "why" ).asText() ), sem || "confirm".equals( nivel ) ? r.s( "r_semantics" )
-          : "" } );
+      String titulo = receta( p.path( "recipe" ).asText() );
+      it.setText( new String[] { "", titulo, r.s( "level_" + nivel ), p.path( "step" ).asText(), IdcCalidad.una( p
+        .path( "why" ).asText() ), sem || "confirm".equals( nivel ) ? r.s( "r_semantics" ) : "" } );
+      it.setData( "tip1", titulo + " (" + p.path( "recipe" ).asText() + ")" );
+      it.setData( "tip4", p.path( "why" ).asText() );
+      it.setData( "tip5", sem || "confirm".equals( nivel ) ? r.s( "r_semantics_tip" ) : "" );
       it.setChecked( marcadaAlEmpezar( p ) );
       if ( !marcable( p ) ) {
         it.setGrayed( true );
@@ -337,10 +410,30 @@ final class IdcRobustez {
       }
     }
     if ( propuestas.isEmpty() ) {
-      detalle.setText( r.s( "r_plan_none" ) );
+      IdcDetalle.Texto t = new IdcDetalle.Texto();
+      t.parrafo( r.s( "r_plan_none" ), IdcDetalle.Texto.SUAVE );
+      pintar( detalle, t );
+      verDetalle.setEnabled( false );
     } else {
       tabla.setSelection( 0 );
       elegida();
+    }
+    if ( ventana != null && !ventana.shell.isDisposed() && antes != null ) {
+      JsonNode mismo = null;
+      for ( JsonNode p : propuestas ) {
+        if ( antes.equals( p.path( "key" ).asText() ) ) {
+          mismo = p;
+        }
+      }
+      if ( mismo != null ) {
+        String est = ventana.estado.getText();
+        llenarVentana( mismo );
+        estadoVentana( est );
+      } else {
+        ventana.aplicar.setEnabled( false );
+        estadoVentana( ventana.estado.getText() + ( ventana.estado.getText().isEmpty() ? "" : "  " ) + r.s(
+          "r_gone" ) );
+      }
     }
     contar();
     shell.layout( true, true );
@@ -355,27 +448,153 @@ final class IdcRobustez {
     if ( i < 0 || i >= propuestas.size() ) {
       return;
     }
-    JsonNode p = propuestas.get( i );
-    StringBuilder b = new StringBuilder();
-    b.append( receta( p.path( "recipe" ).asText() ) ).append( " (" ).append( p.path( "recipe" ).asText() )
-      .append( ") · " ).append( p.path( "step" ).asText() ).append( "\n" )
-      .append( p.path( "why" ).asText() );
-    if ( "manual".equals( p.path( "level" ).asText() ) ) {
-      b.append( "\n\n" ).append( r.s( "r_manual_note" ) );
+    verDetalle.setEnabled( true );
+    IdcDetalle.Texto t = contenido( propuestas.get( i ), true );
+    t.parrafo( r.s( "r_detail_hint" ), IdcDetalle.Texto.SUAVE );
+    pintar( detalle, t );
+  }
+
+  /** El texto con formato de una propuesta: por qué, nota manual, avisos, cambios exactos, cómo hacerlo, datos. */
+  IdcDetalle.Texto contenido( JsonNode p, boolean conTitulo ) {
+    IdcDetalle.Texto t = new IdcDetalle.Texto();
+    String nivel = p.path( "level" ).asText();
+    if ( conTitulo ) {
+      t.titulo( receta( p.path( "recipe" ).asText() ) );
+      t.parrafo( r.s( "level_" + nivel ) + " · " + p.path( "recipe" ).asText() + " · " + r.f( "q_where_step", p.path(
+        "step" ).asText() ), "manual".equals( nivel ) ? IdcDetalle.Texto.SUAVE : "auto".equals( nivel )
+          ? IdcDetalle.Texto.VERDE : IdcDetalle.Texto.AMBAR );
+    }
+    t.seccion( r.s( "d_why_recipe" ) ).parrafo( p.path( "why" ).asText() );
+    if ( p.path( "semantics_change" ).asBoolean() || "confirm".equals( nivel ) ) {
+      t.parrafo( "⚠ " + r.s( "r_semantics_tip" ), IdcDetalle.Texto.AMBAR );
     }
     if ( p.path( "warnings" ).size() > 0 ) {
-      b.append( "\n\n" ).append( r.s( "r_detail_warnings" ) );
+      t.seccion( r.s( "r_detail_warnings" ).replace( ":", "" ) );
+      List<String> l = new ArrayList<String>();
       for ( JsonNode w : p.path( "warnings" ) ) {
-        b.append( "\n· " ).append( w.asText() );
+        l.add( w.asText() );
       }
+      t.vinetas( l );
     }
     if ( IdcCalidad.texto( p, "diff" ) != null ) {
-      b.append( "\n\n" ).append( r.s( "r_detail_changes" ) ).append( "\n" ).append( p.path( "diff" ).asText() );
+      t.seccion( r.s( "r_detail_changes" ).replace( ":", "" ) ).codigo( p.path( "diff" ).asText() );
+      t.parrafo( r.s( "d_undo_one" ), IdcDetalle.Texto.SUAVE );
     }
-    if ( IdcCalidad.texto( p, "how_to" ) != null ) {
-      b.append( "\n\n" ).append( r.s( "r_detail_howto" ) ).append( "\n" ).append( p.path( "how_to" ).asText() );
+    String como = IdcCalidad.texto( p, "how_to" );
+    if ( "manual".equals( nivel ) ) {
+      t.seccion( r.s( "d_manual" ) ).parrafo( como != null ? como : r.s( "r_manual_note" ) );
+      t.parrafo( r.s( "d_manual_claude" ), IdcDetalle.Texto.SUAVE );
+    } else if ( como != null ) {
+      t.seccion( r.s( "r_detail_howto" ).replace( ":", "" ) ).parrafo( como );
     }
-    detalle.setText( b.toString() );
+    JsonNode det = p.get( "detected" );
+    if ( det != null && det.size() > 0 ) {
+      t.seccion( r.s( "d_detected" ) );
+      java.util.Iterator<java.util.Map.Entry<String, JsonNode>> it = det.fields();
+      while ( it.hasNext() ) {
+        java.util.Map.Entry<String, JsonNode> x = it.next();
+        t.dato( x.getKey(), x.getValue().isTextual() ? x.getValue().asText() : x.getValue().toString() );
+      }
+    }
+    return t;
+  }
+
+  /** El enlace al manual: 09-robustez.md. */
+  static String manual() {
+    return IdcDetalle.MANUAL + "09-robustez.md";
+  }
+
+  /** El pedido para Claude: la propuesta con todo lo que hace falta. */
+  String pedido( JsonNode p ) {
+    String como = IdcCalidad.texto( p, "how_to" );
+    return r.f( "d_prompt_harden", servicio.nombre(), receta( p.path( "recipe" ).asText() ), p.path( "recipe" )
+      .asText(), p.path( "step" ).asText(), p.path( "why" ).asText(), como == null ? "—" : como, p.path( "key" )
+        .asText() );
+  }
+
+  // ---------------------------------------------------------------- la ventana de detalle
+
+  void abrirDetalle() {
+    int i = tabla.getSelectionIndex();
+    if ( i < 0 || i >= propuestas.size() ) {
+      return;
+    }
+    JsonNode p = propuestas.get( i );
+    if ( ventana == null || ventana.shell.isDisposed() ) {
+      ventana = new IdcDetalle.Ventana( shell, r, "harden.detail", r.f( "d_title_harden", servicio.nombre() ) );
+      final IdcDetalle.Ventana v = ventana;
+      v.irAlStep.addListener( SWT.Selection, e -> {
+        if ( enVentana != null ) {
+          servicio.seleccionar( enVentana.path( "step" ).asText() );
+        }
+      } );
+      v.aplicar.setText( r.s( "d_apply_recipe" ) );
+      v.aplicar.setToolTipText( r.s( "d_apply_recipe_tip" ) );
+      v.aplicar.addListener( SWT.Selection, e -> aplicarDesdeVentana() );
+      IdcDetalle.Ventana.ocultar( v.silenciar, true );
+      v.claude.addListener( SWT.Selection, e -> {
+        if ( enVentana != null ) {
+          IdcDetalle.copiar( shell.getDisplay(), pedido( enVentana ) );
+          estadoVentana( r.s( "d_claude_copied" ) );
+        }
+      } );
+      llenarVentana( p );
+      v.abrir( shell );
+    } else {
+      llenarVentana( p );
+      ventana.shell.setVisible( true );
+    }
+  }
+
+  void llenarVentana( JsonNode p ) {
+    IdcDetalle.Ventana v = ventana;
+    enVentana = p;
+    String nivel = p.path( "level" ).asText();
+    v.titulo.setText( receta( p.path( "recipe" ).asText() ) );
+    v.insignia( r.s( "level_" + nivel ), "manual".equals( nivel ) ? IdcDetalle.Texto.SUAVE : "auto".equals( nivel )
+      ? IdcDetalle.Texto.VERDE : IdcDetalle.Texto.AMBAR );
+    v.donde.setText( r.f( "d_recipe", p.path( "recipe" ).asText() ) + " · " + r.f( "q_where_step", p.path( "step" )
+      .asText() ) );
+    IdcDetalle.Ventana.ocultar( v.aplicar, !marcable( p ) );
+    v.aplicar.setEnabled( marcable( p ) && !ocupado );
+    v.conValor( null, null );
+    Receta rc = Receta.de( p.path( "recipe" ).asText() );
+    v.enlace( r.f( "d_manual_link", "09-robustez.md", rc == null ? p.path( "recipe" ).asText() : rc.numero + " "
+      + rc.id ), manual() );
+    v.estado.setText( "" );
+    v.mostrar( contenido( p, false ) );
+    v.shell.layout( true, true );
+  }
+
+  /** «Aplicar esta receta»: solo esa propuesta (las demás auto, excluidas). (UI) */
+  void aplicarDesdeVentana() {
+    final JsonNode p = enVentana;
+    if ( p == null || ocupado || !marcable( p ) ) {
+      return;
+    }
+    Set<String> confirmar = new LinkedHashSet<String>();
+    Set<String> excluir = new LinkedHashSet<String>();
+    String k = p.path( "key" ).asText();
+    for ( JsonNode x : propuestas ) {
+      String kx = x.path( "key" ).asText();
+      if ( kx.equals( k ) ) {
+        if ( !"auto".equals( x.path( "level" ).asText() ) ) {
+          confirmar.add( kx );
+        }
+      } else if ( "auto".equals( x.path( "level" ).asText() ) && marcable( x ) ) {
+        excluir.add( kx );
+      }
+    }
+    ventana.aplicar.setEnabled( false );
+    estadoVentana( r.s( "r_applying" ) );
+    aplicarCon( confirmar, excluir, txt -> estadoVentana( txt ) );
+  }
+
+  private void estadoVentana( String txt ) {
+    if ( ventana != null && !ventana.shell.isDisposed() ) {
+      ventana.estado.setText( txt == null ? "" : txt );
+      ventana.shell.layout( true, true );
+    }
   }
 
   /** Las keys marcadas (confirmar) y las auto desmarcadas (excluir). */
@@ -423,8 +642,13 @@ final class IdcRobustez {
       return;
     }
     final Set<String>[] e = eleccion();
+    aplicarCon( e[ 0 ], e[ 1 ], null );
+  }
+
+  private void aplicarCon( final Set<String> confirmar, final Set<String> excluir,
+                           final java.util.function.Consumer<String> alTerminar ) {
     ocupado( r.s( "r_applying" ), false );
-    IdcMenu.enHilo( shell, "pentaholive-idc-harden", () -> servicio.aplicar( e[ 0 ], e[ 1 ] ), o -> {
+    IdcMenu.enHilo( shell, "pentaholive-idc-harden", () -> servicio.aplicar( confirmar, excluir ), o -> {
       int n = o.path( "applied" ).size();
       String antes = puntos( o.get( "robustness_before" ) );
       String despues = puntos( o.get( "robustness_after" ) );
@@ -432,19 +656,37 @@ final class IdcRobustez {
         despues ) );
       List<String> no = new ArrayList<String>();
       for ( JsonNode x : o.path( "not_applied" ) ) {
-        no.add( x.path( "key" ).asText() + ": " + x.path( "reason" ).asText() );
+        no.add( r.f( "q_skip_item", tituloDeKey( x.path( "key" ).asText() ), x.path( "reason" ).asText() ) );
       }
       if ( !no.isEmpty() ) {
         t.append( "  " ).append( r.f( "r_not_applied", String.join( "; ", no ) ) );
       }
       final String txt = t.toString();
+      if ( alTerminar != null ) {
+        alTerminar.accept( txt );
+      }
       libre( txt );
       ocupado( txt, false );
       IdcMenu.enHilo( shell, "pentaholive-idc-plan", () -> servicio.plan(), p -> {
         libre( txt );
         mostrarPlan( p );
       }, err -> libre( txt ) );
-    }, err -> libre( r.f( "r_apply_error", IdcMenu.mensaje( err ) ) ) );
+    }, err -> {
+      String txt = r.f( "r_apply_error", IdcMenu.mensaje( err ) );
+      libre( txt );
+      if ( alTerminar != null ) {
+        alTerminar.accept( txt );
+      }
+    } );
+  }
+
+  /** «Receta · step» de una key harden:&lt;receta&gt;:&lt;step&gt; («*» = toda la tanda). */
+  String tituloDeKey( String key ) {
+    String[] p = key.split( ":", 3 );
+    if ( p.length < 3 ) {
+      return key;
+    }
+    return receta( p[ 1 ] ) + " · " + p[ 2 ];
   }
 
   private static String puntos( JsonNode x ) {
@@ -452,6 +694,61 @@ final class IdcRobustez {
   }
 
   // ---------------------------------------------------------------- prueba con datos sucios
+
+  /** La cabecera de «qué hará»: los pasos de la prueba. */
+  private void queHaraBase( IdcDetalle.Texto t ) {
+    t.seccion( r.s( "r_stress_what" ) ).parrafo( r.s( "r_stress_what_text" ) );
+  }
+
+  /** Antes de correr: qué va a ensuciar, qué variantes, qué comprueba y si va a poder correr. (UI) */
+  void mostrarPrevia( ObjectNode o ) {
+    previa = o;
+    if ( prueba != null ) {
+      return; // ya hay un resultado: manda él
+    }
+    IdcDetalle.Texto t = new IdcDetalle.Texto();
+    queHaraBase( t );
+    if ( o == null ) {
+      pintar( queHara, t );
+      return;
+    }
+    List<String> ins = new ArrayList<String>();
+    List<String> no = new ArrayList<String>();
+    for ( JsonNode x : o.path( "inputs" ) ) {
+      if ( IdcCalidad.texto( x, "not_evaluated" ) != null ) {
+        no.add( r.f( "r_stress_input_no", x.path( "step" ).asText(), x.path( "not_evaluated" ).asText() ) );
+      } else {
+        ins.add( r.f( "r_stress_input", x.path( "step" ).asText(), x.path( "base_rows" ).asInt(), x.path( "fields" )
+          .asInt() ) );
+      }
+    }
+    if ( !ins.isEmpty() ) {
+      t.seccion( r.s( "r_stress_inputs" ) ).vinetas( ins );
+    }
+    if ( !no.isEmpty() ) {
+      t.vinetas( no );
+    }
+    List<String> vs = new ArrayList<String>();
+    for ( JsonNode v : o.path( "variants" ) ) {
+      String id = v.asText();
+      vs.add( r.tiene( "var_" + id ) ? r.s( "var_" + id ) : id );
+    }
+    if ( !vs.isEmpty() ) {
+      t.seccion( r.s( "r_stress_variants" ) ).vinetas( vs );
+    }
+    t.seccion( r.s( "r_stress_checks" ) ).vinetas( java.util.Arrays.asList( r.s( "chk_no_abort" ), r.s(
+      "chk_no_silent_loss" ), r.s( "chk_rejects_have_reason" ) ) );
+    if ( o.path( "will_run" ).asBoolean() ) {
+      t.parrafo( r.s( "r_stress_will_run" ), IdcDetalle.Texto.VERDE );
+    } else {
+      t.seccion( r.s( "r_stress_wont_run" ) );
+      t.parrafo( IdcCalidad.texto( o, "not_run_reason" ), IdcDetalle.Texto.AMBAR );
+      if ( o.path( "databases_not_files" ).size() > 0 ) {
+        t.parrafo( r.s( "r_stress_db_hint" ) );
+      }
+    }
+    pintar( queHara, t );
+  }
 
   /** stress_test en segundo plano con barra, reloj y Cancelar. (UI) */
   void probar() {
@@ -509,23 +806,24 @@ final class IdcRobustez {
     }
   }
 
+  private void ver( org.eclipse.swt.widgets.Control c, boolean ver ) {
+    ( (GridData) c.getLayoutData() ).exclude = !ver;
+    c.setVisible( ver );
+  }
+
   /** Pinta un resultado de stress_test. (UI) */
   void mostrarPrueba( ObjectNode o ) {
     prueba = o;
     String v = o.path( "verdict" ).asText();
     veredicto.setText( r.f( "verdict", r.tiene( "verdict_" + v ) ? r.s( "verdict_" + v ) : v ) );
     veredicto.setForeground( "robust".equals( v ) ? verde : "fragile".equals( v ) ? rojo : ambar );
+    ver( veredicto, true );
     String env = IdcCalidad.texto( o, "environment_problem" );
-    GridData ge = (GridData) entorno.getLayoutData();
     if ( env != null ) {
       entorno.setText( r.s( "r_env_title" ) + ": " + env + "\n" + r.s( "r_env_hint" ) );
       entorno.setForeground( ambar );
-      ge.exclude = false;
-      entorno.setVisible( true );
-    } else {
-      ge.exclude = true;
-      entorno.setVisible( false );
     }
+    ver( entorno, env != null );
     comprobaciones.removeAll();
     for ( JsonNode vj : o.path( "variants" ) ) {
       String id = vj.path( "id" ).asText();
@@ -538,36 +836,55 @@ final class IdcRobustez {
         fila( id, k.path( "id" ).asText(), k.path( "status" ).asText(), k.path( "message" ).asText() );
       }
     }
-    List<String> m = new ArrayList<String>();
+    IdcDetalle.Texto m = new IdcDetalle.Texto();
     JsonNode s = o.get( "summary" );
     if ( s != null ) {
-      m.add( r.f( "r_summary", s.path( "passed" ).asInt(), s.path( "warned" ).asInt(), s.path( "failed" ).asInt() ) );
+      m.parrafo( r.f( "r_summary", s.path( "passed" ).asInt(), s.path( "warned" ).asInt(), s.path( "failed" ).asInt() ),
+        IdcDetalle.Texto.NEGRITA );
     }
     String nr = IdcCalidad.texto( o, "not_run_reason" );
     if ( nr != null && env == null ) {
-      m.add( r.f( "r_not_run_reason", nr ) );
+      m.parrafo( r.f( "r_not_run_reason", nr ), IdcDetalle.Texto.AMBAR );
     }
     String sig = IdcCalidad.texto( o, "next" );
     if ( sig != null ) {
-      m.add( r.f( "r_next", sig ) );
+      m.parrafo( r.f( "r_next", sig ) );
     }
     if ( o.path( "notes" ).size() > 0 ) {
-      m.add( r.s( "r_messages" ) );
+      m.seccion( r.s( "r_messages" ).replace( ":", "" ) );
+      List<String> l = new ArrayList<String>();
       for ( JsonNode n : o.path( "notes" ) ) {
-        m.add( "· " + n.asText() );
+        l.add( n.asText() );
       }
+      m.vinetas( l );
     }
-    resumenPrueba = String.join( "\n", m );
-    mensajes.setText( resumenPrueba );
+    resumenPrueba = m;
+    boolean hayFilas = comprobaciones.getItemCount() > 0;
+    // sin filas (no corrió): nada de tabla vacía, solo el porqué y qué hacer
+    ver( queHara, !hayFilas );
+    ver( resultados, hayFilas );
+    if ( hayFilas ) {
+      pintar( mensajes, m );
+    } else {
+      IdcDetalle.Texto pie = new IdcDetalle.Texto();
+      if ( previa != null && previa.path( "databases_not_files" ).size() > 0 || nr != null && nr.contains( "SQLite" ) ) {
+        pie.parrafo( r.s( "r_stress_db_hint" ) );
+      }
+      pie.parrafo( r.s( "r_stress_db_hint_short" ), IdcDetalle.Texto.SUAVE );
+      pintar( queHara, unir( m, pie ) );
+    }
     grupoPrueba.layout( true, true );
   }
 
   private void fila( String variante, String chk, String st, String msg ) {
     TableItem it = new TableItem( comprobaciones, SWT.NONE );
+    String nombreVar = r.tiene( "var_" + variante ) ? r.s( "var_" + variante ) : variante;
     String nombreChk = chk.isEmpty() ? "" : r.tiene( "chk_" + chk ) ? r.s( "chk_" + chk ) : chk;
     String nombreSt = r.tiene( "st_" + st ) ? r.s( "st_" + st ) : st;
     it.setText( new String[] { variante, nombreChk, nombreSt, IdcCalidad.una( msg ) } );
     it.setData( msg == null ? "" : msg );
+    it.setData( "tip0", nombreVar );
+    it.setData( "tip3", msg == null ? "" : msg );
     it.setForeground( 2, "pass".equals( st ) ? verde : "fail".equals( st ) ? rojo : "warn".equals( st ) ? ambar
       : gris );
   }
@@ -582,6 +899,9 @@ final class IdcRobustez {
     cancelar.setEnabled( cancelable );
     aplicar.setEnabled( false );
     probar.setEnabled( false );
+    if ( ventana != null && !ventana.shell.isDisposed() ) {
+      ventana.aplicar.setEnabled( false );
+    }
     estado.getParent().layout( true );
   }
 
@@ -596,6 +916,9 @@ final class IdcRobustez {
     cancelar.setEnabled( false );
     probar.setEnabled( true );
     contar();
+    if ( ventana != null && !ventana.shell.isDisposed() && enVentana != null ) {
+      ventana.aplicar.setEnabled( marcable( enVentana ) );
+    }
     estado.getParent().layout( true );
   }
 
@@ -643,6 +966,22 @@ final class IdcRobustez {
     public ObjectNode probar( EstresProcesos.Corte corte ) throws Exception {
       ObjectNode a = Tools.obj().put( "document", doc ).put( "language", lang );
       return (ObjectNode) McpHttpServer.JSON.readTree( (String) EstresTools.probar( a, corte ) );
+    }
+
+    @Override
+    public ObjectNode previa() throws Exception {
+      return EstresTools.previa( Tools.obj().put( "document", doc ).put( "language", lang ) );
+    }
+
+    @Override
+    public void seleccionar( String step ) {
+      try {
+        org.pentaho.di.base.AbstractMeta m = Docs.resolverSinActivar( Tools.obj().put( "document", doc ) );
+        Docs.activar( m );
+        TransTools.seleccionar( m, Collections.singletonList( step ) );
+      } catch ( Throwable t ) {
+        McpLifecycleListener.LOG.logDebug( "Pentaho Live: could not select '" + step + "' on the canvas: " + t );
+      }
     }
   }
 }
