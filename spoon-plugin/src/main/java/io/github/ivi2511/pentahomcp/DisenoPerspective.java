@@ -446,6 +446,9 @@ public class DisenoPerspective implements SpoonPerspective {
       for ( String g : actual.transformaciones() ) {
         transformacion.add( PlanoConstruir.nombreGrupo( g ) );
       }
+      if ( PlanoJob.tieneJob( actual ) ) {
+        transformacion.add( r.f( "ui.job", actual.orquestacion.nombre ) ); // el job de la orquestación, al final
+      }
       int i = transformacion.indexOf( elegida );
       transformacion.select( i >= 0 ? i : 0 );
       List<String[]> progreso = progreso( actual );
@@ -528,6 +531,10 @@ public class DisenoPerspective implements SpoonPerspective {
       if ( actual == null ) {
         return;
       }
+      if ( jobElegido() ) {
+        construirJob();
+        return;
+      }
       String g = grupoElegido();
       try {
         Spoon sp = Docs.spoon();
@@ -553,6 +560,49 @@ public class DisenoPerspective implements SpoonPerspective {
         Docs.activar( tm );
         Docs.touched( tm );
         ponerEstado( r.f( "ui.construido", o.path( "steps" ).size(), PlanoConstruir.nombreGrupo( g ) ) );
+      } catch ( Throwable t ) {
+        aviso( r.f( "ui.error", IdcMenu.mensaje( t ) ) );
+      }
+    }
+
+    /** true si en el combo está elegido el job de la orquestación (el último elemento). */
+    boolean jobElegido() {
+      return actual != null && PlanoJob.tieneJob( actual ) && transformacion.getSelectionIndex() == actual
+        .transformaciones().size();
+    }
+
+    /**
+     * Construir el boceto del job: en el job abierto enlazado al plano (un Ctrl+Z) o en uno nuevo (cerrarlo sin
+     * guardar lo deshace). (UI)
+     */
+    void construirJob() {
+      try {
+        Spoon sp = Docs.spoon();
+        org.pentaho.di.job.JobMeta jm = null;
+        for ( AbstractMeta m : Docs.abiertos() ) {
+          if ( m instanceof org.pentaho.di.job.JobMeta && PlanoJob.esDelPlano( (org.pentaho.di.job.JobMeta) m,
+            actual ) ) {
+            jm = (org.pentaho.di.job.JobMeta) m;
+          }
+        }
+        PlanoJob.Pedido pd = PlanoJob.pedido( actual, PlanoConstruir.SKETCH, r.idioma(), PlanoJob.abiertasDelPlano(
+          actual ) );
+        boolean nuevo = jm == null;
+        if ( nuevo ) {
+          Docs.perspectivaPrincipal();
+          sp.newJobFile();
+          AbstractMeta n = Docs.activo();
+          if ( !( n instanceof org.pentaho.di.job.JobMeta ) ) {
+            throw new IllegalStateException( "Spoon did not create the job" );
+          }
+          jm = (org.pentaho.di.job.JobMeta) n;
+          PlanoConstruir.nombrar( sp, jm, pd.nombre );
+        }
+        ObjectNode o = PlanoJob.construirAhora( sp, jm, actual, pd, r.idioma(), sp.getMetaStore(), nuevo );
+        Docs.perspectivaPrincipal();
+        Docs.activar( jm );
+        Docs.touched( jm );
+        ponerEstado( r.f( "ui.construido.job", pd.nombre, o.path( "entries" ).size(), o.path( "undo" ).asText() ) );
       } catch ( Throwable t ) {
         aviso( r.f( "ui.error", IdcMenu.mensaje( t ) ) );
       }

@@ -647,8 +647,21 @@ final class PlanoConstruir {
   /** plan_build: valida en la UI, un Docs.ui por step con pausas afuera, y cierra con las notas. */
   static Object ejecutar( final JsonNode a ) throws Exception {
     final Plano p = PlanoTools.cargar( a );
+    String m0 = Tools.optStr( a, "mode", SKETCH ).trim().toLowerCase( Locale.ROOT );
+    if ( "full".equals( m0 ) ) {
+      m0 = STEPS;
+    }
+    if ( Tools.optBool( a, "job", false ) || PlanoJob.esElJob( p, Tools.optStr( a, "transformation", null ) ) ) {
+      if ( !SKETCH.equals( m0 ) && !STEPS.equals( m0 ) ) {
+        throw new ToolError( "mode must be sketch or steps (full)" );
+      }
+      if ( "lesson".equals( Tools.optStr( a, "pace", "normal" ).trim().toLowerCase( Locale.ROOT ) ) ) {
+        throw new ToolError( "pace=lesson is for transformations: build the job with pace=normal" );
+      }
+      return PlanoJob.ejecutar( a, p, m0, PlanoInforme.idioma( p, Tools.optStr( a, "language", null ) ) );
+    }
     final String grupo = PlanoTools.grupo( p, Tools.optStr( a, "transformation", null ) );
-    final String modo = Tools.optStr( a, "mode", SKETCH ).trim().toLowerCase( Locale.ROOT );
+    final String modo = m0;
     if ( !SKETCH.equals( modo ) && !STEPS.equals( modo ) ) {
       throw new ToolError( "mode must be sketch or steps" );
     }
@@ -749,7 +762,7 @@ final class PlanoConstruir {
   }
 
   /** Le pone nombre a una transformación nueva y refresca la pestaña (como new_transformation name=). (UI) */
-  static void nombrar( Spoon sp, TransMeta tm, String nombre ) {
+  static void nombrar( Spoon sp, org.pentaho.di.base.AbstractMeta tm, String nombre ) {
     tm.setName( nombre );
     try {
       sp.delegates.tabs.renameTabs();
