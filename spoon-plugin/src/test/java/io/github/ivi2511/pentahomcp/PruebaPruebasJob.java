@@ -473,6 +473,36 @@ public class PruebaPruebasJob {
     }
   }
 
+  /** Donde se encuentran las pruebas de un job, que .ktr usa, su firma, test_list y los steps de la ventana. */
+  public void pruebaH_ArchivosYVentana() throws Exception {
+    File dir = proyecto( "h" );
+    EntornoKettle.escribir( new File( dir, "tests/j.test.json" ), "{ \"format\": \"pentaho-live-test/1\", \"job\": "
+      + "\"../10_job_secuencia.kjb\", \"outputs\": [ { \"job_entry\": \"Ventas por producto\", \"step\": \"Totales por "
+      + "producto\" } ], \"files\": [ { \"path\": \"../salida/x.csv\" } ] }" );
+    File kjb = new File( dir, "10_job_secuencia.kjb" );
+    igual( 1, PruebasArchivos.deArchivo( kjb ).size(), "las pruebas del job" );
+    igual( 1, PruebasArchivos.deJobsQueUsan( new File( dir, "03_ventas_por_producto.ktr" ) ).size(),
+      "guardar la .ktr corre la prueba del job que la usa" );
+    igual( 0, PruebasArchivos.deArchivo( new File( dir, "03_ventas_por_producto.ktr" ) ).size(),
+      "pero no es una prueba de la .ktr" );
+    org.pentaho.di.job.JobMeta jm = new org.pentaho.di.job.JobMeta( kjb.getAbsolutePath(), null );
+    java.util.Map<String, String> f1 = PruebasArchivos.firma( jm );
+    jm.getJobEntry( 1 ).setLocation( 999, 999 );
+    igual( f1, PruebasArchivos.firma( jm ), "mover una entrada no cambia la firma" );
+    jm.getJobEntry( 1 ).setDescription( "otra" );
+    cierto( !f1.equals( PruebasArchivos.firma( jm ) ), "cambiar una entrada si" );
+    java.util.Map<String, TransMeta> t = PruebasJob.transformaciones( jm );
+    igual( Arrays.asList( "Generar constantes", "Ventas por producto" ), new java.util.ArrayList<String>( t.keySet() ),
+      "las entradas Transformation" );
+    List<String[]> steps = PruebasDialogo.ServicioSpoon.steps( t.get( "Ventas por producto" ) );
+    cierto( steps.size() == 5, "los steps de la .ktr de la entrada" );
+    com.fasterxml.jackson.databind.node.ObjectNode x = PruebasTools.describir( new File( dir, "tests/j.test.json" ) );
+    cierto( x.path( "valid" ).asBoolean(), "valida: " + x );
+    igual( "Ventas por producto :: Totales por producto", x.path( "outputs" ).get( 0 ).asText(), "con su entrada" );
+    contiene( x.path( "job" ).asText(), "10_job_secuencia.kjb", "el job" );
+    igual( "../salida/x.csv", x.path( "files" ).get( 0 ).asText(), "los archivos" );
+  }
+
   /** PruebasKettleHome: solo las conexiones de shared.xml y kettle.properties; los secretos, descifrados. */
   public void pruebaG_CopiaKettleHome() throws Exception {
     File origen = new File( base, "g/origen/.kettle" );

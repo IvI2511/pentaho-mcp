@@ -206,8 +206,8 @@ public class PruebaMcpInformes {
       noNulo( porNombre.get( n ), n + " registrada" );
       cierto( porNombre.get( n ).toString().chars().allMatch( ch -> ch < 128 ), n + " en ingles (ASCII)" );
     }
-    igual( "[\"name\",\"output_steps\"]", porNombre.get( "test_create" ).path( "inputSchema" ).path( "required" )
-      .toString(), "test_create pide nombre y salidas" );
+    igual( "[\"name\"]", porNombre.get( "test_create" ).path( "inputSchema" ).path( "required" )
+      .toString(), "test_create pide el nombre (las salidas pueden ser steps, tablas o archivos: 0.7.1)" );
     contiene( instr, "test_create", "las instrucciones nombran test_create" );
     for ( JsonNode t : new JsonNode[] { build, datos, mostrar, lint, arreglos, silenciar, robustecer } ) {
       String json = t.toString();
