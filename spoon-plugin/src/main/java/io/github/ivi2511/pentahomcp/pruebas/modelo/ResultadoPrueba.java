@@ -23,7 +23,7 @@ import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
  */
 @JsonInclude( JsonInclude.Include.NON_EMPTY )
 @JsonIgnoreProperties( ignoreUnknown = true )
-@JsonPropertyOrder( { "format", "test", "status", "message", "test_file", "transformation", "source", "seconds",
+@JsonPropertyOrder( { "format", "test", "status", "message", "test_file", "transformation", "job", "source", "seconds",
   "finished_at", "outputs", "case", "notes", "created", "plugin_version" } )
 public final class ResultadoPrueba {
 
@@ -58,6 +58,9 @@ public final class ResultadoPrueba {
   public String archivoPrueba;
   @JsonProperty( "transformation" )
   public String transformacion;
+  /** La .kjb, en una prueba de job (0.7.1). */
+  @JsonProperty( "job" )
+  public String job;
   /** {@link #DEL_ARCHIVO} o {@link #DEL_DOCUMENTO}. */
   @JsonProperty( "source" )
   public String origen;
@@ -87,6 +90,10 @@ public final class ResultadoPrueba {
 
     public static final String STEP = "step";
     public static final String TABLA = "table";
+    /** Un archivo que deja la corrida (0.7.1). */
+    public static final String ARCHIVO = "file";
+    /** La corrida no escribio el archivo (no existe o no cambio). */
+    public static final String SIN_ESCRIBIR = "not_written";
     /** El step ya no esta en la transformacion. */
     public static final String SIN_STEP = "missing_step";
     /** Falta el CSV dorado. */
@@ -96,12 +103,12 @@ public final class ResultadoPrueba {
 
     @JsonProperty( "name" )
     public String nombre;
-    /** {@link #STEP} o {@link #TABLA}. */
+    /** {@link #STEP}, {@link #TABLA} o {@link #ARCHIVO}. */
     @JsonProperty( "kind" )
     public String tipo;
     @JsonProperty( "passed" )
     public boolean paso;
-    /** {@link #SIN_STEP}, {@link #SIN_DORADO}, {@link #SIN_CORRIDA} o null (se comparo). */
+    /** {@link #SIN_STEP}, {@link #SIN_DORADO}, {@link #SIN_CORRIDA}, {@link #SIN_ESCRIBIR} o null (se comparo). */
     @JsonProperty( "problem" )
     public String problema;
     @JsonProperty( "rows_expected" )

@@ -559,8 +559,9 @@ public final class ProyectoMain {
         juntarPruebas( f, pruebas );
       } else if ( f.getName().toLowerCase( Locale.ROOT ).endsWith( DefPrueba.EXTENSION ) ) {
         agregar( f, pruebas );
-      } else if ( f.getName().toLowerCase( Locale.ROOT ).endsWith( ".ktr" ) ) {
-        List<File> deKtr = PruebasArchivos.deTransformacion( f );
+      } else if ( f.getName().toLowerCase( Locale.ROOT ).endsWith( ".ktr" ) || f.getName().toLowerCase( Locale.ROOT )
+        .endsWith( ".kjb" ) ) { // 0.7.1: las pruebas de un job tambien
+        List<File> deKtr = PruebasArchivos.deArchivo( f );
         if ( deKtr.isEmpty() ) {
           err.println( t.f( "test_none_for", relativa( f ) ) );
         }

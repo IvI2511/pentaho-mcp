@@ -92,7 +92,7 @@ public class PruebaIdcMenu {
       "Data Integration", "pentaho-live-reports", "Informes" ) );
     cierto( de( l, "quality" ).habilitada, "calidad sirve para jobs" );
     falso( de( l, "harden" ).habilitada, "robustecer solo transformaciones" );
-    falso( de( l, "tests" ).habilitada, "pruebas solo transformaciones" );
+    cierto( de( l, "tests" ).habilitada, "pruebas tambien de jobs (0.7.1)" );
     igual( "Robustecer… (solo transformaciones)", de( l, "harden" ).texto, "lo dice" );
     contiene( de( l, "harden" ).ayuda, "job_guard", "y por qué" );
     cierto( de( l, "arrange" ).habilitada, "ordenar sirve para jobs" );

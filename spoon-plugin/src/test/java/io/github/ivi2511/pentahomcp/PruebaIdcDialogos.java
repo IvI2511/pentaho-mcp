@@ -680,7 +680,7 @@ public class PruebaIdcDialogos {
         igual( "Revisar calidad…", items[ 0 ].getText(), "primera" );
         falso( items[ 1 ].getEnabled(), "robustecer con un job" );
         igual( "Comparar…", items[ 3 ].getText(), "comparar" );
-        falso( items[ 4 ].getEnabled(), "pruebas con un job" );
+        cierto( items[ 4 ].getEnabled(), "pruebas con un job (0.7.1)" );
         falso( items[ 7 ].getEnabled(), "hoja de mapeo con un job" );
         igual( "Preparar proyecto…", items[ 8 ].getText(), "preparar proyecto" );
         cierto( ( items[ 9 ].getStyle() & SWT.SEPARATOR ) != 0, "separador" );

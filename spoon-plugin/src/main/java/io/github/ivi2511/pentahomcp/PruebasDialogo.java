@@ -26,6 +26,7 @@ import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 import org.pentaho.di.trans.TransHopMeta;
 import org.pentaho.di.trans.TransMeta;
+import io.github.ivi2511.pentahomcp.pruebas.modelo.DefPrueba;
 import org.pentaho.di.trans.step.StepMeta;
 
 import io.github.ivi2511.pentahomcp.corrector.modelo.Comparacion;
@@ -134,7 +135,7 @@ final class PruebasDialogo {
   }
 
   /** Abre (o trae al frente) la ventana de la transformacion. (UI) */
-  static void abrir( Shell padre, TransMeta m, Rotulos r ) {
+  static void abrir( Shell padre, org.pentaho.di.base.AbstractMeta m, Rotulos r ) {
     String id = Docs.id( m );
     if ( abierta != null && !abierta.shell.isDisposed() ) {
       if ( id.equals( abierta.docId ) ) {
@@ -809,8 +810,8 @@ final class PruebasDialogo {
       this.doc = doc;
     }
 
-    private TransMeta meta() throws Exception {
-      return (TransMeta) Docs.resolverSinActivar( Tools.obj().put( "document", doc ) );
+    private org.pentaho.di.base.AbstractMeta meta() throws Exception {
+      return Docs.resolverSinActivar( Tools.obj().put( "document", doc ) );
     }
 
     @Override
@@ -866,7 +867,28 @@ final class PruebasDialogo {
     public List<String[]> steps() {
       List<String[]> l = new ArrayList<String[]>();
       try {
-        TransMeta tm = meta();
+        org.pentaho.di.base.AbstractMeta m = meta();
+        if ( m instanceof org.pentaho.di.job.JobMeta ) { // un job: los steps de sus entradas Transformation
+          for ( java.util.Map.Entry<String, TransMeta> e : PruebasJob.transformaciones( (org.pentaho.di.job.JobMeta) m )
+            .entrySet() ) {
+            for ( String[] s : steps( e.getValue() ) ) {
+              s[ 0 ] = DefPrueba.nombreCompleto( e.getKey(), s[ 0 ] );
+              s[ 2 ] = s[ 2 ].replace( "sel", "" );
+              l.add( s );
+            }
+          }
+          return l;
+        }
+        l.addAll( steps( (TransMeta) m ) );
+      } catch ( Exception ignored ) {
+        // sin documento
+      }
+      return l;
+    }
+
+    static List<String[]> steps( TransMeta tm ) {
+      List<String[]> l = new ArrayList<String[]>();
+      {
         for ( StepMeta sm : tm.getSteps() ) {
           int entran = 0;
           int salen = 0;
@@ -890,8 +912,6 @@ final class PruebasDialogo {
           }
           l.add( new String[] { sm.getName(), sm.getStepID(), String.join( ",", marcas ) } );
         }
-      } catch ( Exception ignored ) {
-        // sin documento
       }
       return l;
     }
@@ -899,7 +919,12 @@ final class PruebasDialogo {
     @Override
     public void seleccionar( String step ) {
       try {
-        TransMeta tm = meta();
+        org.pentaho.di.base.AbstractMeta m = meta();
+        if ( !( m instanceof TransMeta ) ) {
+          Docs.activar( m ); // un job: la salida "Entrada :: Step" no esta en su lienzo
+          return;
+        }
+        TransMeta tm = (TransMeta) m;
         Docs.activar( tm );
         TransTools.seleccionar( tm, Collections.singletonList( step ) );
       } catch ( Throwable t ) {

@@ -92,15 +92,20 @@ public final class PruebasMain {
     public String original;
     @JsonProperty( "output_steps" )
     public List<String> salidas = new ArrayList<String>();
-    /** null = las fuentes. */
+    /** null = las fuentes; vacia = ninguna (por eso NON_NULL: una lista vacia tiene que llegar a la hija). */
     @JsonProperty( "input_steps" )
+    @JsonInclude( JsonInclude.Include.NON_NULL )
     public List<String> entradas;
     @JsonProperty( "key_columns" )
     public Map<String, List<String>> claves = new LinkedHashMap<String, List<String>>();
     @JsonProperty( "ignore_columns" )
     public Map<String, List<String>> ignorar = new LinkedHashMap<String, List<String>>();
-    /** null = saltar los steps que escriben. */
+    /**
+     * null = los ajustes por defecto (saltar lo que escribe); vacia = ninguno. NON_NULL: con el NON_EMPTY de la clase
+     * una lista vacia no llegaba a la hija y la ventana («no saltar nada») terminaba con los ajustes por defecto.
+     */
     @JsonProperty( "tweaks" )
+    @JsonInclude( JsonInclude.Include.NON_NULL )
     public List<DefPrueba.Ajuste> ajustes;
     @JsonProperty( "variables" )
     public Map<String, String> variables = new LinkedHashMap<String, String>();
@@ -110,6 +115,9 @@ public final class PruebasMain {
     public List<BaseDePrueba> bases = new ArrayList<BaseDePrueba>();
     @JsonProperty( "tables" )
     public List<TablaSalida> tablas = new ArrayList<TablaSalida>();
+    /** Archivos que deja la corrida (0.7.1). */
+    @JsonProperty( "files" )
+    public List<String> archivos = new ArrayList<String>();
     @JsonProperty( "db_scripts" )
     public Map<String, List<String>> scriptsBase = new LinkedHashMap<String, List<String>>();
     @JsonProperty( "replace" )
@@ -140,6 +148,7 @@ public final class PruebasMain {
       }
       p.bases.addAll( bases );
       p.tablas.addAll( tablas );
+      p.archivos.addAll( archivos );
       p.scriptsBase.putAll( scriptsBase );
       p.reemplazar = reemplazar;
       p.ignorarInestables = ignorarInestables;
@@ -173,6 +182,8 @@ public final class PruebasMain {
     LanguageChoice.getInstance().setDefaultLocale( Locale.US ); // logs en ingles; numeros con el locale del entorno
     KettleEnvironment.init( false );
     System.out.println( "[tests] Kettle ready in " + Math.round( ( System.nanoTime() - t0 ) / 1e7 ) / 100.0 + " s" );
+    // lo que se copio del KETTLE_HOME del usuario (si se copio): sus contraseñas no salen en ningun resultado
+    List<String> secretos = PruebasKettleHome.secretos( new File( org.pentaho.di.core.Const.getKettleDirectory() ) );
     for ( int i = 0; i < tr.tareas.size(); i++ ) {
       Tarea ta = tr.tareas.get( i );
       if ( cancelar.exists() ) {
@@ -185,6 +196,9 @@ public final class PruebasMain {
       op.sufijoBase = tr.sufijoBase;
       op.versionPlugin = tr.versionPlugin;
       op.cancelada = cancelar::exists;
+      for ( int s = 0; s < secretos.size(); s++ ) {
+        op.claves.put( "#kettle-home-" + s, secretos.get( s ) );
+      }
       ResultadoPrueba r;
       if ( CREAR.equals( ta.tipo ) && ta.crear != null ) {
         claves( op, i, ta.crear.bases );

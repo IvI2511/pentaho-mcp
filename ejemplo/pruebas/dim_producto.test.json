@@ -31,9 +31,7 @@
   } ],
   "case" : {
     "id" : "dim_producto",
-    "expected" : "golden/dim_producto",
-    "weight" : 1.0,
-    "hidden" : false
+    "expected" : "golden/dim_producto"
   },
   "outputs" : [ {
     "step" : "Asignar clave subrogada",

@@ -225,7 +225,8 @@ final class PruebasProcesos {
     Map<String, DefPrueba.Entorno> entornos = new LinkedHashMap<String, DefPrueba.Entorno>();
     for ( Tarea t : c.tareas ) {
       DefPrueba.Entorno e = entorno( t );
-      String k = ( e.locale + "|" + e.zonaHoraria + "|" + e.encoding ).toLowerCase( Locale.ROOT );
+      String k = ( e.locale + "|" + e.zonaHoraria + "|" + e.encoding + "|" + e.usaKettleDelUsuario() ).toLowerCase(
+        Locale.ROOT );
       grupos.computeIfAbsent( k, x -> new ArrayList<Tarea>() ).add( t );
       entornos.putIfAbsent( k, e );
     }
@@ -316,8 +317,11 @@ final class PruebasProcesos {
           }
         }
       }
+      File kettle = entorno.usaKettleDelUsuario() ? ( op.kettleDelUsuario != null ? op.kettleDelUsuario
+        : PruebasKettleHome.carpetaDelUsuario() ) : null;
+      List<String> secretos = PruebasKettleHome.secretos( kettle );
       Process p = CorrectorProcesos.lanzarHija( base, hija, PruebasMain.class.getName(), Collections.singletonList(
-        trabajo.getAbsolutePath() ), log, "tests-" + NUMERO.incrementAndGet(), entorno2 );
+        trabajo.getAbsolutePath() ), log, "tests-" + NUMERO.incrementAndGet(), entorno2, kettle );
       c.proceso = p;
       if ( c.cancelada ) {
         c.cancelar(); // se cancelo mientras arrancaba
@@ -337,7 +341,9 @@ final class PruebasProcesos {
         }
       }
       recoger( c, tareas, tr, vistos );
-      String cola = cola( log, 40 );
+      List<String> tapar = new ArrayList<String>( secretos );
+      tapar.addAll( entorno2.values() );
+      String cola = CorrectorBases.tapar( cola( log, 40 ), tapar );
       for ( int i = 0; i < tareas.size(); i++ ) {
         Tarea t = tareas.get( i );
         if ( t.resultado == null ) {
@@ -414,6 +420,7 @@ final class PruebasProcesos {
       o.xmxMb = b.xmxMb;
       o.argsPadre = b.argsPadre;
       o.propiedades.putAll( b.propiedades );
+      o.kettleDelUsuario = b.kettleDelUsuario;
     }
     return o;
   }

@@ -171,8 +171,8 @@ final class IdcMenu {
     l.add( new Entrada( Tipo.ACCION, COMPARAR, rd.s( "menu_compare" ), hay, false, hay ? rd.s( "menu_compare_tip" )
       : r.s( "no_document" ) ) );
     Rotulos rp = Rotulos.de( PruebasDialogo.AREA, r.idioma() );
-    l.add( new Entrada( Tipo.ACCION, PRUEBAS, rp.s( "menu_tests" ), trans, false, trans ? rp.s( "menu_tests_tip" )
-      : hay ? r.s( "r_only_trans" ) : r.s( "no_document" ) ) );
+    l.add( new Entrada( Tipo.ACCION, PRUEBAS, rp.s( "menu_tests" ), hay, false, hay ? rp.s( "menu_tests_tip" )
+      : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, LECCION, c.leccion ? r.s( "menu_lesson_show" ) : r.s( "menu_lesson" ), true,
       false, null ) );
     l.add( new Entrada( Tipo.ACCION, DISENO, r.s( "menu_design" ), true, false, r.s( "menu_design_tip" ) ) );
@@ -494,11 +494,7 @@ final class IdcMenu {
       } else if ( CALIDAD.equals( id ) ) {
         IdcCalidad.abrir( sp.getShell(), m, r );
       } else if ( PRUEBAS.equals( id ) ) {
-        if ( m instanceof TransMeta ) {
-          PruebasDialogo.abrir( sp.getShell(), (TransMeta) m, PruebasDialogo.rotulos() );
-        } else {
-          aviso( sp.getShell(), r, r.s( "r_only_trans" ) );
-        }
+        PruebasDialogo.abrir( sp.getShell(), m, PruebasDialogo.rotulos() ); // transformaciones y jobs (0.7.1)
       } else if ( MAPEO.equals( id ) ) {
         if ( m instanceof TransMeta ) {
           IdcMapeo.abrir( sp.getShell(), (TransMeta) m, Rotulos.de( PlanoInforme.AREA, r.idioma() ) );
