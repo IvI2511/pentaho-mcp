@@ -151,7 +151,7 @@ public class PruebaPruebasJob {
   public void pruebaB_JobArchivos() throws Exception {
     File dir = proyecto( "b" );
     PruebasMotor.Pedido p = pedido( dir, "10_job_secuencia.kjb", "archivo" );
-    p.archivos.add( "../salida/03_ventas_por_producto.csv" );
+    p.archivos.add( "${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto.csv" ); // la carpeta del job
     ResultadoPrueba r = PruebasMotor.crear( p, op() );
     igual( ResultadoPrueba.PASO, r.estado, "pasa: " + r.mensaje + " " + r.notas );
     File prueba = new File( dir, "tests/archivo.test.json" );
@@ -538,6 +538,23 @@ public class PruebaPruebasJob {
     igual( ResultadoPrueba.FALLO, r.estado, "el job aborto: " + r.mensaje );
     contiene( r.mensaje, "The job did not finish cleanly (finished_with_errors", "termino con errores, no por plazo" );
     cierto( System.currentTimeMillis() - t0 < 30000, "sin esperar el plazo de 60 s" );
+  }
+
+  /** files[] en una prueba de transformacion, con la ruta como la escribe el step (variables de la corrida). */
+  public void pruebaJ_ArchivoDeTransformacion() throws Exception {
+    File dir = proyecto( "j" );
+    PruebasMotor.Pedido p = new PruebasMotor.Pedido();
+    p.carpeta = new File( dir, "tests" );
+    p.nombre = "archivo_ktr";
+    p.original = new File( dir, "03_ventas_por_producto.ktr" );
+    p.archivos.add( "${Internal.Entry.Current.Directory}/salida/03_ventas_por_producto.csv" );
+    ResultadoPrueba r = PruebasMotor.crear( p, op() );
+    igual( ResultadoPrueba.PASO, r.estado, "pasa: " + r.mensaje + " " + r.notas );
+    igual( ResultadoPrueba.Resumen.ARCHIVO, r.salidas.get( 0 ).tipo, "un archivo" );
+    cierto( r.salidas.get( 0 ).filasReales > 0, "con filas" );
+    reemplazar( new File( dir, "03_ventas_por_producto.ktr" ), SUM, MAX );
+    igual( ResultadoPrueba.FALLO, PruebasMotor.correr( new File( dir, "tests/archivo_ktr.test.json" ), op() ).estado,
+      "el cambio se ve en el archivo" );
   }
 
   /** PruebasKettleHome: solo las conexiones de shared.xml y kettle.properties; los secretos, descifrados. */

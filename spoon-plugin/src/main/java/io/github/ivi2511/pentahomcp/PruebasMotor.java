@@ -351,7 +351,10 @@ final class PruebasMotor {
     if ( vars != null ) {
       r = vars.environmentSubstitute( r );
     }
-    r = r.replaceFirst( "^(?i)file:/+(?=[A-Za-z]:)", "" ).replaceFirst( "^(?i)file://", "" );
+    if ( r.regionMatches( true, 0, "file:", 0, 5 ) ) { // ${Internal.Entry.Current.Directory} es una URL (%20...)
+      File f = CorrectorSandbox.aArchivo( r );
+      return f.isAbsolute() ? f.getAbsoluteFile() : resolver( dir, f.getPath() );
+    }
     return resolver( dir, r );
   }
 

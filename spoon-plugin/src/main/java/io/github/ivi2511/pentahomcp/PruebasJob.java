@@ -596,7 +596,17 @@ final class PruebasJob {
           j.setVariable( e.getKey(), j.environmentSubstitute( e.getValue() ) );
         }
         if ( ultima && plan.leerResultados && !plan.d.archivos.isEmpty() ) {
-          antes = PruebasMotor.estadoArchivos( plan.d, plan.dir, j );
+          // antes de start() el Job todavia no tiene Internal.Entry.Current.Directory: las del JobMeta
+          org.pentaho.di.core.variables.VariableSpace vs = PruebasMotor.variablesDe( j,
+            new LinkedHashMap<String, String>() );
+          for ( String v : new String[] { "Internal.Entry.Current.Directory", "Internal.Job.Filename.Directory",
+            "Internal.Job.Filename.Name", "Internal.Job.Name" } ) {
+            String x = vs.getVariable( v );
+            if ( ( x == null || x.trim().isEmpty() ) && jm.getVariable( v ) != null ) {
+              vs.setVariable( v, jm.getVariable( v ) );
+            }
+          }
+          antes = PruebasMotor.estadoArchivos( plan.d, plan.dir, vs );
         }
         String canal = null;
         try {
