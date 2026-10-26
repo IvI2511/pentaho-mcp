@@ -340,6 +340,23 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
 - El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
   transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
 
+## Lo nuevo en 0.7.0
+
+«Planificar y probar», 88 herramientas MCP:
+
+- **Diseñar antes de construir**: un plano de la ETL (`*.plan.yaml`) con diagramas de flujo de datos, de
+  actividad UML y de componentes en una perspectiva nueva **Diseño**; Claude te entrevista, revisa el plano,
+  lo construye como boceto de marcadores o con los steps reales y avisa si el lienzo se aparta del plano. La
+  hoja de mapeo origen-destino se exporta sola desde cualquier ETL (Excel/Markdown) y se puede importar.
+- **Trabajo en equipo**: comparación por significado de `.ktr`/`.kjb` (contra lo guardado, otro archivo o una
+  revisión de git) con marcas en el lienzo; `pentaho-live normalize` y un `textconv` para git; un perfil del
+  linter del curso o del equipo (`.pentaho-live/lint.yaml`); `pentaho-live init` prepara un proyecto con CI en
+  GitHub Actions (linter, pruebas y la comparación de un pull request).
+- **Pruebas con datos de referencia** (`test_create`, `test_run`…), opcionalmente al guardar.
+- Diálogos IDC con ventana de detalle y muchos más arreglos automáticos; un **Ordenar lienzo** mucho mejor
+  (sin cruces ni notas tapadas en lienzos típicos); un asistente de 5 pasos para crear packs de corrección y
+  el arreglo de los archivos temporales del corrector. Ver [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Lo nuevo en 0.6.2
 
 - **Menú IDC** al lado del selector de perspectivas de Spoon: *Revisar calidad…* (nota, hallazgos, aplicar

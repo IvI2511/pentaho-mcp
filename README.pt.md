@@ -339,6 +339,23 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
 - O modo aula funciona **só com transformações** (ainda não com jobs), uma lição por transformação; com mais
   de 12 passos avisa e sugere dividi-la. Se a lição mostra linhas, salve antes o `.ktr` junto dos dados.
 
+## Novidades da 0.7.0
+
+«Planejar e testar», 88 ferramentas MCP:
+
+- **Projetar antes de construir**: um plano da ETL (`*.plan.yaml`) com diagramas de fluxo de dados, de
+  atividade UML e de componentes numa nova perspectiva **Design**; o Claude entrevista você, revisa o plano,
+  constrói como esboço de marcadores ou com os steps reais e avisa quando a tela se afasta do plano. A planilha
+  de mapeamento origem-destino é exportada de qualquer ETL (Excel/Markdown) e pode ser importada.
+- **Trabalho em equipe**: comparação semântica de `.ktr`/`.kjb` (com o arquivo salvo, outro arquivo ou uma
+  revisão do git) com marcas na tela; `pentaho-live normalize` e um `textconv` para o git; um perfil do linter
+  do curso ou da equipe (`.pentaho-live/lint.yaml`); `pentaho-live init` prepara um projeto com CI no GitHub
+  Actions (linter, testes e a comparação de um pull request).
+- **Testes com dados de referência** (`test_create`, `test_run`…), opcionalmente ao salvar.
+- Diálogos IDC com janela de detalhe e muito mais correções automáticas; um **Organizar tela** muito melhor;
+  um assistente de 5 passos para criar pacotes de correção e a correção dos arquivos temporários do corretor.
+  Ver [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Novidades da 0.6.2
 
 - **Menu IDC** ao lado do seletor de perspectivas do Spoon: *Revisar qualidade…* (nota, achados, aplicar

@@ -28,7 +28,7 @@ public class McpLifecycleListener implements LifecycleListener {
   static final LogChannelInterface LOG = new LogChannel( "PentahoMCP" );
 
   /** Si el jar no trae pentaho-mcp-version.txt (compilado a mano, sin build.ps1). */
-  private static final String VERSION_RESPALDO = "0.6.2";
+  private static final String VERSION_RESPALDO = "0.7.0";
 
   /** La version del plugin: la escribe build.ps1 en el jar, sacada del archivo VERSION del repo. */
   static final String VERSION = leerVersion();

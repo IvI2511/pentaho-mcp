@@ -325,6 +325,23 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
   steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
 
+## New in 0.7.0
+
+"Planificar y probar" (plan and test), 88 MCP tools:
+
+- **Design before building**: an ETL plan file (`*.plan.yaml`) with data-flow, UML activity and component
+  diagrams in a new **Design** perspective; Claude interviews you, reviews the plan, builds it as a sketch of
+  placeholder steps or as real steps, and warns when the canvas drifts from the plan. A source-to-target
+  mapping sheet exports itself from any ETL (Excel/Markdown) and can be imported back.
+- **Teamwork**: semantic diff of `.ktr`/`.kjb` (against the saved file, another file or a git revision) with
+  badges on the canvas; `pentaho-live normalize` and a git `textconv` driver; a shared course/team lint
+  profile (`.pentaho-live/lint.yaml`); `pentaho-live init` prepares a project with CI on GitHub Actions
+  (lint, tests and the semantic diff of a pull request).
+- **Tests with golden datasets** (`test_create`, `test_run`…), optionally run on every save.
+- Reworked IDC dialogs with a detail window and many more automatic fixes; a much better **Arrange canvas**
+  (no crossings or covered notes on typical canvases); a 5-step, plain-language wizard to create grading
+  packs, and the grader's temp-file fix. See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## New in 0.6.2
 
 - **IDC menu** next to Spoon's perspective switcher: *Check quality…* (score, findings, apply fixes in one
