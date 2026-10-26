@@ -26,10 +26,11 @@ case "$1" in
       java="java"
       [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] && java="$JAVA_HOME/bin/java"
       [ -n "${PENTAHO_JAVA_HOME:-}" ] && [ -x "$PENTAHO_JAVA_HOME/bin/java" ] && java="$PENTAHO_JAVA_HOME/bin/java"
-      # Java 9+ reads JDK_JAVA_OPTIONS (Kettle needs these opens on 17+); Java 8 ignores it
-      JDK_JAVA_OPTIONS="--add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED"
-      export JDK_JAVA_OPTIONS
-      exec "$java" -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 -DKETTLE_PLUGIN_BASE_FOLDERS="$pdi/plugins" \
+      # Kettle needs these opens on Java 17+. Java 8 does not know --add-opens: IgnoreUnrecognizedVMOptions makes it
+      # skip them (JDK_JAVA_OPTIONS did the same, but Java 9+ printed "NOTE: Picked up..." on stderr every time).
+      exec "$java" -XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.net=ALL-UNNAMED \
+        --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED \
+        -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 -DKETTLE_PLUGIN_BASE_FOLDERS="$pdi/plugins" \
         -cp "$pdi/lib/*:$pdi/plugins/pentaho-mcp/*:$pdi/plugins/pentaho-mcp/lib/*:$pdi/classes" \
         io.github.ivi2511.pentahomcp.ProyectoMain "$@"
     fi

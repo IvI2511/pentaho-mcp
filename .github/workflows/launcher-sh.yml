@@ -12,26 +12,29 @@ permissions:
 
 jobs:
   sh:
-    name: shell launcher (${{ matrix.os }})
+    name: shell launcher (${{ matrix.os }}, Java ${{ matrix.java }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - { os: ubuntu-latest, java: "11" }
+          - { os: ubuntu-latest, java: "8" }
+          - { os: macos-latest, java: "11" }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "11"
+          java-version: ${{ matrix.java }}
 
       - name: Cache PDI CE 9.4 + Pentaho Live
         id: pdi-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/pdi
           key: pdi-ce-9.4-pentaho-live-0.7.0-${{ runner.os }}-${{ hashFiles('ci-tools/overlay.zip') }}
@@ -64,9 +67,9 @@ jobs:
           export KETTLE_HOME="$RUNNER_TEMP/kettle-home"; mkdir -p "$KETTLE_HOME/.kettle"
           pl="sh ci-tools/pentaho-live"
           fail=0
-          check() { want=$1; shift; "$@" > "$RUNNER_TEMP/o.txt" 2> "$RUNNER_TEMP/e.txt"; got=$?
+          check() { want=$1; shift; got=0; "$@" > "$RUNNER_TEMP/o.txt" 2> "$RUNNER_TEMP/e.txt" || got=$?
             echo "== $* -> exit $got (want $want), stdout $(wc -l < "$RUNNER_TEMP/o.txt") lines, stderr $(wc -l < "$RUNNER_TEMP/e.txt") lines"
-            head -n 15 "$RUNNER_TEMP/o.txt"; echo "-- stderr:"; head -n 8 "$RUNNER_TEMP/e.txt"
+            head -n 30 "$RUNNER_TEMP/o.txt"; echo "-- stderr:"; head -n 12 "$RUNNER_TEMP/e.txt"
             [ "$got" = "$want" ] || { echo "::error::$* exited $got, expected $want"; fail=1; }; }
           check 0 $pl init "$RUNNER_TEMP/nuevo" --lang es
           check 0 $pl lint etl
@@ -74,6 +77,8 @@ jobs:
           check 0 $pl test --all
           check 0 $pl test --all --lang es
           check 2 $pl test tests/does-not-exist
+          check 1 $pl lint etl/ejemplos/03_ventas_por_producto.ktr --min-score 100
+          check 0 $pl lint etl/grano-de-oro --lang es
           check 1 $pl diff etl/ejemplos/01_generar_constantes.ktr etl/ejemplos/02_filtrar_clientes.ktr
           check 0 $pl diff --rev HEAD etl
           check 0 $pl textconv etl/ejemplos/01_generar_constantes.ktr
