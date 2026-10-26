@@ -28,7 +28,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sources that all feed the same two steps go in a row with one step above and one below (sample "Value Mapper -
   Same and new field": 15 crossings → 0). PDI samples: 30 → 15 crossings, still none through a step or a name.
 - **Compare… list of changes**: sized to its columns and to the screen (0.7.0 opened it 702 px wide and cut the
-  Detail column), remembers its size and column widths, and shows the full detail of a change in a tooltip.
+  Detail column), remembers its size and column widths, and shows the full detail of a change in a tooltip. The
+  other version's tab is named `[git HEAD: x.ktr] name` so a cut tab still tells them apart, and a hop's badge sits
+  beside the middle of the hop instead of covering Spoon's condition icon.
 - `pentaho-live textconv`: a password shows as `(hidden · #1a2b3c4d)`, a tag that changes when the password changes
   (HMAC with a random key kept in the clone's `.git/pentaho-live/textconv.key`), so a password change is visible
   in `git diff`; never the value nor its hash.
