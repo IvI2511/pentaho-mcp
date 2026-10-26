@@ -89,8 +89,8 @@ profile does not say `off`. Like any rule, `rules.<id>` sets their severity.
 | Rule | Default sev | What it flags | Fix |
 |---|---|---|---|
 | `naming_convention` | I | A step or entry whose name does not start with the prefix of its category (or `by_type`) | **rename** to `prefix + name` (a wrong prefix of the profile is replaced): automatic, one Ctrl+Z, references updated. A name that is a Spoon default is left to `default_step_name`, whose proposed name already carries the prefix |
-| `step_without_description` | I | A step (or entry) with an empty description | by hand: right-click > Edit description |
-| `required_variable` | W | A file path that does not start with a profile variable (references to other `.ktr`/`.kjb` and `%%java.io.tmpdir%%` do not count); a connection whose host does not use one | an absolute path: `${DIR_DATOS}/file` with the parameter `DIR_DATOS` = its folder (confirm); else a value. The host, by hand. With this section, `absolute_path` proposes the profile's variable too |
+| `step_without_description` | I | A step (or entry) with an empty description | a description proposed from its type and configuration (`Lee clientes.csv (6 campos)`), with confirmation; one Ctrl+Z (0.7.1) |
+| `required_variable` | W | A file path that does not start with a profile variable (references to other `.ktr`/`.kjb` and `%%java.io.tmpdir%%` do not count); a connection whose host does not use one | an absolute path: `${DIR_DATOS}/file` with the parameter `DIR_DATOS` = its folder (confirm); else a value. A host: host, port and database to `${DB_HOST_<CONN>}`, `${DB_PORT_<CONN>}`, `${DB_NAME_<CONN>}` with the `kettle.properties` lines in the notes (confirm; the password is never touched; 0.7.1). With this section, `absolute_path` proposes the profile's variable too |
 | `team_pattern` | per rule | Each team rule, on every step (or entry) of its types: the key is `team_pattern:step:<step>:<rule id>` | the rule's `fix` text |
 
 A team rule's regex has a time limit (250 ms per text): one that backtracks forever is stopped and the step is

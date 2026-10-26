@@ -7,6 +7,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Linter autofixes for the profile rules**: `step_without_description` proposes a description from the step's
+  (or entry's) type and configuration ("Lee clientes.csv (6 campos)", "Filtra filas con saldo >= 1000.0 AND
+  activo = 'S'", "Runs the transformation 01_dim_tienda.ktr"; new fix kind `set_step_description`, with
+  confirmation, editable in the IDC details window); `required_variable` on a connection host moves host, port and
+  database to `${DB_HOST_<CONN>}`, `${DB_PORT_<CONN>}` and `${DB_NAME_<CONN>}` (the profile's variable plus the
+  connection name) and gives the `kettle.properties` lines in the notes (`use_connection_variables`, with
+  confirmation; the password is never read nor touched). Both are one Ctrl+Z, in a job too; `${DB_HOST_<CONN>}`
+  satisfies a profile that asks for `DB_HOST`.
+- `diff_documents`: `two_tabs` (with `show_on_canvas`) opens the other version in a new tab, as Compare… > Two tabs.
+
+### Changed
+
+- **Arrange canvas**: in a job, moving entries and notes is ONE Ctrl+Z (it was two: Spoon does not chain job undo
+  actions); a job's shared failure handler (three or more "on failure" hops from one row, like Grano de Oro's
+  "Registrar el error") goes below that row, where no hop crosses an entry name; many sources feeding the same step
+  are spread over two staggered columns (PDI sample "Data Validator - all usecases": 2180 → 1508 px high); k
+  sources that all feed the same two steps go in a row with one step above and one below (sample "Value Mapper -
+  Same and new field": 15 crossings → 0). PDI samples: 30 → 15 crossings, still none through a step or a name.
+- **Compare… list of changes**: sized to its columns and to the screen (0.7.0 opened it 702 px wide and cut the
+  Detail column), remembers its size and column widths, and shows the full detail of a change in a tooltip.
+- `pentaho-live textconv`: a password shows as `(hidden · #1a2b3c4d)`, a tag that changes when the password changes
+  (HMAC with a random key kept in the clone's `.git/pentaho-live/textconv.key`), so a password change is visible
+  in `git diff`; never the value nor its hash.
+
+### Fixed
+
+- The dashed arrow of a removed hop on the canvas started at the source's centre and crossed its icon: it now goes
+  from icon edge to icon edge, with an arrowhead, like Spoon's hops.
 ## [0.7.0] - 2026-10-26
 
 ### Added

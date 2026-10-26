@@ -26,6 +26,7 @@ Everything only reads the documents; nothing here modifies an open transformatio
 {"path": "C:/etl/ventas.ktr", "compare_with": "git:HEAD~1"}       // a file, not open in Spoon
 {"document": "T1", "compare_with": "plantilla.ktr", "format": "markdown", "language": "es"}
 {"document": "T1", "compare_with": "git:main", "show_on_canvas": true}
+{"document": "T1", "compare_with": "git:HEAD", "show_on_canvas": true, "two_tabs": true}
 ```
 
 | Argument | Meaning |
@@ -37,6 +38,7 @@ Everything only reads the documents; nothing here modifies an open transformatio
 | `format` | `json` (default: the changes as data plus `text`), `text` or `markdown`. |
 | `language` | `en`, `es` or `pt` for the readable texts. |
 | `show_on_canvas` | Also mark the changes on the canvas and open the list in Spoon. Only if the person wants to see them there. |
+| `two_tabs` | With `show_on_canvas`: also open the other version in a new tab, both with badges (as *Compare… > Two tabs*). |
 
 Both sides are read the way Spoon writes them (loaded with Kettle and written with `getXML()`), so a
 hand-written file is not full of "changes" for the tags Kettle adds with their default value.
@@ -58,7 +60,8 @@ Each change has a **kind** (`step`, `entry`, `hop`, `error_handling`, `connectio
 - **Hops**: added, removed, enabled/disabled, "now carries the error rows" (transformations), the condition
   `always / on success / on failure` (jobs).
 - **Passwords and users are never shown**, not even encrypted: only `changed (hidden)`, `set (hidden)` or
-  `cleared`. A value that is just a variable (`${DB_PASS}`) is shown. Do not try to recover them.
+  `cleared`. A value that is just a variable (`${DB_PASS}`) is shown. Do not try to recover them. In `git diff`
+  (textconv, below) a password shows as `(hidden · #1a2b3c4d)`: the tag changes when the password changes.
 - `modified_user` and `modified_date` never count.
 
 Tell the person the summary first (`summary_text`), then the changes that matter; quote properties exactly.
@@ -69,12 +72,14 @@ Tell the person the summary first (`summary_text`), then the changes that matter
 listed) or another file; *Ignore box positions* is on by default. Two views:
 
 - **Badges on this canvas**: `+` green, `~` amber, `»` blue on each step and in the middle of each hop;
-  removed steps are drawn as red dashed **ghosts** where they were, and removed hops as red dashed lines.
+  removed steps are drawn as red dashed **ghosts** where they were, and removed hops as red dashed arrows
+  from icon edge to icon edge, like Spoon's own hops.
 - **Two tabs**: the other version opens in a new tab (named `<name> [<where it comes from>]`, without a
   file, so it cannot overwrite anything), both with badges (`−` on what disappears).
 
-The **list of changes** opens next to it; clicking a change selects its step (or both ends of a hop) on
-the canvas. *Copy as Markdown* puts the diff in the clipboard. **Closing the list removes the badges** and
+The **list of changes** opens next to it, sized to its columns and to the screen (it remembers the size and
+column widths the person leaves; the full detail of a change is in its tooltip); clicking a change selects its
+step (or both ends of a hop) on the canvas. *Copy as Markdown* puts the diff in the clipboard. **Closing the list removes the badges** and
 closes the other version's tab if nobody touched it. The badges are only drawing: the document is not
 modified and `Ctrl+Z` has nothing to undo.
 
@@ -122,6 +127,13 @@ git config diff.kettle.cachetextconv true
 From then on `git diff`, `git log -p` and `git show` show one property per line (`condition: saldo > 1000`)
 instead of XML; positions are left out (`pentaho-live textconv --positions` keeps them). A file that is not
 valid XML (for example with conflict markers) is shown as it is. GitHub's web view does not run textconv.
+
+git runs textconv on each version separately, so a password could not say "changed" there. Since 0.7.1 each one
+shows as `password: (hidden · #1a2b3c4d)`: the tag is an HMAC of the hidden value with a random key that lives
+only in that clone (`.git/pentaho-live/textconv.key`, created on first use, never committed). The same password
+gives the same tag and a changed password another one, so `git diff` shows the line changed; the tag is not the
+password nor its hash and is useless without the key. Outside a git repository it is plain `(hidden)`. Tags differ
+between clones (each has its own key): compare them only within one clone.
 
 ### The normalizer and the pre-commit hook
 
