@@ -340,6 +340,18 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
 - El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
   transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
 
+## Lo nuevo en 0.7.1
+
+- **Pruebas de referencia para jobs**: congela una ejecución completa de un `.kjb` (salidas de steps, tablas y
+  los ficheros que deja) y compara con ella cada ejecución posterior; la JVM de pruebas puede usar tus conexiones
+  de `shared.xml` y tu `kettle.properties` (con las contraseñas ocultas en los resultados), y los nombres
+  cualificados con esquema van a la base de pruebas.
+- `plan_build` construye el **job de orquestación** del plano, y `mapping_import` convierte las reglas de la
+  hoja de mapeo en steps reales; el linaje de campos ya explica los steps que cambian valores.
+- Dos arreglos automáticos nuevos (una descripción para cada step, los hosts de conexión a variables), un
+  **Ordenar lienzo** mejor en los jobs (un solo Ctrl+Z, menos cruces), una lista de **Comparar…** que cabe en la
+  pantalla y la CI de `pentaho-live init` probada en GitHub Actions de verdad. Consulta [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Lo nuevo en 0.7.0
 
 «Planificar y probar», 88 herramientas MCP:

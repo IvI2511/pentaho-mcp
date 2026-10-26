@@ -339,6 +339,18 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (em inglês).
 - O modo aula funciona **só com transformações** (ainda não com jobs), uma lição por transformação; com mais
   de 12 passos avisa e sugere dividi-la. Se a lição mostra linhas, salve antes o `.ktr` junto dos dados.
 
+## Novidades da 0.7.1
+
+- **Testes de referência para jobs**: congela uma execução completa de um `.kjb` (saídas de steps, tabelas e os
+  arquivos que deixa) e compara com ela cada execução seguinte; a JVM de testes pode usar as suas conexões do
+  `shared.xml` e o seu `kettle.properties` (senhas ocultas nos resultados), e os nomes qualificados com esquema
+  vão para a base de testes.
+- `plan_build` constrói o **job de orquestração** do plano, e `mapping_import` transforma as regras da planilha
+  de mapeamento em steps reais; a linhagem de campos agora explica os steps que mudam valores.
+- Duas correções automáticas novas (uma descrição para cada step, os hosts de conexão em variáveis), um
+  **Organizar tela** melhor nos jobs (um só Ctrl+Z, menos cruzamentos), uma lista do **Comparar…** que cabe na
+  tela e a CI do `pentaho-live init` testada no GitHub Actions de verdade. Veja [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Novidades da 0.7.0
 
 «Planejar e testar», 88 ferramentas MCP:

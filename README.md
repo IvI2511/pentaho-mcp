@@ -325,6 +325,17 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
   steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
 
+## New in 0.7.1
+
+- **Golden tests for jobs**: freeze a whole `.kjb` run (step outputs, tables and the files it leaves) and
+  compare every later run against it; the test JVM can use your `shared.xml` connections and `kettle.properties`
+  (passwords hidden in the results), and schema-qualified names go to the test database.
+- `plan_build` builds the **orchestration job** of a plan, and `mapping_import` turns the mapping sheet's rules
+  into real steps; field lineage now explains the steps that change values.
+- Two new automatic fixes (a description for every step, connection hosts to variables), a better
+  **Arrange canvas** for jobs (one Ctrl+Z, fewer crossings), a **Compare…** list that fits the screen, and the
+  `pentaho-live init` CI checked on real GitHub Actions runs. See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## New in 0.7.0
 
 "Planificar y probar" (plan and test), 88 MCP tools:

@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-26
+
 ### Added
 
 - **Linter autofixes for the profile rules**: `step_without_description` proposes a description from the step's
@@ -54,6 +56,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   into a test file or the project; passwords and secret-looking variables are scrubbed from results and log
   tails). The grader keeps an empty `KETTLE_HOME` for students' submissions (`CorrectorProcesos.Opciones
   .kettleDelUsuario`, off).
+- `pentaho-live test` speaks English, Spanish or Portuguese (`--lang`, or the system language) and every failing
+  output names its first difference (key, column, expected, actual).
 
 ### Changed
 
@@ -78,6 +82,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `schema.table`. Sub-transformations started by a job are redirected too.
 - Test files no longer carry the case defaults `"weight": 1.0, "hidden": false` (old files still load; the
   grader's packs are unchanged). The example tests in `ejemplo/pruebas/` were cleaned.
+- **CI of `pentaho-live init`, tried on real GitHub Actions runs** (a project with the skill's examples and the
+  Grano de Oro tests, and a pull request that breaks a filter): the workflow template uses `actions/checkout@v7`,
+  `setup-java@v6` and `cache@v6` (Node 24); the launchers pass `--add-opens` with
+  `-XX:+IgnoreUnrecognizedVMOptions` instead of `JDK_JAVA_OPTIONS` (no «NOTE: Picked up» on stderr; Java 8 still
+  works), and the test and grader JVMs copy that flag. The init README and manual 13 explain how to read a CI run.
 
 ### Fixed
 
@@ -90,7 +99,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and in the metaverse path, so the mapping sheet's Rule and the lineage report section show the transformation.
 - `test_create` with `tweaks: []` (and **Create test from preview…** with *Skip the steps that write* unchecked)
   applied the default tweaks anyway: an empty list did not reach the test JVM. `input_steps: []` likewise.
-
+- `pentaho-live lint` without Spoon no longer floods stderr with about 1,800 lines of Kettle's «registering jar
+  plugin file» and dialog `ClassNotFoundException`s.
+- `required_variable`: a Y/N setting whose tag contains «path» is no longer taken for a file path.
+- `run` on a job that ends in an **Abort** entry waited for the whole `wait_s` and reported `stopped_by_timeout`;
+  it now returns as soon as the job stops (the same fix as in the job tests).
 
 ## [0.7.0] - 2026-10-26
 
@@ -928,7 +941,8 @@ canvas. **Robustness** makes a load tolerate dirty data and proves it with broke
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.0...v0.6.1

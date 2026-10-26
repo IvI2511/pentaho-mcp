@@ -1200,7 +1200,8 @@ final class RunMotor {
     boolean corte = false;
     long limite = inicio + esperaMs;
     dormir( 50 );
-    while ( !j.isFinished() ) {
+    // un Abort deja el job parado (stopped) sin marcarlo finished: tambien termino
+    while ( !terminado( j ) ) {
       if ( System.currentTimeMillis() > limite ) {
         corte = true;
         j.stopAll();
@@ -1320,9 +1321,13 @@ final class RunMotor {
     return arr;
   }
 
+  static boolean terminado( Job j ) {
+    return j.isFinished() || ( j.isStopped() && !j.isActive() );
+  }
+
   static ObjectNode estadoJob( Job j, long inicio ) {
     ObjectNode o = Tools.obj();
-    boolean fin = j.isFinished();
+    boolean fin = terminado( j );
     o.put( "state", fin ? ( j.isStopped() ? "stopped" : "finished" ) : ( j.isActive() ? "running" : "not_started" ) );
     o.put( "kettle_status", j.getStatus() );
     if ( inicio > 0 ) {
