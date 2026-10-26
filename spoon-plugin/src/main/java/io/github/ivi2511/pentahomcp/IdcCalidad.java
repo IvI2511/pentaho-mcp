@@ -867,7 +867,7 @@ final class IdcCalidad {
     if ( "rename".equals( k ) || "rename_entry".equals( k ) ) {
       return r.s( "d_value_name" );
     }
-    if ( "set_description".equals( k ) ) {
+    if ( "set_description".equals( k ) || "set_step_description".equals( k ) ) {
       return r.s( "d_value_description" );
     }
     if ( "add_parameter".equals( k ) || "set_parameter_default".equals( k ) ) {

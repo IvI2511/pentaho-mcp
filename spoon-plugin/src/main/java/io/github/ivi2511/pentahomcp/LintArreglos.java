@@ -460,6 +460,12 @@ final class LintArreglos {
     if ( Arreglo.EXPAND_SELECT_STAR.equals( k ) ) {
       return new ExpandirSelect( ap, e );
     }
+    if ( Arreglo.SET_STEP_DESCRIPTION.equals( k ) ) {
+      return new DescripcionDeStep( ap, e );
+    }
+    if ( Arreglo.USE_CONNECTION_VARIABLES.equals( k ) ) {
+      return new VariablesDeConexion( ap, e );
+    }
     throw new Saltar( ap.t( "skip.kind", "kind", k ) );
   }
 
@@ -1387,6 +1393,113 @@ final class LintArreglos {
         r += ap.t( "done.abort.lonely", "name", exito.getName() );
       }
       return r;
+    }
+  }
+
+  /**
+   * step_without_description (0.7.1): la descripción propuesta (o la de values[key]) en el step o la entrada. Con
+   * UndoEfecto: en una transformación entra en el mismo Ctrl+Z que el resto de la llamada; en un job, un Ctrl+Z.
+   */
+  static final class DescripcionDeStep extends Accion {
+    final String valor;
+    StepMeta s;
+    JobEntryCopy c;
+    boolean deshace = true;
+
+    DescripcionDeStep( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      valor = e.valor == null ? "" : e.valor.trim();
+      if ( valor.isEmpty() ) {
+        throw new Saltar( ap.t( "skip.no_step_description" ) );
+      }
+      if ( ap.tm != null ) {
+        s = step( ap, e.h );
+        if ( s.getDescription() != null && !s.getDescription().trim().isEmpty() ) {
+          throw new Saltar( ap.t( "skip.has_description", "name", s.getName() ) );
+        }
+      } else {
+        c = entrada( ap, e.h );
+        if ( c.getDescription() != null && !c.getDescription().trim().isEmpty() ) {
+          throw new Saltar( ap.t( "skip.has_description", "name", c.getName() ) );
+        }
+      }
+    }
+
+    @Override
+    boolean deshacible( Aplicacion ap ) {
+      return deshace;
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) {
+      UndoEfecto.Foto foto = UndoEfecto.Foto.de( ap.meta );
+      if ( s != null ) {
+        s.setDescription( valor );
+        s.setChanged();
+      } else {
+        c.setDescription( valor );
+        c.setChanged();
+      }
+      ap.meta.setChanged();
+      deshace = ap.deshacerEfecto( foto );
+      return s != null ? ap.t( "done.step_description", "name", s.getName(), "value", valor ) : ap.t(
+        "done.entry_description", "name", c.getName(), "value", valor );
+    }
+  }
+
+  /**
+   * required_variable de hosts (0.7.1): host, puerto y base de la conexión pasan a las variables propuestas
+   * (${DB_HOST_VENTAS}...) y la nota da las líneas de kettle.properties con los valores de ahora. La contraseña no se
+   * lee ni se toca. Con UndoEfecto: un Ctrl+Z también en un job (Spoon no deshace ahí el cambio de una conexión).
+   */
+  static final class VariablesDeConexion extends Accion {
+    final DatabaseMeta db;
+    final String host;
+    final String puerto;
+    final String base;
+    final String lineas;
+    boolean deshace = true;
+
+    VariablesDeConexion( Aplicacion ap, Elegido e ) throws Saltar {
+      super( e );
+      db = ap.meta.findDatabase( e.h.object );
+      if ( db == null ) {
+        throw new Saltar( ap.t( "skip.no_connection", "name", e.h.object ) );
+      }
+      if ( db.isShared() ) {
+        throw new Saltar( ap.t( "skip.shared_connection", "name", db.getName() ) );
+      }
+      host = e.h.fix.params.get( "host" );
+      puerto = e.h.fix.params.get( "port" );
+      base = e.h.fix.params.get( "database" );
+      lineas = e.h.fix.params.get( "properties" );
+      if ( host == null || puerto == null || base == null ) {
+        throw new Saltar( ap.t( "skip.kind", "kind", e.h.fix.kind ) );
+      }
+      String ahora = db.getHostname() == null ? "" : db.getHostname();
+      if ( ahora.contains( "${" ) || ahora.contains( "%%" ) ) {
+        throw new Saltar( ap.t( "skip.host_variable", "name", db.getName() ) );
+      }
+    }
+
+    @Override
+    boolean deshacible( Aplicacion ap ) {
+      return deshace;
+    }
+
+    @Override
+    String hacer( Aplicacion ap ) {
+      UndoEfecto.Foto foto = UndoEfecto.Foto.de( ap.meta );
+      db.setHostname( host );
+      db.setDBPort( puerto );
+      db.setDBName( base );
+      db.setChanged();
+      ap.meta.setChanged();
+      deshace = ap.deshacerEfecto( foto );
+      if ( lineas != null && !lineas.isEmpty() ) {
+        ap.notas.add( ap.t( "note.connection_variables", "lines", lineas ) );
+      }
+      return ap.t( "done.connection_variables", "name", db.getName(), "host", host, "port", puerto, "database", base );
     }
   }
 

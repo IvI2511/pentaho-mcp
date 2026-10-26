@@ -26,6 +26,10 @@ public final class Arreglo {
   public static final String DELETE_STEP = "delete_step";
   public static final String DELETE_ENTRY = "delete_entry";
   public static final String EXPAND_SELECT_STAR = "expand_select_star";
+  /** step_without_description (0.7.1): la descripción propuesta del step o la entrada. */
+  public static final String SET_STEP_DESCRIPTION = "set_step_description";
+  /** required_variable de hosts (0.7.1): host, puerto y base de la conexión a variables del perfil. */
+  public static final String USE_CONNECTION_VARIABLES = "use_connection_variables";
 
   public String kind;
   public boolean auto;
