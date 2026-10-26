@@ -170,6 +170,21 @@ public class PruebaPlanoJob {
     }
     igual( 11, PlanoJob.progreso( jm ).path( "placeholders" ).size(), "11 marcadores" );
     igual( 12, jm.nrNotes(), "una nota por marcador y la general" );
+    for ( int i = 0; i < jm.nrNotes(); i++ ) {
+      for ( int j = i + 1; j < jm.nrNotes(); j++ ) {
+        org.pentaho.di.core.NotePadMeta a = jm.getNote( i );
+        org.pentaho.di.core.NotePadMeta b = jm.getNote( j );
+        falso( a.getLocation().x < b.getLocation().x + b.getWidth() && b.getLocation().x < a.getLocation().x + a
+          .getWidth() && a.getLocation().y < b.getLocation().y + b.getHeight() && b.getLocation().y < a.getLocation().y
+            + a.getHeight(), "las notas " + i + " y " + j + " no se pisan" );
+      }
+      for ( JobEntryCopy c : jm.getJobCopies() ) {
+        org.pentaho.di.core.NotePadMeta a = jm.getNote( i );
+        falso( c.getLocation().x < a.getLocation().x + a.getWidth() && a.getLocation().x < c.getLocation().x + 32
+          && c.getLocation().y < a.getLocation().y + a.getHeight() && a.getLocation().y < c.getLocation().y + 32,
+          "la nota " + i + " no tapa a " + c.getName() );
+      }
+    }
     JobEntryCopy t1 = PlanoJob.buscar( jm, "Ejecutar 01_dim_tienda" );
     igual( "TRANS", t1.getAttribute( ReglasBoceto.GRUPO, PlanoJob.K_TIPO ), "guarda la entrada planeada" );
     // los hops rojos ya están, aunque salgan de un DUMMY

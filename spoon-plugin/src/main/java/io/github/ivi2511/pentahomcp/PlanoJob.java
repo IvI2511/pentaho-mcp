@@ -949,44 +949,61 @@ final class PlanoJob {
     for ( Entrada e : pd.entradas ) {
       ( FALLA.equals( e.fila ) ? falla : fila ).add( e );
     }
-    // notas PENDIENTE de la fila: medir
+    // notas PENDIENTE: medir; la separación entre entradas sale de los nombres y de las notas (alternadas arriba y
+    // abajo, dos notas vecinas de la misma banda están a dos pasos)
     Map<Entrada, String> textos = new LinkedHashMap<Entrada, String>();
     Map<Entrada, Point> tam = new LinkedHashMap<Entrada, Point>();
     int altoArriba = 0;
     int altoAbajo = 0;
+    int paso = PASO_X;
     for ( int i = 0; i < fila.size(); i++ ) {
       Entrada e = fila.get( i );
+      paso = Math.max( paso, m.texto( e.nombre, false ).x + 40 );
       if ( !e.marcador ) {
         continue;
       }
       String t = textoNota( pref, e, r );
       Point p = m.texto( t, false );
+      Point s = new Point( p.x + 12, p.y + 10 );
       textos.put( e, t );
-      tam.put( e, new Point( p.x + 12, p.y + 10 ) );
+      tam.put( e, s );
+      paso = Math.max( paso, ( s.x + 30 + 1 ) / 2 );
       if ( i % 2 == 1 ) {
-        altoArriba = Math.max( altoArriba, p.y + 10 );
+        altoArriba = Math.max( altoArriba, s.y );
       } else {
-        altoAbajo = Math.max( altoAbajo, p.y + 10 );
+        altoAbajo = Math.max( altoAbajo, s.y );
       }
     }
     int yFila = yNotas + ( altoArriba == 0 ? 0 : altoArriba + 20 ) + 16;
     for ( int i = 0; i < fila.size(); i++ ) {
-      fila.get( i ).x = X0 + i * PASO_X;
+      fila.get( i ).x = X0 + i * paso;
       fila.get( i ).y = yFila;
     }
     for ( Map.Entry<Entrada, String> x : textos.entrySet() ) {
       Entrada e = x.getKey();
-      Point p = tam.get( e );
-      int w = Math.min( p.x, PASO_X * 2 - 20 );
+      Point s = tam.get( e );
       int i = fila.indexOf( e );
-      int nx = Math.max( 10, e.x + 16 - w / 2 );
-      int ny = i % 2 == 1 ? yFila - 20 - p.y : yFila + 32 + 30;
-      NotePadMeta n = new NotePadMeta( x.getValue(), nx, ny, w, p.y );
+      int nx = Math.max( 10, e.x + 16 - s.x / 2 );
+      int ny = i % 2 == 1 ? yFila - 20 - s.y : yFila + 32 + 30;
+      NotePadMeta n = new NotePadMeta( x.getValue(), nx, ny, s.x, s.y );
       PlanoConstruir.estilizar( n, "load" );
       notas.add( n );
     }
     int yFalla = yFila + 32 + 30 + ( altoAbajo == 0 ? 0 : altoAbajo + 30 ) + 120;
-    // el camino de falla, centrado bajo las transformaciones
+    // el camino de falla, centrado bajo las transformaciones, con sus notas debajo una al lado de la otra
+    Map<Entrada, String> tf = new LinkedHashMap<Entrada, String>();
+    Map<Entrada, Point> sf = new LinkedHashMap<Entrada, Point>();
+    int pasoF = paso;
+    for ( Entrada e : falla ) {
+      pasoF = Math.max( pasoF, m.texto( e.nombre, false ).x + 40 );
+      if ( e.marcador ) {
+        String t = textoNota( pref, e, r );
+        Point p = m.texto( t, false );
+        tf.put( e, t );
+        sf.put( e, new Point( p.x + 12, p.y + 10 ) );
+        pasoF = Math.max( pasoF, p.x + 12 + 30 );
+      }
+    }
     int primera = Integer.MAX_VALUE;
     int ultima = 0;
     for ( Entrada e : fila ) {
@@ -997,19 +1014,17 @@ final class PlanoJob {
     }
     if ( primera == Integer.MAX_VALUE ) {
       primera = X0;
-      ultima = X0 + ( fila.size() - 1 ) * PASO_X;
+      ultima = X0 + ( fila.size() - 1 ) * paso;
     }
     int centro = ( primera + ultima ) / 2;
-    int x0 = centro - ( falla.size() - 1 ) * PASO_X / 2;
+    int x0 = centro - ( falla.size() - 1 ) * pasoF / 2;
     for ( int i = 0; i < falla.size(); i++ ) {
       Entrada e = falla.get( i );
-      e.x = Math.max( X0, x0 + i * PASO_X );
+      e.x = Math.max( X0, x0 + i * pasoF );
       e.y = yFalla;
-      if ( e.marcador ) {
-        String t = textoNota( pref, e, r );
-        Point p = m.texto( t, false );
-        int w = Math.min( p.x + 12, PASO_X - 10 + ( i == falla.size() - 1 ? 200 : 0 ) );
-        NotePadMeta n = new NotePadMeta( t, Math.max( 10, e.x + 16 - w / 2 ), yFalla + 32 + 30, w, p.y + 10 );
+      if ( tf.containsKey( e ) ) {
+        Point s = sf.get( e );
+        NotePadMeta n = new NotePadMeta( tf.get( e ), Math.max( 10, e.x + 16 - s.x / 2 ), yFalla + 32 + 30, s.x, s.y );
         PlanoConstruir.estilizar( n, "reject" );
         notas.add( n );
       }

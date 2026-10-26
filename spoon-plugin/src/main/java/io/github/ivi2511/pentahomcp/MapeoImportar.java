@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.pentaho.di.core.NotePadMeta;
+import org.pentaho.di.core.gui.Point;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.trans.TransHopMeta;
@@ -283,6 +284,9 @@ final class MapeoImportar {
     Map<String, List<Mapeo.Fila>> porCampo = new HashMap<String, List<Mapeo.Fila>>();
     Map<String, String> pasoDeTabla = new LinkedHashMap<String, String>();
     for ( Mapeo.Fila f : etl ) {
+      if ( f.tabla != null && f.paso != null ) {
+        pasoDeTabla.put( f.tabla.toLowerCase( Locale.ROOT ), f.paso ); // también sin campos (base que no existe)
+      }
       if ( f.campo == null ) {
         continue;
       }
@@ -373,6 +377,8 @@ final class MapeoImportar {
       for ( ValueMetaInterface v : llega.getValueMetaList() ) {
         c.disponibles.put( v.getName().toLowerCase( Locale.ROOT ), v );
       }
+    } else if ( d != null ) {
+      c.sinCampos = lin.error( d ) == null ? d.getName() : lin.error( d );
     }
     // steps de entrada sueltos (sin hops de salida): se pueden usar como origen de un Stream lookup sin tocar el flujo
     for ( StepMeta s : tm.getSteps() ) {
@@ -554,9 +560,28 @@ final class MapeoImportar {
       int y0 = Math.max( ya, yb ) + 110;
       StepMeta marcador = null;
       StepMeta filtro = null;
+      // separación según el ancho de los nombres (los de la cadena son largos: «Calcular campos para …»)
+      int[] xs = new int[ cad.pasos.size() ];
+      String notaPendiente = cad.pendiente.isEmpty() ? null : textoNota( r.f( "map.imp.paso.marcador", d.getName() ),
+        cad.pendiente, idioma );
+      Point tamPendiente = null;
+      LeccionNotas.MedidorCerrable med = LeccionNotas.medidor( -1 );
+      try {
+        int cx = x0;
+        for ( int i = 0; i < xs.length; i++ ) {
+          xs[ i ] = cx;
+          cx += Math.max( 170, med.texto( cad.pasos.get( i )[ 1 ], false ).x + 40 );
+        }
+        if ( notaPendiente != null ) {
+          Point tp = med.texto( notaPendiente, false );
+          tamPendiente = new Point( tp.x + 12, tp.y + 10 );
+        }
+      } finally {
+        med.cerrar();
+      }
       for ( int i = 0; i < cad.pasos.size(); i++ ) {
         String[] c = cad.pasos.get( i );
-        TransOps.Agregado ag = TransOps.agregarStep( tm, c[ 0 ], c[ 1 ], c[ 2 ], x0 + i * 170, y0, anterior, null, ms );
+        TransOps.Agregado ag = TransOps.agregarStep( tm, c[ 0 ], c[ 1 ], c[ 2 ], xs[ i ], y0, anterior, null, ms );
         nuevos.add( ag.step );
         if ( ag.hop != null ) {
           hops.add( ag.hop );
@@ -576,7 +601,7 @@ final class MapeoImportar {
       StepMeta rechazos = null;
       if ( filtro != null ) {
         TransOps.Agregado ag = TransOps.agregarStep( tm, ReglasBoceto.DUMMY, cad.rechazos, null, filtro.getLocation().x,
-          filtro.getLocation().y + 110, null, null, ms );
+          filtro.getLocation().y + 110 + ( tamPendiente == null ? 0 : tamPendiente.y + 30 ), null, null, ms );
         rechazos = ag.step;
         rechazos.setAttribute( ReglasBoceto.GRUPO, ReglasBoceto.K_MARCADOR, "mapping" );
         nuevos.add( rechazos );
@@ -605,10 +630,16 @@ final class MapeoImportar {
       TransOps.resolverReferencias( tm );
       List<NotePadMeta> notas = new ArrayList<NotePadMeta>();
       if ( marcador != null ) {
-        notas.add( nota( marcador, cad.pendiente, idioma ) );
+        notas.add( nota( marcador, cad.pendiente, idioma, tamPendiente ) );
       }
       if ( rechazos != null ) {
-        notas.add( nota( rechazos, cad.notaRechazos, idioma ) );
+        LeccionNotas.MedidorCerrable mr = LeccionNotas.medidor( -1 );
+        try {
+          Point tr = mr.texto( textoNota( rechazos.getName(), cad.notaRechazos, idioma ), false );
+          notas.add( nota( rechazos, cad.notaRechazos, idioma, new Point( tr.x + 12, tr.y + 10 ) ) );
+        } finally {
+          mr.cerrar();
+        }
       }
       for ( NotePadMeta n : notas ) {
         PlanoConstruir.estilizar( n, "reject" );
@@ -628,17 +659,24 @@ final class MapeoImportar {
     return out;
   }
 
-  /** Una nota PENDIENTE debajo de un marcador: la primera línea con el prefijo y su nombre, después las líneas. */
-  private static NotePadMeta nota( StepMeta m, List<String> lineas, String idioma ) {
+  /** El texto de una nota PENDIENTE: la primera línea con el prefijo y el nombre, después las líneas. */
+  private static String textoNota( String nombre, List<String> lineas, String idioma ) {
     String pref = PlanoConstruir.PREFIJO.get( Rotulos.normalizar( idioma ) );
-    StringBuilder t = new StringBuilder( pref == null ? PlanoConstruir.PREFIJO.get( "en" ) : pref ).append( m
-      .getName() );
+    StringBuilder t = new StringBuilder( pref == null ? PlanoConstruir.PREFIJO.get( "en" ) : pref ).append( nombre );
     for ( String linea : lineas ) {
       for ( String l : PlanoConstruir.envolver( linea, 40 ) ) {
         t.append( '\n' ).append( l );
       }
     }
-    return new NotePadMeta( t.toString(), m.getLocation().x, m.getLocation().y + 70, 200, 40 );
+    return t.toString();
+  }
+
+  /** La nota PENDIENTE debajo de un marcador, con su tamaño medido. */
+  private static NotePadMeta nota( StepMeta m, List<String> lineas, String idioma, Point tam ) {
+    int w = tam == null ? 200 : tam.x;
+    int h = tam == null ? 40 : tam.y;
+    return new NotePadMeta( textoNota( m.getName(), lineas, idioma ), Math.max( 10, m.getLocation().x + 16 - w / 2 ), m
+      .getLocation().y + 60, w, h );
   }
 
   /** La cadena de steps de un destino: {tipo, nombre, config}, los hops de info y los textos de las notas. */

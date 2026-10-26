@@ -132,6 +132,8 @@ final class MapeoReglas {
       ValueMetaInterface>>();
     /** La conexión para Database lookup (la del step destino, o la única de la transformación), o null. */
     String conexion;
+    /** Por qué no se pudieron calcular los campos que llegan al destino (null si se pudieron). */
+    String sinCampos;
     Rotulos r;
 
     ValueMetaInterface campo( String nombre ) {
@@ -163,6 +165,10 @@ final class MapeoReglas {
     String regla = h.g( "rule" );
     String defecto = h.g( "default" );
     String fuente = c.nombre( origen[ 1 ] );
+    if ( c.sinCampos != null && !( regla.isEmpty() && origen[ 1 ].isEmpty() && !defecto.isEmpty() ) ) {
+      p.dudas.add( r.f( "map.duda.sin_campos", c.sinCampos ) ); // sin los campos no se puede comprobar nada
+      return p;
+    }
     if ( regla.isEmpty() ) {
       if ( fuente != null ) {
         if ( !fuente.equalsIgnoreCase( destino ) ) {

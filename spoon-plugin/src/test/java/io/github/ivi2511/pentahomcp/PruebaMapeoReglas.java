@@ -186,6 +186,21 @@ public class PruebaMapeoReglas {
     contiene( tipos( fila( vs, "ciudad2" ) ), "filter_rows", "one of" );
   }
 
+  /** El destino escribe en una base de archivo que no existe: sin sus campos solo se propone la constante. */
+  public void pruebaSinCamposDelDestino() throws Exception {
+    TransMeta tm = base( true );
+    tm.findDatabase( "dw" ).setDBName( new File( EntornoKettle.salida( "mapeo-reglas" ), "nunca_" + System.nanoTime()
+      + ".sqlite" ).getAbsolutePath() );
+    TransOps.agregarStep( tm, "TableOutput", "Cargar", "<connection>dw</connection><table>t</table>", 600, 300,
+      "segmentos", null, null );
+    List<MapeoImportar.Veredicto> vs = comparar( tm, hoja( "Source,Target,Type,Rule,Default\n"
+      + "segmentos.segmento,t.seg_up,String,upper case,\n"
+      + ",t.origen,String,,TPV\n" ), "en" );
+    igual( "placeholder", fila( vs, "seg_up" ).accion, "sin los campos no se adivina" );
+    contiene( String.join( " ", fila( vs, "seg_up" ).plan.dudas ), "could not be computed", "dice por qué" );
+    igual( "constant", fila( vs, "origen" ).accion, "la constante no depende de los campos" );
+  }
+
   /** La cadena aplicada se ejecuta: los valores salen como dice la hoja y las filas malas van a rechazos. */
   public void pruebaSeEjecuta() throws Exception {
     Object[] r100 = correr( "> 100" );
