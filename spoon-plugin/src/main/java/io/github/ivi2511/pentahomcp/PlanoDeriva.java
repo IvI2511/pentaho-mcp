@@ -358,6 +358,11 @@ final class PlanoDeriva {
   }
 
   private static String transDe( JobEntryCopy c ) {
+    if ( PlanoJob.esMarcador( c ) && "TRANS".equals( c.getAttribute( ReglasBoceto.GRUPO, PlanoJob.K_TIPO ) ) ) {
+      // un marcador del boceto del job que va a ser un TRANS: cuenta para el orden (ya se avisa que es marcador)
+      String f = valor( String.valueOf( c.getAttribute( ReglasBoceto.GRUPO, PlanoJob.K_CONFIG ) ), "filename" );
+      return f == null || f.isEmpty() ? null : Plano.sinKtr( f ).toLowerCase( Locale.ROOT );
+    }
     if ( c.getEntry() == null || !"TRANS".equals( c.getEntry().getPluginId() ) ) {
       return null;
     }

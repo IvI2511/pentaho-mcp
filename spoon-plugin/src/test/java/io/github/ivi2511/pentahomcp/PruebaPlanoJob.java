@@ -199,6 +199,8 @@ public class PruebaPlanoJob {
     boolean visto = false;
     for ( PlanoDeriva.Hallazgo h : r.hallazgos ) {
       visto |= "job_placeholder_left".equals( h.codigo );
+      falso( "transformation_not_in_job".equals( h.codigo ) || "job_order_differs".equals( h.codigo ),
+        "un marcador TRANS cuenta para el orden: " + h.mensaje );
     }
     cierto( visto, "plan_check cuenta los marcadores del job" );
     // fill_placeholder sin tipo: la entrada planeada
@@ -217,6 +219,10 @@ public class PruebaPlanoJob {
       rojo |= h.getFromEntry() == nueva && !h.isUnconditional() && !h.getEvaluation();
     }
     cierto( rojo, "conserva su hop rojo" );
+    JobHopMeta verde = jm.findJobHop( PlanoJob.buscar( jm, "Crear tablas destino" ), nueva, true );
+    noNulo( verde, "el hop que entra" );
+    falso( verde.isUnconditional(), "sigue verde aunque salga de un marcador" );
+    cierto( verde.getEvaluation(), "on_success" );
     // un Ctrl+Z devuelve el marcador
     deshacerJob( jm );
     JobEntryCopy otraVez = PlanoJob.buscar( jm, "Ejecutar 01_dim_tienda" );

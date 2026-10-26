@@ -1421,8 +1421,10 @@ final class PlanoJob {
       JobEntryCopy a = h.getFromEntry() == d ? nueva : h.getFromEntry();
       JobEntryCopy b = h.getToEntry() == d ? nueva : h.getToEntry();
       JobHopMeta n = new JobHopMeta( a, b );
+      // la condición planeada se conserva aunque el otro extremo siga siendo un marcador (DUMMY): cuando se rellene,
+      // el hop ya es el que dice el plano; solo la entrada nueva que no evalúa (START, DUMMY) la fuerza a «always»
       String cond = JobSoporte.condicion( h );
-      JobSoporte.aplicarCondicion( n, JobSoporte.soloIncondicional( a ) ? JobSoporte.SIEMPRE : cond );
+      JobSoporte.aplicarCondicion( n, a == nueva && JobSoporte.soloIncondicional( a ) ? JobSoporte.SIEMPRE : cond );
       n.setEnabled( h.isEnabled() );
       jm.addJobHop( n );
     }
