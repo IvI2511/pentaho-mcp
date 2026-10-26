@@ -880,7 +880,7 @@
             <value>
               <name>constant</name>
               <type>Integer</type>
-              <text>0</text>
+              <text>1</text>
               <length>-1</length>
               <precision>0</precision>
               <isnull>N</isnull>
