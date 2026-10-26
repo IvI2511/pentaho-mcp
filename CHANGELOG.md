@@ -7,6 +7,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Golden-dataset tests for jobs.** `test_create` with `job_file` (or the job open in Spoon) freezes a `.kjb`:
+  steps are named `"Entry :: Step"` (the Transformation entry and a step of its `.ktr`), and the test file gets
+  `"job"` instead of `"transformation"` and a `job_entry` in each output, dataset and step tweak. The whole job
+  runs like Kitchen in the test JVM; every transformation it starts is caught before it runs (datasets injected,
+  tweaks applied, connections pointed to the test databases, outputs captured from the last run of each entry).
+  New tweak **`skip_entry`** (the entry does nothing and the job goes on); by default `test_create` skips the
+  entries that talk to the outside (mail, FTP/SFTP, SSH, HTTP…), SQL entries without a test database and, when
+  nothing is compared but step outputs, the entries that change files and every writing step. `test_run`,
+  `test_run_all`, `test_list` (new argument `job_file`), **IDC › Tests…** (now also for jobs), run on save (saving
+  a job runs its tests; saving a `.ktr` also runs the job tests whose job runs it) and `pentaho-live test x.kjb`.
+- **`files[]` in tests** (jobs and transformations): files the run leaves, read as CSV (separator detected at
+  creation) and compared with a golden copy; a file the run did not write (missing or unchanged) fails as
+  `not_written`. `${PENTAHO_LIVE_TEST_DIR}` is a temporary folder of each run, to send outputs there with a
+  `set_variable` tweak. `test_create` has a new argument `files`.
+- **The person's `KETTLE_HOME` in the test JVM**: its `shared.xml` connections and `kettle.properties` variables
+  are copied to the test JVM's temporary `KETTLE_HOME` (`environment.user_kettle_home`, default `true`; never
+  into a test file or the project; passwords and secret-looking variables are scrubbed from results and log
+  tails). The grader keeps an empty `KETTLE_HOME` for students' submissions (`CorrectorProcesos.Opciones
+  .kettleDelUsuario`, off).
+
+### Changed
+
+- **Schemas and qualified names go to the test database** in the tests and in the grader, for MySQL, MariaDB,
+  PostgreSQL and H2: a step's `schema`, a `schema.table` name and qualified names in SQL (`gym_dw.ventas`,
+  `USE gym_dw`) that name the original database (or the one the connection pointed to) are rewritten.
+  Conservative: only names that qualify another one change, never a table, column or alias called like the
+  database. In tests, a schema or SQL that would leave the test databases is an `error`; `tables[]` may name
+  `schema.table`. Sub-transformations started by a job are redirected too.
+- Test files no longer carry the case defaults `"weight": 1.0, "hidden": false` (old files still load; the
+  grader's packs are unchanged). The example tests in `ejemplo/pruebas/` were cleaned.
+
 ## [0.7.0] - 2026-10-26
 
 ### Added

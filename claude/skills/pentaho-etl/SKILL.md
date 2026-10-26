@@ -206,7 +206,8 @@ mismo, test this*): `preview_step` the step that matters and check it with the p
 frozen as datasets by default) → change → `test_run` / `test_run_all` → on `failed`, explain from the row
 diff (`case.tables[].comparison.examples`). Recreate with `replace: true` only when the change was
 intended. Tests live in `tests/` next to the `.ktr`; in Spoon, **IDC › Tests…** (with *Run on save*).
-Format, databases and troubleshooting: `manual/12-pruebas.md`.
+A **job** can be tested too (`job_file`; steps as `"Entry :: Step"`, plus `files` and `tables` it leaves).
+Format, jobs, databases and troubleshooting: `manual/12-pruebas.md`.
 
 ## Where everything is
 

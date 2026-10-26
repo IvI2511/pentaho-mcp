@@ -111,8 +111,9 @@ case is: open the solution, **Next**, **Next**, **Save pack**.
 
 ## 4. How a submission is graded
 
-All of it happens in the child JVM (a worker), with an empty `KETTLE_HOME` and the pack's locale, timezone and
-encoding:
+All of it happens in the child JVM (a worker), with an empty `KETTLE_HOME` (the golden-dataset tests of
+`manual/12-pruebas.md` copy the person's `shared.xml` connections and `kettle.properties` into theirs; the grader
+never does it for students' submissions) and the pack's locale, timezone and encoding:
 
 1. **Load** the `.ktr` (a `DOCTYPE` is rejected). If it does not load: `load_failed`.
 2. **Static checks**, without running anything: the step policy (§8), the rules, `lint:*` (the linter, ignoring
@@ -296,7 +297,7 @@ any capture works with `test_databases`.
 | It must end in a test suffix: `_correccion`, `_test`, `_prueba`, `_grading` (`database_safety.test_suffixes`) | a typo cannot hit a real database; `database_safety.allow_any_name: true` is an explicit override |
 | Never a system database (`mysql`, `information_schema`, `sys`, `postgres`…) nor one of `database_safety.deny` (`*` allowed) | |
 | The grader never connects to the original databases | the student's connections are rewritten before anything runs |
-| A step whose schema (Table output, Insert/Update…) or SQL names another database, or SQL that reads or writes server files, users or permissions (`INTO OUTFILE`, `LOAD DATA`, `GRANT`, `COPY … TO`, `CSVWRITE`…) blocks | `foreign_schema`, `forbidden_sql` |
+| A step's schema (Table output, Insert/Update, Database lookup…), a `schema.table` name and the qualified names in its SQL (`gym_dw.ventas`, `USE gym_dw`) that name the original database (or the one the student's connection pointed to) go to the test database — in MySQL, MariaDB, PostgreSQL and H2 (0.7.1). Only names that qualify another one change: a table, column or alias called like the database is left alone. In MySQL a schema is a database, so another one blocks; in H2 and PostgreSQL a schema lives inside the test database (create it in the scripts). SQL that names another database or reads or writes server files, users or permissions (`INTO OUTFILE`, `LOAD DATA`, `GRANT`, `COPY … TO`, `CSVWRITE`…) blocks | `foreign_schema`, `forbidden_sql` |
 | With several workers each one gets its own databases: `gym_dw_correccion_w1`, `_w2`… (`database_safety.single_worker: true` = one worker) | two submissions never share a database |
 
 These checks reduce the risk; the real protection is a **database user with rights only on the test databases**
