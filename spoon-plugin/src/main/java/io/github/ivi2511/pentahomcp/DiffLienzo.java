@@ -205,8 +205,15 @@ final class DiffLienzo {
           int[] a = posicion( meta, s[ 0 ], posFantasma );
           int[] b = posicion( meta, s[ 1 ], posFantasma );
           if ( a != null && b != null ) {
-            gc.drawLine( a[ 0 ] + ox + icono / 2, a[ 1 ] + oy + icono / 2, b[ 0 ] + ox + icono / 2, b[ 1 ] + oy
-              + icono / 2 );
+            // como los hops de Spoon: de borde a borde de los iconos (el del fantasma es la caja rayada, 2 px mas
+            // grande), no de centro a centro por encima del icono
+            int c = icono / 2;
+            int[] l = recorte( a[ 0 ] + ox + c, a[ 1 ] + oy + c, b[ 0 ] + ox + c, b[ 1 ] + oy + c,
+              c + ( posFantasma.containsKey( s[ 0 ] ) ? 4 : 2 ), c + ( posFantasma.containsKey( s[ 1 ] ) ? 4 : 2 ) );
+            if ( l != null ) {
+              gc.drawLine( l[ 0 ], l[ 1 ], l[ 2 ], l[ 3 ] );
+              flecha( gc, l );
+            }
           }
         }
       }
@@ -262,6 +269,36 @@ final class DiffLienzo {
       gc.setBackground( EColor.BACKGROUND );
       gc.setFont( EFont.GRAPH );
     }
+  }
+
+  /**
+   * El tramo visible de la recta de centro (x1, y1) a centro (x2, y2): sale del cuadrado de semilado {@code m1}
+   * alrededor del primero y llega al de semilado {@code m2} alrededor del segundo. null si los cuadrados se tocan (no
+   * queda nada que dibujar).
+   */
+  static int[] recorte( int x1, int y1, int x2, int y2, int m1, int m2 ) {
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double mx = Math.max( Math.abs( dx ), Math.abs( dy ) );
+    if ( mx <= m1 + m2 ) {
+      return null;
+    }
+    double t1 = m1 / mx;
+    double t2 = 1 - m2 / mx;
+    return new int[] { (int) Math.round( x1 + dx * t1 ), (int) Math.round( y1 + dy * t1 ), (int) Math.round( x1 + dx
+      * t2 ), (int) Math.round( y1 + dy * t2 ) };
+  }
+
+  /** Una punta de flecha sólida al final del tramo (los hops de Spoon también la tienen). */
+  private static void flecha( GCInterface gc, int[] l ) {
+    double ang = Math.atan2( l[ 3 ] - l[ 1 ], l[ 2 ] - l[ 0 ] );
+    int largo = 9;
+    gc.setLineStyle( ELineStyle.SOLID );
+    for ( double d : new double[] { -0.45, 0.45 } ) {
+      gc.drawLine( l[ 2 ], l[ 3 ], (int) Math.round( l[ 2 ] - largo * Math.cos( ang + d ) ), (int) Math.round( l[ 3 ]
+        - largo * Math.sin( ang + d ) ) );
+    }
+    gc.setLineStyle( ELineStyle.DASH );
   }
 
   static int[] colorDe( String simbolo ) {

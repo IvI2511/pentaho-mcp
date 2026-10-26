@@ -165,6 +165,61 @@ public class PruebaDiffGit {
     Files.delete( script.toPath() );
   }
 
+  /**
+   * textconv y contraseñas (0.7.1): una contraseña cambiada se ve en git diff como una marca distinta, nunca el valor
+   * ni su hash; la misma contraseña da la misma marca; la clave de las marcas vive en el .git del clon.
+   */
+  public void pruebaD_TextconvMarcaLaContrasenaCambiada() throws Exception {
+    File otro = EntornoKettle.salida( "diff-git/repo-pass" );
+    if ( otro.exists() ) {
+      try ( java.util.stream.Stream<java.nio.file.Path> s = Files.walk( otro.toPath() ) ) {
+        s.forEach( p -> p.toFile().setWritable( true ) );
+      }
+      EntornoKettle.borrar( otro.toPath() );
+    }
+    otro.mkdirs();
+    File guardado = repo;
+    repo = otro;
+    try {
+      git( "init", "-q" );
+      String x = PruebaDiff.ejemplo( "manual/ejemplos/07_conexion_sqlite.ktr" );
+      cierto( x.contains( "<password" ), "el ejemplo tiene el tag password" );
+      String uno = x.replaceFirst( "<password/>|<password>[^<]*</password>", "<password>Encrypted 2be98afc86aa7f2e4cb79ce10df90acde</password>" );
+      String dos = x.replaceFirst( "<password/>|<password>[^<]*</password>", "<password>Encrypted 2be98afc86aa7f2e4bb18bd63c99dbdde</password>" );
+      File k = new File( otro, "etl/con_clave.ktr" );
+      EntornoKettle.escribir( k, uno );
+      git( "add", "." );
+      commit( "con clave" );
+      Object[] r = cli( "textconv", "--lang", "en", "etl/con_clave.ktr" );
+      String t1 = (String) r[ 1 ];
+      java.util.regex.Matcher mt = java.util.regex.Pattern.compile( "password: \\(hidden · #([0-9a-f]{8})\\)" ).matcher(
+        t1 );
+      cierto( mt.find(), "la contraseña sale con su marca: " + t1 );
+      String m1 = mt.group( 1 );
+      noContiene( t1, "2be98afc86aa7f2e4cb79ce10df90acde", "nunca el valor cifrado" );
+      noContiene( t1, io.github.ivi2511.pentahomcp.diff.Aplanar.secreto(
+        "Encrypted 2be98afc86aa7f2e4cb79ce10df90acde" ).substring( 8, 20 ), "ni el hash" );
+      cierto( new File( otro, ".git/pentaho-live/textconv.key" ).isFile(), "la clave quedó dentro de .git" );
+      igual( (String) cli( "textconv", "--lang", "en", "etl/con_clave.ktr" )[ 1 ], t1, "misma contraseña, misma marca" );
+      EntornoKettle.escribir( k, dos );
+      String t2 = (String) cli( "textconv", "--lang", "en", "etl/con_clave.ktr" )[ 1 ];
+      cierto( !t2.contains( "#" + m1 ), "otra contraseña, otra marca" );
+      // en git diff: la línea de la contraseña cambia
+      File clases = new File( Normalizador.class.getProtectionDomain().getCodeSource().getLocation().toURI() );
+      String java = new File( System.getProperty( "java.home" ), "bin/java" ).getPath().replace( '\\', '/' );
+      File script = new File( otro, ".pl-textconv.sh" );
+      EntornoKettle.escribir( script, "#!/bin/sh\nexec \"" + java + "\" -cp \"" + clases.getPath().replace( '\\', '/' )
+        + "\" io.github.ivi2511.pentahomcp.diff.LineaComandos textconv --lang en \"$@\"\n" );
+      EntornoKettle.escribir( new File( otro, ".gitattributes" ), "*.ktr diff=kettle\n" );
+      String d = git( "-c", "diff.kettle.textconv=sh .pl-textconv.sh", "diff", "--", "etl/con_clave.ktr" );
+      contiene( d, "-    password: (hidden · #" + m1 + ")", "la de antes en git diff: " + d );
+      contiene( d, "+    password: (hidden · #", "la de ahora en git diff" );
+      noContiene( d, "Encrypted", "sin el valor" );
+    } finally {
+      repo = guardado;
+    }
+  }
+
   /** normalize --check, normalize y el hook de pre-commit (solo si no hay cambios sin preparar). */
   public void pruebaC_NormalizarYPreCommit() throws Exception {
     File crudo = new File( repo, "etl/crudo.ktr" );

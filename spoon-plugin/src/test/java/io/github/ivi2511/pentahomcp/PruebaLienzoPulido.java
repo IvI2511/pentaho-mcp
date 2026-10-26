@@ -204,13 +204,13 @@ public class PruebaLienzoPulido {
     for ( String d : new String[] { "Union A", "Union B" } ) {
       org.pentaho.di.trans.step.StepMeta t = new org.pentaho.di.trans.step.StepMeta( "Dummy", d,
         new org.pentaho.di.trans.steps.dummytrans.DummyTransMeta() );
-      t.setLocation( 300, y + 150 );
+      t.setLocation( 500, y + 300 );
       tm.addStep( t );
       for ( int i = 0; i < 4; i++ ) {
         org.pentaho.di.trans.step.StepMeta s = new org.pentaho.di.trans.step.StepMeta( "Dummy", d + " fuente " + i,
           new org.pentaho.di.trans.steps.dummytrans.DummyTransMeta() );
         s.setLocation( 100, y );
-        y += 100;
+        y += 200;
         tm.addStep( s );
         tm.addTransHop( new org.pentaho.di.trans.TransHopMeta( s, t ) );
       }
@@ -218,6 +218,12 @@ public class PruebaLienzoPulido {
     TransLayout.Movimientos mov = ordenarYMostrar( "abanico chico (2 x 4 fuentes)", tm );
     igual( 0, LienzoLayout.graves( mov.medidaDespues ), "sin hops por encima de nada" );
     igual( 0, mov.medidaDespues.cruces, "sin cruces" );
-    cierto( alto( LienzoModelo.de( tm ).grafo ) < 8 * 112 - 112, "mas bajo que 8 carriles" );
+    java.util.Set<Integer> xs = new java.util.TreeSet<Integer>();
+    for ( int i = 0; i < 4; i++ ) {
+      xs.add( tm.findStep( "Union A fuente " + i ).getLocation().x );
+    }
+    igual( 2, xs.size(), "las cuatro fuentes en dos columnas" );
+    cierto( alto( LienzoModelo.de( tm ).grafo ) < 2 * ( 3 * 112 + 52 ), "mas bajo que con una fuente por carril" );
+    cierto( TransLayout.ordenar( tm ).vacio(), "ordenar otra vez no mueve nada" );
   }
 }

@@ -418,7 +418,14 @@ public final class LineaComandos {
       return ERROR;
     }
     try {
-      out.print( Volcado.texto( Documento.leer( b ), posiciones, idioma ) );
+      // git corre textconv en la raiz del clon (y pasa el archivo o una copia temporal): la clave de las marcas de
+      // las contraseñas es la de ese clon
+      File desde = cwd != null ? cwd : new File( "." ).getAbsoluteFile();
+      byte[] clave = ClaveSecretos.clave( desde );
+      if ( clave == null ) {
+        clave = ClaveSecretos.clave( f.getAbsoluteFile().getParentFile() );
+      }
+      out.print( Volcado.texto( Documento.leer( b ), posiciones, idioma, clave ) );
     } catch ( Xmls.XmlInvalido e ) {
       // XML roto (marcas de conflicto, a medio escribir): git muestra el texto tal cual
       out.print( new String( b, StandardCharsets.UTF_8 ) );
