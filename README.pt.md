@@ -106,8 +106,8 @@ perspectivas, com tudo isso à mão sem pedir ao Claude: **Revisar qualidade…*
 corrigi-los, clique em um para ver o seu step na tela, as correções automáticas com um único Ctrl+Z,
 silenciar uma regra onde ela é deliberada e uma revisão profunda opcional que lê dados), **Robustecer…** (o
 plano com caixas de seleção, aplicá-lo com um único Ctrl+Z e o teste com dados sujos com o seu veredito),
-**Organizar tela**, **Comparar…**, **Lição**, a troca para Data Integration, Relatórios ou Corretor e **Sobre o
-Pentaho Live**.
+**Organizar tela**, **Comparar…**, **Testes…**, **Lição**, **Design…**, **Planilha de mapeamento…**, **Preparar
+projeto…**, a troca para Data Integration, Relatórios, Corretor ou Design e **Sobre o Pentaho Live**.
 
 **Versões.** Veja o que mudou entre duas versões de uma transformação ou de um job *pelo significado*, não como
 linhas de XML: steps adicionados, removidos ou renomeados, `Filter rows: saldo > 1000 → saldo >= 1000`, listas de
@@ -173,7 +173,7 @@ flowchart LR
 ```
 
 - O **plugin do Spoon** é um plugin de ciclo de vida do Kettle. Quando o Spoon abre, ele sobe um servidor
-  MCP em `127.0.0.1:8765` com 80 ferramentas e aplica cada alteração na thread de interface do
+  MCP em `127.0.0.1:8765` com 88 ferramentas e aplica cada alteração na thread de interface do
   Spoon, com desfazer. O mesmo jar acrescenta as perspectivas **Relatórios** e **Corretor** ao seletor de
   perspectivas do Spoon.
 - O **plugin do Claude Code `pentaho-live`** conecta o Claude a esse servidor e inclui a skill
@@ -265,6 +265,9 @@ Códigos de saída, solução de problemas e todos os passos: [`INSTALL.md`](INS
 | Parâmetros | Listar, definir e excluir parâmetros |
 | Canvas | Adicionar notas, selecionar steps, organizar o layout, tirar uma imagem do canvas |
 | Versões | Comparar uma transformação ou um job com o arquivo salvo, uma revisão do git ou outro arquivo pelo significado (steps, propriedades, saltos, conexões sem senhas), em JSON, texto ou Markdown, e marcar na tela |
+| Testes | Congelar as saídas de uma transformação como datasets dourados, rodar um teste ou todos em uma JVM à parte e ler a diferença linha a linha de um que falha, listar os testes de uma transformação |
+| Design | Escrever e revisar um plano ETL, mostrar os diagramas de fluxo de dados, de atividade e de componentes, construí-lo como esboço de marcadores e preenchê-los um a um, comparar plano e tela, exportar e importar a planilha de mapeamento origem-destino |
+| Projetos em equipe | Mostrar o perfil do linter do projeto, preparar um projeto de equipe (pastas, `.gitignore`, perfil, README, um workflow do GitHub Actions com o linter, os testes e o diff semântico de cada pull request) |
 | Corretor | Montar um pacote de exercício a partir de uma solução (casos, casos ocultos, saída esperada, regras, rubrica, cópia para alunos), validá-lo, corrigir uma entrega ou uma pasta inteira em JVMs à parte, acompanhar o lote e obter a planilha e a devolutiva de cada aluno |
 | Relatórios | Montar o relatório completo de uma transformação ou de um job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imagens, JSON), sozinho ou com vários documentos combinados, com linhagem, dicionário de dados, métricas, qualidade técnica e uma narrativa opcional; ler os dados dele; abri-lo na perspectiva Relatórios do Spoon; um relatório rápido em Markdown com diagrama Mermaid |
 

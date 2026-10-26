@@ -122,7 +122,8 @@ public class PruebaIdcMenu {
     Contexto c = contexto( IdcMenu.TRANSFORMACION, false, null );
     c.boceto = es.f( "menu_sketch", 7, 12 );
     List<Entrada> l = IdcMenu.modelo( es, c );
-    igual( Arrays.asList( "quality", "harden", "arrange", "lesson", "design", "mapping", "sketch", "---", "about" ),
+    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "lesson", "design", "mapping", "sketch",
+      "project", "---", "about" ),
       ids( l ), "el progreso va después de Hoja de mapeo" );
     igual( "Boceto: 7 de 12 piezas construidas", de( l, "sketch" ).texto, "texto del progreso" );
     falso( de( l, "sketch" ).habilitada, "solo informa" );

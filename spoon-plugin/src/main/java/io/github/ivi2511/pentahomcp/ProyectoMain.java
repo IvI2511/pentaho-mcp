@@ -430,6 +430,8 @@ public final class ProyectoMain {
       String x = a.get( i );
       if ( x.equals( "--all" ) ) {
         continue; // lo mismo que sin rutas: todas las de la carpeta actual (o las de las carpetas dadas)
+      } else if ( x.equals( "--lang" ) ) {
+        valor( a, ++i, x ); // como en lint; los resultados de las pruebas van en inglés (los de test_run también)
       } else if ( x.equals( "--format" ) ) {
         formato = valor( a, ++i, x ).toLowerCase( Locale.ROOT );
         if ( !formato.equals( "text" ) && !formato.equals( "json" ) && !formato.equals( "github" ) ) {

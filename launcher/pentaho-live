@@ -3,7 +3,8 @@
 # run a .cmd file by its bare name, so this forwards to pentaho-live.cmd, next to this file.
 #
 # [0.7 project] init / lint / profile / test on macOS and Linux (no cmd.exe): Java + the PDI of PDI_HOME
-# (default ~/pentaho/data-integration, where instalar.sh --instalar-pdi puts it). On Windows they go to the .cmd.
+# (PENTAHO_LIVE_PDI first; default ~/pentaho/data-integration, where instalar.sh --instalar-pdi puts it).
+# On Windows they go to the .cmd.
 #
 # The git and console commands run here directly, with Java and the Pentaho Live jar (no Spoon, and
 # no cmd.exe in between, so paths with spaces arrive intact), on Windows, macOS and Linux:
@@ -17,7 +18,7 @@
 case "$1" in
   init|lint|profile|test)
     if ! command -v cmd.exe >/dev/null 2>&1; then
-      pdi="${PDI_HOME:-$HOME/pentaho/data-integration}"
+      pdi="${PENTAHO_LIVE_PDI:-${PDI_HOME:-$HOME/pentaho/data-integration}}"
       if [ ! -d "$pdi/plugins/pentaho-mcp" ]; then
         echo "pentaho-live: no Pentaho Live plugin in $pdi/plugins (set PDI_HOME to its data-integration folder)" >&2
         exit 2

@@ -100,8 +100,10 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
   categoría, descripción obligatoria, variables obligatorias, reglas del equipo por patrón) que usan `lint_etl`,
   «Revisar calidad…», los Informes y el corrector (`lint:profile`); `lint_profile`, `project_init`, «Preparar
   proyecto…» y `pentaho-live init | lint | profile`; plantilla de CI con PDI en caché y el linter con el mínimo del
-  perfil. Queda para después: los pasos de pruebas (P1) y diff semántico (E1) del workflow, el comentario en el PR,
-  la imagen Docker de PDI para no bajar 400 MB, el autoarreglo de `step_without_description` y de los hosts.
+  perfil. En la integración (`feat/0.7.0`) el workflow quedó completo (P4): `pentaho-live test --all` con las
+  pruebas con datasets dorados y `pentaho-live diff --rev origin/<base>` en el resumen del job, con comentario en la PR
+  opcional. Queda para después: la imagen Docker de PDI para no bajar 400 MB, el autoarreglo de
+  `step_without_description` y de los hosts.
 - **Diff semántico y visual** (E1, hecho en `feat/070-diff`): `diff_documents` compara el documento abierto
   o un archivo con su archivo guardado, una revisión de git u otro archivo por significado (steps
   añadidos, quitados y renombrados por tipo, configuración y vecinos; condiciones legibles, listas de
@@ -122,8 +124,8 @@ Las cuatro piezas se integraron en `feat/0.6.0` (73 herramientas MCP, guías 06 
   `test_run`, `test_run_all`, `test_list`; **IDC › Pruebas…** (verde y rojo, ejecutar con cancelar, la
   diferencia fila a fila, crear desde la vista previa) y **ejecutar al guardar** (apagado por defecto: solo
   las pruebas afectadas por el cambio, indicador ✓ 12/12 o ✗ 1 en el botón IDC y un globo si falla). Guía:
-  `manual/12-pruebas.md`; ejemplo: `ejemplo/pruebas/`. Falta: correrlas con Pan en CI (P4, sin Spoon:
-  un `pentaho-live test` de línea de comandos sobre `PruebasMain`), pruebas de jobs, el diff de E1 para
+  `manual/12-pruebas.md`; ejemplo: `ejemplo/pruebas/`. En CI y en la consola: `pentaho-live test` (hecho en la
+  integración). Falta: pruebas de jobs, el diff de E1 para
   elegir las pruebas afectadas con más precisión, y una prueba que congele una salida a archivo leyendo el
   archivo (hoy se captura la salida del step).
 - **Generador de datos «sucios»** para practicar limpieza (nulos, duplicados, fechas y decimales mal

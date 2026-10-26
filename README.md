@@ -98,8 +98,9 @@ or read back from a sheet a teacher or client filled in, with the missing steps 
 everything above at hand without asking Claude: **Check quality…** (score, findings with how to fix them,
 click one to see its step on the canvas, apply the automatic fixes as one Ctrl+Z, silence a rule where it is
 deliberate, optional deep check that reads data), **Harden…** (the plan with checkboxes, apply as one Ctrl+Z,
-and the dirty-data test with its verdict), **Arrange canvas**, **Compare…**, **Lesson**, the switch to Data
-Integration, Reports or Grader, and **About Pentaho Live**.
+and the dirty-data test with its verdict), **Arrange canvas**, **Compare…**, **Tests…**, **Lesson**,
+**Design…**, **Mapping sheet…**, **Prepare project…**, the switch to Data Integration, Reports, Grader or Design,
+and **About Pentaho Live**.
 
 **Versions.** See what changed between two versions of a transformation or job *by meaning*, not as XML lines:
 steps added, removed or renamed, `Filter rows: saldo > 1000 → saldo >= 1000`, field lists, SQL line by line,
@@ -165,7 +166,7 @@ flowchart LR
 ```
 
 - The **Spoon plugin** is a Kettle lifecycle plugin. When Spoon opens, it starts an MCP server on
-  `127.0.0.1:8765` with 80 tools, and applies every edit on Spoon's UI thread with undo support.
+  `127.0.0.1:8765` with 88 tools, and applies every edit on Spoon's UI thread with undo support.
   The same jar adds the **Reports** and **Grader** perspectives to Spoon's perspective switcher.
 - The **Claude Code plugin `pentaho-live`** connects Claude to that server and adds the `pentaho-etl`
   skill, so Claude knows the exact step ids and XML instead of guessing.
@@ -256,6 +257,9 @@ Exit codes, troubleshooting and the full step list: [`INSTALL.md`](INSTALL.md).
 | Parameters | List, set and delete parameters |
 | Canvas | Add notes, select steps, tidy the layout, take a screenshot of the canvas |
 | Versions | Compare a transformation or job with its saved file, a git revision or another file by meaning (steps, properties, hops, connections without passwords), as JSON, text or Markdown, optionally marked on the canvas |
+| Tests | Freeze a transformation's outputs as golden datasets, run one test or all of them in a separate JVM and read the row diff of a failure, list the tests of a transformation |
+| Design | Write and review an ETL plan, show its data-flow, activity and component diagrams, build it as a sketch of placeholders and fill them one by one, check the drift between plan and canvas, export and import the source-to-target mapping sheet |
+| Team projects | Show the project's lint profile, prepare a team project (folders, `.gitignore`, profile, README, a GitHub Actions workflow with lint, tests and the semantic diff of each pull request) |
 | Grading | Build an exercise pack from a solution (cases, hidden cases, expected output, rules, rubric, a copy for students), validate it, grade one submission or a whole folder in separate JVMs, follow the job, get the gradebook and each student's feedback |
 | Reports | Build the full report of a transformation or job (HTML, PDF, Markdown, PowerPoint, Word, Excel, images, JSON), alone or several documents combined, with lineage, data dictionary, metrics, technical quality and an optional narrative; read its data; open it in Spoon's Reports perspective; a quick Markdown report with a Mermaid diagram |
 

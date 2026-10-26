@@ -112,8 +112,9 @@ the resource `pentaho://lint/rules`.
 says `profile: {name, min_score, passed}`: follow its naming prefixes (`IN_`, `OUT_`…), required variables and
 team rules when you build. `lint_profile` shows it; `project_init` (or `pentaho-live init` in a terminal) prepares
 a team project: folders, `.gitignore`, the profile, a README and a GitHub Actions workflow that lints `etl/` with
-the profile's minimum score. Never overwrites anything; ask before creating files in a folder the person did not
-name. Everything: `manual/13-proyecto.md`.
+the profile's minimum score, runs the golden-dataset tests (`pentaho-live test --all`) and writes the semantic diff
+of a pull request to the job summary (`pentaho-live diff --rev origin/<base> --format markdown`). Never overwrites
+anything; ask before creating files in a folder the person did not name. Everything: `manual/13-proyecto.md`.
 
 ## Grading exercises: `grade_exercise`, `grade_submissions`
 
@@ -222,7 +223,7 @@ Format, databases and troubleshooting: `manual/12-pruebas.md`.
 | Design first: the plan file, the interview, `plan_review`, the sketch (`plan_build`, `fill_placeholder`), drift (`plan_check`), the mapping sheet | `manual/10-plano.md`, `ejemplo/plano/` of the repo |
 | What changed between two versions (`diff_documents`, Compare…), readable `git diff`, `pentaho-live normalize`, the pre-commit hook | `manual/11-versiones.md` |
 | Regression tests with golden datasets: `test_create`, `test_run`, the test file, test databases, run on save | `manual/12-pruebas.md` |
-| Team projects: the lint profile `.pentaho-live/lint.yaml`, `lint_profile`, `project_init` / `pentaho-live init`, `pentaho-live lint`, CI | `manual/13-proyecto.md` |
+| Team projects: the lint profile `.pentaho-live/lint.yaml`, `lint_profile`, `project_init` / `pentaho-live init`, `pentaho-live lint` / `test` / `diff`, CI | `manual/13-proyecto.md` |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

@@ -37,6 +37,8 @@ rem  Environment:
 rem      PENTAHO_LIVE_DRY_RUN=1   only print what it would do; starts nothing
 rem      PENTAHO_MCP_PORT         MCP port to check (default 8765)
 rem      IDC_LAUNCHER_READY_FILE  set by IDCLauncher.exe (used with --launcher)
+rem      PENTAHO_LIVE_PDI         a data-integration folder to use instead of
+rem                               bin\pdi-home.txt (CI, a second PDI)
 rem      PENTAHO_LIVE_JAR         git and console commands: the plugin jar (or a
 rem                               folder of jars) instead of <PDI>\plugins\pentaho-mcp
 rem
@@ -85,6 +87,11 @@ if defined PL_LAUNCHER set "PL_GUI=1"
 rem --- PDI: bin\pdi-home.txt (UTF-8, written by the installer) or the bundled one
 set "PL_PDI="
 set "PL_PDI_FROM=bundled with Pentaho Live"
+if not defined PENTAHO_LIVE_PDI goto :pdi_file
+set "PL_PDI=%PENTAHO_LIVE_PDI%"
+set "PL_PDI_FROM=PENTAHO_LIVE_PDI"
+goto :pdi_default
+:pdi_file
 if not exist "%PL_BIN%pdi-home.txt" goto :pdi_default
 set "PL_CP="
 for /f "tokens=2 delims=:." %%C in ('chcp') do set "PL_CP=%%C"

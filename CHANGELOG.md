@@ -25,10 +25,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`pentaho-live init [folder]`** (also **IDC > Prepare project…** and `project_init`): a team project with
   only what is missing, never overwriting a file: `etl/`, `datasets/`, `tests/`, `contracts/`, `env/` with an
   example `dev.properties`, `.gitignore` (secrets, run outputs, SQLite outputs), `.gitattributes` (the readable-diff
-  driver for `.ktr`/`.kjb`, commented until `pentaho-live textconv` exists), a default course profile, a README
+  driver for `.ktr`/`.kjb` for `pentaho-live textconv`), a default course profile, a README
   with the conventions and `.github/workflows/pentaho-live.yml`: PDI CE 9.4 with Pentaho Live from the release,
   cached, and the linter with the profile's minimum score on every `.ktr`/`.kjb` under `etl/` (annotations and a
-  job summary; TODO steps for golden-dataset tests and the semantic diff).
+  job summary), the golden-dataset tests and the semantic diff of a pull request (below).
 - **`pentaho-live lint <files|folders>`** (`--profile`, `--min-score`, `--format text|json|github`, `--summary`)
   and **`pentaho-live profile`**, without Spoon (`ProyectoMain`): exit code 1 when a file is below the minimum.
   `launcher/pentaho-live` runs them on macOS and Linux too, with `PDI_HOME`.
@@ -56,82 +56,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   SQLite/H2 file, such as MySQL) it says why and what to do, instead of an empty grid.
 - The windows remember their size and the width of their columns (per user, in Spoon's properties); table cells
   show their full text as a tooltip.
-
-### Changed
-
-- Parameters and the document description are undoable: the parameter that `harden_etl`'s
-  `input_file_parameter` recipe declares, and `apply_lint_fixes`' parameters, parameter defaults and description,
-  go into the same Ctrl+Z as the rest of the call (and Ctrl+Y puts them back). The plan no longer says
-  "[not undoable with Ctrl+Z]"; `undoable` is now true for those proposals and fixes.
-- `password_in_file` proposes `${DB_PASSWORD_<CONNECTION>}` (was `${<CONNECTION>_PASSWORD}`) and is a confirm fix
-  instead of asking for a value: the dialog shows the exact line to add to kettle.properties. The password itself
-  is never read, copied, printed or logged.
-- `duplicate_step_name` is evaluated when the document has unsaved changes too (it reads the file on disk, and
-  the document in memory) instead of being listed as not evaluated.
-- The texts of `apply_lint_fixes` (`change`, `reason`, `notes`) come in the requested `language` (English by
-  default, as before). The dialogs show everything in Spoon's language, the diff lines of the `harden_etl` plan
-  included (through MCP they stay in English, the same in every language).
-- A deep check with nothing to read says so ("it only confirms unsorted input and the empty decimal symbol with
-  data") instead of "0 probes in 0.0 s"; the checks that could not be evaluated show their reason.
-### Changed
-
-- **Arrange canvas** (`arrange_canvas`, the canvas button and IDC menu item, and `build_steps` with
-  `arrange`) uses a new layered layout. Before, it could leave crossing hops, hops drawn over other steps
-  and steps on top of notes that could no longer be read. Now:
-  - each level goes in a column, the main flow in straight lanes, the source of a lookup (Stream lookup,
-    Append, Merge join… info streams) in the lane next to the step that reads it, the target of an error
-    hop below its source, and separate flows in separate bands;
-  - columns are spaced by the width of the step names measured with Spoon's canvas font, so names never
-    overlap, and everything lands on Spoon's grid;
-  - crossings are minimised (several barycenter sweeps and neighbour transpositions over virtual nodes),
-    then a local search over the real drawing (straight lines from icon centre to icon centre) moves steps
-    between lanes until no hop crosses another step or its name;
-  - **notes are never left under a step, a name, a hop or another note**. With `notes=keep_near` (default)
-    each note follows the steps it was next to (or on top of) and goes to the closest free spot around
-    them; with `notes=margin` all notes go in a band above the drawing. Their size is measured as Spoon
-    paints them (width/height and font of each note);
-  - steps and notes move in the same undo group: one Ctrl+Z in a transformation (in a job, Spoon undoes
-    the moved notes with a second Ctrl+Z); arranging an already arranged canvas moves nothing.
-  - `arrange_canvas` takes optional `mode` (`readable`, the default, or `compact`) and `notes`
-    (`keep_near` or `margin`), and returns `notes_moved` and the canvas metrics `before` and `after`
-    (hop crossings, hops through steps and names, overlapping steps/names, steps over notes, hops through
-    notes, overlapping notes). Lesson notes (class mode) keep using the class rule.
-  - On the repository examples (31 files) and PDI's samples (208): no hop through a step, no covered note
-    and no overlapping names after arranging; hop crossings 0.6.2 → now: 31 → 2 (repo) and 38 → 30 (PDI
-    samples, as drawn by hand: 39).
-### Changed
-
-- Exercise grader: **Create pack from this transformation…** redesigned for a teacher who is not a Pentaho expert.
-  Five steps with the step list on the left (current, done, pending; click a done step to go back): **Solution and
-  output**, **Test data**, **What is compared**, **Rules and grade**, **Review and save**. Every field has a line of
-  help with an example under it, and what is wrong is shown in red right under the field instead of one long error at
-  the bottom. Smart defaults: the title, the pack folder next to the solution, the capture in plain words (*the tables
-  it loads into the database*, *the file written by the step «X»*, *the rows coming out of the last step*), so the
-  common case is open, Next, Next, **Save pack** (it already works from step 3). The key and the columns not to
-  compare are now boxes per column (**Identifies the row**, **Do not compare**), a table can be left out, and the rules
-  and their points share one page with the total. The last step summarises what will be compared, the cases, the test
-  databases, the grade and what students get. Spanish (tú), English and Portuguese. The pack format and the MCP tools
-  do not change.
-- Exercises with a database, in the wizard: one sentence explains why a test database is needed; the `.sql` scripts
-  next to the solution are found and filled in by themselves (by the database or the tables each script names, the
-  ones that create tables first, hidden-case scripts apart); **Test connection** only creates and drops the test
-  database and says why it fails; **Generate the script from the current database…** reads the original database
-  **read-only** (read-only connection, only `SELECT`/`SHOW` and JDBC metadata, a read-only user is enough) and writes a
-  script with its tables in foreign-key order and their rows — the tables the solution loads go empty — for the
-  teacher to review; the password is the one typed, kept in memory only.
-- A case that does not finish cleanly (`finished_with_errors`, `init_failed`, `solution_failed` when creating a pack)
-  now shows the whole Kettle error of the first step that failed — «Step»: message: cause, without the stack trace —
-  instead of a single, often empty, line.
-
-### Fixed
-
-- Exercise grader: a solution or submission with **Join Rows (cartesian product)** or **Group by** («include all
-  rows») failed inside the grader with «Error creating temporary file(s)»: the sandbox pointed their temporary folder
-  to `${Internal.Entry.Current.Directory}/tmp`, which at run time is a `file:///` URL that `java.io.File` does not
-  understand (Sort rows, which uses VFS, worked). The temporary folder of Sort rows, Join Rows, Group by and Blocking
-  step now always goes to the local path of the case's `tmp/` folder, which exists, counts towards `max_output_mb`
-  and is deleted with the sandbox, whatever the submission had (`%%java.io.tmpdir%%`, a folder of the student's or
-  nothing).
 - **Transformation tests with golden datasets** (0.7.0, P1): `tests/<name>.test.json` next to the `.ktr`
   (format `pentaho-live-test/1`, JSON Schema in `docs/schemas/pentaho-live-test-1.schema.json`). A test
   replaces input steps with fixed datasets (CSV in `tests/datasets/`, injected with the original field types
@@ -142,7 +66,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Disposable test databases (H2, MySQL, MariaDB, PostgreSQL) recreated from scripts before the run, and
   tables compared after it, exactly like the grader: the case, compare options, test databases and tables
   use the grader's pack format and engine (no grader file changed).
-- Four MCP tools (77 in total): `test_create` (snapshot mode: freezes today's input rows as datasets and the
+- Four MCP tools: `test_create` (snapshot mode: freezes today's input rows as datasets and the
   chosen outputs as golden data, skipping the steps that write, detecting columns that change between runs,
   copying the variables the transformation uses), `test_run`, `test_run_all` and `test_list` (with
   `show_in_spoon`). By default they test what is open in Spoon, unsaved changes included.
@@ -154,7 +78,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unsure) run in the background; the IDC button shows **✓ 12/12** or **✗ 1** with the details in its tooltip,
   and a balloon warns when one fails.
 - The skill's manual gets `manual/12-pruebas.md`; `ejemplo/pruebas/` has tests for the Grano de Oro example.
-- **Semantic diff of `.ktr`/`.kjb`** (`diff_documents`, 74 MCP tools): compares a transformation or job
+- **Semantic diff of `.ktr`/`.kjb`** (`diff_documents`): compares a transformation or job
   open in Spoon (or a file) with its saved file (`compare_with=saved`, the unsaved changes), a git revision
   (`git:HEAD`, `git:HEAD~1`, a branch, a commit, through the system git) or another file, **by meaning**:
   steps or job entries added, removed or renamed (recognised by type, configuration, neighbours and position;
@@ -190,21 +114,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   itself. The existing launcher options are unchanged.
 - **Skill manual `11-versiones.md`** (also the MCP resource `pentaho://guide/versions`): when and how Claude
   uses `diff_documents`, how to read the result, Compare… in Spoon, the report section and the git setup.
-
-### Tested
-
-- `PruebaDiff`: pairs of versions of the skill examples modified in the test (condition, rename with and
-  without other changes, not-a-rename, positions, field lists, parameters and error handling, multi-line SQL,
-  notes, jobs) and passwords and users never present in text, Markdown, JSON or textconv.
-- `PruebaNormalizador`: on every example and pattern of the skill the normalizer is idempotent, the
-  semantic diff with the original is empty, Kettle loads the normalized file with the same `getXML()` except
-  the two volatile fields, validation gives the same remarks, and running every example and pattern job
-  gives the same results and output files; a Spoon save normalized is stable.
-- `PruebaDiffGit`: a throwaway git repository: `diff --rev`, two files, JSON, `textconv` wired to
-  `git diff` through `.gitattributes`, `normalize --check`, the pre-commit hook, `diff_documents` with
-  `path`, the changes section.
-- `PruebaDiffLienzo`: the badges of each side, the drawing with a recording GC, the painter extensions,
-  the Compare… dialog and the list of changes off screen.
 - **ETL plan (design before building).** A small, versionable design file, `<name>.plan.yaml` (or `.plan.json`;
   JSON Schema in `docs/plano.schema.json`): goal, grain, full or incremental load, sources (format, location,
   volume, frequency, key, rejects plan), targets (kind, key, load type), business rules, stages (kind,
@@ -246,6 +155,106 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Skill: `manual/10-plano.md` (interviewing the user, the plan format, review codes, sketch, drift, mapping
   sheet), also the MCP resource `pentaho://guide/plan`. Example: `ejemplo/plano/` with the Grano de Oro plan,
   its design document and diagrams, and the mapping sheet of `04_hechos_ventas`.
+- **The CI of `pentaho-live init` is complete** (P4): the workflow puts a `pentaho-live` command on the `PATH` and,
+  on every pull request and push to `main`, lints `etl/` with the profile, runs the golden-dataset tests
+  (`pentaho-live test --all`, also when the lint failed) and, on a pull request, fetches the base branch and writes
+  the semantic diff of every changed `.ktr`/`.kjb` to the job summary (`pentaho-live diff --rev origin/<base>
+  --format markdown`). Optional, off by default: the same diff as a pull-request comment (`gh pr comment`, edits its
+  own comment), with `PENTAHO_LIVE_PR_COMMENT: "true"` and `pull-requests: write`.
+- **`pentaho-live test [--all] [tests, .ktr files or folders]`**: the golden-dataset tests without Spoon, in a
+  separate JVM like `test_run_all`; `--format text|json|github`, `--summary file.md`, `--timeout`; exit code 1 when
+  one does not pass.
+- **`pentaho-live diff --rev REV [folders]`** without a single file: every `.ktr`/`.kjb` changed since `REV`
+  (default `HEAD`), by meaning, in text, Markdown or JSON; new and removed files get one line.
+- MCP resources `pentaho://guide/tests` and `pentaho://guide/team-projects` (manuals 12 and 13, now also in the
+  plugin's jar). In total 88 MCP tools (73 in 0.6.2).
+
+### Changed
+
+- Parameters and the document description are undoable: the parameter that `harden_etl`'s
+  `input_file_parameter` recipe declares, and `apply_lint_fixes`' parameters, parameter defaults and description,
+  go into the same Ctrl+Z as the rest of the call (and Ctrl+Y puts them back). The plan no longer says
+  "[not undoable with Ctrl+Z]"; `undoable` is now true for those proposals and fixes.
+- `password_in_file` proposes `${DB_PASSWORD_<CONNECTION>}` (was `${<CONNECTION>_PASSWORD}`) and is a confirm fix
+  instead of asking for a value: the dialog shows the exact line to add to kettle.properties. The password itself
+  is never read, copied, printed or logged.
+- `duplicate_step_name` is evaluated when the document has unsaved changes too (it reads the file on disk, and
+  the document in memory) instead of being listed as not evaluated.
+- The texts of `apply_lint_fixes` (`change`, `reason`, `notes`) come in the requested `language` (English by
+  default, as before). The dialogs show everything in Spoon's language, the diff lines of the `harden_etl` plan
+  included (through MCP they stay in English, the same in every language).
+- A deep check with nothing to read says so ("it only confirms unsorted input and the empty decimal symbol with
+  data") instead of "0 probes in 0.0 s"; the checks that could not be evaluated show their reason.
+- **Arrange canvas** (`arrange_canvas`, the canvas button and IDC menu item, and `build_steps` with
+  `arrange`) uses a new layered layout. Before, it could leave crossing hops, hops drawn over other steps
+  and steps on top of notes that could no longer be read. Now:
+  - each level goes in a column, the main flow in straight lanes, the source of a lookup (Stream lookup,
+    Append, Merge join… info streams) in the lane next to the step that reads it, the target of an error
+    hop below its source, and separate flows in separate bands;
+  - columns are spaced by the width of the step names measured with Spoon's canvas font, so names never
+    overlap, and everything lands on Spoon's grid;
+  - crossings are minimised (several barycenter sweeps and neighbour transpositions over virtual nodes),
+    then a local search over the real drawing (straight lines from icon centre to icon centre) moves steps
+    between lanes until no hop crosses another step or its name;
+  - **notes are never left under a step, a name, a hop or another note**. With `notes=keep_near` (default)
+    each note follows the steps it was next to (or on top of) and goes to the closest free spot around
+    them; with `notes=margin` all notes go in a band above the drawing. Their size is measured as Spoon
+    paints them (width/height and font of each note);
+  - steps and notes move in the same undo group: one Ctrl+Z in a transformation (in a job, Spoon undoes
+    the moved notes with a second Ctrl+Z); arranging an already arranged canvas moves nothing.
+  - `arrange_canvas` takes optional `mode` (`readable`, the default, or `compact`) and `notes`
+    (`keep_near` or `margin`), and returns `notes_moved` and the canvas metrics `before` and `after`
+    (hop crossings, hops through steps and names, overlapping steps/names, steps over notes, hops through
+    notes, overlapping notes). Lesson notes (class mode) keep using the class rule.
+  - On the repository examples (31 files) and PDI's samples (208): no hop through a step, no covered note
+    and no overlapping names after arranging; hop crossings 0.6.2 → now: 31 → 2 (repo) and 38 → 30 (PDI
+    samples, as drawn by hand: 39).
+- Exercise grader: **Create pack from this transformation…** redesigned for a teacher who is not a Pentaho expert.
+  Five steps with the step list on the left (current, done, pending; click a done step to go back): **Solution and
+  output**, **Test data**, **What is compared**, **Rules and grade**, **Review and save**. Every field has a line of
+  help with an example under it, and what is wrong is shown in red right under the field instead of one long error at
+  the bottom. Smart defaults: the title, the pack folder next to the solution, the capture in plain words (*the tables
+  it loads into the database*, *the file written by the step «X»*, *the rows coming out of the last step*), so the
+  common case is open, Next, Next, **Save pack** (it already works from step 3). The key and the columns not to
+  compare are now boxes per column (**Identifies the row**, **Do not compare**), a table can be left out, and the rules
+  and their points share one page with the total. The last step summarises what will be compared, the cases, the test
+  databases, the grade and what students get. Spanish (tú), English and Portuguese. The pack format and the MCP tools
+  do not change.
+- Exercises with a database, in the wizard: one sentence explains why a test database is needed; the `.sql` scripts
+  next to the solution are found and filled in by themselves (by the database or the tables each script names, the
+  ones that create tables first, hidden-case scripts apart); **Test connection** only creates and drops the test
+  database and says why it fails; **Generate the script from the current database…** reads the original database
+  **read-only** (read-only connection, only `SELECT`/`SHOW` and JDBC metadata, a read-only user is enough) and writes a
+  script with its tables in foreign-key order and their rows — the tables the solution loads go empty — for the
+  teacher to review; the password is the one typed, kept in memory only.
+- A case that does not finish cleanly (`finished_with_errors`, `init_failed`, `solution_failed` when creating a pack)
+  now shows the whole Kettle error of the first step that failed — «Step»: message: cause, without the stack trace —
+  instead of a single, often empty, line.
+
+### Fixed
+
+- Exercise grader: a solution or submission with **Join Rows (cartesian product)** or **Group by** («include all
+  rows») failed inside the grader with «Error creating temporary file(s)»: the sandbox pointed their temporary folder
+  to `${Internal.Entry.Current.Directory}/tmp`, which at run time is a `file:///` URL that `java.io.File` does not
+  understand (Sort rows, which uses VFS, worked). The temporary folder of Sort rows, Join Rows, Group by and Blocking
+  step now always goes to the local path of the case's `tmp/` folder, which exists, counts towards `max_output_mb`
+  and is deleted with the sandbox, whatever the submission had (`%%java.io.tmpdir%%`, a folder of the student's or
+  nothing).
+
+### Tested
+
+- `PruebaDiff`: pairs of versions of the skill examples modified in the test (condition, rename with and
+  without other changes, not-a-rename, positions, field lists, parameters and error handling, multi-line SQL,
+  notes, jobs) and passwords and users never present in text, Markdown, JSON or textconv.
+- `PruebaNormalizador`: on every example and pattern of the skill the normalizer is idempotent, the
+  semantic diff with the original is empty, Kettle loads the normalized file with the same `getXML()` except
+  the two volatile fields, validation gives the same remarks, and running every example and pattern job
+  gives the same results and output files; a Spoon save normalized is stable.
+- `PruebaDiffGit`: a throwaway git repository: `diff --rev`, two files, JSON, `textconv` wired to
+  `git diff` through `.gitattributes`, `normalize --check`, the pre-commit hook, `diff_documents` with
+  `path`, the changes section.
+- `PruebaDiffLienzo`: the badges of each side, the drawing with a recording GC, the painter extensions,
+  the Compare… dialog and the list of changes off screen.
 
 ## [0.6.2] - 2026-10-25
 

@@ -14,10 +14,11 @@ Hitachi Vantara. Pentaho is a trademark of Hitachi Vantara.
   entries with their default XML, an annotated guide to the ~45 most used steps, nine runnable examples
   and the errors Pan/Kitchen give (including the silent ones). It works on its own: without Spoon,
   Claude writes the file and checks it with Pan.
-- **MCP connection `pentaho`**: 73 tools (create/open/save, add/configure/connect steps and job
+- **MCP connection `pentaho`**: 88 tools (create/open/save, add/configure/connect steps and job
   entries, list output fields, validate, preview rows, run, database connections, parameters, a
   quality check, reports: HTML, PDF, Markdown and PowerPoint with lineage, data dictionary, run
-  metrics and technical quality, an exercise grader, class mode and robustness).
+  metrics and technical quality, an exercise grader, class mode, robustness, golden-dataset tests, a
+  semantic diff of versions, an ETL plan with a sketch on the canvas and team projects with CI).
 
 ## Quality
 

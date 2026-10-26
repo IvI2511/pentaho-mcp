@@ -106,8 +106,8 @@ perspectivas, con todo lo anterior a mano sin pedírselo a Claude: **Revisar cal
 hallazgos con cómo arreglarlos, clic en uno para ver su step en el lienzo, los arreglos automáticos con un
 solo Ctrl+Z, silenciar una regla donde es deliberada y una revisión profunda opcional que lee datos),
 **Robustecer…** (el plan con casillas, aplicarlo con un solo Ctrl+Z y la prueba con datos sucios con su
-veredicto), **Ordenar lienzo**, **Comparar…**, **Lección**, el cambio a Data Integration, Informes o Corrector y
-**Acerca de Pentaho Live**.
+veredicto), **Ordenar lienzo**, **Comparar…**, **Pruebas…**, **Lección**, **Diseño…**, **Hoja de mapeo…**,
+**Preparar proyecto…**, el cambio a Data Integration, Informes, Corrector o Diseño y **Acerca de Pentaho Live**.
 
 **Versiones.** Mira qué cambió entre dos versiones de una transformación o un job *por significado*, no como
 líneas de XML: steps añadidos, quitados o renombrados, `Filter rows: saldo > 1000 → saldo >= 1000`, listas de
@@ -174,7 +174,7 @@ flowchart LR
 ```
 
 - El **plugin de Spoon** es un plugin de ciclo de vida de Kettle. Cuando abre Spoon, levanta un servidor
-  MCP en `127.0.0.1:8765` con 80 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
+  MCP en `127.0.0.1:8765` con 88 herramientas y aplica cada cambio en el hilo de interfaz de Spoon,
   con deshacer. El mismo jar agrega las perspectivas **Informes** y **Corrector** al selector de
   perspectivas de Spoon.
 - El **plugin de Claude Code `pentaho-live`** conecta a Claude con ese servidor y suma la skill
@@ -266,6 +266,9 @@ Códigos de salida, problemas comunes y todos los pasos: [`INSTALL.md`](INSTALL.
 | Parámetros | Listar, definir y borrar parámetros |
 | Lienzo | Agregar notas, seleccionar steps, ordenar el lienzo, sacar una imagen del lienzo |
 | Versiones | Comparar una transformación o un job con su archivo guardado, una revisión de git u otro archivo por significado (steps, propiedades, saltos, conexiones sin contraseñas), en JSON, texto o Markdown, y marcarlo en el lienzo |
+| Pruebas | Congelar las salidas de una transformación como datasets dorados, correr una prueba o todas en una JVM aparte y leer la diferencia fila a fila de una que falla, listar las pruebas de una transformación |
+| Diseño | Escribir y revisar un plano ETL, mostrar sus diagramas de flujo de datos, de actividad y de componentes, construirlo como boceto de marcadores y completarlos uno a uno, comparar plano y lienzo, exportar e importar la hoja de mapeo origen-destino |
+| Proyectos en equipo | Mostrar el perfil del linter del proyecto, preparar un proyecto de equipo (carpetas, `.gitignore`, perfil, README, un workflow de GitHub Actions con el linter, las pruebas y el diff semántico de cada pull request) |
 | Corrector | Armar un pack de ejercicio desde una solución (casos, casos ocultos, salida esperada, reglas, rúbrica, copia para alumnos), validarlo, corregir una entrega o una carpeta entera en JVMs aparte, seguir el lote, y obtener la planilla y la devolución de cada alumno |
 | Informes | Armar el informe completo de una transformación o un job (HTML, PDF, Markdown, PowerPoint, Word, Excel, imágenes, JSON), solo o con varios documentos combinados, con linaje, diccionario de datos, métricas, calidad técnica y una narrativa opcional; leer sus datos; abrirlo en la perspectiva Informes de Spoon; un informe rápido en Markdown con diagrama Mermaid |
 
