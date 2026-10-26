@@ -41,9 +41,9 @@ import io.github.ivi2511.pentahomcp.corrector.modelo.TablaSalida;
  */
 @JsonInclude( JsonInclude.Include.NON_EMPTY )
 @JsonIgnoreProperties( ignoreUnknown = true )
-@JsonPropertyOrder( { "$schema", "format", "name", "description", "transformation", "environment", "datasets", "case",
-  "test_databases", "database_safety", "outputs", "tables", "golden_csv", "tweaks", "run_whole_transformation",
-  "created_with" } )
+@JsonPropertyOrder( { "$schema", "format", "name", "description", "transformation", "job", "environment", "datasets",
+  "case", "test_databases", "database_safety", "outputs", "tables", "files", "golden_csv", "tweaks",
+  "run_whole_transformation", "created_with" } )
 public final class DefPrueba {
 
   public static final String FORMATO = "pentaho-live-test/1";
@@ -64,6 +64,13 @@ public final class DefPrueba {
   /** La .ktr que se prueba, relativa a la carpeta de la prueba ("../06_kpi.ktr"). */
   @JsonProperty( "transformation" )
   public String transformacion;
+  /**
+   * La .kjb que se prueba (0.7.1), en lugar de {@link #transformacion}: el job corre entero en la JVM de la prueba
+   * (como Kitchen) y se comparan las salidas de los steps de sus transformaciones ({@link Salida#entrada}), las
+   * tablas de las bases de prueba y los archivos que deja ({@link #archivos}).
+   */
+  @JsonProperty( "job" )
+  public String job;
   @JsonProperty( "environment" )
   @JsonMerge
   public Entorno entorno = new Entorno();
@@ -89,6 +96,9 @@ public final class DefPrueba {
   /** Tablas de las bases de prueba que se leen despues de correr y se comparan con {@code <expected>/<tabla>.csv}. */
   @JsonProperty( "tables" )
   public List<TablaSalida> tablas = new ArrayList<>();
+  /** Archivos que deja la corrida (0.7.1): se leen como CSV y se comparan con {@code <expected>/<file>}. */
+  @JsonProperty( "files" )
+  public List<ArchivoSalida> archivos = new ArrayList<>();
   /** Como estan escritos los CSV dorados (por defecto: coma, comillas, encabezado, UTF-8). */
   @JsonProperty( "golden_csv" )
   @JsonMerge
@@ -144,6 +154,17 @@ public final class DefPrueba {
     /** Filas capturadas como mucho por salida (y leidas de cada dataset). */
     @JsonProperty( "max_rows" )
     public long maxFilas = 1000000;
+    /**
+     * Copiar al KETTLE_HOME temporal de la JVM de la prueba las conexiones del {@code shared.xml} y las variables del
+     * {@code kettle.properties} del usuario (0.7.1); null = si (por defecto). false = KETTLE_HOME vacio.
+     */
+    @JsonProperty( "user_kettle_home" )
+    public Boolean kettleDelUsuario;
+
+    /** Si se copia el KETTLE_HOME del usuario (por defecto si). */
+    public boolean usaKettleDelUsuario() {
+      return kettleDelUsuario == null || kettleDelUsuario;
+    }
 
     /** La politica del corrector con este entorno (para lanzar la JVM con los mismos -D que una correccion). */
     public PoliticaPack politica() {
@@ -162,6 +183,9 @@ public final class DefPrueba {
   @JsonIgnoreProperties( ignoreUnknown = true )
   public static final class Dataset {
 
+    /** En una prueba de job: la entrada Transformation (o el nombre de su .ktr) donde esta el step. */
+    @JsonProperty( "job_entry" )
+    public String entrada;
     @JsonProperty( "step" )
     public String step;
     /** CSV del dataset, relativo a la prueba ("datasets/kpi/leer_ventas.csv"): coma, comillas, encabezado, UTF-8. */
@@ -222,6 +246,9 @@ public final class DefPrueba {
   @JsonIgnoreProperties( ignoreUnknown = true )
   public static final class Salida {
 
+    /** En una prueba de job: la entrada Transformation (o el nombre de su .ktr) donde esta el step. */
+    @JsonProperty( "job_entry" )
+    public String entrada;
     @JsonProperty( "step" )
     public String step;
     /** CSV dorado relativo a la carpeta {@code expected} del caso; null = {@code <step limpio>.csv}. */
@@ -269,11 +296,16 @@ public final class DefPrueba {
     public static final String QUITAR = "remove_step";
     public static final String VARIABLE = "set_variable";
     public static final String PARAMETRO = "set_parameter";
+    /** Pruebas de job (0.7.1): la entrada del job no hace nada y sigue por su salto de exito (un Success). */
+    public static final String SALTAR_ENTRADA = "skip_entry";
     public static final List<String> TIPOS = Collections.unmodifiableList( Arrays.asList( SALTAR, QUITAR, VARIABLE,
-      PARAMETRO ) );
+      PARAMETRO, SALTAR_ENTRADA ) );
 
     @JsonProperty( "type" )
     public String tipo;
+    /** En una prueba de job: la entrada (skip_entry) o la entrada Transformation del step (skip_step, remove_step). */
+    @JsonProperty( "job_entry" )
+    public String entrada;
     @JsonProperty( "step" )
     public String step;
     @JsonProperty( "name" )
@@ -303,9 +335,74 @@ public final class DefPrueba {
       return a;
     }
 
+    public static Ajuste saltarEntrada( String entrada, String nota ) {
+      Ajuste a = new Ajuste();
+      a.tipo = SALTAR_ENTRADA;
+      a.entrada = entrada;
+      a.nota = nota;
+      return a;
+    }
+
     @JsonIgnore
     public boolean deStep() {
       return SALTAR.equals( tipo ) || QUITAR.equals( tipo );
+    }
+
+    @JsonIgnore
+    public boolean deEntrada() {
+      return SALTAR_ENTRADA.equals( tipo );
+    }
+  }
+
+  /**
+   * {@code files[]} (0.7.1): un archivo que deja la corrida (un job o una transformacion entera), leido como CSV con
+   * {@link #csv} y comparado con su dorado como la salida de un step. La ruta admite variables de la corrida
+   * ({@code ${Internal.Entry.Current.Directory}}, {@code ${PENTAHO_LIVE_TEST_DIR}}...); relativa, a la carpeta de la
+   * prueba. Si la corrida no lo escribio (no cambio), la prueba falla: nunca se compara un archivo viejo.
+   */
+  @JsonInclude( JsonInclude.Include.NON_EMPTY )
+  @JsonIgnoreProperties( ignoreUnknown = true )
+  public static final class ArchivoSalida {
+
+    @JsonProperty( "path" )
+    public String ruta;
+    /** CSV dorado relativo a la carpeta {@code expected} del caso; null = {@code <nombre del archivo limpio>.csv}. */
+    @JsonProperty( "file" )
+    public String archivo;
+    /** Como esta escrito el archivo (por defecto como los dorados: coma, comillas, encabezado, UTF-8). */
+    @JsonProperty( "csv" )
+    public Pack.FormatoCsv csv;
+    @JsonProperty( "columns" )
+    public List<Pack.Columna> columnas = new ArrayList<>();
+    @JsonProperty( "compare" )
+    @JsonMerge
+    public OpcionesComparar comparar = compararPorDefecto();
+    @JsonProperty( "ignore_columns" )
+    public List<String> ignorar = new ArrayList<>();
+
+    public ArchivoSalida() {
+    }
+
+    public ArchivoSalida( String ruta ) {
+      this.ruta = ruta;
+    }
+
+    /** El nombre que lo identifica en el resultado: el nombre del archivo de la ruta. */
+    @JsonIgnore
+    public String nombre() {
+      String r = ruta == null ? "" : ruta.trim().replace( '\\', '/' );
+      int i = r.lastIndexOf( '/' );
+      return i < 0 ? r : r.substring( i + 1 );
+    }
+
+    /** Como Salida, para reusar la comparacion (columnas ignoradas). */
+    @JsonIgnore
+    public Salida comoSalida() {
+      Salida s = new Salida( nombre() );
+      s.columnas = columnas;
+      s.comparar = comparar;
+      s.ignorar = ignorar;
+      return s;
     }
   }
 
@@ -384,6 +481,32 @@ public final class DefPrueba {
         t.completar();
       }
     }
+    if ( archivos == null ) {
+      archivos = new ArrayList<>();
+    }
+    for ( ArchivoSalida a : archivos ) {
+      if ( a == null ) {
+        continue;
+      }
+      if ( a.columnas == null ) {
+        a.columnas = new ArrayList<>();
+      }
+      if ( a.ignorar == null ) {
+        a.ignorar = new ArrayList<>();
+      }
+      if ( a.comparar == null ) {
+        a.comparar = compararPorDefecto();
+      }
+      if ( a.comparar.columnasClave == null ) {
+        a.comparar.columnasClave = new ArrayList<>();
+      }
+      if ( a.comparar.formatosFecha == null ) {
+        a.comparar.formatosFecha = new ArrayList<>();
+      }
+      if ( a.comparar.columnasDeMas == null ) {
+        a.comparar.columnasDeMas = OpcionesComparar.EXTRA_RESTAR;
+      }
+    }
     if ( csvDorado == null ) {
       csvDorado = csvPorDefecto();
     }
@@ -414,6 +537,30 @@ public final class DefPrueba {
     }
     p.salida.csvEsperado = csvDorado == null ? csvPorDefecto() : csvDorado;
     return p.completar();
+  }
+
+  /** Es una prueba de job ({@link #job}). */
+  @JsonIgnore
+  public boolean esJob() {
+    return job != null && !job.trim().isEmpty();
+  }
+
+  /** Entre la entrada del job y el step en los nombres completos ("Cargar ventas :: Leer ventas"). */
+  public static final String SEPARADOR = " :: ";
+
+  /** "Cargar ventas :: Leer ventas" en una prueba de job; el step solo si no hay entrada. */
+  public static String nombreCompleto( String entrada, String step ) {
+    return entrada == null || entrada.trim().isEmpty() ? step : entrada.trim() + SEPARADOR + step;
+  }
+
+  /** Separa "entrada :: step" (como lo escriben test_create y la ventana); {null, step} si no tiene separador. */
+  public static String[] partir( String s ) {
+    if ( s == null ) {
+      return new String[] { null, null };
+    }
+    int i = s.indexOf( "::" );
+    return i < 0 ? new String[] { null, s.trim() } : new String[] { s.substring( 0, i ).trim(), s.substring( i + 2 )
+      .trim() };
   }
 
   /** La salida de ese step (sin mayusculas), o null. */

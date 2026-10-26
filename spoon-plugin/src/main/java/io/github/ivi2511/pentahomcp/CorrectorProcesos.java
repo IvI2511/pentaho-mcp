@@ -98,6 +98,12 @@ final class CorrectorProcesos implements Closeable {
     List<String> argsPadre;
     /** -D extra para la hija (pruebas). */
     final Map<String, String> propiedades = new LinkedHashMap<String, String>();
+    /**
+     * (0.7.1) La carpeta {@code .kettle} del usuario cuyas conexiones de shared.xml y kettle.properties se copian al
+     * KETTLE_HOME temporal de la hija ({@link PruebasKettleHome}); null = KETTLE_HOME vacio. Las pruebas de ETL la
+     * ponen por defecto; el corrector no (las entregas corren con un KETTLE_HOME vacio).
+     */
+    File kettleDelUsuario;
     /** Margen del vigilante por entrega sobre timeout_s × casos. */
     long margenMs = 60000;
     /** Si es mayor que 0, reemplaza al limite por entrega (timeout_s × casos + margen). Pruebas. */
@@ -687,7 +693,7 @@ final class CorrectorProcesos implements Closeable {
 
     File log = new File( dirLogs, "worker-" + w.ranura + ".log" );
     w.proceso = lanzarHija( comandoBase, dw, CorrectorMain.class.getName(), Collections.singletonList(
-      trabajo.getAbsolutePath() ), log, w.id, entornoBases );
+      trabajo.getAbsolutePath() ), log, w.id, entornoBases, op.kettleDelUsuario );
     w.lanzado = System.currentTimeMillis();
     lanzados.add( w.id );
   }
@@ -710,6 +716,15 @@ final class CorrectorProcesos implements Closeable {
    */
   static Process lanzarHija( List<String> comandoBase, File dirHija, String clase, List<String> args, File log,
                              String id, Map<String, String> entornoExtra ) throws IOException {
+    return lanzarHija( comandoBase, dirHija, clase, args, log, id, entornoExtra, null );
+  }
+
+  /**
+   * Igual, y con {@code kettleDelUsuario} (una carpeta {@code .kettle}) copia sus conexiones de shared.xml y su
+   * kettle.properties al KETTLE_HOME de la hija antes de lanzarla (0.7.1, las pruebas de ETL).
+   */
+  static Process lanzarHija( List<String> comandoBase, File dirHija, String clase, List<String> args, File log,
+                             String id, Map<String, String> entornoExtra, File kettleDelUsuario ) throws IOException {
     File kettleHome = new File( dirHija, "kettle-home" );
     File home = new File( dirHija, "home" );
     File metastore = new File( dirHija, "metastore" );
@@ -719,6 +734,8 @@ final class CorrectorProcesos implements Closeable {
         throw new IOException( "cannot create " + d );
       }
     }
+    List<String> copiado = kettleDelUsuario == null ? Collections.<String>emptyList() : PruebasKettleHome.copiar(
+      kettleDelUsuario, new File( kettleHome, ".kettle" ) );
     List<String> cmd = new ArrayList<String>( comandoBase );
     cmd.add( "-Djava.io.tmpdir=" + tmp.getAbsolutePath() );
     cmd.add( "-DKETTLE_HOME=" + kettleHome.getAbsolutePath() );
@@ -752,6 +769,9 @@ final class CorrectorProcesos implements Closeable {
     }
     escribirLinea( log, "=== " + new SimpleDateFormat( "yyyy-MM-dd HH:mm:ss", Locale.ROOT ).format( new Date() ) + " "
       + id + ": " + String.join( " ", cmd ) );
+    if ( !copiado.isEmpty() ) {
+      escribirLinea( log, "=== " + id + ": user KETTLE_HOME copied: " + String.join( ", ", copiado ) );
+    }
     pb.redirectErrorStream( true );
     pb.redirectOutput( ProcessBuilder.Redirect.appendTo( log ) );
     Process p = pb.start();

@@ -123,20 +123,32 @@ final class PruebasMotor {
     if ( !DefPrueba.FORMATO.equals( d.formato ) ) {
       l.add( "format must be " + DefPrueba.FORMATO + " (is " + d.formato + ")" );
     }
-    if ( vacio( d.transformacion ) ) {
+    if ( vacio( d.transformacion ) && !d.esJob() ) {
       l.add( "'transformation' is missing" );
     }
-    if ( d.salidas.isEmpty() && d.tablas.isEmpty() ) {
-      l.add( "nothing to compare: 'outputs' and 'tables' are empty" );
+    if ( !vacio( d.transformacion ) && d.esJob() ) {
+      l.add( "a test has 'transformation' or 'job', not both" );
+    }
+    if ( d.salidas.isEmpty() && d.tablas.isEmpty() && d.archivos.isEmpty() ) {
+      l.add( "nothing to compare: 'outputs', 'tables' and 'files' are empty" );
     }
     for ( DefPrueba.Salida s : d.salidas ) {
       if ( s == null || vacio( s.step ) ) {
         l.add( "an output without 'step'" );
+      } else if ( d.esJob() && vacio( s.entrada ) ) {
+        l.add( "the output '" + s.step + "' needs 'job_entry' (the Transformation entry of the job that runs it)" );
       }
     }
     for ( DefPrueba.Dataset ds : d.datasets ) {
       if ( ds == null || vacio( ds.step ) || vacio( ds.archivo ) ) {
         l.add( "a dataset without 'step' or 'file'" );
+      } else if ( d.esJob() && vacio( ds.entrada ) ) {
+        l.add( "the dataset of '" + ds.step + "' needs 'job_entry'" );
+      }
+    }
+    for ( DefPrueba.ArchivoSalida a : d.archivos ) {
+      if ( a == null || vacio( a.ruta ) ) {
+        l.add( "a file without 'path'" );
       }
     }
     for ( DefPrueba.Ajuste a : d.ajustes ) {
@@ -144,7 +156,11 @@ final class PruebasMotor {
         l.add( "unknown tweak type " + ( a == null ? null : a.tipo ) + " (use " + DefPrueba.Ajuste.TIPOS + ")" );
       } else if ( a.deStep() && vacio( a.step ) ) {
         l.add( a.tipo + " without 'step'" );
-      } else if ( !a.deStep() && vacio( a.nombre ) ) {
+      } else if ( a.deStep() && d.esJob() && vacio( a.entrada ) ) {
+        l.add( a.tipo + " '" + a.step + "' needs 'job_entry'" );
+      } else if ( a.deEntrada() && ( vacio( a.entrada ) || !d.esJob() ) ) {
+        l.add( a.tipo + ( d.esJob() ? " without 'job_entry'" : " is only for job tests" ) );
+      } else if ( !a.deStep() && !a.deEntrada() && vacio( a.nombre ) ) {
         l.add( a.tipo + " without 'name'" );
       }
     }
@@ -172,10 +188,36 @@ final class PruebasMotor {
     }
   }
 
+  /**
+   * Escribe una prueba sin el ruido de los valores por defecto del caso del pack (0.7.1): {@code weight: 1.0} y
+   * {@code hidden: false} no dicen nada en una prueba (el formato del pack los sigue leyendo y escribiendo igual).
+   */
+  static void guardar( DefPrueba d, File f ) throws IOException {
+    com.fasterxml.jackson.databind.node.ObjectNode n = CorrectorJson.mapper().valueToTree( d );
+    com.fasterxml.jackson.databind.JsonNode caso = n.get( "case" );
+    if ( caso instanceof com.fasterxml.jackson.databind.node.ObjectNode ) {
+      com.fasterxml.jackson.databind.node.ObjectNode c = (com.fasterxml.jackson.databind.node.ObjectNode) caso;
+      if ( c.has( "weight" ) && c.get( "weight" ).asDouble() == 1.0 ) {
+        c.remove( "weight" );
+      }
+      if ( c.has( "hidden" ) && !c.get( "hidden" ).asBoolean() ) {
+        c.remove( "hidden" );
+      }
+    }
+    CorrectorJson.guardar( n, f );
+  }
+
+  /** El CSV dorado de un archivo: {@code <expected>/<file>} o {@code <expected>/file_<nombre limpio>.csv}. */
+  static File dorado( File dir, DefPrueba d, DefPrueba.ArchivoSalida a ) {
+    File esperado = resolver( dir, d.caso.esperado );
+    return new File( esperado, vacio( a.archivo ) ? "file_" + DefPrueba.archivoDe( a.nombre() ) + ".csv" : a.archivo );
+  }
+
   /** El CSV dorado de una salida: {@code <expected>/<file>} o {@code <expected>/<step limpio>.csv}. */
   static File dorado( File dir, DefPrueba d, DefPrueba.Salida s ) {
     File esperado = resolver( dir, d.caso.esperado );
-    return new File( esperado, vacio( s.archivo ) ? DefPrueba.archivoDe( s.step ) + ".csv" : s.archivo );
+    return new File( esperado, vacio( s.archivo ) ? DefPrueba.archivoDe( vacio( s.entrada ) ? s.step : s.entrada + "_"
+      + s.step ) + ".csv" : s.archivo );
   }
 
   // ================================================================ correr
@@ -208,6 +250,10 @@ final class PruebasMotor {
   }
 
   private static void correr( DefPrueba d, File dir, Opciones op, ResultadoPrueba r ) throws Exception {
+    if ( d.esJob() ) {
+      PruebasJob.correr( d, dir, op, r );
+      return;
+    }
     File original = resolver( dir, d.transformacion );
     r.transformacion = original.getPath();
     File ktr = op.ktr != null ? op.ktr : original;
@@ -226,7 +272,7 @@ final class PruebasMotor {
       s.problema = ResultadoPrueba.Resumen.SIN_STEP;
       r.salidas.add( s );
     }
-    if ( p.reales.isEmpty() && d.tablas.isEmpty() ) {
+    if ( p.reales.isEmpty() && d.tablas.isEmpty() && d.archivos.isEmpty() ) {
       r.estado = ResultadoPrueba.FALLO;
       r.mensaje = "None of the captured steps is in the transformation any more: " + p.faltan;
       rc.corrida.estado = ResultadoCaso.SIN_STEP_DE_SALIDA;
@@ -242,12 +288,114 @@ final class PruebasMotor {
       r.mensaje = "Cancelled";
       return;
     }
-    boolean corrio = rc.corrioBien();
-    for ( DefPrueba.Salida s : d.salidas ) {
-      if ( p.faltan.contains( s.step ) ) {
+    final Preparada pp = p;
+    comparar( d, dir, r, rc, rc.corrioBien(), "transformation", new Capturas() {
+      @Override
+      public String nombre( DefPrueba.Salida s ) {
+        return pp.faltan.contains( s.step ) ? null : pp.real( s.step );
+      }
+
+      @Override
+      public CorrectorTabla tabla( DefPrueba.Salida s ) {
+        return pp.capturada( s.step );
+      }
+
+      @Override
+      public CorrectorBases.Captura tabla( TablaSalida t ) {
+        return pp.tablas.get( t.clave() );
+      }
+
+      @Override
+      public ArchivoLeido archivo( DefPrueba.ArchivoSalida a ) {
+        return pp.archivos.get( a );
+      }
+    } );
+  }
+
+  /** Lo que la corrida dejo para comparar (una transformacion o un job). */
+  interface Capturas {
+    /** El nombre real de la salida (para el resultado), o null si el step no esta (ya se informo). */
+    String nombre( DefPrueba.Salida s );
+
+    CorrectorTabla tabla( DefPrueba.Salida s );
+
+    CorrectorBases.Captura tabla( TablaSalida t );
+
+    /** El archivo leido despues de correr, o null si no se llego a leer. */
+    ArchivoLeido archivo( DefPrueba.ArchivoSalida a );
+  }
+
+  /** Un archivo de {@code files[]} despues de correr: sus filas, o por que no se puede comparar. */
+  static final class ArchivoLeido {
+    /** La ruta resuelta. */
+    File archivo;
+    CorrectorTabla tabla;
+    /** Por que no (no existe, no lo escribio la corrida, no se pudo leer), en ingles; null = se leyo. */
+    String problema;
+  }
+
+  /** Antes de correr: la ruta resuelta de cada archivo y su estado (fecha y tamaño; null = no existe). */
+  static Map<DefPrueba.ArchivoSalida, Object[]> estadoArchivos( DefPrueba d, File dir,
+                                                                 org.pentaho.di.core.variables.VariableSpace vars ) {
+    Map<DefPrueba.ArchivoSalida, Object[]> m = new LinkedHashMap<DefPrueba.ArchivoSalida, Object[]>();
+    for ( DefPrueba.ArchivoSalida a : d.archivos ) {
+      File f = rutaArchivo( dir, a, vars );
+      m.put( a, new Object[] { f, f.isFile() ? new long[] { f.lastModified(), f.length() } : null } );
+    }
+    return m;
+  }
+
+  /** La ruta de un archivo de files[] con las variables de la corrida; relativa, a la carpeta de la prueba. */
+  static File rutaArchivo( File dir, DefPrueba.ArchivoSalida a, org.pentaho.di.core.variables.VariableSpace vars ) {
+    String r = a.ruta == null ? "" : a.ruta.trim();
+    if ( vars != null ) {
+      r = vars.environmentSubstitute( r );
+    }
+    r = r.replaceFirst( "^(?i)file:/+(?=[A-Za-z]:)", "" ).replaceFirst( "^(?i)file://", "" );
+    return resolver( dir, r );
+  }
+
+  /** Despues de correr: cada archivo leido como CSV, si la corrida lo escribio (existe y cambio). */
+  static Map<DefPrueba.ArchivoSalida, ArchivoLeido> leerArchivos( DefPrueba d, Map<DefPrueba.ArchivoSalida,
+    Object[]> antes ) {
+    Map<DefPrueba.ArchivoSalida, ArchivoLeido> m = new LinkedHashMap<DefPrueba.ArchivoSalida, ArchivoLeido>();
+    for ( DefPrueba.ArchivoSalida a : d.archivos ) {
+      Object[] x = antes.get( a );
+      if ( x == null ) {
         continue;
       }
-      ResultadoPrueba.Resumen x = new ResultadoPrueba.Resumen( p.real( s.step ), ResultadoPrueba.Resumen.STEP );
+      ArchivoLeido l = new ArchivoLeido();
+      l.archivo = (File) x[ 0 ];
+      long[] previo = (long[]) x[ 1 ];
+      if ( !l.archivo.isFile() ) {
+        l.problema = "the run did not write " + l.archivo;
+      } else if ( previo != null && previo[ 0 ] == l.archivo.lastModified() && previo[ 1 ] == l.archivo.length() ) {
+        l.problema = "the run did not change " + l.archivo + " (an old file is never compared)";
+      } else {
+        try {
+          l.tabla = CorrectorTabla.esperada( l.archivo, a.csv == null ? DefPrueba.csvPorDefecto() : a.csv,
+            nombresColumnas( a.columnas ) );
+        } catch ( Exception e ) {
+          l.problema = "cannot read " + l.archivo + ": " + RunMotor.primeraLinea( e );
+        }
+      }
+      m.put( a, l );
+    }
+    return m;
+  }
+
+  /**
+   * Compara lo capturado con los dorados (salidas de steps, tablas y archivos), arma el resumen y da el veredicto.
+   * {@code que}: "transformation" o "job" (para el mensaje de una corrida que fallo).
+   */
+  static void comparar( DefPrueba d, File dir, ResultadoPrueba r, ResultadoCaso rc, boolean corrio, String que,
+                        Capturas cap ) throws Exception {
+    for ( DefPrueba.Salida s : d.salidas ) {
+      String nombre = cap.nombre( s );
+      if ( nombre == null ) {
+        continue;
+      }
+      ResultadoPrueba.Resumen x = new ResultadoPrueba.Resumen( nombre, ResultadoPrueba.Resumen.STEP );
       File dorado = dorado( dir, d, s );
       x.dorado = relativa( dir, dorado );
       r.salidas.add( x );
@@ -259,7 +407,7 @@ final class PruebasMotor {
         x.problema = ResultadoPrueba.Resumen.SIN_DORADO;
         continue;
       }
-      CorrectorTabla real = PruebasDatasets.sin( p.capturada( s.step ), s );
+      CorrectorTabla real = PruebasDatasets.sin( cap.tabla( s ), s );
       CorrectorTabla esp = PruebasDatasets.sin( CorrectorTabla.esperada( dorado, d.csvDorado, nombresColumnas(
         s.columnas ) ), s );
       List<Aviso> avisos = new ArrayList<Aviso>();
@@ -277,8 +425,8 @@ final class PruebasMotor {
       File dorado = new File( resolver( dir, d.caso.esperado ), t.archivo() );
       x.dorado = relativa( dir, dorado );
       r.salidas.add( x );
-      CorrectorBases.Captura cap = p.tablas.get( t.clave() );
-      if ( !corrio || cap == null ) {
+      CorrectorBases.Captura ct = cap.tabla( t );
+      if ( !corrio || ct == null ) {
         x.problema = ResultadoPrueba.Resumen.SIN_CORRIDA;
         continue;
       }
@@ -286,14 +434,14 @@ final class PruebasMotor {
         x.problema = ResultadoPrueba.Resumen.SIN_DORADO;
         continue;
       }
-      if ( cap.falta != null ) {
-        rc.avisos.add( new Aviso( CorrectorMotor.AVISO_SIN_TABLA, t.nombre + ": " + cap.falta ) );
+      if ( ct.falta != null ) {
+        rc.avisos.add( new Aviso( CorrectorMotor.AVISO_SIN_TABLA, t.nombre + ": " + ct.falta ) );
       }
       CorrectorTabla esp = CorrectorTabla.esperada( dorado, d.csvDorado, nombresColumnas( t.columnas ) );
       OpcionesComparar oc = DefPrueba.compararPorDefecto();
       oc.columnasClave = new ArrayList<String>( t.columnasClave );
       List<Aviso> avisos = new ArrayList<Aviso>();
-      Comparacion c = CorrectorComparar.comparar( esp, cap.tabla, t.columnas, oc, d.entorno.politica().localeJava(),
+      Comparacion c = CorrectorComparar.comparar( esp, ct.tabla, t.columnas, oc, d.entorno.politica().localeJava(),
         avisos );
       for ( Aviso a : avisos ) {
         a.detalle = t.nombre + ": " + ( a.detalle == null ? "" : a.detalle );
@@ -302,18 +450,51 @@ final class PruebasMotor {
       rc.tablas.add( new ResultadoCaso.ComparacionTabla( t.nombre, t.conexion, c ) );
       resumir( x, c, oc );
     }
+    for ( DefPrueba.ArchivoSalida a : d.archivos ) {
+      ResultadoPrueba.Resumen x = new ResultadoPrueba.Resumen( a.nombre(), ResultadoPrueba.Resumen.ARCHIVO );
+      File dorado = dorado( dir, d, a );
+      x.dorado = relativa( dir, dorado );
+      r.salidas.add( x );
+      ArchivoLeido l = cap.archivo( a );
+      if ( !corrio || l == null ) {
+        x.problema = ResultadoPrueba.Resumen.SIN_CORRIDA;
+        continue;
+      }
+      if ( !dorado.isFile() ) {
+        x.problema = ResultadoPrueba.Resumen.SIN_DORADO;
+        continue;
+      }
+      if ( l.problema != null ) {
+        x.problema = ResultadoPrueba.Resumen.SIN_ESCRIBIR;
+        rc.avisos.add( new Aviso( CorrectorMotor.AVISO_SIN_TABLA, a.nombre() + ": " + l.problema ) );
+        continue;
+      }
+      DefPrueba.Salida comoSalida = a.comoSalida();
+      CorrectorTabla real = PruebasDatasets.sin( l.tabla, comoSalida );
+      CorrectorTabla esp = PruebasDatasets.sin( CorrectorTabla.esperada( dorado, d.csvDorado, nombresColumnas(
+        a.columnas ) ), comoSalida );
+      List<Aviso> avisos = new ArrayList<Aviso>();
+      Comparacion c = CorrectorComparar.comparar( esp, real, a.columnas, a.comparar, d.entorno.politica()
+        .localeJava(), avisos );
+      for ( Aviso av : avisos ) {
+        av.detalle = a.nombre() + ": " + ( av.detalle == null ? "" : av.detalle );
+        rc.avisos.add( av );
+      }
+      rc.tablas.add( new ResultadoCaso.ComparacionTabla( a.nombre(), null, c ) );
+      resumir( x, c, a.comparar );
+    }
     if ( !rc.tablas.isEmpty() ) {
       rc.comparacion = CorrectorComparar.juntar( rc.tablas );
     }
-    veredicto( r, rc, corrio );
+    veredicto( r, rc, corrio, que );
   }
 
   /** passed / failed y el mensaje de por que. */
-  private static void veredicto( ResultadoPrueba r, ResultadoCaso rc, boolean corrio ) {
+  private static void veredicto( ResultadoPrueba r, ResultadoCaso rc, boolean corrio, String que ) {
     if ( !corrio ) {
       r.estado = ResultadoPrueba.FALLO;
       String det = rc.corrida.detalle == null ? "" : ": " + rc.corrida.detalle;
-      r.mensaje = "The transformation did not finish cleanly (" + rc.corrida.estado + ( rc.corrida.errores != null
+      r.mensaje = "The " + que + " did not finish cleanly (" + rc.corrida.estado + ( rc.corrida.errores != null
         && rc.corrida.errores > 0 ? ", " + rc.corrida.errores + " errors" : "" ) + ")" + det;
       return;
     }
@@ -326,6 +507,8 @@ final class PruebasMotor {
         mal.add( "'" + s.nombre + "' is no longer in the transformation" );
       } else if ( ResultadoPrueba.Resumen.SIN_DORADO.equals( s.problema ) ) {
         mal.add( "'" + s.nombre + "' has no golden file (" + s.dorado + ")" );
+      } else if ( ResultadoPrueba.Resumen.SIN_ESCRIBIR.equals( s.problema ) ) {
+        mal.add( "the file '" + s.nombre + "' was not written by the run" );
       } else {
         List<String> q = new ArrayList<String>();
         if ( s.columnasFaltan != null && !s.columnasFaltan.isEmpty() ) {
@@ -398,6 +581,12 @@ final class PruebasMotor {
     /** Tablas leidas despues de correr (clave de TablaSalida). */
     final Map<String, CorrectorBases.Captura> tablas = new LinkedHashMap<String, CorrectorBases.Captura>();
     List<TablaSalida> tablasPedidas = new ArrayList<TablaSalida>();
+    /** La carpeta de la prueba (rutas de files[]). */
+    File dir;
+    DefPrueba def;
+    /** Los archivos de files[] leidos despues de la ultima corrida. */
+    final Map<DefPrueba.ArchivoSalida, ArchivoLeido> archivos = new LinkedHashMap<DefPrueba.ArchivoSalida,
+      ArchivoLeido>();
     long timeoutMs;
     long maxFilas;
     int veces = 1;
@@ -442,6 +631,8 @@ final class PruebasMotor {
     }
     tm.setInternalKettleVariables();
     p.tm = tm;
+    p.dir = dir;
+    p.def = d;
     p.timeoutMs = Math.max( 1, d.entorno.timeoutSeg ) * 1000L;
     p.maxFilas = d.entorno.maxFilas <= 0 ? Long.MAX_VALUE : d.entorno.maxFilas;
     p.veces = d.caso == null ? 1 : d.caso.vecesQueCorre();
@@ -469,7 +660,7 @@ final class PruebasMotor {
       }
     }
     // solo lo que llega a las capturas (como una vista previa)
-    if ( !d.todaLaTransformacion && d.tablas.isEmpty() && !objetivos.isEmpty() ) {
+    if ( !d.todaLaTransformacion && d.tablas.isEmpty() && d.archivos.isEmpty() && !objetivos.isEmpty() ) {
       int antes = tm.nrSteps();
       Set<String> nombresAntes = nombresSteps( tm );
       RunMotor.recortar( tm, objetivos );
@@ -516,45 +707,8 @@ final class PruebasMotor {
         }
         continue;
       }
-      StepMeta sm = buscar( tm, a.step );
-      if ( sm == null ) {
-        notas.add( a.tipo + " '" + a.step + "' ignored: the step is not in the copy that runs" );
-        continue;
-      }
-      if ( p.inyectar.containsKey( sm.getName() ) ) {
-        notas.add( a.tipo + " '" + a.step + "' ignored: the step is replaced by its dataset" );
-        continue;
-      }
-      if ( DefPrueba.Ajuste.SALTAR.equals( a.tipo ) ) {
-        dummy( tm, sm );
-        notas.add( "step '" + sm.getName() + "' skipped (rows pass through, nothing is written)" );
-      } else {
-        if ( objetivos.contains( sm ) ) {
-          throw new ToolError( "remove_step '" + a.step + "': it is a captured output" );
-        }
-        boolean destinoDeErrores = false;
-        for ( StepMeta x : tm.getSteps() ) {
-          destinoDeErrores |= x.getStepErrorMeta() != null && x.getStepErrorMeta().isEnabled() && x.getStepErrorMeta()
-            .getTargetStep() == sm;
-        }
-        if ( destinoDeErrores ) { // el manejo de errores sigue: las filas con error terminan aca y no siguen
-          dummy( tm, sm );
-          for ( int i = tm.nrTransHops() - 1; i >= 0; i-- ) {
-            if ( tm.getTransHop( i ).getFromStep() == sm ) {
-              tm.removeTransHop( i );
-            }
-          }
-          notas.add( "step '" + sm.getName() + "' removed: it receives error rows, so they end there" );
-          continue;
-        }
-        for ( int i = tm.nrTransHops() - 1; i >= 0; i-- ) {
-          TransHopMeta h = tm.getTransHop( i );
-          if ( h.getFromStep() == sm || h.getToStep() == sm ) {
-            tm.removeTransHop( i );
-          }
-        }
-        tm.removeStep( tm.indexOfStep( sm ) );
-        notas.add( "step '" + sm.getName() + "' removed with its hops" );
+      if ( a.deStep() ) {
+        ajustarStep( tm, a, objetivos, p.inyectar.keySet(), notas );
       }
     }
     for ( StepMeta s : tm.getSteps() ) {
@@ -569,10 +723,61 @@ final class PruebasMotor {
       } catch ( CorrectorBases.Falla f ) {
         throw new ToolError( f.getMessage() );
       }
-      redirigir( tm, pk, p.bases, notas );
+      Redireccion red = redirigir( tm.getDatabases(), usadas( tm ), pk, p.bases, notas );
+      esquemas( tm, p.bases, red, variablesDe( tm, p.variables ), notas );
+    } else {
+      avisarSinBases( tm, notas );
     }
     RunMotor.sinTablasDeLog( tm ); // una prueba no escribe en tablas de log
     return p;
+  }
+
+  /**
+   * Aplica un skip_step o remove_step a la copia que corre. {@code objetivos}: las salidas capturadas (no se pueden
+   * quitar); {@code inyectados}: los steps cambiados por su dataset (el ajuste no se aplica).
+   */
+  static void ajustarStep( TransMeta tm, DefPrueba.Ajuste a, java.util.Collection<StepMeta> objetivos,
+                           Set<String> inyectados, List<String> notas ) throws ToolError {
+    StepMeta sm = buscar( tm, a.step );
+    if ( sm == null ) {
+      notas.add( a.tipo + " '" + a.step + "' ignored: the step is not in the copy that runs" );
+      return;
+    }
+    if ( inyectados.contains( sm.getName() ) ) {
+      notas.add( a.tipo + " '" + a.step + "' ignored: the step is replaced by its dataset" );
+      return;
+    }
+    if ( DefPrueba.Ajuste.SALTAR.equals( a.tipo ) ) {
+      dummy( tm, sm );
+      notas.add( "step '" + sm.getName() + "' skipped (rows pass through, nothing is written)" );
+      return;
+    }
+    if ( objetivos.contains( sm ) ) {
+      throw new ToolError( "remove_step '" + a.step + "': it is a captured output" );
+    }
+    boolean destinoDeErrores = false;
+    for ( StepMeta x : tm.getSteps() ) {
+      destinoDeErrores |= x.getStepErrorMeta() != null && x.getStepErrorMeta().isEnabled() && x.getStepErrorMeta()
+        .getTargetStep() == sm;
+    }
+    if ( destinoDeErrores ) { // el manejo de errores sigue: las filas con error terminan aca y no siguen
+      dummy( tm, sm );
+      for ( int i = tm.nrTransHops() - 1; i >= 0; i-- ) {
+        if ( tm.getTransHop( i ).getFromStep() == sm ) {
+          tm.removeTransHop( i );
+        }
+      }
+      notas.add( "step '" + sm.getName() + "' removed: it receives error rows, so they end there" );
+      return;
+    }
+    for ( int i = tm.nrTransHops() - 1; i >= 0; i-- ) {
+      TransHopMeta h = tm.getTransHop( i );
+      if ( h.getFromStep() == sm || h.getToStep() == sm ) {
+        tm.removeTransHop( i );
+      }
+    }
+    tm.removeStep( tm.indexOfStep( sm ) );
+    notas.add( "step '" + sm.getName() + "' removed with its hops" );
   }
 
   /** Cambia el step por un Injector con su nombre y los campos del dataset; sin sus saltos de entrada. */
@@ -643,6 +848,22 @@ final class PruebasMotor {
    * corrector): tipo, servidor, puerto, la base de prueba, usuario, opciones del pack y la contraseña en memoria.
    */
   static void redirigir( TransMeta tm, Pack pk, CorrectorBases.Sesion s, List<String> notas ) {
+    redirigir( tm.getDatabases(), usadas( tm ), pk, s, notas );
+  }
+
+  /** Las variables de una copia con las de la prueba (para sustituir en esquemas y SQL). */
+  static org.pentaho.di.core.variables.VariableSpace variablesDe( org.pentaho.di.core.variables.VariableSpace base,
+                                                                  Map<String, String> extra ) {
+    org.pentaho.di.core.variables.Variables v = new org.pentaho.di.core.variables.Variables();
+    v.copyVariablesFrom( base );
+    for ( Map.Entry<String, String> e : extra.entrySet() ) {
+      v.setVariable( e.getKey(), e.getValue() );
+    }
+    return v;
+  }
+
+  /** Las conexiones que usan los steps (sin mayusculas). */
+  static Set<String> usadas( TransMeta tm ) {
     Set<String> usadas = new HashSet<String>();
     for ( StepMeta sm : tm.getSteps() ) {
       try {
@@ -655,8 +876,34 @@ final class PruebasMotor {
         // un step sin conexiones
       }
     }
-    Set<BaseDePrueba> emparejadas = new HashSet<BaseDePrueba>();
+    return usadas;
+  }
+
+  /** Sin bases de prueba: anota las conexiones que usan los steps (la prueba usa las de verdad). */
+  static void avisarSinBases( TransMeta tm, List<String> notas ) {
+    Set<String> u = usadas( tm );
     for ( DatabaseMeta dm : tm.getDatabases() ) {
+      if ( dm.getName() != null && u.contains( dm.getName().toLowerCase( Locale.ROOT ) ) ) {
+        notas.add( "connection '" + dm.getName() + "' is the real one (the test has no test_databases)" );
+      }
+    }
+  }
+
+  /** Lo que dejo {@link #redirigir}: conexion (sin mayusculas) → su base de prueba, y base original → de prueba. */
+  static final class Redireccion {
+    final Map<String, CorrectorBases.Destino> conexiones = new LinkedHashMap<String, CorrectorBases.Destino>();
+    final Map<String, String> originales = new LinkedHashMap<String, String>();
+  }
+
+  /**
+   * Apunta cada conexion con base de prueba a ella (las de una transformacion o las de un job). Las usadas sin base de
+   * prueba quedan con un WARNING en las notas.
+   */
+  static Redireccion redirigir( List<DatabaseMeta> conexiones, Set<String> usadas, Pack pk, CorrectorBases.Sesion s,
+                                List<String> notas ) {
+    Redireccion red = new Redireccion();
+    Set<BaseDePrueba> emparejadas = new HashSet<BaseDePrueba>();
+    for ( DatabaseMeta dm : conexiones ) {
       BaseDePrueba b = CorrectorBases.emparejar( pk, dm.getName(), dm.getPluginId(), dm.getHostname(), dm
         .getDatabaseName(), emparejadas, false );
       boolean usada = dm.getName() != null && usadas.contains( dm.getName().toLowerCase( Locale.ROOT ) );
@@ -682,7 +929,76 @@ final class PruebasMotor {
       nueva.getAttributes().putAll( conservar );
       dm.replaceMeta( nueva );
       dm.setName( nombre );
+      red.conexiones.put( nombre == null ? "" : nombre.toLowerCase( Locale.ROOT ), dest );
+      CorrectorBases.anotarOriginal( antes, dest, red.originales );
       notas.add( "connection '" + nombre + "' (" + antes + ") -> test database " + dest.describir() );
+    }
+    return red;
+  }
+
+  /**
+   * (0.7.1) Los esquemas y el SQL de los steps que usan una conexion redirigida, como en el corrector
+   * ({@link CorrectorSandbox#esquemasDeStep}): {@code schema} y {@code gym_dw.ventas} de la base original pasan a la
+   * de prueba. Lo que saldria de las bases de prueba (otro esquema de MySQL, SQL que nombra otra base o lee archivos
+   * del servidor) es un error: la prueba no corre.
+   */
+  static void esquemas( TransMeta tm, CorrectorBases.Sesion s, Redireccion red,
+                        org.pentaho.di.core.variables.VariableSpace vars, List<String> notas ) throws ToolError {
+    if ( red.conexiones.isEmpty() ) {
+      return;
+    }
+    Set<String> pruebas = s.nombres();
+    Set<String> prohibidas = s.prohibidas();
+    Map<String, String> ren = s.renombres();
+    for ( Map.Entry<String, String> o : red.originales.entrySet() ) {
+      ren.putIfAbsent( o.getKey(), o.getValue() );
+    }
+    for ( StepMeta sm : tm.getSteps() ) {
+      CorrectorBases.Destino d = null;
+      try {
+        for ( DatabaseMeta x : sm.getStepMetaInterface().getUsedDatabaseConnections() ) {
+          if ( d == null && x != null && x.getName() != null ) {
+            d = red.conexiones.get( x.getName().toLowerCase( Locale.ROOT ) );
+          }
+        }
+      } catch ( Throwable ignored ) {
+        // sin conexiones
+      }
+      if ( d == null ) {
+        continue;
+      }
+      org.w3c.dom.Element e;
+      try {
+        e = io.github.ivi2511.pentahomcp.lint.Nodos.parse( sm.getXML() );
+      } catch ( Exception ex ) {
+        continue;
+      }
+      List<String> redir = new ArrayList<String>();
+      List<CorrectorPolitica.Hallazgo> mal = new ArrayList<CorrectorPolitica.Hallazgo>();
+      CorrectorSandbox.esquemasDeStep( e, sm.getName(), sm.getStepID(), d, vars, pruebas, prohibidas, ren, redir,
+        mal );
+      if ( !mal.isEmpty() ) {
+        throw new ToolError( "The test does not run: " + mal.get( 0 ).detalle() + " (a test only reads and writes "
+          + "its test databases)" );
+      }
+      if ( redir.isEmpty() ) {
+        continue;
+      }
+      try {
+        StepMeta nuevo = new StepMeta( e, tm.getDatabases(), (org.pentaho.metastore.api.IMetaStore) null );
+        org.pentaho.di.trans.step.StepMetaInterface smi = nuevo.getStepMetaInterface();
+        if ( smi instanceof org.pentaho.di.trans.step.BaseStepMeta ) {
+          ( (org.pentaho.di.trans.step.BaseStepMeta) smi ).setParentStepMeta( sm );
+        }
+        sm.setStepMetaInterface( smi );
+      } catch ( Exception ex ) {
+        throw new ToolError( "Could not point the step '" + sm.getName() + "' to the test databases: "
+          + RunMotor.primeraLinea( ex ) );
+      }
+      notas.addAll( redir );
+    }
+    for ( StepMeta x : tm.getSteps() ) {
+      x.getStepMetaInterface().searchInfoAndTargetSteps( tm.getSteps() );
     }
   }
 
@@ -706,6 +1022,7 @@ final class PruebasMotor {
     }
     Trans t = null;
     String canal = null;
+    Map<DefPrueba.ArchivoSalida, Object[]> antesArchivos = null;
     try {
       for ( int vez = 1; vez <= p.veces; vez++ ) {
         boolean ultima = vez == p.veces;
@@ -721,6 +1038,9 @@ final class PruebasMotor {
         RunMotor.prepararVariables( t, p.tm );
         RunMotor.sinTablasDeLog( p.tm, t );
         canal = t.getLogChannelId();
+        if ( ultima && p.def != null && !p.def.archivos.isEmpty() ) {
+          antesArchivos = estadoArchivos( p.def, p.dir, t );
+        }
         try {
           RunMotor.prepararConPlazo( t, Math.max( 1, limite - System.currentTimeMillis() ), "Preparing the "
             + "transformation" );
@@ -831,6 +1151,15 @@ final class PruebasMotor {
           throw new ToolError( "Test database: " + f.getMessage() );
         }
       }
+      if ( antesArchivos != null ) {
+        p.archivos.putAll( leerArchivos( p.def, antesArchivos ) );
+        for ( ArchivoLeido l : p.archivos.values() ) {
+          if ( l.tabla != null ) {
+            filas += l.tabla.cantidadFilas();
+            desde.add( "file " + l.archivo.getName() );
+          }
+        }
+      }
       run.filasCapturadas = filas;
       run.capturadoDe = String.join( ", ", desde );
     } finally {
@@ -850,7 +1179,7 @@ final class PruebasMotor {
   }
 
   /** El hilo que pone las filas del dataset en el Injector (una copia de cada fila: los steps reusan arrays). */
-  private static Thread alimentador( final Trans t, final RowProducer rp, final PruebasDatasets.Filas filas,
+  static Thread alimentador( final Trans t, final RowProducer rp, final PruebasDatasets.Filas filas,
                                      String step ) {
     Thread h = new Thread( () -> {
       try {
@@ -907,6 +1236,8 @@ final class PruebasMotor {
     /** Bases de prueba y tablas (opcional: pruebas con base de datos). */
     final List<BaseDePrueba> bases = new ArrayList<BaseDePrueba>();
     final List<TablaSalida> tablas = new ArrayList<TablaSalida>();
+    /** Archivos que deja la corrida (0.7.1): rutas, con variables o relativas a la carpeta de las pruebas. */
+    final List<String> archivos = new ArrayList<String>();
     final Map<String, List<String>> scriptsBase = new LinkedHashMap<String, List<String>>();
     boolean reemplazar;
     /** Pasar a ignore_columns las columnas que no se reproducen con los datasets. */
@@ -950,8 +1281,11 @@ final class PruebasMotor {
     if ( archivo.exists() && !pc.reemplazar ) {
       throw new ToolError( "The test " + archivo + " already exists (replace=true to overwrite it)" );
     }
-    if ( pc.salidas.isEmpty() && pc.tablas.isEmpty() ) {
+    if ( pc.salidas.isEmpty() && pc.tablas.isEmpty() && pc.archivos.isEmpty() ) {
       throw new ToolError( "Choose at least one output step to freeze (output_steps)" );
+    }
+    if ( pc.original != null && pc.original.getName().toLowerCase( Locale.ROOT ).endsWith( ".kjb" ) ) {
+      return PruebasJob.crear( pc, op, archivo, escritos );
     }
     File dir = pc.carpeta.getAbsoluteFile();
     File ktr = op.ktr != null ? op.ktr : pc.original;
@@ -970,6 +1304,9 @@ final class PruebasMotor {
     d.caso.scriptsBase.putAll( pc.scriptsBase );
     d.bases.addAll( pc.bases );
     d.tablas.addAll( pc.tablas );
+    for ( String a : pc.archivos ) {
+      d.archivos.add( new DefPrueba.ArchivoSalida( a ) );
+    }
     d.creadaCon = "Pentaho Live " + ( op.versionPlugin == null ? "" : op.versionPlugin );
     d.completar();
 
@@ -991,8 +1328,8 @@ final class PruebasMotor {
         salidas.add( sm );
       }
     }
-    Set<StepMeta> alcance = d.tablas.isEmpty() ? ancestros( tm, salidas ) : new LinkedHashSet<StepMeta>(
-      tm.getSteps() );
+    Set<StepMeta> alcance = d.tablas.isEmpty() && d.archivos.isEmpty() ? ancestros( tm, salidas )
+      : new LinkedHashSet<StepMeta>( tm.getSteps() );
     Pack pk = d.comoPack();
     List<StepMeta> entradas = new ArrayList<StepMeta>();
     if ( pc.entradas == null ) {
@@ -1022,7 +1359,7 @@ final class PruebasMotor {
     // ajustes: los pedidos, o saltar todo lo que escribe (salvo las entradas)
     if ( pc.ajustes != null ) {
       d.ajustes.addAll( pc.ajustes );
-    } else {
+    } else if ( d.archivos.isEmpty() ) { // con files[] lo que escribe tiene que escribir
       for ( StepMeta sm : alcance ) {
         if ( !entradas.contains( sm ) && RunMotor.escribe( sm ) && !conBaseDePrueba( sm, pk ) ) {
           d.ajustes.add( DefPrueba.Ajuste.saltar( sm.getName(), "writes outside the transformation ("
@@ -1120,30 +1457,7 @@ final class PruebasMotor {
       PruebasDatasets.escribirDorado( f, t, d.csvDorado );
       creada.dorados.add( new ResultadoPrueba.Archivo( s.step, relativa( dir, f ), t.cantidadFilas(), t.columnas ) );
       // ¿los datasets reproducen la salida en vivo?
-      CorrectorTabla vivaT = vivo.capturada( s.step );
-      Comparacion c = CorrectorComparar.comparar( t, vivaT, s.columnas, s.comparar, d.entorno.politica()
-        .localeJava(), null );
-      ResultadoPrueba.Resumen x = new ResultadoPrueba.Resumen( s.step, ResultadoPrueba.Resumen.STEP );
-      resumir( x, c, s.comparar );
-      if ( !x.paso ) {
-        List<String> cols = new ArrayList<String>( c.diferenciasPorColumna.keySet() );
-        boolean soloValores = c.filas.faltan == 0 && c.filas.sobran == 0 && c.columnas.faltan.isEmpty()
-          && c.columnas.sobran.isEmpty() && !cols.isEmpty();
-        if ( soloValores && pc.ignorarInestables ) {
-          for ( String col : cols ) {
-            if ( !s.ignora( col ) ) {
-              s.ignorar.add( col );
-            }
-          }
-          creada.avisos.add( "'" + s.step + "': the columns " + cols + " change between runs (system dates, "
-            + "random values...): added to ignore_columns" );
-        } else {
-          creada.avisos.add( "'" + s.step + "': replaying the datasets does not give the same rows as the live "
-            + "sources (" + ( c.filas.distintas + c.filas.faltan + c.filas.sobran ) + " rows differ" + ( cols
-            .isEmpty() ? "" : ", columns " + cols ) + "). The golden file is the replayed output; check the "
-            + "inputs that were not frozen and non-deterministic steps" );
-        }
-      }
+      estabilidad( s, t, vivo.capturada( s.step ), d, pc.ignorarInestables, creada );
     }
     for ( TablaSalida ts : d.tablas ) {
       CorrectorBases.Captura c = rep.tablas.get( ts.clave() );
@@ -1161,9 +1475,21 @@ final class PruebasMotor {
       creada.dorados.add( new ResultadoPrueba.Archivo( "table " + ts.nombre, relativa( dir, f ), c.tabla
         .cantidadFilas(), c.tabla.columnas ) );
     }
+    for ( DefPrueba.ArchivoSalida a : d.archivos ) {
+      ArchivoLeido l = rep.archivos.get( a );
+      if ( l == null || l.tabla == null ) {
+        throw new ToolError( "The file " + a.ruta + " cannot be frozen: " + ( l == null ? "it was not read"
+          : l.problema ) );
+      }
+      File f = dorado( dir, d, a );
+      escritos.add( f );
+      PruebasDatasets.escribirDorado( f, l.tabla, d.csvDorado );
+      creada.dorados.add( new ResultadoPrueba.Archivo( "file " + a.nombre(), relativa( dir, f ), l.tabla
+        .cantidadFilas(), l.tabla.columnas ) );
+    }
     creada.ajustes.addAll( d.ajustes );
     escritos.add( archivo );
-    CorrectorJson.guardar( d, archivo );
+    guardar( d, archivo );
 
     // 4) la prueba recien creada, corrida como cualquier otra
     ResultadoPrueba r = correr( archivo, op );
@@ -1172,6 +1498,39 @@ final class PruebasMotor {
       creada.avisos.add( "The new test does not pass on its own frozen data: " + r.mensaje );
     }
     return r;
+  }
+
+  /**
+   * Si los datasets reproducen la salida en vivo: si solo cambian valores de algunas columnas (fechas del sistema,
+   * aleatorios) y {@code ignorar}, pasan a {@code ignore_columns}; si no, un aviso.
+   */
+  static void estabilidad( DefPrueba.Salida s, CorrectorTabla repetida, CorrectorTabla viva, DefPrueba d,
+                           boolean ignorar, ResultadoPrueba.Creada creada ) {
+    String nombre = DefPrueba.nombreCompleto( s.entrada, s.step );
+    Comparacion c = CorrectorComparar.comparar( repetida, viva, s.columnas, s.comparar, d.entorno.politica()
+      .localeJava(), null );
+    ResultadoPrueba.Resumen x = new ResultadoPrueba.Resumen( nombre, ResultadoPrueba.Resumen.STEP );
+    resumir( x, c, s.comparar );
+    if ( x.paso ) {
+      return;
+    }
+    List<String> cols = new ArrayList<String>( c.diferenciasPorColumna.keySet() );
+    boolean soloValores = c.filas.faltan == 0 && c.filas.sobran == 0 && c.columnas.faltan.isEmpty()
+      && c.columnas.sobran.isEmpty() && !cols.isEmpty();
+    if ( soloValores && ignorar ) {
+      for ( String col : cols ) {
+        if ( !s.ignora( col ) ) {
+          s.ignorar.add( col );
+        }
+      }
+      creada.avisos.add( "'" + nombre + "': the columns " + cols + " change between runs (system dates, "
+        + "random values...): added to ignore_columns" );
+    } else {
+      creada.avisos.add( "'" + nombre + "': replaying the datasets does not give the same rows as the live "
+        + "sources (" + ( c.filas.distintas + c.filas.faltan + c.filas.sobran ) + " rows differ" + ( cols
+        .isEmpty() ? "" : ", columns " + cols ) + "). The golden file is the replayed output; check the "
+        + "inputs that were not frozen and non-deterministic steps" );
+    }
   }
 
   /** El step usa conexiones y todas tienen base de prueba: lee o escribe solo en bases descartables. */

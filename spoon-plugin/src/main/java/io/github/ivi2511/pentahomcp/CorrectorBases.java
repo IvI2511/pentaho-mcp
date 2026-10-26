@@ -753,6 +753,136 @@ final class CorrectorBases {
     return b.toString();
   }
 
+  /**
+   * (0.7.1) Como {@link #renombrar}, pero conservador, para el SQL de los steps: solo cambia un nombre que es una base
+   * original cuando califica a otro ({@code gym_dw.ventas}, {@code `gym_dw`.`ventas`}, {@code "gym_dw".ventas}) o va
+   * despues de {@code USE}; nunca una tabla, columna o alias que se llame igual. Si en el mismo SQL el nombre tambien
+   * aparece solo (una tabla «ventas» con la base «ventas»: {@code ventas.importe} es la columna de la tabla), no se
+   * toca y queda en {@code ambiguos} (sin mayusculas).
+   */
+  static String renombrarCalificados( String sql, Map<String, String> renombres, Set<String> ambiguos ) {
+    if ( sql == null || renombres == null || renombres.isEmpty() ) {
+      return sql;
+    }
+    Map<String, String> m = new LinkedHashMap<String, String>();
+    for ( Map.Entry<String, String> e : renombres.entrySet() ) {
+      m.put( e.getKey().toLowerCase( Locale.ROOT ), e.getValue() );
+    }
+    // primera pasada: los identificadores (sin mayusculas) y si alguno de los renombrables aparece sin calificar
+    List<int[]> tokens = new ArrayList<int[]>(); // {inicio, fin, comilla}
+    int i = 0;
+    int n = sql.length();
+    while ( i < n ) {
+      char c = sql.charAt( i );
+      if ( c == '\'' ) {
+        i = fin( sql, i, '\'' );
+      } else if ( c == '-' && i + 1 < n && sql.charAt( i + 1 ) == '-' ) {
+        int j = sql.indexOf( '\n', i );
+        i = j < 0 ? n : j;
+      } else if ( c == '/' && i + 1 < n && sql.charAt( i + 1 ) == '*' ) {
+        int j = sql.indexOf( "*/", i + 2 );
+        i = j < 0 ? n : j + 2;
+      } else if ( c == '`' || c == '"' ) {
+        int j = fin( sql, i, c );
+        tokens.add( new int[] { i, j, c } );
+        i = j;
+      } else if ( Character.isLetter( c ) || c == '_' ) {
+        int j = i;
+        while ( j < n && ( Character.isLetterOrDigit( sql.charAt( j ) ) || sql.charAt( j ) == '_'
+          || sql.charAt( j ) == '$' ) ) {
+          j++;
+        }
+        tokens.add( new int[] { i, j, 0 } );
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    Set<String> solos = new HashSet<String>();
+    List<int[]> calificadores = new ArrayList<int[]>();
+    for ( int k = 0; k < tokens.size(); k++ ) {
+      int[] t = tokens.get( k );
+      String w = palabra( sql, t ).toLowerCase( Locale.ROOT );
+      if ( !m.containsKey( w ) ) {
+        continue;
+      }
+      boolean antesPunto = siguiente( sql, t[ 1 ] ) == '.';
+      boolean despuesPunto = anterior( sql, t[ 0 ] ) == '.';
+      boolean trasUse = k > 0 && tokens.get( k - 1 )[ 2 ] == 0 && "use".equalsIgnoreCase( palabra( sql, tokens.get(
+        k - 1 ) ) ) && soloEspacios( sql, tokens.get( k - 1 )[ 1 ], t[ 0 ] );
+      if ( ( antesPunto && !despuesPunto ) || trasUse ) {
+        calificadores.add( t );
+      } else {
+        solos.add( w );
+      }
+    }
+    StringBuilder b = new StringBuilder();
+    int desde = 0;
+    for ( int[] t : calificadores ) {
+      String w = palabra( sql, t ).toLowerCase( Locale.ROOT );
+      if ( solos.contains( w ) ) {
+        if ( ambiguos != null ) {
+          ambiguos.add( w );
+        }
+        continue;
+      }
+      b.append( sql, desde, t[ 0 ] );
+      String r = m.get( w );
+      b.append( t[ 2 ] == 0 ? r : (char) t[ 2 ] + r + (char) t[ 2 ] );
+      desde = t[ 1 ];
+    }
+    b.append( sql.substring( desde ) );
+    return b.toString();
+  }
+
+  /** El identificador del token, sin sus comillas. */
+  private static String palabra( String sql, int[] t ) {
+    return t[ 2 ] == 0 ? sql.substring( t[ 0 ], t[ 1 ] ) : sql.substring( t[ 0 ] + 1, Math.max( t[ 0 ] + 1, t[ 1 ]
+      - 1 ) );
+  }
+
+  private static char siguiente( String s, int i ) {
+    while ( i < s.length() && Character.isWhitespace( s.charAt( i ) ) ) {
+      i++;
+    }
+    return i < s.length() ? s.charAt( i ) : 0;
+  }
+
+  private static char anterior( String s, int i ) {
+    i--;
+    while ( i >= 0 && Character.isWhitespace( s.charAt( i ) ) ) {
+      i--;
+    }
+    return i >= 0 ? s.charAt( i ) : 0;
+  }
+
+  private static boolean soloEspacios( String s, int a, int b ) {
+    for ( int i = a; i < b; i++ ) {
+      if ( !Character.isWhitespace( s.charAt( i ) ) ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * (0.7.1) Anota la base a la que apuntaba una conexion redirigida (la de la .ktr o la entrega) como una original mas
+   * de su base de prueba ({@code m}: sin mayusculas → nombre de prueba), si es un nombre simple que no es una base del
+   * sistema ni la de prueba. Asi {@code ventas_dw.hechos} en el SQL de un step tambien pasa a la de prueba.
+   */
+  static void anotarOriginal( String base, Destino d, Map<String, String> m ) {
+    if ( base == null || d == null || base.contains( "${" ) || base.contains( "%%" ) ) {
+      return;
+    }
+    String solo = BaseDePrueba.nombreSolo( base ).trim();
+    String prueba = BaseDePrueba.nombreSolo( d.nombre );
+    if ( solo.isEmpty() || !NOMBRE_VALIDO.matcher( solo ).matches() || solo.equalsIgnoreCase( prueba )
+      || SeguridadBases.DEL_SISTEMA.contains( solo.toLowerCase( Locale.ROOT ) ) ) {
+      return;
+    }
+    m.putIfAbsent( solo.toLowerCase( Locale.ROOT ), prueba );
+  }
+
   /** Despues del cierre de una cadena o identificador que empieza en i con q (q doble = q escapada). */
   private static int fin( String s, int i, char q ) {
     int j = i + 1;

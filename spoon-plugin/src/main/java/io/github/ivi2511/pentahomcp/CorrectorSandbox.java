@@ -201,6 +201,11 @@ final class CorrectorSandbox {
     String step;
     /** Conexion de la copia (nombre) → la base de prueba a la que apunta: el motor le pone la contraseña. */
     final Map<String, CorrectorBases.Destino> conexionesPrueba = new LinkedHashMap<String, CorrectorBases.Destino>();
+    /**
+     * La base a la que apuntaba cada conexion redirigida (sin mayusculas) → su base de prueba (0.7.1): los nombres
+     * calificados con ella en los steps tambien pasan a la de prueba.
+     */
+    final Map<String, String> originales = new LinkedHashMap<String, String>();
 
     boolean bloqueada() {
       return motivo != null;
@@ -732,6 +737,7 @@ final class CorrectorSandbox {
       attrs.appendChild( a );
     }
     p.conexionesPrueba.put( nombre, d );
+    CorrectorBases.anotarOriginal( antes, d, p.originales );
     p.redirecciones.add( "connection " + q( nombre ) + " (" + tipo + "): " + antes + " -> test database "
       + d.describir() );
   }
@@ -747,6 +753,9 @@ final class CorrectorSandbox {
     Set<String> pruebas = bases.nombres();
     Set<String> prohibidas = bases.prohibidas();
     Map<String, String> renombres = bases.renombres();
+    for ( Map.Entry<String, String> o : p.originales.entrySet() ) {
+      renombres.putIfAbsent( o.getKey(), o.getValue() );
+    }
     Map<String, CorrectorBases.Destino> porConexion = new HashMap<String, CorrectorBases.Destino>();
     for ( Map.Entry<String, CorrectorBases.Destino> en : p.conexionesPrueba.entrySet() ) {
       porConexion.put( en.getKey().toLowerCase( Locale.ROOT ), en.getValue() );
@@ -763,59 +772,89 @@ final class CorrectorSandbox {
       if ( d == null ) {
         continue;
       }
-      boolean mysql = d.base.esMysql();
-      for ( Element[] hp : Nodos.hojas( s ) ) {
-        Element h = hp[ 0 ];
-        String tag = h.getTagName().toLowerCase( Locale.ROOT );
-        String crudo = h.getTextContent();
-        String valor = sustituir( vars, crudo ).trim();
-        if ( mysql && ( tag.equals( "schema" ) || tag.equals( "schemaname" ) || tag.equals( "schema_name" ) ) ) {
-          if ( valor.isEmpty() ) {
-            continue;
-          }
-          if ( valor.contains( "${" ) || valor.contains( "%%" ) ) {
+      esquemasDeStep( s, nombre, tipo, d, vars, pruebas, prohibidas, renombres, p.redirecciones, problemas );
+    }
+  }
+
+  /**
+   * Los esquemas y el SQL de un step (o de una entrada de job: el mismo XML de hojas) cuya conexion apunta a la base de
+   * prueba {@code d} (0.6.2; 0.7.1 tambien para H2 y PostgreSQL y compartido con las pruebas de ETL):
+   * <ul>
+   * <li>hojas {@code schema}: una base original ({@code renombres}) pasa a la de prueba. En MySQL el esquema es una
+   * base del servidor: uno que no es de prueba bloquea ({@code foreign_schema}), igual que uno con variables. En H2 y
+   * PostgreSQL un esquema vive dentro de la base de prueba: los demas quedan como estan.</li>
+   * <li>hojas {@code table} con un nombre calificado ({@code gym_dw.ventas}): el calificador, igual.</li>
+   * <li>hojas de SQL: solo los nombres calificados con una base original ({@code gym_dw.ventas},
+   * {@code USE gym_dw}) pasan a la de prueba ({@link CorrectorBases#renombrarCalificados}: un nombre que en el mismo
+   * SQL tambien es una tabla o un alias no se toca), y el SQL no puede salir de las bases de prueba
+   * ({@code forbidden_sql}, {@link CorrectorBases#sqlAjeno}).</li>
+   * </ul>
+   */
+  static void esquemasDeStep( Element s, String nombre, String tipo, CorrectorBases.Destino d, VariableSpace vars,
+                              Set<String> pruebas, Set<String> prohibidas, Map<String, String> renombres,
+                              List<String> redirecciones, List<Hallazgo> problemas ) {
+    boolean mysql = d.base.esMysql();
+    for ( Element[] hp : Nodos.hojas( s ) ) {
+      Element h = hp[ 0 ];
+      String tag = h.getTagName().toLowerCase( Locale.ROOT );
+      String crudo = h.getTextContent();
+      String valor = sustituir( vars, crudo ).trim();
+      if ( tag.equals( "schema" ) || tag.equals( "schemaname" ) || tag.equals( "schema_name" ) ) {
+        if ( valor.isEmpty() ) {
+          continue;
+        }
+        if ( valor.contains( "${" ) || valor.contains( "%%" ) ) {
+          if ( mysql ) {
             problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.variable", nombre, tipo,
               crudo.trim() ), nombre ) );
-            continue;
-          }
-          String nuevo = renombres.get( valor.toLowerCase( Locale.ROOT ) );
-          if ( nuevo != null ) {
-            h.setTextContent( nuevo );
-            p.redirecciones.add( "schema " + q( nombre ) + ": " + crudo.trim() + " -> " + nuevo );
-          } else if ( !pruebas.contains( valor.toLowerCase( Locale.ROOT ) ) ) {
-            problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.foreign", nombre, tipo,
-              valor, String.join( ", ", pruebas ) ), nombre ) );
           }
           continue;
         }
-        if ( mysql && ( tag.equals( "table" ) || tag.equals( "tablename" ) || tag.equals( "table_name" ) )
-          && valor.indexOf( '.' ) > 0 ) {
-          String esquema = valor.substring( 0, valor.indexOf( '.' ) ).replace( "`", "" ).trim();
-          String nuevo = renombres.get( esquema.toLowerCase( Locale.ROOT ) );
-          if ( nuevo != null ) {
-            h.setTextContent( nuevo + valor.substring( valor.indexOf( '.' ) ) );
-            p.redirecciones.add( "schema " + q( nombre ) + ": " + crudo.trim() + " -> " + h.getTextContent() );
-          } else if ( !pruebas.contains( esquema.toLowerCase( Locale.ROOT ) ) ) {
-            problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.foreign", nombre, tipo,
-              esquema, String.join( ", ", pruebas ) ), nombre ) );
-          }
-          continue;
+        String limpio = valor.replace( "`", "" ).replace( "\"", "" ).trim();
+        String nuevo = renombres.get( limpio.toLowerCase( Locale.ROOT ) );
+        if ( nuevo != null ) {
+          h.setTextContent( nuevo );
+          redirecciones.add( "schema " + q( nombre ) + ": " + crudo.trim() + " -> " + nuevo );
+        } else if ( mysql && !pruebas.contains( limpio.toLowerCase( Locale.ROOT ) ) ) {
+          problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.foreign", nombre, tipo,
+            valor, String.join( ", ", pruebas ) ), nombre ) );
         }
-        if ( tag.contains( "sql" ) || tag.equals( "query" ) || tag.equals( "statement" ) ) {
-          // primero los nombres de las bases originales pasan a los de prueba (gym_dw.dim → gym_dw_correccion.dim)
-          String nuevo = mysql ? CorrectorBases.renombrar( crudo, renombres ) : crudo;
-          String ajeno = CorrectorBases.sqlAjeno( mysql ? CorrectorBases.renombrar( valor, renombres ) : valor,
-            pruebas, prohibidas );
-          if ( ajeno == null ) {
-            ajeno = CorrectorBases.sqlAjeno( nuevo, pruebas, prohibidas );
-          }
-          if ( ajeno != null ) {
-            problemas.add( new Hallazgo( ResultadoCaso.SQL_PROHIBIDO, new Mensaje( "det.sql.server", nombre, tipo,
-              ajeno ), nombre ) );
-          } else if ( !nuevo.equals( crudo ) ) {
-            h.setTextContent( nuevo );
-            p.redirecciones.add( "sql " + q( nombre ) + ": original database names -> test databases" );
-          }
+        continue;
+      }
+      if ( ( tag.equals( "table" ) || tag.equals( "tablename" ) || tag.equals( "table_name" ) )
+        && valor.indexOf( '.' ) > 0 ) {
+        String esquema = valor.substring( 0, valor.indexOf( '.' ) ).replace( "`", "" ).replace( "\"", "" ).trim();
+        String nuevo = renombres.get( esquema.toLowerCase( Locale.ROOT ) );
+        if ( nuevo != null ) {
+          String q = valor.startsWith( "`" ) ? "`" : valor.startsWith( "\"" ) ? "\"" : "";
+          h.setTextContent( q + nuevo + q + valor.substring( valor.indexOf( '.' ) ) );
+          redirecciones.add( "schema " + q( nombre ) + ": " + crudo.trim() + " -> " + h.getTextContent() );
+        } else if ( mysql && !pruebas.contains( esquema.toLowerCase( Locale.ROOT ) ) ) {
+          problemas.add( new Hallazgo( ResultadoCaso.ESQUEMA_AJENO, new Mensaje( "det.schema.foreign", nombre, tipo,
+            esquema, String.join( ", ", pruebas ) ), nombre ) );
+        }
+        continue;
+      }
+      if ( tag.contains( "sql" ) || tag.equals( "query" ) || tag.equals( "statement" ) ) {
+        // primero los nombres calificados con una base original pasan a la de prueba (gym_dw.dim → gym_dw_test.dim)
+        Set<String> ambiguos = new HashSet<String>();
+        String nuevo = CorrectorBases.renombrarCalificados( crudo, renombres, ambiguos );
+        String sustNuevo = CorrectorBases.renombrarCalificados( valor, renombres, ambiguos );
+        Set<String> prohibidasAca = prohibidas;
+        if ( !ambiguos.isEmpty() ) { // "ventas.importe" con la tabla ventas: no es la base
+          prohibidasAca = new HashSet<String>( prohibidas );
+          prohibidasAca.removeAll( ambiguos );
+        }
+        String ajeno = CorrectorBases.sqlAjeno( sustNuevo, pruebas, prohibidasAca );
+        if ( ajeno == null ) {
+          ajeno = CorrectorBases.sqlAjeno( nuevo, pruebas, prohibidasAca );
+        }
+        if ( ajeno != null ) {
+          problemas.add( new Hallazgo( ResultadoCaso.SQL_PROHIBIDO, new Mensaje( "det.sql.server", nombre, tipo,
+            ajeno ), nombre ) );
+        } else if ( !nuevo.equals( crudo ) ) {
+          h.setTextContent( nuevo );
+          redirecciones.add( "sql " + q( nombre ) + ": original database names -> test databases" );
         }
       }
     }
