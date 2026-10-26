@@ -182,6 +182,11 @@ public class PruebaDiffLienzo {
     contiene( t, "drawLine[282, 166, 282, 240]", "salto fantasma recortado: " + t );
     noContiene( t, "drawLine[282, 148, 282, 260]", "nunca de centro a centro por encima del icono" );
     contiene( t, "drawLine[282, 240, ", "la punta de la flecha" );
+    // la insignia de un salto, corrida del medio para no tapar el icono de condición de Spoon
+    igual( "50,-13", DiffLienzo.medioDeSalto( 0, 0, 100, 0 )[ 0 ] + "," + DiffLienzo.medioDeSalto( 0, 0, 100, 0 )[ 1 ],
+      "horizontal: arriba" );
+    igual( "13,50", DiffLienzo.medioDeSalto( 0, 0, 0, 100 )[ 0 ] + "," + DiffLienzo.medioDeSalto( 0, 0, 0, 100 )[ 1 ],
+      "vertical: al costado" );
     // deja el GC como estaba
     String fin = llamadas.subList( llamadas.size() - 5, llamadas.size() ).toString();
     contiene( fin, "setLineStyle[SOLID]", "estilo restituido" );
@@ -292,6 +297,22 @@ public class PruebaDiffLienzo {
       // el tamaño que dejó queda recordado y la próxima lista abre así
       String rec = IdcDetalle.pref( IdcComparar.Lista.PREF + ".size" );
       cierto( rec != null && rec.matches( "\\d+,\\d+" ), "al cerrarla se recuerda su tamaño: " + rec );
+      // pantalla angosta: la de «qué» cede primero, el detalle no baja de 240 px y todo entra en la ventana
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".size", "" );
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".cols", "" );
+      IdcComparar.Lista angosta = new IdcComparar.Lista( host, despues, null, res, r );
+      try {
+        org.eclipse.swt.graphics.Point t = angosta.medir( new Rectangle( 0, 0, 800, 600 ) );
+        cierto( t.x <= 800 * 92 / 100, "no pasa del 92 % de la pantalla: " + t.x );
+        int suma = 0;
+        for ( org.eclipse.swt.widgets.TableColumn c : angosta.tabla.getColumns() ) {
+          suma += c.getWidth();
+        }
+        cierto( suma < t.x, "las tres columnas entran en la ventana: " + suma + " < " + t.x );
+        cierto( angosta.tabla.getColumn( 2 ).getWidth() >= 240, "el detalle, al menos 240 px" );
+      } finally {
+        angosta.shell.dispose();
+      }
       IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".size", "1000,520" );
       IdcComparar.Lista otra = new IdcComparar.Lista( host, despues, null, res, r );
       try {

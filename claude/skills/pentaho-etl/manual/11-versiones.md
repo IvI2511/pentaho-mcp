@@ -74,7 +74,7 @@ listed) or another file; *Ignore box positions* is on by default. Two views:
 - **Badges on this canvas**: `+` green, `~` amber, `»` blue on each step and in the middle of each hop;
   removed steps are drawn as red dashed **ghosts** where they were, and removed hops as red dashed arrows
   from icon edge to icon edge, like Spoon's own hops.
-- **Two tabs**: the other version opens in a new tab (named `<name> [<where it comes from>]`, without a
+- **Two tabs**: the other version opens in a new tab (named `[<where it comes from>] <name>`, so the start of the tab already tells them apart, without a
   file, so it cannot overwrite anything), both with badges (`−` on what disappears).
 
 The **list of changes** opens next to it, sized to its columns and to the screen (it remembers the size and

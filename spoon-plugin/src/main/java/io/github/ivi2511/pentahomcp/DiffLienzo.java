@@ -239,9 +239,9 @@ final class DiffLienzo {
           int[] a = posicion( meta, p[ 0 ], null );
           int[] b = p.length > 1 ? posicion( meta, p[ 1 ], null ) : null;
           if ( a != null && b != null ) {
-            int mx = ( a[ 0 ] + b[ 0 ] ) / 2 + ox + icono / 2;
-            int my = ( a[ 1 ] + b[ 1 ] ) / 2 + oy + icono / 2;
-            insignia( gc, mx, my, (String) e.getValue(), 7 );
+            int[] m = medioDeSalto( a[ 0 ] + ox + icono / 2, a[ 1 ] + oy + icono / 2, b[ 0 ] + ox + icono / 2, b[ 1 ]
+              + oy + icono / 2 );
+            insignia( gc, m[ 0 ], m[ 1 ], (String) e.getValue(), 7 );
           }
         }
       }
@@ -287,6 +287,28 @@ final class DiffLienzo {
     double t2 = 1 - m2 / mx;
     return new int[] { (int) Math.round( x1 + dx * t1 ), (int) Math.round( y1 + dy * t1 ), (int) Math.round( x1 + dx
       * t2 ), (int) Math.round( y1 + dy * t2 ) };
+  }
+
+  /**
+   * Dónde va la insignia de un salto: en el medio, corrida 13 px hacia un costado (arriba en un salto horizontal), para
+   * no tapar el icono de condición que Spoon pinta en el medio del salto (verdadero/falso, error, si falla…).
+   */
+  static int[] medioDeSalto( int x1, int y1, int x2, int y2 ) {
+    double mx = ( x1 + x2 ) / 2.0;
+    double my = ( y1 + y2 ) / 2.0;
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double l = Math.sqrt( dx * dx + dy * dy );
+    if ( l < 1 ) {
+      return new int[] { (int) Math.round( mx ), (int) Math.round( my ) };
+    }
+    double nx = dy / l;
+    double ny = -dx / l;
+    if ( ny > 0 || ny == 0 && nx < 0 ) {
+      nx = -nx;
+      ny = -ny;
+    }
+    return new int[] { (int) Math.round( mx + 13 * nx ), (int) Math.round( my + 13 * ny ) };
   }
 
   /** Una punta de flecha sólida al final del tramo (los hops de Spoon también la tienen). */

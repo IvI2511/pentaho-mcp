@@ -437,8 +437,19 @@ final class IdcComparar {
         suma += cs[ i ].getWidth();
       }
       int barra = tabla.getVerticalBar() == null ? 18 : tabla.getVerticalBar().getSize().x;
-      int ancho = suma + barra + 2 * tabla.getBorderWidth() + 2 * 12 + 8;
-      ancho = Math.max( 560, Math.min( ancho, pantalla.width * 92 / 100 ) );
+      int extra = barra + 2 * tabla.getBorderWidth() + 2 * 12 + 8;
+      int tope2 = pantalla.width * 92 / 100;
+      int ancho = suma + extra;
+      if ( ancho > tope2 ) {
+        // no entra: la de «qué» cede hasta 300 px y después la de detalle (el texto entero queda en el tooltip)
+        int sobra = ancho - tope2;
+        int q = Math.min( sobra, Math.max( 0, cs[ 1 ].getWidth() - 300 ) );
+        cs[ 1 ].setWidth( cs[ 1 ].getWidth() - q );
+        sobra -= q;
+        cs[ 2 ].setWidth( Math.max( 240, cs[ 2 ].getWidth() - sobra ) );
+        ancho = cs[ 0 ].getWidth() + cs[ 1 ].getWidth() + cs[ 2 ].getWidth() + extra;
+      }
+      ancho = Math.max( 560, Math.min( ancho, tope2 ) );
       int filas = Math.max( 6, Math.min( 22, tabla.getItemCount() + 1 ) );
       ( (GridData) tabla.getLayoutData() ).heightHint = tabla.getHeaderHeight() + filas * tabla.getItemHeight();
       int alto = shell.computeSize( ancho, SWT.DEFAULT, true ).y;
