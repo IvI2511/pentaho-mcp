@@ -77,9 +77,7 @@
   } ],
   "case" : {
     "id" : "kpi_tienda_categoria",
-    "expected" : "golden/kpi_tienda_categoria",
-    "weight" : 1.0,
-    "hidden" : false
+    "expected" : "golden/kpi_tienda_categoria"
   },
   "outputs" : [ {
     "step" : "Redondear importe",

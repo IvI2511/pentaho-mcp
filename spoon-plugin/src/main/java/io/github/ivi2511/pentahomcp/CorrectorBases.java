@@ -1321,6 +1321,13 @@ final class CorrectorBases {
       try {
         Connection cn = db.getConnection();
         String sql = "SELECT * FROM " + db.getDatabaseMeta().quoteField( t.nombre.trim() );
+        int punto = t.nombre.trim().indexOf( '.' );
+        if ( punto > 0 ) { // 0.7.1: "gym_dw.ventas", con el esquema de la base original llevado a la de prueba
+          String esquema = t.nombre.trim().substring( 0, punto ).trim();
+          String nuevo = renombres().get( esquema.toLowerCase( Locale.ROOT ) );
+          sql = "SELECT * FROM " + db.getDatabaseMeta().getQuotedSchemaTableCombination( nuevo != null ? nuevo
+            : esquema, t.nombre.trim().substring( punto + 1 ).trim() );
+        }
         List<String> nombres = new ArrayList<String>();
         List<List<Object>> filas = new ArrayList<List<Object>>();
         List<Integer> usar = new ArrayList<Integer>();

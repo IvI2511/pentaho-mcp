@@ -62,10 +62,12 @@ final class PruebasArchivos {
   private PruebasArchivos() {
   }
 
-  /** Lo leido de una carpeta de pruebas: cada archivo con la .ktr que prueba (canonica) o null si es invalida. */
+  /** Lo leido de una carpeta de pruebas: cada archivo con la .ktr o .kjb que prueba (canonica) o null si es invalida. */
   private static final class Leida {
     long huella;
     final Map<File, String> pruebas = new LinkedHashMap<File, String>();
+    /** Pruebas de job → las .ktr (canonicas) que corren sus entradas Transformation (0.7.1). */
+    final Map<File, Set<String>> ktrsDeJob = new LinkedHashMap<File, Set<String>>();
   }
 
   // ------------------------------------------------------------------ carpetas
@@ -100,6 +102,65 @@ final class PruebasArchivos {
       Collections.sort( l, ( a, b ) -> a.getName().compareToIgnoreCase( b.getName() ) );
     }
     return l;
+  }
+
+  /** Las pruebas de una .ktr o una .kjb (en todas sus carpetas de pruebas). */
+  static List<File> deArchivo( File f ) {
+    return deTransformacion( f );
+  }
+
+  /**
+   * (0.7.1) Las pruebas de jobs (en las carpetas de pruebas de la .ktr) cuyo job corre esa .ktr con una entrada
+   * Transformation: al guardarla tambien corren.
+   */
+  static List<File> deJobsQueUsan( File ktr ) {
+    List<File> l = new ArrayList<File>();
+    String objetivo = canonica( ktr );
+    if ( objetivo == null ) {
+      return l;
+    }
+    for ( File c : carpetas( ktr ) ) {
+      for ( Map.Entry<File, Set<String>> e : leer( c ).ktrsDeJob.entrySet() ) {
+        for ( String k : e.getValue() ) {
+          if ( k.equalsIgnoreCase( objetivo ) && !l.contains( e.getKey() ) ) {
+            l.add( e.getKey() );
+          }
+        }
+      }
+    }
+    return l;
+  }
+
+  /**
+   * Las .ktr (canonicas) que nombran las entradas Transformation de una .kjb, con las variables de la carpeta del job
+   * ({@code Internal.Entry.Current.Directory}, {@code Internal.Job.Filename.Directory}); solo XML.
+   */
+  static Set<String> ktrsDe( File kjb ) {
+    Set<String> s = new LinkedHashSet<String>();
+    try ( java.io.InputStream in = new java.io.FileInputStream( kjb ) ) {
+      org.w3c.dom.Element raiz = io.github.ivi2511.pentahomcp.lint.Nodos.parse( in );
+      String dir = kjb.getAbsoluteFile().getParentFile().getAbsolutePath().replace( '\\', '/' );
+      for ( org.w3c.dom.Element e : io.github.ivi2511.pentahomcp.lint.Nodos.hijos(
+        io.github.ivi2511.pentahomcp.lint.Nodos.hijo( raiz, "entries" ), "entry" ) ) {
+        if ( !"TRANS".equalsIgnoreCase( io.github.ivi2511.pentahomcp.lint.Nodos.txt( e, "type" ) ) ) {
+          continue;
+        }
+        String f = io.github.ivi2511.pentahomcp.lint.Nodos.txt( e, "filename" ).replace( "${Internal.Entry.Current"
+          + ".Directory}", dir ).replace( "${Internal.Job.Filename.Directory}", dir ).replace( "${Internal.Entry"
+          + ".Current.Directory}", dir );
+        if ( f.isEmpty() || f.contains( "${" ) ) {
+          continue;
+        }
+        File x = new File( f.replaceFirst( "^(?i)file:/+(?=[A-Za-z]:)", "" ).replaceFirst( "^(?i)file://", "" ) );
+        if ( !x.isAbsolute() ) {
+          x = new File( kjb.getAbsoluteFile().getParentFile(), f );
+        }
+        s.add( canonica( x ) );
+      }
+    } catch ( Exception ignored ) {
+      // un job que no se puede leer: ninguna
+    }
+    return s;
   }
 
   /** Las pruebas de una .ktr (en todas sus carpetas de pruebas). */
@@ -148,8 +209,13 @@ final class PruebasArchivos {
         try {
           JsonNode j = CorrectorJson.mapper().readTree( contenido( f ) );
           String ruta = j.path( "transformation" ).asText( "" );
+          String job = j.path( "job" ).asText( "" );
           if ( !ruta.trim().isEmpty() ) {
             t = canonica( PruebasMotor.resolver( carpeta, ruta ) );
+          } else if ( !job.trim().isEmpty() ) {
+            File kjb = PruebasMotor.resolver( carpeta, job );
+            t = canonica( kjb );
+            n.ktrsDeJob.put( f.getAbsoluteFile(), ktrsDe( kjb ) );
           }
         } catch ( Exception ignored ) {
           // invalida: se lista igual (el error lo da al correrla)
@@ -276,7 +342,8 @@ final class PruebasArchivos {
    * habilitados de la version nueva, sin pasar de los steps con dataset). cambiados null = no se sabe: true.
    */
   static boolean afectada( DefPrueba d, TransMeta tm, Set<String> cambiados ) {
-    if ( cambiados == null || cambiados.contains( GLOBAL ) || !d.tablas.isEmpty() || d.todaLaTransformacion ) {
+    if ( cambiados == null || cambiados.contains( GLOBAL ) || !d.tablas.isEmpty() || !d.archivos.isEmpty()
+      || d.todaLaTransformacion || d.esJob() ) {
       return true;
     }
     if ( cambiados.isEmpty() ) {
@@ -319,6 +386,20 @@ final class PruebasArchivos {
       }
     }
     return false;
+  }
+
+  /** La firma de un job (0.7.1): un solo hash de su XML sin posiciones, notas ni fechas; cualquier cambio, todas. */
+  static Map<String, String> firma( org.pentaho.di.job.JobMeta jm ) {
+    Map<String, String> f = new LinkedHashMap<String, String>();
+    String x;
+    try {
+      x = jm.getXML().replaceAll( "<xloc>[^<]*</xloc>|<yloc>[^<]*</yloc>", "" ).replaceAll( "(?s)<notepads>.*?"
+        + "</notepads>", "" ).replaceAll( "<(modified|created)_(date|user)>[^<]*</(modified|created)_(date|user)>", "" );
+    } catch ( Throwable t ) {
+      x = String.valueOf( System.nanoTime() );
+    }
+    f.put( GLOBAL, hash( x ) );
+    return f;
   }
 
   private static String hash( String s ) {

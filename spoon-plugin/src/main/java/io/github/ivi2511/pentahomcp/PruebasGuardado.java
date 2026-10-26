@@ -28,6 +28,7 @@ import org.pentaho.di.ui.spoon.Spoon;
 import io.github.ivi2511.pentahomcp.corrector.modelo.CorrectorJson;
 import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.informes.tema.Ajustes;
+import io.github.ivi2511.pentahomcp.pruebas.modelo.DefPrueba;
 import io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba;
 
 /**
@@ -133,7 +134,7 @@ final class PruebasGuardado {
       return;
     }
     for ( AbstractMeta m : Docs.abiertos() ) {
-      if ( !( m instanceof TransMeta ) ) {
+      if ( !( m instanceof TransMeta ) && !( m instanceof org.pentaho.di.job.JobMeta ) ) {
         continue;
       }
       File ktr = PruebasTools.archivoDe( m );
@@ -153,7 +154,12 @@ final class PruebasGuardado {
       if ( e != null && e.modificado == mod ) {
         continue;
       }
-      List<File> pruebas = PruebasArchivos.deTransformacion( ktr );
+      List<File> pruebas = PruebasArchivos.deArchivo( ktr );
+      for ( File f : PruebasArchivos.deJobsQueUsan( ktr ) ) { // 0.7.1: los jobs que corren esta .ktr
+        if ( !pruebas.contains( f ) ) {
+          pruebas.add( f );
+        }
+      }
       if ( pruebas.isEmpty() ) {
         ESTADOS.remove( k );
         continue;
@@ -163,7 +169,7 @@ final class PruebasGuardado {
         e = new Estado();
         e.doc = new java.lang.ref.WeakReference<AbstractMeta>( m );
         e.modificado = mod;
-        e.firma = guardado ? PruebasArchivos.firma( (TransMeta) m ) : null;
+        e.firma = guardado ? firma( m ) : null;
         ESTADOS.put( k, e );
         continue;
       }
@@ -171,7 +177,7 @@ final class PruebasGuardado {
         continue; // cambio en el disco pero el documento no esta guardado: se mira al guardar
       }
       e.modificado = mod;
-      Map<String, String> nueva = PruebasArchivos.firma( (TransMeta) m );
+      Map<String, String> nueva = firma( m );
       Set<String> cambiados = e.firma == null ? null : PruebasArchivos.cambiados( e.firma, nueva );
       e.firma = nueva;
       if ( cambiados != null && cambiados.isEmpty() ) {
@@ -180,7 +186,8 @@ final class PruebasGuardado {
       List<File> afectadas = new ArrayList<File>();
       for ( File f : pruebas ) {
         try {
-          if ( PruebasArchivos.afectada( PruebasMotor.cargar( f ), (TransMeta) m, cambiados ) ) {
+          DefPrueba d = PruebasMotor.cargar( f );
+          if ( !( m instanceof TransMeta ) || d.esJob() || PruebasArchivos.afectada( d, (TransMeta) m, cambiados ) ) {
             afectadas.add( f );
           }
         } catch ( Exception ex ) {
@@ -199,6 +206,12 @@ final class PruebasGuardado {
       }
       correr( sp, k, nombre, afectadas );
     }
+  }
+
+  /** La firma de una transformacion (por step) o de un job (una sola). */
+  private static Map<String, String> firma( AbstractMeta m ) {
+    return m instanceof TransMeta ? PruebasArchivos.firma( (TransMeta) m ) : PruebasArchivos.firma(
+      (org.pentaho.di.job.JobMeta) m );
   }
 
   /** Corre las pruebas afectadas contra el .ktr guardado y pinta el resultado. */
@@ -342,8 +355,8 @@ final class PruebasGuardado {
       t.addListener( SWT.Selection, e -> {
         try {
           AbstractMeta m = Docs.activo();
-          if ( m instanceof TransMeta ) {
-            PruebasDialogo.abrir( sp.getShell(), (TransMeta) m, PruebasDialogo.rotulos() );
+          if ( m != null ) {
+            PruebasDialogo.abrir( sp.getShell(), m, PruebasDialogo.rotulos() );
           }
         } catch ( Throwable ignored ) {
           // sin documento

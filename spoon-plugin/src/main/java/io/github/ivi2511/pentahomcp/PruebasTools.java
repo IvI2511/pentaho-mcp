@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.pentaho.di.base.AbstractMeta;
+import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.trans.TransMeta;
 
 import io.github.ivi2511.pentahomcp.McpHttpServer.ToolError;
@@ -47,12 +48,13 @@ final class PruebasTools {
 
   static void register( McpHttpServer s ) {
     s.add( Tools.tool( "test_list",
-      "Lists the regression tests (golden-dataset tests) of a transformation: the *.test.json files in a tests/ or "
-        + "pruebas/ folder next to it (or in its two parent folders) whose 'transformation' points to it, or every "
-        + "test of a 'folder'. For each test: its file, the steps replaced by datasets, the captured output steps "
-        + "and tables, its tweaks and the last result in this Spoon session. Read-only.",
+      "Lists the regression tests (golden-dataset tests) of a transformation or a job: the *.test.json files in a "
+        + "tests/ or pruebas/ folder next to it (or in its two parent folders) whose 'transformation' or 'job' points "
+        + "to it, or every test of a 'folder'. For each test: its file, the steps replaced by datasets, the captured "
+        + "output steps, tables and files, its tweaks and the last result in this Spoon session. Read-only.",
       Tools.schema().document()
         .str( "transformation_file", "Absolute path of a .ktr on disk, instead of an open document", false )
+        .str( "job_file", "Absolute path of a .kjb on disk, instead of an open document", false )
         .str( "folder", "Absolute path of a tests folder: list all its tests, whatever transformation they test",
           false )
         .bool( "show_in_spoon", "Also open IDC > Tests... in Spoon for this transformation (only when the user asks to "
@@ -60,7 +62,11 @@ final class PruebasTools {
       a -> listar( a ) ) );
 
     s.add( Tools.tool( "test_create",
-      "Creates a regression test by SNAPSHOT: runs the transformation (the open document by default, unsaved "
+      "Creates a regression test by SNAPSHOT of a transformation or a JOB. For a job, steps are named 'Entry :: Step' "
+        + "(the Transformation entry and a step of its .ktr); the whole job runs like Kitchen in a separate JVM, "
+        + "entries that talk to the outside (mail, FTP, SSH, HTTP...) and SQL entries without a test database are "
+        + "skipped (skip_entry), and 'files' (files the job leaves) and 'tables' can be frozen too. "
+        + "For a transformation: runs it (the open document by default, unsaved "
         + "changes included; steps that write files or tables are skipped, so nothing is written) in a separate JVM, "
         + "freezes the rows that come out of the input steps as datasets (CSV in tests/datasets/<name>/) and the rows "
         + "of the output_steps as golden files (tests/golden/<name>/), and writes tests/<name>.test.json. When the "
@@ -73,11 +79,18 @@ final class PruebasTools {
         + "once.",
       Tools.schema().document()
         .str( "transformation_file", "Absolute path of the .ktr, instead of an open document", false )
+        .str( "job_file", "Absolute path of a .kjb (a job test), instead of an open document", false )
         .str( "name", "Test name: letters, digits, - and _ (the file is <name>.test.json)", true )
         .strList( "output_steps", "Steps whose output rows are frozen as golden data and compared when the test "
-          + "runs (usually the last step of each branch, or a step whose result matters)", true )
-        .strList( "input_steps", "Steps whose output is replaced by a frozen dataset. Default: every source step "
-          + "(no incoming hop) that leads to the outputs, except Data grid and Generate rows", false )
+          + "runs (usually the last step of each branch, or a step whose result matters). In a job: 'Entry :: Step'. "
+          + "Can be empty if 'tables' or 'files' are given", false )
+        .strList( "input_steps", "Steps whose output is replaced by a frozen dataset ('Entry :: Step' in a job). "
+          + "Default: every source step (no incoming hop) that leads to the outputs, except Data grid and Generate "
+          + "rows", false )
+        .strList( "files", "Files the run leaves (paths, may use ${Internal.Entry.Current.Directory} or "
+          + "${PENTAHO_LIVE_TEST_DIR}; relative = to the tests folder): read as CSV (comma, quotes, header, UTF-8) and "
+          + "compared with a golden copy. A file the run did not write fails the test. With files or tables nothing is "
+          + "skipped by default (what writes must write)", false )
         .raw( "key_columns", mapaDeListas( "Output step -> columns that identify a row (compare by key; default: "
           + "compare as a multiset, row order ignored)" ), false )
         .raw( "ignore_columns", mapaDeListas( "Output step -> columns that are not compared" ), false )
@@ -103,6 +116,7 @@ final class PruebasTools {
         .str( "test", "Test name (looked up among the tests of the transformation or the folder) or absolute path "
           + "of a .test.json", true )
         .str( "transformation_file", "Absolute path of a .ktr whose tests are searched", false )
+        .str( "job_file", "Absolute path of a .kjb whose tests are searched", false )
         .str( "folder", "Absolute path of the tests folder where the name is searched", false )
         .strEnum( "source", "auto (default): the open document if the transformation is open in Spoon, else the "
           + "file; open_document; file", false, AUTO, ResultadoPrueba.DEL_DOCUMENTO, ResultadoPrueba.DEL_ARCHIVO )
@@ -110,10 +124,11 @@ final class PruebasTools {
       a -> correrUna( a ) ) );
 
     s.add( Tools.tool( "test_run_all",
-      "Runs every regression test of a transformation (or of a tests folder) in one separate JVM and returns a "
-        + "summary (passed, failed, errors) and each result; the failing ones with their row diffs.",
+      "Runs every regression test of a transformation or a job (or of a tests folder) in one separate JVM and "
+        + "returns a summary (passed, failed, errors) and each result; the failing ones with their row diffs.",
       Tools.schema().document()
         .str( "transformation_file", "Absolute path of a .ktr: run its tests", false )
+        .str( "job_file", "Absolute path of a .kjb: run its tests", false )
         .str( "folder", "Absolute path of a tests folder: run all its tests", false )
         .strEnum( "source", "auto (default), open_document or file (see test_run)", false, AUTO,
           ResultadoPrueba.DEL_DOCUMENTO, ResultadoPrueba.DEL_ARCHIVO )
@@ -223,16 +238,21 @@ final class PruebasTools {
       }
     }
     String archivo = Tools.optStr( a, "transformation_file", null );
+    String argArchivo = "transformation_file";
+    if ( archivo == null ) {
+      archivo = Tools.optStr( a, "job_file", null );
+      argArchivo = "job_file";
+    }
     String doc = Tools.optStr( a, "document", null );
     if ( archivo != null ) {
-      o.ktr = absoluta( archivo, "transformation_file" );
+      o.ktr = absoluta( archivo, argArchivo );
       o.nombre = o.ktr.getName();
       final String canon = PruebasArchivos.canonica( o.ktr );
       try {
         o.docId = Docs.ui( () -> {
           for ( AbstractMeta m : Docs.abiertos() ) {
-            if ( m instanceof TransMeta && m.getFilename() != null && canon.equalsIgnoreCase( PruebasArchivos.canonica(
-              archivoDe( m ) ) ) ) {
+            if ( ( m instanceof TransMeta || m instanceof JobMeta ) && m.getFilename() != null && canon
+              .equalsIgnoreCase( PruebasArchivos.canonica( archivoDe( m ) ) ) ) {
               return Docs.id( m );
             }
           }
@@ -246,9 +266,6 @@ final class PruebasTools {
     if ( doc != null || o.carpeta == null ) {
       Object[] r = Docs.ui( () -> {
         AbstractMeta m = Docs.resolverSinActivar( a );
-        if ( !( m instanceof TransMeta ) ) {
-          throw new ToolError( "Tests are for transformations: '" + Docs.nombre( m ) + "' is a job" );
-        }
         return new Object[] { Docs.id( m ), m.getFilename() == null ? null : archivoDe( m ), Docs.nombre( m ) };
       } );
       o.docId = (String) r[ 0 ];
@@ -289,10 +306,23 @@ final class PruebasTools {
   }
 
   /** La copia del documento abierto en una carpeta temporal nueva (quien la usa la borra al terminar). */
-  static File copia( String docId, List<File> temporales ) throws Exception {
+  static File copia( final String docId, List<File> temporales ) throws Exception {
     File tmp = Files.createTempDirectory( "pentaho-live-tests-doc-" ).toFile();
     temporales.add( tmp );
-    return CorrectorTools.copiaDeDocumento( Tools.obj().put( "document", docId ), tmp ).ktr;
+    Object[] job = Docs.ui( () -> {
+      AbstractMeta m = Docs.resolverSinActivar( Tools.obj().put( "document", docId ) );
+      return m instanceof JobMeta ? new Object[] { ( (JobMeta) m ).getXML(), Docs.nombre( m ) } : null;
+    } );
+    if ( job == null ) {
+      return CorrectorTools.copiaDeDocumento( Tools.obj().put( "document", docId ), tmp ).ktr;
+    }
+    String nombre = CorrectorSandbox.limpio( String.valueOf( job[ 1 ] ) ).replaceFirst( "(?i)\\.kjb$", "" );
+    File f = new File( tmp, ( nombre.isEmpty() ? "job" : nombre ) + ".kjb" );
+    try ( java.io.OutputStream os = new java.io.FileOutputStream( f ) ) {
+      os.write( ( org.pentaho.di.core.xml.XMLHandler.getXMLHeader() + job[ 0 ] ).getBytes(
+        java.nio.charset.StandardCharsets.UTF_8 ) );
+    }
+    return f;
   }
 
   /** Las tareas de correr: una prueba ({@code test}) o todas las de la transformacion o la carpeta. */
@@ -350,7 +380,7 @@ final class PruebasTools {
     List<File> pruebas = new ArrayList<File>();
     ArrayNode carpetas = r.putArray( "tests_folders" );
     if ( o.ktr != null ) {
-      r.put( "transformation", o.ktr.getPath() );
+      r.put( esJob( o.ktr ) ? "job" : "transformation", o.ktr.getPath() );
       r.put( "default_folder", PruebasArchivos.carpetaPorDefecto( o.ktr ).getPath() );
       for ( File c : PruebasArchivos.carpetas( o.ktr ) ) {
         carpetas.add( c.getPath() );
@@ -358,7 +388,7 @@ final class PruebasTools {
       pruebas.addAll( PruebasArchivos.deTransformacion( o.ktr ) );
     } else if ( o.nombre != null ) {
       r.put( "transformation", o.nombre );
-      r.put( "note", "The transformation is not saved: tests need a .ktr file" );
+      r.put( "note", "The document is not saved: tests need a .ktr or .kjb file" );
     }
     if ( o.carpeta != null ) {
       carpetas.add( o.carpeta.getPath() );
@@ -379,7 +409,7 @@ final class PruebasTools {
       }
       final String id = o.docId;
       Docs.ui( () -> {
-        TransMeta tm = (TransMeta) Docs.resolverSinActivar( Tools.obj().put( "document", id ) );
+        AbstractMeta tm = Docs.resolverSinActivar( Tools.obj().put( "document", id ) );
         PruebasDialogo.abrir( Docs.spoon().getShell(), tm, PruebasDialogo.rotulos() );
         return null;
       } );
@@ -399,23 +429,33 @@ final class PruebasTools {
       if ( d.descripcion != null ) {
         x.put( "description", d.descripcion );
       }
-      x.put( "transformation", PruebasMotor.resolver( f.getAbsoluteFile().getParentFile(), d.transformacion )
-        .getPath() );
+      x.put( d.esJob() ? "job" : "transformation", PruebasMotor.resolver( f.getAbsoluteFile().getParentFile(),
+        d.esJob() ? d.job : d.transformacion ).getPath() );
       ArrayNode ds = x.putArray( "datasets" );
       for ( DefPrueba.Dataset s : d.datasets ) {
-        ds.add( s.step );
+        ds.add( DefPrueba.nombreCompleto( s.entrada, s.step ) );
       }
       ArrayNode out = x.putArray( "outputs" );
       for ( DefPrueba.Salida s : d.salidas ) {
-        out.add( s.step );
+        out.add( DefPrueba.nombreCompleto( s.entrada, s.step ) );
       }
       ArrayNode tb = x.putArray( "tables" );
       for ( TablaSalida t : d.tablas ) {
         tb.add( t.nombre );
       }
+      if ( !d.archivos.isEmpty() ) {
+        ArrayNode fl = x.putArray( "files" );
+        for ( DefPrueba.ArchivoSalida a : d.archivos ) {
+          fl.add( a.ruta );
+        }
+      }
       ArrayNode aj = x.putArray( "tweaks" );
       for ( DefPrueba.Ajuste j : d.ajustes ) {
-        aj.add( j.tipo + " " + ( j.deStep() ? j.step : j.nombre ) );
+        aj.add( j.tipo + " " + ( j.deStep() ? DefPrueba.nombreCompleto( j.entrada, j.step ) : j.deEntrada()
+          ? j.entrada : j.nombre ) );
+      }
+      if ( !d.entorno.usaKettleDelUsuario() ) {
+        x.put( "user_kettle_home", false );
       }
       if ( !d.bases.isEmpty() ) {
         ArrayNode b = x.putArray( "test_databases" );
@@ -562,7 +602,7 @@ final class PruebasTools {
     sinCarpeta.remove( "folder" ); // la carpeta de una prueba nueva puede no existir todavia
     Objetivo o = objetivo( sinCarpeta );
     if ( o.ktr == null ) {
-      throw new ToolError( "Save the transformation to a .ktr first: the test points to its file" );
+      throw new ToolError( "Save the transformation (.ktr) or job (.kjb) first: the test points to its file" );
     }
     PruebasMain.Creacion c = new PruebasMain.Creacion();
     c.nombre = Tools.str( a, "name" ).trim();
@@ -577,9 +617,16 @@ final class PruebasTools {
       carpeta = absoluta( f, "folder" );
     }
     c.carpeta = carpeta.getAbsolutePath();
-    c.salidas.addAll( lista( a, "output_steps" ) );
-    if ( c.salidas.isEmpty() ) {
-      throw new ToolError( "Missing argument 'output_steps': the steps whose rows are frozen as golden data" );
+    if ( a.has( "output_steps" ) && !a.get( "output_steps" ).isNull() ) {
+      c.salidas.addAll( lista( a, "output_steps" ) );
+    }
+    if ( a.has( "files" ) && !a.get( "files" ).isNull() ) {
+      c.archivos.addAll( lista( a, "files" ) );
+    }
+    boolean conTablas = a.has( "tables" ) && a.get( "tables" ).isArray() && a.get( "tables" ).size() > 0;
+    if ( c.salidas.isEmpty() && c.archivos.isEmpty() && !conTablas ) {
+      throw new ToolError( "Missing argument 'output_steps': the steps whose rows are frozen as golden data (or "
+        + "'tables' / 'files')" );
     }
     if ( a.has( "input_steps" ) && !a.get( "input_steps" ).isNull() ) {
       c.entradas = lista( a, "input_steps" );
@@ -649,12 +696,12 @@ final class PruebasTools {
     if ( doc ) {
       final String id = o.docId;
       Object[] info = Docs.ui( () -> {
-        TransMeta tm = (TransMeta) Docs.resolverSinActivar( Tools.obj().put( "document", id ) );
+        AbstractMeta tm = Docs.resolverSinActivar( Tools.obj().put( "document", id ) );
         return new Object[] { tm.hasChanged(), variables( tm ) };
       } );
       if ( Boolean.TRUE.equals( info[ 0 ] ) ) {
-        c.avisos.add( "The transformation has unsaved changes: the frozen data comes from what is open in Spoon, "
-          + "but the test runs the saved .ktr unless it is run with the open document. Save it." );
+        c.avisos.add( "The document has unsaved changes: the frozen data comes from what is open in Spoon, "
+          + "but the test runs the saved file unless it is run with the open document. Save it." );
       }
       @SuppressWarnings( "unchecked" )
       Map<String, String> vars = (Map<String, String>) info[ 1 ];
@@ -662,7 +709,8 @@ final class PruebasTools {
       ktr = copia( id, temporales );
     } else {
       try {
-        c.variables.putAll( variables( new TransMeta( o.ktr.getAbsolutePath() ) ) );
+        c.variables.putAll( variables( esJob( o.ktr ) ? new JobMeta( o.ktr.getAbsolutePath(), null )
+          : new TransMeta( o.ktr.getAbsolutePath() ) ) );
       } catch ( Exception ignored ) {
         // sin variables: la hija dira si no carga
       }
@@ -670,14 +718,38 @@ final class PruebasTools {
     return PruebasProcesos.Tarea.crear( c, ktr );
   }
 
-  /** Las variables que usa la transformacion y tienen valor en Spoon (sin las internas, parametros ni secretas). */
-  static Map<String, String> variables( TransMeta tm ) {
+  /** Un .kjb. */
+  static boolean esJob( File f ) {
+    return f != null && f.getName().toLowerCase( Locale.ROOT ).endsWith( ".kjb" );
+  }
+
+  /**
+   * Las variables que usa la transformacion o el job (y, en un job, las transformaciones de sus entradas) y tienen
+   * valor en Spoon (sin las internas, parametros ni secretas).
+   */
+  static Map<String, String> variables( AbstractMeta tm ) {
+    Map<String, String> m = variablesDe( tm );
+    if ( tm instanceof JobMeta ) {
+      for ( TransMeta t : PruebasJob.transformaciones( (JobMeta) tm ).values() ) {
+        for ( Map.Entry<String, String> e : variablesDe( t ).entrySet() ) {
+          if ( !m.containsKey( e.getKey() ) && tm.getVariable( e.getKey() ) != null ) {
+            m.put( e.getKey(), tm.getVariable( e.getKey() ) );
+          }
+        }
+      }
+    }
+    return m;
+  }
+
+  private static Map<String, String> variablesDe( AbstractMeta tm ) {
     Map<String, String> m = new LinkedHashMap<String, String>();
     List<String> parametros = new ArrayList<String>();
     for ( String p : tm.listParameters() ) {
       parametros.add( p );
     }
-    for ( String v : tm.getUsedVariables() ) {
+    List<String> usadas = tm instanceof JobMeta ? ( (JobMeta) tm ).getUsedVariables() : tm instanceof TransMeta
+      ? ( (TransMeta) tm ).getUsedVariables() : new ArrayList<String>();
+    for ( String v : usadas ) {
       if ( v == null || v.startsWith( "Internal." ) || parametros.contains( v ) || SECRETA.matcher( v ).matches() ) {
         continue;
       }

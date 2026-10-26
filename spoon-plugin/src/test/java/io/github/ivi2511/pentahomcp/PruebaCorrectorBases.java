@@ -460,6 +460,45 @@ public class PruebaCorrectorBases {
       tm.getXML() ), "" );
     igual( ResultadoCaso.ESQUEMA_AJENO, otro.motivo, "un esquema que no es de prueba" );
     contiene( otro.mensaje.texto( "es" ), "usa el esquema «contabilidad»", "en español" );
+
+    // 0.7.1, H2 (y PostgreSQL): el esquema y el SQL calificado con la base original tambien van a la de prueba;
+    // otro esquema vive dentro de la base de prueba y no bloquea
+    org.pentaho.di.trans.TransMeta th = sinServidor.trans( BasesH2.Variante.TABLE_OUTPUT );
+    ( (org.pentaho.di.trans.steps.tableoutput.TableOutputMeta) th.findStep( "Cargar dim_cliente" )
+      .getStepMetaInterface() ).setSchemaName( "gym_dw" );
+    ( (org.pentaho.di.trans.steps.tableinput.TableInputMeta) th.findStep( "Leer clientes" ).getStepMetaInterface() )
+      .setSQL( "SELECT c.id, c.nombre, c.id_ciudad FROM gym_oltp.clientes c" );
+    Preparacion ph = preparar( packH2( "H2" ), BasesH2.escribir( new File( dir, "ktr/h2esquema.ktr" ),
+      th.getXML() ), "" );
+    falso( ph.bloqueada(), "H2 con los nombres originales: corre: " + ph.detalle );
+    String xh = new String( Files.readAllBytes( ph.ktr.toPath() ), StandardCharsets.UTF_8 );
+    contiene( xh, "<schema>gym_dw_correccion</schema>", "el esquema del Table output en H2" );
+    contiene( xh, "gym_oltp_correccion.clientes c", "el SQL calificado en H2" );
+    contiene( xh, "c.id, c.nombre", "el alias no se toca" );
+    ( (org.pentaho.di.trans.steps.tableoutput.TableOutputMeta) th.findStep( "Cargar dim_cliente" )
+      .getStepMetaInterface() ).setSchemaName( "staging" );
+    Preparacion ph2 = preparar( packH2( "H2" ), BasesH2.escribir( new File( dir, "ktr/h2esquema2.ktr" ),
+      th.getXML() ), "" );
+    falso( ph2.bloqueada(), "en H2 otro esquema queda dentro de la base de prueba: " + ph2.detalle );
+    contiene( new String( Files.readAllBytes( ph2.ktr.toPath() ), StandardCharsets.UTF_8 ),
+      "<schema>staging</schema>", "y no se toca" );
+  }
+
+  /** 0.7.1: solo los nombres que califican a otro (o van tras USE) cambian; un nombre que tambien es tabla, no. */
+  public void pruebaB2_RenombrarCalificados() throws Exception {
+    java.util.Map<String, String> m = Collections.singletonMap( "gym_dw", "gym_dw_test" );
+    java.util.Set<String> amb = new HashSet<String>();
+    igual( "SELECT * FROM gym_dw_test.ventas v JOIN `gym_dw_test`.`dim` d ON v.id = d.id WHERE x = 'gym_dw.a' -- gym_dw.b",
+      CorrectorBases.renombrarCalificados( "SELECT * FROM gym_dw.ventas v JOIN `gym_dw`.`dim` d ON v.id = d.id "
+        + "WHERE x = 'gym_dw.a' -- gym_dw.b", m, amb ), "calificados, sin cadenas ni comentarios" );
+    cierto( amb.isEmpty(), "sin ambiguos" );
+    igual( "USE gym_dw_test", CorrectorBases.renombrarCalificados( "USE gym_dw", m, amb ), "USE" );
+    igual( "SELECT gym_dw FROM t", CorrectorBases.renombrarCalificados( "SELECT gym_dw FROM t", m, amb ),
+      "una columna con ese nombre no" );
+    String ventas = "SELECT ventas.importe FROM ventas";
+    igual( ventas, CorrectorBases.renombrarCalificados( ventas, Collections.singletonMap( "ventas", "ventas_test" ),
+      amb ), "la tabla ventas de la base ventas: ambiguo, no se toca" );
+    cierto( amb.contains( "ventas" ), "y queda anotado" );
   }
 
 

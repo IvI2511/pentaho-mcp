@@ -373,8 +373,10 @@ final class PruebasMotor {
         l.problema = "the run did not change " + l.archivo + " (an old file is never compared)";
       } else {
         try {
-          l.tabla = CorrectorTabla.esperada( l.archivo, a.csv == null ? DefPrueba.csvPorDefecto() : a.csv,
-            nombresColumnas( a.columnas ) );
+          if ( a.csv == null ) {
+            a.csv = csvDe( l.archivo ); // al crear: el separador del archivo queda en la prueba
+          }
+          l.tabla = CorrectorTabla.esperada( l.archivo, a.csv, nombresColumnas( a.columnas ) );
         } catch ( Exception e ) {
           l.problema = "cannot read " + l.archivo + ": " + RunMotor.primeraLinea( e );
         }
@@ -382,6 +384,45 @@ final class PruebasMotor {
       m.put( a, l );
     }
     return m;
+  }
+
+  /**
+   * Como esta escrito un archivo de files[] sin {@code csv}: el separador mas frecuente de su primera linea (fuera de
+   * comillas) entre {@code ; , | tab}; comillas dobles, encabezado y UTF-8.
+   */
+  static Pack.FormatoCsv csvDe( File f ) {
+    Pack.FormatoCsv c = DefPrueba.csvPorDefecto();
+    String linea = "";
+    try ( java.io.BufferedReader r = new java.io.BufferedReader( new java.io.InputStreamReader(
+      new java.io.FileInputStream( f ), java.nio.charset.StandardCharsets.UTF_8 ) ) ) {
+      String x = r.readLine();
+      linea = x == null ? "" : x;
+    } catch ( IOException ignored ) {
+      return c;
+    }
+    char[] candidatos = { ';', ',', '|', '\t' };
+    int mejor = 0;
+    boolean dentro = false;
+    int[] n = new int[ candidatos.length ];
+    for ( char ch : linea.toCharArray() ) {
+      if ( ch == '"' ) {
+        dentro = !dentro;
+      }
+      for ( int i = 0; i < candidatos.length && !dentro; i++ ) {
+        if ( ch == candidatos[ i ] ) {
+          n[ i ]++;
+        }
+      }
+    }
+    for ( int i = 0; i < candidatos.length; i++ ) {
+      if ( n[ i ] > n[ mejor ] ) {
+        mejor = i;
+      }
+    }
+    if ( n[ mejor ] > 0 ) {
+      c.separador = String.valueOf( candidatos[ mejor ] );
+    }
+    return c;
   }
 
   /**
