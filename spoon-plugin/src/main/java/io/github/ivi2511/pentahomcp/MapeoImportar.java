@@ -34,15 +34,12 @@ import io.github.ivi2511.pentahomcp.lint.reglas.ReglasBoceto;
  * mapping_import (D3): lee una hoja de mapeo rellenada (xlsx o csv, con los encabezados en inglés, español o
  * portugués: la que exporta mapping_export o una hecha a mano), la compara con lo que la transformación hace hoy
  * ({@link Mapeo}) y dice qué filas están implementadas, cuáles difieren y cuáles faltan, con una propuesta de steps
- * para las que faltan:
- * <ul>
- * <li>el origen llega al step destino con otro nombre → un Calculator que copia el campo con el nombre destino;</li>
- * <li>sin origen y con valor por defecto → un Add constants;</li>
- * <li>el resto (una regla que hay que programar) → un marcador del boceto (Dummy) con una nota PENDIENTE que lista
- * las filas y sus reglas.</li>
- * </ul>
+ * para las que faltan, que arma {@link MapeoReglas} leyendo la regla, el valor por defecto, el tipo y la validación
+ * (copia, constante, String operations, Replace in string, Value mapper, Calculator, Select values, Stream o
+ * Database lookup, If field value is null y Filter rows con rechazos). Lo que no se entiende entero queda como
+ * marcador del boceto (Dummy) con una nota PENDIENTE que lista las filas, sus reglas y el porqué.
  * Por defecto es un ensayo (no cambia nada); con apply=true inserta esa cadena delante del step destino, en un solo
- * Ctrl+Z. Las reglas en lenguaje natural son ambiguas: lo que no es una copia o una constante no se adivina.
+ * Ctrl+Z. Las reglas en lenguaje natural son ambiguas: lo que no se entiende no se adivina.
  */
 final class MapeoImportar {
 

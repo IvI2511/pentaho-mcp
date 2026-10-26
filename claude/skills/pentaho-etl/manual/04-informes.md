@@ -135,7 +135,7 @@ No headings, tables, links, images, code blocks or HTML (it is escaped and would
 | To talk about | Look at |
 |---|---|
 | What the ETL reads and writes, and its size | `summary` → indicators and `data` (`reads`, `writes`, `tables`, `steps`, `hops`) |
-| Where an output field comes from | `lineage` → `data.fields[].origins` and the operation of each hop (`kind`: pass, rename, calc, aggregate, lookup, join…) |
+| Where an output field comes from | `lineage` → `data.fields[].origins` and the operation of each hop (`kind`: pass, rename, calc, aggregate, lookup, join…). The steps that change a value without renaming it are `calc` with what they do: String operations («trims the spaces, upper case»), Replace in string, Strings cut, Concat fields, Split fields, Split field to rows, User defined Java expression and Modified JavaScript value (from the fields they name), Value mapper (the pairs), If field value is null, Null if, Number range, Set field value, Set field value to a constant (the field is born there), Add a checksum and Regex evaluation; the Rule of the mapping sheet says the same |
 | Fields and types | `dictionary` → tables per final output |
 | Rows, durations, slowest step | `metrics` → indicators (duration, rows read and written, errors, slowest step), the per-step table and the chart series |
 | Keys and target columns | `target_model` → `data` (tables, columns, primary and foreign keys) |
