@@ -605,7 +605,8 @@ final class PruebasJob {
           canal = j.getLogChannelId();
           RunMotor.dormir( 50 );
           String corte = null;
-          while ( !j.isFinished() ) {
+          // un Abort deja el job parado (stopped) sin marcarlo finished: tambien termino
+          while ( !j.isFinished() && !( j.isStopped() && !j.isActive() ) ) {
             if ( plan.op.cancelada.getAsBoolean() ) {
               corte = "cancelled";
               break;
@@ -895,7 +896,9 @@ final class PruebasJob {
     }
     if ( !ResultadoCaso.TERMINO.equals( run.estado ) ) {
       throw new ToolError( "The job does not run cleanly, so nothing was frozen (" + run.estado + "): "
-        + ( run.detalle == null ? "" : run.detalle ) + ( run.log == null ? "" : "\n" + run.log ) );
+        + ( run.detalle == null ? "" : run.detalle ) + ( pc.ajustes == null ? ". The default tweaks skip what writes: "
+        + "if later entries read what earlier ones write, pass the tweaks yourself (tweaks: [] runs everything) or use "
+        + "test_databases" : "" ) + ( run.log == null ? "" : "\n" + run.log ) );
     }
 
     // 2) los datasets

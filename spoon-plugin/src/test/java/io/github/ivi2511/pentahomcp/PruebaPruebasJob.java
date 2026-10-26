@@ -503,6 +503,43 @@ public class PruebaPruebasJob {
     igual( "../salida/x.csv", x.path( "files" ).get( 0 ).asText(), "los archivos" );
   }
 
+  /**
+   * Lo que encontro el chequeo en vivo: una lista de ajustes vacia ("no saltar nada") tiene que llegar a la JVM de las
+   * pruebas, y un job que termina en un Abort termina (no espera hasta el plazo).
+   */
+  public void pruebaI_ListasVaciasYAbort() throws Exception {
+    PruebasMain.Creacion c = new PruebasMain.Creacion();
+    c.ajustes = new java.util.ArrayList<DefPrueba.Ajuste>();
+    c.entradas = new java.util.ArrayList<String>();
+    PruebasMain.Creacion x = CorrectorJson.leer( CorrectorJson.escribir( c, false ), PruebasMain.Creacion.class );
+    noNulo( x.ajustes, "tweaks: [] llega como lista vacia (no como 'los de por defecto')" );
+    noNulo( x.entradas, "input_steps: [] tambien" );
+    PruebasMain.Creacion y = CorrectorJson.leer( CorrectorJson.escribir( new PruebasMain.Creacion(), false ),
+      PruebasMain.Creacion.class );
+    cierto( y.ajustes == null && y.entradas == null, "sin nada: los de por defecto" );
+
+    File dir = proyecto( "i" );
+    String abortar = "    <entry>\n      <name>Abortar</name>\n      <type>ABORT</type>\n      <message>fin</message>\n"
+      + "      <parallel>N</parallel>\n      <draw>Y</draw>\n      <nr>0</nr>\n      <xloc>200</xloc>\n"
+      + "      <yloc>100</yloc>\n    </entry>\n";
+    BasesH2.escribir( new File( dir, "aborta.kjb" ), job( "", abortar + entradaTrans( "Ventas", "03_ventas_por_producto"
+      + ".ktr" ), "Abortar", "Ventas" ) );
+    DefPrueba d = new DefPrueba();
+    d.job = "../aborta.kjb";
+    DefPrueba.Salida s = new DefPrueba.Salida( "Totales por producto" );
+    s.entrada = "Ventas";
+    d.salidas.add( s );
+    d.entorno.timeoutSeg = 60;
+    d.completar();
+    File f = new File( dir, "tests/aborta.test.json" );
+    PruebasMotor.guardar( d, f );
+    long t0 = System.currentTimeMillis();
+    ResultadoPrueba r = PruebasMotor.correr( f, op() );
+    igual( ResultadoPrueba.FALLO, r.estado, "el job aborto: " + r.mensaje );
+    contiene( r.mensaje, "The job did not finish cleanly (finished_with_errors", "termino con errores, no por plazo" );
+    cierto( System.currentTimeMillis() - t0 < 30000, "sin esperar el plazo de 60 s" );
+  }
+
   /** PruebasKettleHome: solo las conexiones de shared.xml y kettle.properties; los secretos, descifrados. */
   public void pruebaG_CopiaKettleHome() throws Exception {
     File origen = new File( base, "g/origen/.kettle" );

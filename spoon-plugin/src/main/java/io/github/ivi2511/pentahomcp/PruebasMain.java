@@ -92,15 +92,20 @@ public final class PruebasMain {
     public String original;
     @JsonProperty( "output_steps" )
     public List<String> salidas = new ArrayList<String>();
-    /** null = las fuentes. */
+    /** null = las fuentes; vacia = ninguna (por eso NON_NULL: una lista vacia tiene que llegar a la hija). */
     @JsonProperty( "input_steps" )
+    @JsonInclude( JsonInclude.Include.NON_NULL )
     public List<String> entradas;
     @JsonProperty( "key_columns" )
     public Map<String, List<String>> claves = new LinkedHashMap<String, List<String>>();
     @JsonProperty( "ignore_columns" )
     public Map<String, List<String>> ignorar = new LinkedHashMap<String, List<String>>();
-    /** null = saltar los steps que escriben. */
+    /**
+     * null = los ajustes por defecto (saltar lo que escribe); vacia = ninguno. NON_NULL: con el NON_EMPTY de la clase
+     * una lista vacia no llegaba a la hija y la ventana («no saltar nada») terminaba con los ajustes por defecto.
+     */
     @JsonProperty( "tweaks" )
+    @JsonInclude( JsonInclude.Include.NON_NULL )
     public List<DefPrueba.Ajuste> ajustes;
     @JsonProperty( "variables" )
     public Map<String, String> variables = new LinkedHashMap<String, String>();
