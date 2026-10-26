@@ -136,6 +136,68 @@ final class UndoEfecto {
   }
 
   /**
+   * Una entrada de job del historial que, cuando Spoon la clona para deshacer o rehacer, pone en su lugar las entradas y
+   * las notas de su foto de posiciones. Es como un job deshace «Ordenar lienzo» de un solo Ctrl+Z: SpoonJobDelegate no
+   * encadena acciones (ver UndoGrupo), así que las entradas y las notas que se movieron van en UNA acción de cambio
+   * sobre la primera entrada, cuya propia posición es la de la foto.
+   */
+  static final class PosicionesConFoto extends JobEntryCopy {
+    final transient JobMeta meta;
+    final transient Object[] objetos;
+    final transient org.pentaho.di.core.gui.Point[] lugares;
+
+    PosicionesConFoto( JobEntryCopy base, JobMeta meta, Object[] objetos, org.pentaho.di.core.gui.Point[] lugares,
+                       org.pentaho.di.core.gui.Point propio ) {
+      super();
+      replaceMeta( base );
+      setLocation( propio.x, propio.y );
+      this.meta = meta;
+      this.objetos = objetos;
+      this.lugares = lugares;
+    }
+
+    @Override
+    public Object clone() {
+      try {
+        for ( int i = 0; i < objetos.length; i++ ) {
+          org.pentaho.di.core.gui.Point p = lugares[ i ];
+          if ( objetos[ i ] instanceof JobEntryCopy && meta.indexOfJobEntry( (JobEntryCopy) objetos[ i ] ) >= 0 ) {
+            ( (JobEntryCopy) objetos[ i ] ).setLocation( p.x, p.y );
+          } else if ( objetos[ i ] instanceof org.pentaho.di.core.NotePadMeta
+            && meta.indexOfNote( (org.pentaho.di.core.NotePadMeta) objetos[ i ] ) >= 0 ) {
+            ( (org.pentaho.di.core.NotePadMeta) objetos[ i ] ).setLocation( p.x, p.y );
+          }
+        }
+      } catch ( RuntimeException e ) {
+        McpLifecycleListener.LOG.logDebug( "Pentaho Live: could not restore the positions on undo: " + e );
+      }
+      return super.clone();
+    }
+  }
+
+  /**
+   * Registra como UNA acción (un Ctrl+Z en un job) el movimiento de entradas y notas: 'objetos' (entradas y notas, ya
+   * movidas a 'despues') estaban en 'antes'. Cuelga de la primera entrada del job; false si el job no tiene entradas.
+   */
+  static boolean registrarPosiciones( UndoGrupo undo, JobMeta jm, Object[] objetos,
+                                      org.pentaho.di.core.gui.Point[] antes, org.pentaho.di.core.gui.Point[] despues ) {
+    if ( jm.nrJobEntries() == 0 || objetos.length == 0 ) {
+      return false;
+    }
+    JobEntryCopy c = jm.getJobEntry( 0 );
+    org.pentaho.di.core.gui.Point ahora = new org.pentaho.di.core.gui.Point( c.getLocation().x, c.getLocation().y );
+    org.pentaho.di.core.gui.Point antesPropio = ahora;
+    for ( int i = 0; i < objetos.length; i++ ) {
+      if ( objetos[ i ] == c ) {
+        antesPropio = antes[ i ];
+      }
+    }
+    undo.cambio( new Object[] { new PosicionesConFoto( c, jm, objetos, antes, antesPropio ) },
+      new Object[] { new PosicionesConFoto( c, jm, objetos, despues, ahora ) }, new int[] { 0 } );
+    return true;
+  }
+
+  /**
    * Registra en el grupo el paso de la foto antes a la actual del documento (que ya tiene el cambio hecho). Devuelve
    * false si no hay dónde colgarlo (un documento sin steps ni entradas): entonces no se deshace con Ctrl+Z.
    */

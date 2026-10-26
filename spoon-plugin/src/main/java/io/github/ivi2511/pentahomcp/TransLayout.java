@@ -8,6 +8,7 @@ import java.util.List;
 import org.pentaho.di.base.AbstractMeta;
 import org.pentaho.di.core.NotePadMeta;
 import org.pentaho.di.core.gui.Point;
+import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.job.entry.JobEntryCopy;
 import org.pentaho.di.trans.step.StepMeta;
 
@@ -66,11 +67,23 @@ final class TransLayout {
     }
 
     /**
-     * Registra el movimiento en el grupo: una accion de posicion de steps y otra de notas, encadenadas (en una
-     * transformacion, un solo Ctrl+Z; en un job Spoon no encadena y las notas son un Ctrl+Z aparte). Devuelve
-     * cuantas acciones agrego.
+     * Registra el movimiento en el grupo: en una transformacion, una accion de posicion de steps y otra de notas,
+     * encadenadas (un solo Ctrl+Z); en un job, donde Spoon no encadena acciones, entradas y notas van juntas en una sola
+     * accion ({@link UndoEfecto#registrarPosiciones}): tambien un Ctrl+Z. Devuelve cuantas acciones agrego.
      */
     int registrar( UndoGrupo u ) {
+      if ( !objetos.isEmpty() && !notas.isEmpty() && u.meta() instanceof JobMeta ) {
+        List<Object> todos = new ArrayList<Object>( objetos );
+        todos.addAll( notas );
+        List<Point> a = new ArrayList<Point>( antes );
+        a.addAll( notasAntes );
+        List<Point> d = new ArrayList<Point>( despues );
+        d.addAll( notasDespues );
+        if ( UndoEfecto.registrarPosiciones( u, (JobMeta) u.meta(), todos.toArray(), a.toArray( new Point[ 0 ] ),
+          d.toArray( new Point[ 0 ] ) ) ) {
+          return 1;
+        }
+      }
       int n = 0;
       if ( !objetos.isEmpty() ) {
         u.posicion( objetos(), indices(), antes(), despues() );

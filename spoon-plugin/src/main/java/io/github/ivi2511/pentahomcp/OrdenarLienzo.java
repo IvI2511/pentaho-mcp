@@ -73,8 +73,8 @@ final class OrdenarLienzo {
 
   /**
    * Lo mismo con opciones (modo legible/compacto, notas cerca/al margen). Los steps y las notas que se movieron van al
-   * mismo grupo de undo: en una transformacion, un Ctrl+Z; en un job Spoon no encadena acciones y las notas son un
-   * Ctrl+Z aparte (ver UndoGrupo). (UI)
+   * mismo grupo de undo: un Ctrl+Z (en un job, donde Spoon no encadena acciones, van juntos en una sola accion:
+   * TransLayout.Movimientos.registrar). (UI)
    */
   static TransLayout.Movimientos ordenar( Spoon sp, AbstractMeta m, LienzoLayout.Opciones o ) throws ToolError {
     if ( m instanceof org.pentaho.di.trans.TransMeta

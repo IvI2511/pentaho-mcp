@@ -293,13 +293,28 @@ final class LienzoLayout {
       x1 = Math.max( x1, p.x );
       y1 = Math.max( y1, p.y );
     }
-    // un hop que va hacia atras (de derecha a izquierda) o de costado: el flujo no se lee de izquierda a derecha
+    // un hop que va hacia atras (de derecha a izquierda) o de costado: el flujo no se lee de izquierda a derecha (salvo
+    // el «si falla» hacia un manejador compartido, que va debajo de la fila que lo alimenta)
+    int[] errores = new int[ g.n() ];
     for ( int[] h : g.hopsDibujados() ) {
+      if ( h[ 2 ] == ERROR ) {
+        errores[ h[ 1 ] ]++;
+      }
+    }
+    for ( int[] h : g.hopsDibujados() ) {
+      if ( h[ 2 ] == ERROR && errores[ h[ 1 ] ] >= 3 ) {
+        continue;
+      }
       if ( r.nodos[ h[ 1 ] ].x <= r.nodos[ h[ 0 ] ].x ) {
         s += P_CRUCE;
       }
     }
     return s + ( x1 + y1 ) / 100.0;
+  }
+
+  /** Lo que nunca se acepta de mas: hops por encima de steps o nombres, iconos o nombres encimados. */
+  static int graves( LienzoMetricas.Cuenta k ) {
+    return k.hopsPorPasos + k.hopsPorRotulos + k.pasosEncimados + k.rotulosEncimados;
   }
 
   static boolean iguales( Resultado a, Resultado b ) {
@@ -773,7 +788,437 @@ final class LienzoLayout {
         x[ k ] = colX[ col[ k ] ];
         y[ k ] = carril[ k ] * pasoY;
       }
+      // 7. retoques sobre las posiciones: cada uno se queda solo si no empeora nada de lo que se mide
+      Grafo l = local( g );
+      peine( l, modo, gr, colX );
+      abanicos( l, modo, gr, colX, pasoY );
+      manejadores( l, gr, pasoY );
       cajaDeNodos( g );
+    }
+
+    // ---------------------------------------------------------------- retoques (0.7.1)
+
+    /** La componente sola, con sus aristas locales y sus nombres (las posiciones se pasan al medir). */
+    private Grafo local( Grafo g ) {
+      Grafo l = new Grafo();
+      l.icono = g.icono;
+      l.grilla = g.grilla;
+      for ( int k = 0; k < nodos.size(); k++ ) {
+        int[] r = g.rotulos.get( nodos.get( k ) );
+        l.nodo( new Point( 0, 0 ), r[ 0 ], r[ 1 ] );
+      }
+      for ( int[] a : aristas ) {
+        l.arista( a[ 0 ], a[ 1 ], a[ 2 ] );
+      }
+      return l;
+    }
+
+    private static Point[] puntos( int[] xs, int[] ys ) {
+      Point[] p = new Point[ xs.length ];
+      for ( int k = 0; k < xs.length; k++ ) {
+        p[ k ] = new Point( xs[ k ], ys[ k ] );
+      }
+      return p;
+    }
+
+    private static LienzoMetricas.Cuenta medir( Grafo l, int[] xs, int[] ys ) {
+      return LienzoMetricas.medir( l, puntos( xs, ys ), null );
+    }
+
+    /** Alto de la caja de los iconos y nombres. */
+    private static int alto( Grafo l, int[] xs, int[] ys ) {
+      int y0 = Integer.MAX_VALUE;
+      int y1 = Integer.MIN_VALUE;
+      for ( int k = 0; k < xs.length; k++ ) {
+        int[] c = caja( xs[ k ], ys[ k ], l.icono, l.rotulos.get( k ) );
+        y0 = Math.min( y0, c[ 1 ] );
+        y1 = Math.max( y1, c[ 3 ] );
+      }
+      return y1 - y0;
+    }
+
+    /** Media columna para los nombres de unos nodos (como en el paso 5). */
+    private static int mitad( Grafo l, List<Integer> vs ) {
+      int h = l.icono / 2 + 1;
+      for ( int v : vs ) {
+        h = Math.max( h, Math.max( l.icono, l.rotulos.get( v )[ 0 ] + 2 ) / 2 + 1 );
+      }
+      return h;
+    }
+
+    private int[][] grados() {
+      int m = nodos.size();
+      int[][] r = new int[ 2 ][ m ];
+      for ( int[] a : aristas ) {
+        r[ 1 ][ a[ 0 ] ]++;
+        r[ 0 ][ a[ 1 ] ]++;
+      }
+      return r; // {entradas, salidas}
+    }
+
+    /**
+     * Peine: k &gt;= 3 fuentes (la columna 0 entera) que alimentan cada una a los MISMOS dos steps S y N de la columna 1
+     * (Value Mapper: Same y New). Con las fuentes una debajo de la otra son k(k-1)/2 cruces sí o sí; en una fila, con S
+     * arriba a la derecha y N abajo a la derecha, ninguno. Se queda con la fila si baja los cruces sin pasar un hop por
+     * encima de nada.
+     */
+    void peine( Grafo l, Modo modo, int gr, int[] colX ) {
+      int m = nodos.size();
+      List<Integer> fuentes = new ArrayList<Integer>();
+      for ( int k = 0; k < m; k++ ) {
+        if ( col[ k ] == 0 ) {
+          fuentes.add( k );
+        }
+      }
+      if ( fuentes.size() < 3 ) {
+        return;
+      }
+      int[][] gs = grados();
+      int s = -1;
+      int n = -1;
+      for ( int f : fuentes ) {
+        if ( f == inicio || gs[ 0 ][ f ] != 0 || gs[ 1 ][ f ] != 2 ) {
+          return;
+        }
+        int a = -1;
+        int b = -1;
+        for ( int[] e : aristas ) {
+          if ( e[ 0 ] == f ) {
+            if ( e[ 2 ] != NORMAL ) {
+              return;
+            }
+            if ( a < 0 ) {
+              a = e[ 1 ];
+            } else {
+              b = e[ 1 ];
+            }
+          }
+        }
+        int lo = Math.min( a, b );
+        int hi = Math.max( a, b );
+        if ( s < 0 ) {
+          s = lo;
+          n = hi;
+        } else if ( s != lo || n != hi ) {
+          return;
+        }
+      }
+      if ( s == n || col[ s ] != 1 || col[ n ] != 1 || gs[ 0 ][ s ] != fuentes.size() || gs[ 0 ][ n ] != fuentes
+        .size() ) {
+        return;
+      }
+      if ( y[ s ] > y[ n ] ) {
+        int t = s;
+        s = n;
+        n = t;
+      }
+      final int[] yy = y;
+      Collections.sort( fuentes, new Comparator<Integer>() {
+        @Override
+        public int compare( Integer a, Integer b ) {
+          int c = Integer.compare( yy[ a ], yy[ b ] );
+          return c != 0 ? c : a.compareTo( b );
+        }
+      } );
+      LienzoMetricas.Cuenta base = medir( l, x, y );
+      int k = fuentes.size();
+      int dp = arriba( Math.max( modo.minDx, 2 * mitad( l, fuentes ) + modo.aireRotulos ), gr );
+      int corrimiento = ( k - 1 ) * dp;
+      int yS = y[ s ];
+      int yN = y[ n ];
+      int fila = cerca( ( yS + yN ) / 2, gr );
+      int m2 = nodos.size();
+      for ( int a = arriba( l.icono * 2, gr ); a <= 12 * modo.dy; a += gr ) {
+        int[] nx = new int[ m2 ];
+        int[] ny = new int[ m2 ];
+        for ( int v = 0; v < m2; v++ ) {
+          if ( col[ v ] == 0 ) {
+            continue;
+          }
+          nx[ v ] = x[ v ] + corrimiento;
+          double t = yN == yS ? ( v == n ? 1 : 0 ) : ( y[ v ] - yS ) / (double) ( yN - yS );
+          ny[ v ] = cerca( (int) Math.round( fila - a + t * 2 * a ), gr );
+        }
+        for ( int i = 0; i < k; i++ ) {
+          nx[ fuentes.get( i ) ] = colX[ 0 ] + i * dp;
+          ny[ fuentes.get( i ) ] = fila;
+        }
+        LienzoMetricas.Cuenta c = medir( l, nx, ny );
+        if ( graves( c ) <= graves( base ) && c.cruces < base.cruces ) {
+          x = nx;
+          y = ny;
+          return;
+        }
+      }
+    }
+
+    /**
+     * Abanicos: muchas fuentes (la columna 0 entera son fuentes puras, cada una con un solo hop) que alimentan de a
+     * dos o más a un mismo step dejan el dibujo alto, una fuente por carril. Las de cada grupo se reparten en dos
+     * columnas, una sí y otra no, y los carriles se juntan (medio carril entre una fuente y la siguiente, un carril
+     * entero dentro de cada columna). Grupo por grupo (de arriba a abajo) se queda con la variante más baja que no
+     * agrega cruces ni pasa un hop por encima de un step o un nombre.
+     */
+    void abanicos( Grafo l, Modo modo, int gr, int[] colX, int pasoY ) {
+      int m = nodos.size();
+      if ( m < 5 ) {
+        return;
+      }
+      int[][] gs = grados();
+      int[] dest = new int[ m ];
+      int[] tipo = new int[ m ];
+      for ( int[] a : aristas ) {
+        dest[ a[ 0 ] ] = a[ 1 ];
+        tipo[ a[ 0 ] ] = a[ 2 ];
+      }
+      java.util.TreeMap<Integer, List<Integer>> grupos = new java.util.TreeMap<Integer, List<Integer>>();
+      List<Integer> fuentes = new ArrayList<Integer>();
+      for ( int k = 0; k < m; k++ ) {
+        if ( col[ k ] != 0 ) {
+          continue;
+        }
+        if ( k == inicio || gs[ 0 ][ k ] != 0 || gs[ 1 ][ k ] != 1 || tipo[ k ] != NORMAL || col[ dest[ k ] ] != 1 ) {
+          return; // la columna 0 no es solo de fuentes puras
+        }
+        fuentes.add( k );
+        List<Integer> gr0 = grupos.get( dest[ k ] );
+        if ( gr0 == null ) {
+          gr0 = new ArrayList<Integer>();
+          grupos.put( dest[ k ], gr0 );
+        }
+        gr0.add( k );
+      }
+      int enGrupo = 0;
+      List<Integer> objetivos = new ArrayList<Integer>();
+      for ( Map.Entry<Integer, List<Integer>> e : grupos.entrySet() ) {
+        if ( e.getValue().size() >= 2 ) {
+          enGrupo += e.getValue().size();
+          objetivos.add( e.getKey() );
+        }
+      }
+      if ( enGrupo < 4 ) {
+        return;
+      }
+      final int[] cr = carril;
+      Comparator<Integer> porCarril = new Comparator<Integer>() {
+        @Override
+        public int compare( Integer a, Integer b ) {
+          int c = Integer.compare( cr[ a ], cr[ b ] );
+          return c != 0 ? c : a.compareTo( b );
+        }
+      };
+      Collections.sort( objetivos, porCarril );
+      int u = arriba( ( pasoY + 1 ) / 2, gr );
+      int dB = arriba( Math.max( modo.minDx, 2 * mitad( l, fuentes ) + modo.aireRotulos ), gr );
+      LienzoMetricas.Cuenta base = medir( l, x, y );
+      int[][] mejor = null;
+      int altoMejor = alto( l, x, y );
+      // la columna de atras a una distancia o a una y media (mas lejos, sus hops cruzan la de adelante mas cerca del
+      // destino): se queda la que deja el dibujo mas bajo
+      for ( int lejos = 0; lejos < 2; lejos++ ) {
+        int dBx = lejos == 0 ? dB : arriba( dB + dB / 2, gr );
+        int[][] r = abanicosCon( l, objetivos, grupos, porCarril, u, dBx, colX, pasoY, base );
+        if ( r != null && alto( l, r[ 0 ], r[ 1 ] ) < altoMejor ) {
+          altoMejor = alto( l, r[ 0 ], r[ 1 ] );
+          mejor = r;
+        }
+      }
+      if ( mejor != null ) {
+        x = mejor[ 0 ];
+        y = mejor[ 1 ];
+      }
+    }
+
+    private int[][] abanicosCon( Grafo l, List<Integer> objetivos, Map<Integer, List<Integer>> grupos,
+      Comparator<Integer> porCarril, int u, int dB, int[] colX, int pasoY, LienzoMetricas.Cuenta base ) {
+      int m = nodos.size();
+      int[] lado = new int[ m ]; // 1 = columna de atras
+      int[] cr0 = carril.clone(); // el destino de un grupo puede pasar al carril de una de sus fuentes
+      int[][] mejor = null;
+      int altoMejor = alto( l, x, y );
+      for ( int t : objetivos ) {
+        List<Integer> fs = new ArrayList<Integer>( grupos.get( t ) );
+        Collections.sort( fs, porCarril );
+        List<Integer> carriles = new ArrayList<Integer>();
+        carriles.add( cr0[ t ] );
+        for ( int f : fs ) {
+          boolean libre = !carriles.contains( cr0[ f ] );
+          for ( int v = 0; v < m && libre; v++ ) {
+            libre = v == t || col[ v ] != col[ t ] || cr0[ v ] != cr0[ f ];
+          }
+          if ( libre ) {
+            carriles.add( cr0[ f ] );
+          }
+        }
+        int[] elegido = null;
+        int[] elegidoCr = null;
+        for ( int ct : carriles ) {
+          // grupos de hasta 5: todas las maneras de repartirlas; mas grandes, una si y otra no
+          int variantes = fs.size() <= 5 ? 1 << fs.size() : 2;
+          for ( int var = 0; var < variantes; var++ ) {
+            int[] ld = lado.clone();
+            for ( int i = 0; i < fs.size(); i++ ) {
+              ld[ fs.get( i ) ] = fs.size() <= 5 ? ( var >> i ) & 1 : ( i + var ) % 2;
+            }
+            int[] crs = cr0.clone();
+            crs[ t ] = ct;
+            int[][] xy = empaquetar( ld, crs, u, dB, colX, pasoY );
+            LienzoMetricas.Cuenta c = medir( l, xy[ 0 ], xy[ 1 ] );
+            if ( graves( c ) > graves( base ) || c.cruces > base.cruces ) {
+              continue;
+            }
+            int h = alto( l, xy[ 0 ], xy[ 1 ] );
+            if ( h < altoMejor ) {
+              altoMejor = h;
+              elegido = ld;
+              elegidoCr = crs;
+              mejor = xy;
+            }
+          }
+        }
+        if ( elegido != null ) {
+          lado = elegido;
+          cr0 = elegidoCr;
+        }
+      }
+      return mejor;
+    }
+
+    /**
+     * Las posiciones con las fuentes de 'lado' = 1 en una columna de atras: los carriles se apilan de arriba a abajo,
+     * cada uno medio carril debajo del anterior como minimo y un carril entero debajo del ultimo nodo de cada una de
+     * sus columnas.
+     */
+    private int[][] empaquetar( int[] lado, int[] carril, int u, int dB, int[] colX, int pasoY ) {
+      int m = nodos.size();
+      int max = 0;
+      for ( int k = 0; k < m; k++ ) {
+        max = Math.max( max, carril[ k ] );
+      }
+      List<List<Integer>> porCarril = new ArrayList<List<Integer>>();
+      for ( int c = 0; c <= max; c++ ) {
+        porCarril.add( new ArrayList<Integer>() );
+      }
+      for ( int k = 0; k < m; k++ ) {
+        porCarril.get( carril[ k ] ).add( k );
+      }
+      int[] yc = new int[ max + 1 ];
+      Map<Integer, Integer> ultimo = new HashMap<Integer, Integer>();
+      for ( int c = 0; c <= max; c++ ) {
+        int v0 = c == 0 ? 0 : yc[ c - 1 ] + u;
+        for ( int v : porCarril.get( c ) ) {
+          Integer p = ultimo.get( col[ v ] == 0 && lado[ v ] == 1 ? -1 : col[ v ] );
+          if ( p != null ) {
+            v0 = Math.max( v0, p + pasoY );
+          }
+        }
+        yc[ c ] = v0;
+        for ( int v : porCarril.get( c ) ) {
+          ultimo.put( col[ v ] == 0 && lado[ v ] == 1 ? -1 : col[ v ], v0 );
+        }
+      }
+      int[] nx = new int[ m ];
+      int[] ny = new int[ m ];
+      for ( int k = 0; k < m; k++ ) {
+        nx[ k ] = col[ k ] == 0 && lado[ k ] == 1 ? colX[ 0 ] - dB : colX[ col[ k ] ];
+        ny[ k ] = yc[ carril[ k ] ];
+      }
+      return new int[][] { nx, ny };
+    }
+
+    /**
+     * Manejadores de error compartidos (en un job, «Registrar el error» con ocho entradas que le mandan su «si
+     * falla»): si tres o más nodos de una misma fila le mandan su hop de error, el manejador (y lo que cuelga solo de
+     * él, como «Abortar») va DEBAJO de esa fila, en el x y la profundidad mas chicos en que ningún hop pasa por encima
+     * de un step o de un nombre y no hay más cruces que antes.
+     */
+    void manejadores( Grafo l, int gr, int pasoY ) {
+      int m = nodos.size();
+      for ( int h = 0; h < m; h++ ) {
+        List<Integer> fs = new ArrayList<Integer>();
+        for ( int[] a : aristas ) {
+          if ( a[ 1 ] == h && a[ 2 ] == ERROR && !fs.contains( a[ 0 ] ) ) {
+            fs.add( a[ 0 ] );
+          }
+        }
+        if ( fs.size() < 3 ) {
+          continue;
+        }
+        int fila = y[ fs.get( 0 ) ];
+        java.util.TreeSet<Integer> xs = new java.util.TreeSet<Integer>();
+        boolean misma = true;
+        for ( int f : fs ) {
+          misma &= y[ f ] == fila;
+          xs.add( x[ f ] );
+        }
+        if ( !misma || xs.size() < 3 ) {
+          continue;
+        }
+        // lo que cuelga solo del manejador
+        List<Integer> sub = new ArrayList<Integer>();
+        sub.add( h );
+        boolean crecio = true;
+        while ( crecio ) {
+          crecio = false;
+          for ( int[] a : aristas ) {
+            if ( sub.contains( a[ 0 ] ) && !sub.contains( a[ 1 ] ) ) {
+              boolean solo = true;
+              for ( int[] b : aristas ) {
+                if ( b[ 1 ] == a[ 1 ] && !sub.contains( b[ 0 ] ) ) {
+                  solo = false;
+                }
+              }
+              if ( solo ) {
+                sub.add( a[ 1 ] );
+                crecio = true;
+              }
+            }
+          }
+        }
+        boolean cruzaFila = false;
+        for ( int v : sub ) {
+          cruzaFila |= fs.contains( v );
+        }
+        if ( cruzaFila ) {
+          continue;
+        }
+        // x candidatas: las de las fuentes y los puntos medios, la mas cercana a la mediana primero
+        List<Integer> cand = new ArrayList<Integer>();
+        Integer prev = null;
+        for ( int v : xs ) {
+          if ( prev != null ) {
+            cand.add( arriba( ( prev + v ) / 2, gr ) );
+          }
+          cand.add( v );
+          prev = v;
+        }
+        List<Integer> lx = new ArrayList<Integer>( xs );
+        final int med = lx.get( lx.size() / 2 );
+        Collections.sort( cand, new Comparator<Integer>() {
+          @Override
+          public int compare( Integer a, Integer b ) {
+            int c = Integer.compare( Math.abs( a - med ), Math.abs( b - med ) );
+            return c != 0 ? c : a.compareTo( b );
+          }
+        } );
+        LienzoMetricas.Cuenta base = medir( l, x, y );
+        int[] nx = x.clone();
+        int[] ny = y.clone();
+        busca: for ( int yh = arriba( fila + pasoY, gr ); yh <= fila + 10 * pasoY; yh += gr ) {
+          for ( int xh : cand ) {
+            for ( int v : sub ) {
+              nx[ v ] = xh + ( x[ v ] - x[ h ] );
+              ny[ v ] = yh + ( y[ v ] - y[ h ] );
+            }
+            LienzoMetricas.Cuenta c = medir( l, nx, ny );
+            if ( graves( c ) <= graves( base ) && c.cruces <= base.cruces ) {
+              x = nx;
+              y = ny;
+              break busca;
+            }
+          }
+        }
+      }
     }
 
     private int maxAlto( Grafo g ) {
