@@ -95,12 +95,23 @@ final class PlanoTools {
         + "kind and format) unconfigured, with the same notes; stages with no clear step stay placeholders. Stages "
         + "already on the canvas (same name) are skipped. pace=lesson plays it as a class-mode lesson (one stage per "
         + "step, Next in the Lesson tab) instead. The transformation keeps a link to the plan: the IDC menu shows "
-        + "the sketch progress, lint_etl flags the placeholders left (placeholder_step) and plan_check compares.",
+        + "the sketch progress, lint_etl flags the placeholders left (placeholder_step) and plan_check compares. "
+        + "job=true (or transformation=<orchestration.name>) builds the ORCHESTRATION JOB instead, in a NEW job "
+        + "document (close it without saving to undo it; Spoon does not chain undo in jobs) or, if a job linked to the "
+        + "plan is open, adding only the missing entries in one Ctrl+Z: START, a Check files exist of the sources, "
+        + "Create folder of the outputs, a SQL entry with the CREATE TABLE of the target tables (derived from the "
+        + "transformations already built in orchestration.folder; DROP + CREATE for load overwrite), one TRANS per "
+        + "transformation in dependency order (dimensions before facts, or orchestration.order), SUCCESS, the failure "
+        + "path of on_failure (Write to log + Abort; continue = unconditional hops) and a note. In sketch mode the "
+        + "entries are placeholders (DUMMY + TO DO note) that fill_placeholder without 'type' turns into the planned "
+        + "entry. Save it as the 'save_as' path of the result.",
       Tools.schema().document()
         .str( "plan", "Absolute path of the plan file", true )
         .str( "transformation", "Which transformation of the plan (its 'transformation' name). Required if the plan "
-          + "has several", false )
-        .strEnum( "mode", "sketch (placeholders, default) or steps (suggested step types)", false, "sketch", "steps" )
+          + "has several. The orchestration name builds the job", false )
+        .bool( "job", "Build the orchestration job of the plan instead of a transformation. Default false", false )
+        .strEnum( "mode", "sketch (placeholders, default) or steps (suggested step types; for the job, configured "
+          + "entries; 'full' is the same)", false, "sketch", "steps", "full" )
         .strEnum( "pace", "normal (default) or lesson", false, "normal", "lesson" )
         .strEnum( "lesson_pace", "With pace=lesson: guided (default), auto or manual", false, "guided", "auto",
           "manual" )
@@ -129,9 +140,12 @@ final class PlanoTools {
       "Replaces a placeholder of the sketch (a Dummy left by plan_build) with the real step, or a chain of steps: the "
         + "first one gets the hops that went into the placeholder, the last one gives the hops that went out, and the "
         + "TO DO note is removed (keep_note=true keeps it). The new steps keep the link to the plan's stage. One "
-        + "Ctrl+Z brings the placeholder back. Configure them with config_xml here or later with configure_step.",
+        + "Ctrl+Z brings the placeholder back. Configure them with config_xml here or later with configure_step. In a "
+        + "JOB sketch (plan_build job=true) it replaces a placeholder entry with ONE entry: without 'type' the planned "
+        + "one (Check files exist, Create folder, SQL, TRANS...), or the 'type' + config_xml you pass; its hops keep "
+        + "their conditions; one Ctrl+Z.",
       Tools.schema().document()
-        .str( "step", "Name of the placeholder (Dummy) step", true )
+        .str( "step", "Name of the placeholder (Dummy step, or DUMMY entry of a job)", true )
         .str( "type", "Step type id of the replacement (one step). Or use 'steps'", false )
         .str( "name", "Name of the replacement (default: the placeholder's)", false )
         .str( "config_xml", "Only the configuration tags that differ from get_step_template", false )
@@ -139,6 +153,16 @@ final class PlanoTools {
         .bool( "keep_note", "Keep the TO DO note. Default false", false ).build(),
       a -> Docs.ui( () -> {
         Spoon sp = Docs.spoon();
+        AbstractMeta doc = Docs.resolver( a );
+        if ( doc instanceof JobMeta ) {
+          JobMeta jm = (JobMeta) doc;
+          boolean pide = a.hasNonNull( "type" ) || a.hasNonNull( "steps" );
+          ObjectNode o = PlanoJob.rellenar( sp, jm, Tools.str( a, "step" ), pide ? PlanoConstruir.piezas( a )
+            : null, Tools.optBool( a, "keep_note", false ), sp.getMetaStore() );
+          Docs.touched( jm );
+          o.put( "document", Docs.id( jm ) );
+          return o;
+        }
         TransMeta tm = Docs.trans( a );
         List<PlanoConstruir.Pieza> ps = PlanoConstruir.piezas( a );
         ObjectNode o = PlanoConstruir.rellenar( tm, Tools.str( a, "step" ), ps, Tools.optBool( a, "keep_note", false ),

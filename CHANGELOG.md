@@ -18,6 +18,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   confirmation; the password is never read nor touched). Both are one Ctrl+Z, in a job too; `${DB_HOST_<CONN>}`
   satisfies a profile that asks for `DB_HOST`.
 - `diff_documents`: `two_tabs` (with `show_on_canvas`) opens the other version in a new tab, as Compare… > Two tabs.
+- **`plan_build` builds the orchestration job** (`job=true`, or `transformation=<orchestration.name>`): START,
+  Check files exist of the file sources, Create folder of the outputs, a SQL entry with the `CREATE TABLE` of the
+  target tables (derived from the transformations already built, on a temporary SQLite copy, never opening the
+  user's database; `DROP` + `CREATE` for `load: overwrite`), one TRANS per transformation in dependency order
+  (dimensions before facts, or `orchestration.order`), SUCCESS, the failure path of `on_failure` (Write to log +
+  Abort, red hops from every entry; `continue` = black hops; an e-mail in `notify` = a placeholder) and a note. It
+  goes to a new job document (close it to undo it), or, into the open job linked to the plan, adding only what is
+  missing in **one Ctrl+Z** (a snapshot of the job canvas carried by one entry change: Spoon does not chain undo in
+  jobs). `mode=sketch` leaves placeholders with TO DO notes; `fill_placeholder` on a job puts the planned entry
+  (or the one passed). `plan_check` reports `job_placeholder_left` and `job_without_input_check`; the Design
+  perspective builds the job sketch. The Grano de Oro job built from the plan has the structure of
+  `solucion-referencia/job_carga_dw.kjb` and Kitchen runs it on a copy of `ejemplo/` (29 of 29 checks).
+- **`mapping_import` proposes real steps** from the Rule, Default, Type and Validation cells (en/es/pt, read
+  conservatively): String operations, Replace in string, Value mapper, Calculator (arithmetic, rounding, date
+  parts), Select values (type and format), Stream lookup / Database lookup, If field value is null, Add constants
+  and Filter rows with the failing rows to a rejects placeholder. What it does not fully understand stays a sketch
+  placeholder and the row says `why`. Rows carry `proposal` and `steps`; apply is still one Ctrl+Z.
 
 ### Changed
 
@@ -39,6 +56,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The dashed arrow of a removed hop on the canvas started at the source's centre and crossed its icon: it now goes
   from icon edge to icon edge, with an arrowhead, like Spoon's hops.
+- **Field lineage of the steps that change values**: String operations, Replace in string, Strings cut, Concat
+  fields, Split fields, Split field to rows, User defined Java expression, Modified JavaScript value, Value
+  mapper, If field value is null, Null if, Number range, Set field value, Set field value to a constant, Add a
+  checksum and Regex evaluation were «no change» (pass); now they are `calc` with what they do, in the own engine
+  and in the metaverse path, so the mapping sheet's Rule and the lineage report section show the transformation.
+
 ## [0.7.0] - 2026-10-26
 
 ### Added

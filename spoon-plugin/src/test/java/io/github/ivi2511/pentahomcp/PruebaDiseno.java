@@ -133,7 +133,8 @@ public class PruebaDiseno {
     } );
     contiene( panel.ultimoEstado, "Grano de Oro", "estado con el nombre" );
     contiene( panel.ultimoEstado, "29 etapas en 5 transformaciones", "estado con las cuentas" );
-    igual( 5, (int) ui( () -> panel.transformacion.getItemCount() ), "las cinco transformaciones" );
+    igual( 6, (int) ui( () -> panel.transformacion.getItemCount() ), "las cinco transformaciones y el job" );
+    igual( "Job: job_carga_dw", ui( () -> panel.transformacion.getItem( 5 ) ), "el job de la orquestación al final" );
     cierto( ui( () -> panel.construir.getEnabled() && panel.exportar.getEnabled() ), "acciones habilitadas" );
     noNulo( panel.html, "documento del plano" );
     String h = new String( Files.readAllBytes( panel.html.toPath() ), StandardCharsets.UTF_8 );

@@ -51,7 +51,8 @@ import io.github.ivi2511.pentahomcp.informes.Rotulos;
  * Para cada step pide sus campos de salida a {@link Contexto#salida} (memo y timeout compartidos) y
  * anota de donde sale cada uno: step anterior, campo y operacion. Hay reglas para Select values,
  * Calculator (las constantes son valores, no campos), Group by, Memory group by, Stream lookup, Merge join,
- * Multiway merge join, Formula y las filas de error; para el resto, mismo nombre en un step anterior =
+ * Multiway merge join, Formula, los steps que cambian valores ({@link LinajeValores}: String operations, Replace in
+ * string, Value mapper, If field value is null...) y las filas de error; para el resto, mismo nombre en un step anterior =
  * pasa igual, sin steps anteriores = fuente, y si no, creado por el step. Los steps anteriores son los de
  * {@code findPreviousSteps(s, true)} menos los de {@code getInfoStep}; si el campo no viene de ninguno, se
  * busca en los de {@code getInfoStep} (Append, Merge rows...: sus filas llegan por streams de info).
@@ -210,6 +211,8 @@ final class LinajePropio {
   private final Map<String, String> bloqueos = new HashMap<>();
   private final Set<String> bloqueando = new HashSet<>();
   private final Map<String, Pendiente> pendientes = new LinkedHashMap<>();
+  /** step -&gt; los campos a los que les cambia el valor ({@link LinajeValores}). */
+  private final Map<String, Map<String, LinajeValores.Cambio>> cambios = new HashMap<>();
 
   LinajePropio( TransMeta tm, Contexto ctx ) {
     this.tm = tm;
@@ -540,6 +543,39 @@ final class LinajePropio {
       }
     }
 
+    // steps que cambian el valor sin cambiar el nombre (String operations, Value mapper, If field value is null...)
+    // o que crean un campo a partir de otros (Concat fields, Split fields...): antes quedaban como «pasa igual»
+    for ( LinajeValores.Cambio c : cambios( s ).values() ) {
+      int k = in.salida.indexOfValue( c.sale );
+      String sale = k < 0 ? null : in.salida.getValueMeta( k ).getName();
+      if ( sale == null || hechos.contains( sale ) ) {
+        continue;
+      }
+      hechos.add( sale );
+      if ( c.entran.isEmpty() ) {
+        in.nace.put( sale, new String[] { CREA, c.op } );
+        continue;
+      }
+      for ( String a : c.entran ) {
+        String clase = c.op != null ? CALCULA : a.equals( sale ) ? PASA : RENOMBRA;
+        String op = c.op != null ? c.op : PASA.equals( clase ) ? null : a + " → " + sale;
+        boolean alguno = false;
+        for ( StepMeta p : normales ) {
+          RowMetaInterface cp = campos( p );
+          int i = cp == null ? -1 : cp.indexOfValue( a );
+          if ( i >= 0 ) {
+            ref( in, sale, new Ref( p.getName(), cp.getValueMeta( i ).getName(), clase, op, null ) );
+            alguno = true;
+          }
+        }
+        if ( !alguno ) {
+          for ( StepMeta p : normales ) {
+            ref( in, sale, new Ref( p.getName(), a, clase, op, null ) );
+          }
+        }
+      }
+    }
+
     // filas de error que llegan de un step anterior: sus campos de error nacen en ese step
     for ( StepMeta p : conError ) {
       StepErrorMeta em = p.getStepErrorMeta();
@@ -628,6 +664,25 @@ final class LinajePropio {
     return c.getType() != ValueMetaInterface.TYPE_NONE || c.getLength() != -2 || c.getPrecision() != -2
       || !vacio( c.getConversionMask() ) || !vacio( c.getDecimalSymbol() ) || !vacio( c.getGroupingSymbol() )
       || !vacio( c.getCurrencySymbol() ) || !vacio( c.getEncoding() ) || c.getStorageType() > 0;
+  }
+
+  /** Los cambios de valor del step (memo por step). */
+  private Map<String, LinajeValores.Cambio> cambios( StepMeta s ) {
+    Map<String, LinajeValores.Cambio> m = cambios.get( s.getName() );
+    if ( m == null ) {
+      m = LinajeValores.TIPOS.contains( s.getStepID() ) ? LinajeValores.de( s, campos( s ), rot )
+        : new LinkedHashMap<String, LinajeValores.Cambio>();
+      cambios.put( s.getName(), m );
+    }
+    return m;
+  }
+
+  /** Lo que el step le hace al valor del campo de salida (String operations, Value mapper...), o null. */
+  LinajeValores.Cambio cambio( StepMeta s, String campo ) {
+    if ( s == null || campo == null || !LinajeValores.TIPOS.contains( s.getStepID() ) ) {
+      return null;
+    }
+    return sinMayusculas( cambios( s ), campo );
   }
 
   private static Set<String> referenciasFormula( String expr ) {
@@ -938,6 +993,10 @@ final class LinajePropio {
     if ( calcula ) {
       return new String[] { CALCULA, null };
     }
+    LinajeValores.Cambio cv = cambio( s, campo );
+    if ( cv != null && cv.op != null && ( cv.entran.isEmpty() || contiene( cv.entran, previo.campo ) ) ) {
+      return new String[] { CALCULA, null }; // metaverse no siempre informa la operacion de estos steps
+    }
     if ( m instanceof StreamLookupMeta ) {
       StreamLookupMeta l = (StreamLookupMeta) m;
       if ( previo.step.equals( fuenteLookup( l ) ) ) {
@@ -963,6 +1022,15 @@ final class LinajePropio {
     return new String[] { PASA, null };
   }
 
+  private static boolean contiene( List<String> l, String x ) {
+    for ( String y : l ) {
+      if ( y.equalsIgnoreCase( x ) ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private static boolean esValor( StreamLookupMeta l, String valor, String sale ) {
     for ( int i = 0; l.getValue() != null && i < l.getValue().length; i++ ) {
       String n = vacio( l.getValueName()[ i ] ) ? l.getValue()[ i ] : l.getValueName()[ i ];
@@ -983,6 +1051,10 @@ final class LinajePropio {
     }
     try {
       StepMetaInterface m = s.getStepMetaInterface();
+      LinajeValores.Cambio cv = CALCULA.equals( clase ) ? cambio( s, sale ) : null;
+      if ( cv != null && cv.op != null ) {
+        return cv.op;
+      }
       if ( CALCULA.equals( clase ) && m instanceof CalculatorMeta ) {
         CalculatorMetaFunction[] fs = ( (CalculatorMeta) m ).getCalculation();
         int k = definicion( fs, sale, fs.length );

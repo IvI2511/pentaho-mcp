@@ -287,6 +287,32 @@ final class PlanoDeriva {
         res.hallazgos.add( new Hallazgo( "job_without_failure_path", AVISO, null, null, r.f( "der.sin_falla", nj ) ) );
       }
     }
+    // marcadores del boceto del job (plan_build job=true mode=sketch)
+    List<String> marcadores = new ArrayList<String>();
+    boolean compruebaArchivos = false;
+    for ( JobEntryCopy c : jm.getJobCopies() ) {
+      if ( PlanoJob.esMarcador( c ) ) {
+        marcadores.add( c.getName() );
+        compruebaArchivos |= "FILES_EXIST".equals( c.getAttribute( ReglasBoceto.GRUPO, PlanoJob.K_TIPO ) );
+      } else if ( c.getEntry() != null ) {
+        String id = c.getEntry().getPluginId();
+        compruebaArchivos |= "FILES_EXIST".equals( id ) || "FILE_EXISTS".equals( id );
+      }
+    }
+    if ( !marcadores.isEmpty() ) {
+      res.hallazgos.add( new Hallazgo( "job_placeholder_left", INFO, null, null, r.f( "der.job_marcadores", nj,
+        marcadores.size(), String.join( ", ", marcadores ) ) ) );
+    }
+    List<String> archivos = new ArrayList<String>();
+    for ( Fuente f : p.fuentes ) {
+      if ( f.ubicacion != null && f.formato != null && f.formato.matches( "csv|text|excel|json|xml" ) ) {
+        archivos.add( f.nombre );
+      }
+    }
+    if ( !archivos.isEmpty() && !compruebaArchivos ) {
+      res.hallazgos.add( new Hallazgo( "job_without_input_check", INFO, null, null, r.f( "der.job_sin_comprobar",
+        String.join( ", ", archivos ), nj ) ) );
+    }
   }
 
   /** Las transformaciones que corre el job (nombre de archivo sin .ktr, en minúsculas), en el orden de los hops. */
@@ -332,6 +358,11 @@ final class PlanoDeriva {
   }
 
   private static String transDe( JobEntryCopy c ) {
+    if ( PlanoJob.esMarcador( c ) && "TRANS".equals( c.getAttribute( ReglasBoceto.GRUPO, PlanoJob.K_TIPO ) ) ) {
+      // un marcador del boceto del job que va a ser un TRANS: cuenta para el orden (ya se avisa que es marcador)
+      String f = valor( String.valueOf( c.getAttribute( ReglasBoceto.GRUPO, PlanoJob.K_CONFIG ) ), "filename" );
+      return f == null || f.isEmpty() ? null : Plano.sinKtr( f ).toLowerCase( Locale.ROOT );
+    }
     if ( c.getEntry() == null || !"TRANS".equals( c.getEntry().getPluginId() ) ) {
       return null;
     }
