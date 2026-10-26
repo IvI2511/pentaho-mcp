@@ -122,7 +122,8 @@ public class PruebaPruebasMcp {
    */
   public void pruebaD_LineaDeComandos() throws Exception {
     File resumen = new File( base, "resumen-pruebas.md" );
-    Object[] r = cli( dir, "test", "--all", "--format", "github", "--summary", resumen.getAbsolutePath() );
+    Object[] r = cli( dir, "test", "--all", "--format", "github", "--summary", resumen.getAbsolutePath(), "--lang",
+      "en" );
     igual( 1, r[ 0 ], "la del Group by cambiado falla: " + r[ 1 ] + r[ 2 ] );
     contiene( (String) r[ 1 ], "::error file=tests/ventas.test.json,title=pentaho-live test ventas::", "anotación" );
     contiene( (String) r[ 1 ], "FAIL  ventas  failed", "en texto" );
@@ -144,7 +145,7 @@ public class PruebaPruebasMcp {
 
     File vacia = new File( base, "sin-pruebas" );
     vacia.mkdirs();
-    r = cli( vacia, "test" );
+    r = cli( vacia, "test", "--lang", "en" );
     igual( 0, r[ 0 ], "sin pruebas: 0" );
     contiene( (String) r[ 1 ], "nothing to run", "lo dice" );
     igual( 2, cli( dir, "test", "--format", "xml" )[ 0 ], "uso: --format" );

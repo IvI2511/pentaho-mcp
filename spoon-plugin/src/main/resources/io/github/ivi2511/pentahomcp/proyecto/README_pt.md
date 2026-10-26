@@ -30,6 +30,7 @@ Projeto de ETL com Pentaho Data Integration 9.4 e [Pentaho Live](https://github.
 pentaho-live lint etl              # usa .pentaho-live/lint.yaml; sai com 1 se algum não chega ao mínimo
 pentaho-live lint etl --format json
 pentaho-live test --all            # cada *.test.json; sai com 1 se algum falha
+pentaho-live test --all --lang pt  # o mesmo em português (en, es, pt; por padrão, o idioma do sistema)
 pentaho-live diff --rev main --format markdown   # o que mudou em cada .ktr/.kjb desde main, por significado
 ```
 
@@ -38,6 +39,8 @@ No Spoon: **IDC > Revisar qualidade...** mostra "Perfil: {{NAME}}" e os achados 
 ## Integração contínua
 
 `.github/workflows/pentaho-live.yml` instala o PDI CE 9.4 com o Pentaho Live (com cache) e, em cada pull request e push para `main`, passa o linter com o perfil em todo `etl/`, roda os testes com datasets dourados e escreve no resumo do job o diff semântico dos `.ktr`/`.kjb` alterados contra a branch base. O mesmo diff pode ir como comentário no pull request: defina `PENTAHO_LIVE_PR_COMMENT: "true"` e descomente `pull-requests: write` no workflow.
+
+**Como ler uma execução.** Abra a execução na aba **Actions** do repositório (ou **Details** ao lado da verificação do pull request). Cada achado do linter e cada teste que não passa é uma anotação (`::error` / `::warning`) no seu arquivo: elas aparecem no quadro **Annotations** da execução e, num pull request, também em **Files changed** quando o arquivo faz parte dele. A página **Summary** da execução tem três seções: a nota de lint de cada arquivo, cada teste com a primeira diferença encontrada (chave, coluna, valor esperado e obtido) e o diff semântico dos `.ktr`/`.kjb` alterados. Um ✗ vermelho no passo dos testes quer dizer que uma saída dourada mudou: se a mudança foi de propósito, crie o teste de novo (`test_create` com `replace: true`) no mesmo pull request. Mais em [manual/13-proyecto.md](https://github.com/IvI2511/pentaho-mcp/blob/main/claude/skills/pentaho-etl/manual/13-proyecto.md#reading-a-ci-run).
 
 ## Diff legível no git
 

@@ -81,7 +81,7 @@ final class CorrectorProcesos implements Closeable {
     "--add-modules", "--patch-module" );
   private static final List<String> PREFIJOS_COPIADOS = Arrays.asList( "--add-opens=", "--add-exports=",
     "--add-reads=", "--add-modules=", "--patch-module=", "--illegal-access=", "-Djava.locale.providers=",
-    "-Djava.endorsed.dirs=" );
+    "-Djava.endorsed.dirs=", "-XX:+IgnoreUnrecognizedVMOptions" ); // el de pentaho-live: Java 8 salta los --add-opens
 
   /** Como lanzar y vigilar. */
   static final class Opciones {

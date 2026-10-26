@@ -65,8 +65,8 @@ public final class Rutas {
         continue;
       }
       String v = e.getTextContent().trim();
-      if ( v.isEmpty() || v.equals( "/" ) ) {
-        continue;
+      if ( v.isEmpty() || v.equals( "/" ) || v.equals( "Y" ) || v.equals( "N" ) ) {
+        continue; // Y/N: un interruptor con «path» en el tag (defaultPathLeafToNull de JSON input), no una ruta
       }
       Ruta r = new Ruta();
       r.tag = nombreDeFile ? "file/name" : t;

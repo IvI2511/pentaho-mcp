@@ -30,6 +30,7 @@ Las fija `.pentaho-live/lint.yaml` y las comprueban, sin configurar nada, Claude
 pentaho-live lint etl              # usa .pentaho-live/lint.yaml; sale con 1 si alguno no llega al mínimo
 pentaho-live lint etl --format json
 pentaho-live test --all            # cada *.test.json; sale con 1 si alguna falla
+pentaho-live test --all --lang es  # lo mismo en español (en, es, pt; por defecto, el idioma del sistema)
 pentaho-live diff --rev main --format markdown   # qué cambió en cada .ktr/.kjb desde main, por significado
 ```
 
@@ -38,6 +39,8 @@ En Spoon: menú **IDC > Revisar calidad…** muestra «Perfil: {{NAME}}» y los 
 ## Integración continua
 
 `.github/workflows/pentaho-live.yml` instala PDI CE 9.4 con Pentaho Live (con caché) y, en cada pull request y push a `main`, pasa el linter con el perfil a todo `etl/`, corre las pruebas con datasets dorados y escribe en el resumen del job el diff semántico de los `.ktr`/`.kjb` cambiados contra la rama base. El mismo diff puede ir como comentario en la pull request: pon `PENTAHO_LIVE_PR_COMMENT: "true"` y descomenta `pull-requests: write` en el workflow.
+
+**Cómo leer una ejecución.** Abre la ejecución en la pestaña **Actions** del repositorio (o **Details** junto a la comprobación de la pull request). Cada hallazgo del linter y cada prueba que no pasa es una anotación (`::error` / `::warning`) en su archivo: las ves en el recuadro **Annotations** de la ejecución y, en una pull request, también en **Files changed** si el archivo forma parte de ella. La página **Summary** de la ejecución tiene tres secciones: la nota de lint de cada archivo, cada prueba con la primera diferencia que encontró (clave, columna, valor esperado y obtenido) y el diff semántico de los `.ktr`/`.kjb` cambiados. Una ✗ roja en el paso de las pruebas quiere decir que cambió una salida dorada: si el cambio era a propósito, vuelve a crear la prueba (`test_create` con `replace: true`) en la misma pull request. Más en [manual/13-proyecto.md](https://github.com/IvI2511/pentaho-mcp/blob/main/claude/skills/pentaho-etl/manual/13-proyecto.md#reading-a-ci-run).
 
 ## Diff legible en git
 

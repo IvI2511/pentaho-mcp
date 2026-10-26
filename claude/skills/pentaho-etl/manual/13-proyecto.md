@@ -134,9 +134,12 @@ pentaho-live diff --rev origin/main --format markdown   # every .ktr/.kjb change
 
 Exit code: **0** every file reaches the minimum (`--min-score`, else the profile's `min_score`, else none);
 **1** a file is below it, could not be loaded, or its profile could not be read; **2** a usage error or a
-`--profile` that does not exist. Kettle's own log goes to stderr, so `--format json` can be piped. No Spoon is
-needed: the launcher runs `io.github.ivi2511.pentahomcp.ProyectoMain` with PDI's `lib/` and the plugin's jar.
-On macOS/Linux, `launcher/pentaho-live` does the same with `PDI_HOME` (default `~/pentaho/data-integration`).
+`--profile` that does not exist. Kettle's own log goes to stderr, so `--format json` can be piped; since 0.7.1
+without the hundreds of "Unexpected error registering jar plugin file" / `ClassNotFoundException: ...Dialog` lines a
+PDI without Spoon used to print (only real errors are left). No Spoon is needed: the launcher runs
+`io.github.ivi2511.pentahomcp.ProyectoMain` with PDI's `lib/` and the plugin's jar, Java 8 to 21 (the
+`--add-opens` Kettle needs on 17+ go with `-XX:+IgnoreUnrecognizedVMOptions`, which Java 8 skips). On
+macOS/Linux, `launcher/pentaho-live` does the same with `PDI_HOME` (default `~/pentaho/data-integration`).
 
 `pentaho-live test [--all] [tests, .ktr files or folders]` runs the golden-dataset tests like `test_run_all`, in a
 separate JVM with its own empty Kettle settings: with no paths (or `--all`) every `*.test.json` under the current
@@ -144,17 +147,22 @@ folder (hidden folders such as `.git` skipped); a `.ktr` runs the tests of its `
 (default), `json` (the `test_run` result of each test) or `github` (an `::error` annotation on the file of each test
 that does not pass, plus the text); `--summary file.md` appends a table; `--timeout` seconds for the whole run
 (default 1800). Exit code: **0** every test passed, or there are none; **1** one failed, had an error or did not
-finish in time; **2** a usage error.
+finish in time; **2** a usage error. The text, the annotations and the summary are in English, Spanish or
+Portuguese (`--lang en|es|pt`, by default the system's language, like `lint` and `diff`); each failing output
+names its first difference (`first: [key] column expected "x", got "y"`, or the first missing or extra row).
+`--format json` keeps the English codes of `test_run` (`passed`, `failed`…), for tools.
 
 `pentaho-live diff --rev REV [folders]` (no single file) compares every `.ktr`/`.kjb` that changed between the git
 revision `REV` (default `HEAD`) and the working folder, by meaning, as text, `--format markdown` or `json`; new and
 removed files get one line. Exit code: 0 nothing changed, 1 something changed, 2 an error (an unknown revision: in
 a shallow CI checkout, fetch the base branch first).
 
-The workflow that `init` writes (GitHub Actions, `ubuntu-24.04`):
+The workflow that `init` writes (GitHub Actions, `ubuntu-24.04`, actions on Node 24: `checkout@v7`,
+`setup-java@v6`, `cache@v6`):
 
 1. Java 11 (Temurin); PDI CE 9.4 **with the plugin of the same version** from the release
-   (`pdi-ce-9.4-con-pentaho-mcp.zip`), kept in `actions/cache` (about 400 MB, downloaded once per version);
+   (`pdi-ce-9.4-con-pentaho-mcp.zip`), kept in `actions/cache` (about 400 MB, downloaded once per version: about
+   10 s on GitHub's runners; the whole job takes about half a minute);
 2. a `pentaho-live` command on the `PATH` (the same as `launcher/pentaho-live` on Linux, with that PDI);
 3. `pentaho-live lint etl --format github --summary $GITHUB_STEP_SUMMARY`: each finding becomes an annotation on
    the file, a table goes to the job summary, and the job **fails** if a file is below the profile's `min_score`;
@@ -168,6 +176,35 @@ The workflow that `init` writes (GitHub Actions, `ubuntu-24.04`):
 
 To try the same checks before pushing: `pentaho-live lint etl`, `pentaho-live test --all` and
 `pentaho-live diff --rev main --format markdown`.
+
+### Reading a CI run
+
+Open the run from the repository's **Actions** tab, or with **Details** next to the `pentaho-live` check of the
+pull request. Three places tell what happened:
+
+- **The steps.** "Lint with the project profile", "Tests with golden datasets" and "Semantic diff against the base
+  branch" each turn red on their own; the tests and the diff run even when the lint step failed, so one push shows
+  everything. Their logs are the same text as on your computer (`ok`/`FAIL` per file or test and a total).
+- **The annotations** (`::error` / `::warning`), in the run's **Annotations** box and, on a pull request, in
+  **Files changed** when the file is part of it: a lint finding of `warning` or `error` severity on its
+  `.ktr`/`.kjb`, a file below `min_score` ("lint score"), and a test that does not pass on its `.test.json`, for
+  example:
+
+  ```
+  Test kpi_tienda_categoria failed: 1 of 1 outputs differ: 'Redondear importe' 20 changed rows
+  output "Redondear importe": 20 changed (rows expected 20, got 20); first: [Chamberí | Bebidas] unidades expected "91", got "37"
+  ```
+
+- **The Summary page** of the run (the job summary): "Pentaho Live lint" (score, errors, warnings and result of
+  each file, and the profile), "Pentaho Live tests" (each test, its result, seconds and the first difference) and,
+  on a pull request, "Pentaho Live: semantic diff against origin/<base>" (each changed step, setting, hop and
+  connection, e.g. `condition: … cantidad > 0 → … cantidad > 1`). With `PENTAHO_LIVE_PR_COMMENT: "true"` the
+  diff is also the pull request's comment from `github-actions`, edited on every push.
+
+A red test after a change on purpose means the golden output is old: create the test again (`test_create` with
+`replace: true`, `manual/12-pruebas.md`) in the same pull request, and the reviewer sees both the diff and the new
+golden CSV. A red test you did not expect is the point of the test: the annotation says which output, which key
+and which column.
 
 ## 6. The grader: `lint:profile`
 
@@ -186,5 +223,7 @@ computer. Without a profile in the pack the line is `evaluated: false`.
 | `required_variable` on a path that already has a variable | It must **start** with one of `required_variables.paths`: add that variable to the list or change the path |
 | CI: `ClassNotFoundException: ...ProyectoMain` | The PDI zip of that version has a plugin older than 0.7.0: set `PENTAHO_LIVE_VERSION` in the workflow to a release with it |
 | CI is slow on the first run | It downloads PDI once; later runs use the cache until `PENTAHO_LIVE_VERSION` changes |
+| CI: "Node.js 20 actions are deprecated" | The workflow was written by `init` 0.7.0 (`checkout@v4`, `setup-java@v4`, `cache@v4`): change them to `@v7`, `@v6` and `@v6` |
+| CI log full of `ClassNotFoundException: ...Dialog` | Pentaho Live 0.7.0 printed PDI's plugin-registration noise without Spoon; 0.7.1 filters it (set `PENTAHO_LIVE_VERSION` to it). Harmless either way |
 | CI: `unknown git revision 'origin/main'` in the diff step | The checkout is shallow: the workflow fetches the base branch first; keep that `git fetch` line if you edit the step |
 | CI: a test passes on your computer and fails in CI | The test runs with its `environment` (locale, time zone, encoding) in both places; look for paths or variables only your computer has (`test_list` shows its datasets and tweaks) |

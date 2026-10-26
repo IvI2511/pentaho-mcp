@@ -194,6 +194,259 @@ public class PruebaProyectoInit {
     contiene( s.out, "lint profile", "y dice por qué" );
   }
 
+  /**
+   * 0.7.1: lint sin SWT no llena stderr. Kettle escribe por cada plugin con diálogo «Unexpected error registering jar
+   * plugin file» y un ClassNotFoundException del diálogo: el filtro tira el par y deja pasar lo demás.
+   */
+  public void pruebaC_SinRuidoDeKettle() throws Exception {
+    String aviso = "2026/10/26 07:31:02 - General - ERROR (version 9.4.0.0-343) : Unexpected error registering jar "
+      + "plugin file: file:/pdi/plugins/excel-plugins/excel-plugins-core-9.4.0.0-343.jar";
+    String dialogo = "2026/10/26 07:31:02 - General - ERROR (version 9.4.0.0-343) : java.lang.ClassNotFoundException: "
+      + "org.pentaho.di.trans.steps.excelinput.ExcelInputDialog\n2026/10/26 07:31:02 - General - \tat java.base/"
+      + "jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:581)";
+    String ui = "ERROR : java.lang.ClassNotFoundException: org.pentaho.di.ui.trans.steps.delay.DelayDialog";
+    String swt = "ERROR : java.lang.NoClassDefFoundError: org/eclipse/swt/widgets/Shell";
+    String real = "2026/10/26 07:31:03 - General - ERROR (version 9.4.0.0-343) : java.lang.ClassNotFoundException: "
+      + "com.acme.MiStep";
+    for ( String r : new String[] { dialogo, ui, swt } ) {
+      cierto( ProyectoMain.ruido( r ), "ruido: " + r );
+    }
+    falso( ProyectoMain.ruido( real ), "una clase que no es de interfaz no es ruido" );
+    falso( ProyectoMain.ruido( "Loading transformation from file" ), "un log normal" );
+    falso( ProyectoMain.ruido( null ), "null" );
+
+    ByteArrayOutputStream b = new ByteArrayOutputStream();
+    PrintStream f = ProyectoMain.SinRuido.sobre( new PrintStream( b, true, "UTF-8" ) );
+    f.println( aviso );
+    f.println( dialogo );
+    f.println( aviso );
+    f.println( ui );
+    f.flush();
+    igual( "", b.toString( "UTF-8" ), "los pares de un PDI sin Spoon no salen" );
+    f.println( aviso );
+    f.println( real );
+    f.println( "fin" );
+    f.flush();
+    String s = b.toString( "UTF-8" );
+    contiene( s, "registering jar plugin file", "un plugin roto por otra cosa: sale el aviso" );
+    contiene( s, "com.acme.MiStep", "y su causa" );
+    contiene( s, "fin", "y lo que sigue" );
+    cierto( s.indexOf( "registering" ) < s.indexOf( "com.acme" ), "en orden" );
+    f.println( aviso );
+    f.flush();
+    cierto( b.toString( "UTF-8" ).endsWith( aviso + System.lineSeparator() ), "un aviso guardado sale con flush" );
+
+    // silenciarRuido pone el filtro en los dos canales de Kettle, una sola vez
+    java.io.PrintStream eAntes = org.pentaho.di.core.logging.KettleLogStore.OriginalSystemErr;
+    java.io.PrintStream oAntes = org.pentaho.di.core.logging.KettleLogStore.OriginalSystemOut;
+    try {
+      ProyectoMain m = new ProyectoMain( System.out, new PrintStream( new ByteArrayOutputStream(), true, "UTF-8" ) );
+      m.silenciarRuido();
+      PrintStream e1 = org.pentaho.di.core.logging.KettleLogStore.OriginalSystemErr;
+      cierto( e1 instanceof ProyectoMain.SinRuido, "stderr de Kettle filtrado" );
+      cierto( org.pentaho.di.core.logging.KettleLogStore.OriginalSystemOut instanceof ProyectoMain.SinRuido, "y stdout" );
+      m.silenciarRuido();
+      cierto( e1 == org.pentaho.di.core.logging.KettleLogStore.OriginalSystemErr, "una vez" );
+    } finally {
+      org.pentaho.di.core.logging.KettleLogStore.OriginalSystemErr = eAntes;
+      org.pentaho.di.core.logging.KettleLogStore.OriginalSystemOut = oAntes;
+    }
+
+    // los hijos de pentaho-live test copian el flag con el que Java 8 salta los --add-opens del lanzador
+    java.util.List<String> fl = CorrectorProcesos.flagsDe( java.util.Arrays.asList( "-XX:+IgnoreUnrecognizedVMOptions",
+      "--add-opens=java.base/java.lang=ALL-UNNAMED", "-Xmx1g", "-XX:+UseG1GC" ) );
+    igual( java.util.Arrays.asList( "-XX:+IgnoreUnrecognizedVMOptions", "--add-opens=java.base/java.lang=ALL-UNNAMED" ),
+      fl, "flags para la JVM hija" );
+    // y los dos lanzadores pasan los --add-opens así, sin JDK_JAVA_OPTIONS (Java 9+ avisaba en stderr cada vez)
+    File repo = new File( EntornoKettle.recursos(), "../../../.." ).getCanonicalFile();
+    for ( String l : new String[] { "launcher/pentaho-live", "launcher/pentaho-live.cmd" } ) {
+      String t = EntornoKettle.leer( new File( repo, l ) );
+      contiene( t, "-XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.net=ALL-UNNAMED", l );
+      noContiene( t.replaceAll( "(?m)^\\s*(#|rem ).*$", "" ), "JDK_JAVA_OPTIONS", l + " sin JDK_JAVA_OPTIONS" );
+    }
+  }
+
+  /** 0.7.1: la salida de pentaho-live test en en/es/pt (--lang o el idioma del sistema), sin correr JVMs. */
+  public void pruebaD_PruebasEnTresIdiomas() throws Exception {
+    File p = new File( base, "idiomas" );
+    p.mkdirs();
+    java.util.List<io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba> rs = resultados( p );
+    String[][] esperado = {
+      { "en", "  ok    dim_producto  passed in 0.41 s  tests/dim_producto.test.json",
+        "  FAIL  kpi  failed in 0.45 s  tests/kpi.test.json",
+        "output \"Redondear importe\": 20 changed (rows expected 20, got 20); first: [T01 | Cafés] importe expected "
+          + "\"12.50\", got \"10.00\"",
+        "table \"dim_tienda\": missing golden", "2 test(s): 1 passed, 1 failed, with errors or not finished.",
+        "title=pentaho-live test kpi::Test kpi failed: 1 of 1 outputs differ", "## Pentaho Live tests",
+        "1 of 2 did not pass.", "| Test | File | Result | Seconds | Detail |",
+        "| kpi | `tests/kpi.test.json` | **failed** | 0.45 |" },
+      { "es", "  ok    dim_producto  pasa en 0,41 s  tests/dim_producto.test.json",
+        "  FALLA  kpi  falla en 0,45 s  tests/kpi.test.json",
+        "salida «Redondear importe»: 20 cambian (filas esperadas 20, obtenidas 20); la primera: [T01 | Cafés] importe "
+          + "esperado «12.50», obtenido «10.00»",
+        "tabla «dim_tienda»: falta el archivo dorado", "2 prueba(s): 1 pasan, 1 fallan, dan error o no terminaron.",
+        "title=pentaho-live test kpi::La prueba kpi falla: 1 of 1 outputs differ", "## Pruebas de Pentaho Live",
+        "1 de 2 no pasan.", "| Prueba | Archivo | Resultado | Segundos | Detalle |",
+        "| kpi | `tests/kpi.test.json` | **falla** | 0,45 |" },
+      { "pt", "  ok    dim_producto  passa em 0,41 s  tests/dim_producto.test.json",
+        "  FALHA  kpi  falha em 0,45 s  tests/kpi.test.json",
+        "saída \"Redondear importe\": 20 mudam (linhas esperadas 20, obtidas 20); a primeira: [T01 | Cafés] importe "
+          + "esperado \"12.50\", obtido \"10.00\"",
+        "tabela \"dim_tienda\": falta o arquivo dourado", "2 teste(s): 1 passam, 1 falham, dão erro ou não terminaram.",
+        "title=pentaho-live test kpi::O teste kpi falha: 1 of 1 outputs differ", "## Testes do Pentaho Live",
+        "1 de 2 não passam.", "| Teste | Arquivo | Resultado | Segundos | Detalhe |",
+        "| kpi | `tests/kpi.test.json` | **falha** | 0,45 |" } };
+    for ( String[] e : esperado ) {
+      io.github.ivi2511.pentahomcp.informes.Rotulos t = io.github.ivi2511.pentahomcp.informes.Rotulos.de(
+        ProyectoMain.AREA, e[ 0 ] );
+      ByteArrayOutputStream o = new ByteArrayOutputStream();
+      ProyectoMain m = new ProyectoMain( new PrintStream( o, true, "UTF-8" ), System.err );
+      m.cwd = p.getAbsoluteFile();
+      File resumen = new File( base, "resumen-" + e[ 0 ] + ".md" );
+      resumen.delete();
+      m.githubPruebas( rs, t );
+      m.textoPruebas( rs, t );
+      m.escribirResumenPruebas( resumen.getAbsolutePath(), rs, t );
+      String s = o.toString( "UTF-8" ).replace( "\r\n", "\n" ) + EntornoKettle.leer( resumen );
+      for ( int i = 1; i < e.length; i++ ) {
+        contiene( s, e[ i ], e[ 0 ] + ": " + e[ i ] + "\n" + s );
+      }
+      noContiene( s, "::error file=tests/dim_producto", e[ 0 ] + ": sin anotación para la que pasa" );
+    }
+    // --lang en el comando (sin pruebas no arranca ninguna JVM); sin --lang, el idioma del sistema
+    Salida s = correr( p, "test", "--lang", "es" );
+    igual( 0, s.codigo, "sin pruebas: 0" );
+    contiene( s.out, "no hay pruebas (*.test.json)", "en español" );
+    s = correr( p, "test", "--lang", "pt", "--summary", new File( base, "vacio-pt.md" ).getAbsolutePath() );
+    contiene( s.out, "nenhum teste", "em português" );
+    contiene( EntornoKettle.leer( new File( base, "vacio-pt.md" ) ), "Nenhum teste com datasets dourados", "o resumo" );
+    s = correr( p, "test", "--lang", "en" );
+    contiene( s.out, "nothing to run", "in English" );
+    java.util.Locale antes = java.util.Locale.getDefault();
+    try {
+      java.util.Locale.setDefault( new java.util.Locale( "es", "ES" ) );
+      contiene( correr( p, "test" ).out, "nada que ejecutar", "el idioma del sistema" );
+    } finally {
+      java.util.Locale.setDefault( antes );
+    }
+    igual( 2, correr( p, "test", "--lang" ).codigo, "--lang sin valor" );
+  }
+
+  /** Una que pasa y una que falla con una celda distinta y una tabla sin dorado. */
+  private static java.util.List<io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba> resultados( File p ) {
+    io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba ok =
+      new io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba();
+    ok.prueba = "dim_producto";
+    ok.estado = io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.PASO;
+    ok.segundos = 0.41;
+    ok.archivoPrueba = new File( p, "tests/dim_producto.test.json" ).getAbsolutePath();
+    io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba mal =
+      new io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba();
+    mal.prueba = "kpi";
+    mal.estado = io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.FALLO;
+    mal.mensaje = "1 of 1 outputs differ";
+    mal.segundos = 0.45;
+    mal.archivoPrueba = new File( p, "tests/kpi.test.json" ).getAbsolutePath();
+    io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen sa =
+      new io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen( "Redondear importe",
+        io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen.STEP );
+    sa.distintas = 20;
+    sa.filasEsperadas = 20;
+    sa.filasReales = 20;
+    io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen ta =
+      new io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen( "dim_tienda",
+        io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen.TABLA );
+    ta.problema = io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba.Resumen.SIN_DORADO;
+    mal.salidas.add( sa );
+    mal.salidas.add( ta );
+    io.github.ivi2511.pentahomcp.corrector.modelo.Comparacion c = new io.github.ivi2511.pentahomcp.corrector.modelo
+      .Comparacion();
+    c.ejemplos.distintas.add( io.github.ivi2511.pentahomcp.corrector.modelo.Comparacion.Ejemplo.diferencia(
+      "T01 | Cafés", "importe", "12.50", "10.00" ) );
+    mal.caso = new io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso();
+    mal.caso.tablas = new java.util.ArrayList<io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso
+      .ComparacionTabla>();
+    mal.caso.tablas.add( new io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso.ComparacionTabla(
+      "Redondear importe", null, c ) );
+    return java.util.Arrays.asList( ok, mal );
+  }
+
+  /**
+   * 0.7.1, lo que mostró la CI de verdad: el JSON input de Grano de Oro tiene defaultPathLeafToNull=Y, un tag con «path»
+   * que no es una ruta; required_variable avisaba «la ruta de 'Leer tiendas (JSON)' no empieza con ${DIR_DATOS}: Y».
+   */
+  public void pruebaE_UnInterruptorNoEsUnaRuta() throws Exception {
+    File p = new File( base, "grano" );
+    ProyectoInit.crear( p, "Grano", "en", false );
+    File ktr = new File( EntornoKettle.recursos(), "../../../../ejemplo/solucion-referencia/01_dim_tienda.ktr" )
+      .getCanonicalFile();
+    cierto( ktr.isFile(), "la solución de Grano de Oro: " + ktr );
+    contiene( EntornoKettle.leer( ktr ), "<defaultPathLeafToNull>Y</defaultPathLeafToNull>", "el caso de la CI" );
+    Files.copy( ktr.toPath(), new File( p, "etl/01_dim_tienda.ktr" ).toPath(), StandardCopyOption.REPLACE_EXISTING );
+    Salida s = correr( p, "lint", "etl/01_dim_tienda.ktr", "--format", "json", "--lang", "en" );
+    igual( 0, s.codigo, "pasa: " + s.out + s.err );
+    JsonNode fs = McpHttpServer.JSON.readTree( s.out ).path( "files" ).path( 0 ).path( "lint" ).path( "findings" );
+    for ( JsonNode h : fs ) {
+      if ( "required_variable".equals( h.path( "rule" ).asText() ) ) {
+        noContiene( h.path( "message" ).asText(), ": Y.", "un Y/N no es una ruta: " + h );
+      }
+    }
+    noContiene( fs.toString(), "defaultPathLeafToNull", "ningún hallazgo sobre el interruptor" );
+  }
+
+  /**
+   * 0.7.1: la guía 13 es el recurso pentaho://guide/team-projects (dentro del jar: build.ps1 la copia) y cuenta cómo leer
+   * la CI de verdad; build.ps1 y McpResources nombran las mismas guías; el texto del diálogo que ya no se ve no está.
+   */
+  public void pruebaF_GuiaYPlantillas() throws Exception {
+    McpResources r = new McpResources();
+    contiene( r.listar( null ).toString(), "pentaho://guide/team-projects", "resources/list trae la guía 13" );
+    String g = r.leer( "pentaho://guide/team-projects" ).path( "contents" ).path( 0 ).path( "text" ).asText();
+    for ( String n : new String[] { "pentaho-live init", "pentaho-live test", "Summary", "::error",
+      "PENTAHO_LIVE_PR_COMMENT" } ) {
+      contiene( g, n, "la guía 13 nombra " + n );
+    }
+    // las guías que lee McpResources = las que build.ps1 mete en el jar
+    java.util.Set<String> enRecursos = new java.util.TreeSet<String>();
+    java.lang.reflect.Field docs = McpResources.class.getDeclaredField( "DOCS" );
+    docs.setAccessible( true );
+    for ( Object d : (Object[]) docs.get( null ) ) {
+      java.lang.reflect.Field ruta = d.getClass().getDeclaredField( "ruta" );
+      ruta.setAccessible( true );
+      String x = (String) ruta.get( d );
+      if ( x != null && x.startsWith( "manual/" ) ) {
+        enRecursos.add( x.substring( "manual/".length() ) );
+      }
+    }
+    File repo = new File( EntornoKettle.recursos(), "../../../.." ).getCanonicalFile();
+    String build = EntornoKettle.leer( new File( repo, "spoon-plugin/build.ps1" ) );
+    java.util.Set<String> enBuild = new java.util.TreeSet<String>();
+    java.util.regex.Matcher mt = java.util.regex.Pattern.compile( "\"manual\\\\(\\d\\d-[\\w-]+\\.md)\"" ).matcher( build );
+    while ( mt.find() ) {
+      enBuild.add( mt.group( 1 ) );
+    }
+    cierto( enRecursos.contains( "13-proyecto.md" ), "13-proyecto.md es recurso: " + enRecursos );
+    igual( enRecursos, enBuild, "build.ps1 copia al jar las guías que McpResources lee" );
+    for ( String m : enBuild ) {
+      cierto( new File( repo, "claude/skills/pentaho-etl/manual/" + m ).isFile(), "existe " + m );
+    }
+
+    // el README que deja init cuenta cómo leer la CI (en los tres idiomas)
+    for ( String l : new String[] { "en", "es", "pt" } ) {
+      File q = new File( base, "readme-" + l );
+      ProyectoInit.crear( q, "X", l, false );
+      String readme = EntornoKettle.leer( new File( q, "README.md" ) );
+      contiene( readme, "manual/13-proyecto.md", l + ": enlaza la guía 13" );
+      contiene( readme, "::error", l + ": las anotaciones" );
+      contiene( readme, "pentaho-live test --all --lang", l + ": las pruebas en su idioma" );
+    }
+    // «Preparar proyecto…»: ya no hay plugin sin textconv, así que su aviso se fue con sus claves
+    for ( String l : new String[] { "en", "es", "pt" } ) {
+      falso( io.github.ivi2511.pentahomcp.informes.Rotulos.de( IdcMenu.AREA, l ).tiene( "p_textconv_off" ),
+        l + ": sin p_textconv_off" );
+    }
+  }
+
   // ---------------------------------------------------------------- ayudas
 
   static final class Salida {
