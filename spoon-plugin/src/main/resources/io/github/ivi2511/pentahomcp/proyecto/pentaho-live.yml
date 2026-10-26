@@ -37,16 +37,16 @@ jobs:
       contents: read
       # pull-requests: write   # uncomment with PENTAHO_LIVE_PR_COMMENT: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "11"
 
       - name: Cache PDI CE 9.4 + Pentaho Live
         id: pdi-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/pdi
           key: pdi-ce-9.4-pentaho-live-${{ env.PENTAHO_LIVE_VERSION }}

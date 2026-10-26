@@ -254,14 +254,15 @@ if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "PL_JAVA=%JAVA_HOME
 if defined PENTAHO_JAVA_HOME if exist "%PENTAHO_JAVA_HOME%\bin\java.exe" set "PL_JAVA=%PENTAHO_JAVA_HOME%\bin\java.exe"
 if exist "%PL_APP%\jre\bin\java.exe" set "PL_JAVA=%PL_APP%\jre\bin\java.exe"
 set "PL_PCP=%PL_PDI%\lib\*;%PL_PDI%\plugins\pentaho-mcp\*;%PL_PDI%\plugins\pentaho-mcp\lib\*;%PL_PDI%\classes"
-rem Java 9+ reads JDK_JAVA_OPTIONS (Kettle needs these opens on 17+); Java 8 ignores it
-set "JDK_JAVA_OPTIONS=--add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED"
+rem Kettle needs these opens on Java 17+. Java 8 does not know --add-opens: IgnoreUnrecognizedVMOptions
+rem makes it skip them (JDK_JAVA_OPTIONS did the same, but Java 9+ printed "NOTE: Picked up..." on stderr).
+set "PL_OPENS=-XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED"
 if "%PENTAHO_LIVE_DRY_RUN%"=="1" goto :pl_proyecto_ensayo
-"%PL_JAVA%" -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 "-DKETTLE_PLUGIN_BASE_FOLDERS=%PL_PDI%\plugins" -cp "%PL_PCP%" io.github.ivi2511.pentahomcp.ProyectoMain %*
+"%PL_JAVA%" %PL_OPENS% -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 "-DKETTLE_PLUGIN_BASE_FOLDERS=%PL_PDI%\plugins" -cp "%PL_PCP%" io.github.ivi2511.pentahomcp.ProyectoMain %*
 exit /b %ERRORLEVEL%
 :pl_proyecto_ensayo
 setlocal EnableDelayedExpansion
-echo [dry run] "!PL_JAVA!" -Xmx1g -Djava.awt.headless=true -cp "!PL_PCP!" io.github.ivi2511.pentahomcp.ProyectoMain %*
+echo [dry run] "!PL_JAVA!" !PL_OPENS! -Xmx1g -Djava.awt.headless=true -cp "!PL_PCP!" io.github.ivi2511.pentahomcp.ProyectoMain %*
 endlocal
 exit /b 0
 :pl_proyecto_sin_plugin

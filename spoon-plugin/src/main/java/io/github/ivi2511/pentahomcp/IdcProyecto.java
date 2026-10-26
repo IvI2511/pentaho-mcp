@@ -211,9 +211,6 @@ final class IdcProyecto {
     try {
       ProyectoInit.Hecho h = ProyectoInit.crear( d, nombreElegido(), r.idioma(), false );
       String t = r.f( "p_summary_done", h.cuantos( ProyectoInit.CREADO ), h.cuantos( ProyectoInit.EXISTE ) );
-      if ( !h.textconv ) {
-        t += " " + r.s( "p_textconv_off" );
-      }
       mostrar( h, t + " " + r.s( "p_next" ), false );
     } catch ( Exception e ) {
       mostrar( null, r.f( "p_error", IdcMenu.mensaje( e ) ), false );

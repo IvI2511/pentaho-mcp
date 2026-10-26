@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -21,9 +22,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.pentaho.di.base.AbstractMeta;
 import org.pentaho.di.core.KettleEnvironment;
+import org.pentaho.di.core.logging.KettleLogStore;
 import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.trans.TransMeta;
 
+import io.github.ivi2511.pentahomcp.corrector.modelo.Comparacion;
+import io.github.ivi2511.pentahomcp.corrector.modelo.ResultadoCaso;
+import io.github.ivi2511.pentahomcp.informes.Rotulos;
 import io.github.ivi2511.pentahomcp.lint.Hallazgo;
 import io.github.ivi2511.pentahomcp.lint.LintJson;
 import io.github.ivi2511.pentahomcp.lint.LintMotor;
@@ -52,8 +57,9 @@ import io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba;
  * con --min-score, que manda). Códigos de salida: 0 todo bien; 1 algún archivo por debajo del mínimo o que no se pudo
  * leer; 2 un error de uso o de perfil. init: 0, o 2 si no pudo crear algo. test (P4: las pruebas con datasets dorados
  * en la CI, en JVMs aparte como test_run_all): 0 todas pasan o no hay ninguna; 1 alguna falla, da error o no terminó a
- * tiempo; 2 un error de uso. La salida de Kettle (sus logs) va a stderr:
- * stdout queda para el resultado (--format json se puede leer con una herramienta).
+ * tiempo; 2 un error de uso. La salida de Kettle (sus logs) va a stderr, sin el ruido de un PDI sin Spoon ({@link
+ * #ruido}): stdout queda para el resultado (--format json se puede leer con una herramienta). test habla en/es/pt
+ * (--lang o el idioma del sistema, como lint y diff; textos en informes/textos/proyecto_*.properties).
  */
 public final class ProyectoMain {
 
@@ -359,12 +365,95 @@ public final class ProyectoMain {
         System.setProperty( "KETTLE_PLUGIN_BASE_FOLDERS", new File( lib.getParentFile(), "plugins" ).getPath() );
       }
     }
+    silenciarRuido();
     try {
       KettleEnvironment.init( false );
     } catch ( Exception e ) {
       throw new IllegalStateException( "Kettle did not start: " + RunMotor.primeraLinea( e ), e );
     }
     kettleListo = true;
+  }
+
+  /**
+   * Sin Spoon, PDI no tiene SWT ni las clases de los diálogos: al registrar sus plugins Kettle escribe en la consola,
+   * por cada uno, «Unexpected error registering jar plugin file» y un ClassNotFoundException del diálogo con su pila
+   * (unas 1.700 líneas en stderr en cada lint de la CI). Kettle escribe su log por KettleLogStore.OriginalSystemErr/Out
+   * (campos públicos que toma de System.err/out al cargarse): se envuelven con {@link SinRuido}, que tira solo esos
+   * pares. Los demás errores (un plugin roto por otra cosa, un .ktr que no carga) siguen saliendo por stderr.
+   */
+  void silenciarRuido() {
+    if ( !( KettleLogStore.OriginalSystemErr instanceof SinRuido ) ) {
+      KettleLogStore.OriginalSystemErr = SinRuido.sobre( err );
+    }
+    if ( !( KettleLogStore.OriginalSystemOut instanceof SinRuido ) ) {
+      KettleLogStore.OriginalSystemOut = SinRuido.sobre( err );
+    }
+  }
+
+  /** La clase que falta es de la interfaz: org.pentaho.di.ui.*, SWT/JFace o el diálogo de un step (…Dialog). */
+  static final Pattern CLASE_DE_UI = Pattern.compile( "(ClassNotFoundException|NoClassDefFoundError):\\s*("
+    + "org[./]eclipse[./](swt|jface)[./]|org[./]pentaho[./]di[./]ui[./]|[\\w$./]*Dialog\\b)" );
+  static final String AL_REGISTRAR = "Unexpected error registering jar plugin file";
+
+  /** Un registro del log de Kettle que dice que falta una clase de la interfaz (ruido sin Spoon). */
+  static boolean ruido( String registro ) {
+    return registro != null && CLASE_DE_UI.matcher( registro ).find();
+  }
+
+  /**
+   * Los registros del log de Kettle sin el ruido de un PDI sin Spoon: el aviso «registering jar plugin file» se guarda
+   * hasta ver el siguiente; si ese es la clase de interfaz que falta, se tiran los dos; si no, sale el aviso y lo que
+   * siga. Una clase de interfaz que falta sola también se tira. Kettle escribe cada registro con println(String).
+   */
+  static final class SinRuido extends PrintStream {
+    private String guardado;
+
+    private SinRuido( PrintStream destino ) throws UnsupportedEncodingException {
+      super( destino, true, "UTF-8" );
+    }
+
+    static PrintStream sobre( PrintStream destino ) {
+      try {
+        return new SinRuido( destino );
+      } catch ( UnsupportedEncodingException e ) {
+        return destino;
+      }
+    }
+
+    @Override
+    public synchronized void println( String x ) {
+      String antes = guardado;
+      guardado = null;
+      if ( x != null && x.contains( AL_REGISTRAR ) ) {
+        if ( antes != null ) {
+          super.println( antes );
+        }
+        guardado = x;
+        return;
+      }
+      if ( ruido( x ) ) {
+        return; // con el aviso de antes, si lo había
+      }
+      if ( antes != null ) {
+        super.println( antes );
+      }
+      super.println( x );
+    }
+
+    @Override
+    public void println( Object x ) {
+      println( String.valueOf( x ) );
+    }
+
+    @Override
+    public synchronized void flush() {
+      if ( guardado != null ) {
+        String g = guardado;
+        guardado = null;
+        super.println( g );
+      }
+      super.flush();
+    }
   }
 
   private static File carpetaDeLib() {
@@ -425,13 +514,14 @@ public final class ProyectoMain {
     List<String> rutas = new ArrayList<String>();
     String formato = "text";
     String resumen = null;
+    String lang = Locale.getDefault().getLanguage();
     int espera = ESPERA_PRUEBAS_S;
     for ( int i = 0; i < a.size(); i++ ) {
       String x = a.get( i );
       if ( x.equals( "--all" ) ) {
         continue; // lo mismo que sin rutas: todas las de la carpeta actual (o las de las carpetas dadas)
       } else if ( x.equals( "--lang" ) ) {
-        valor( a, ++i, x ); // como en lint; los resultados de las pruebas van en inglés (los de test_run también)
+        lang = valor( a, ++i, x ); // la consola, las anotaciones y el resumen; el JSON queda con sus códigos
       } else if ( x.equals( "--format" ) ) {
         formato = valor( a, ++i, x ).toLowerCase( Locale.ROOT );
         if ( !formato.equals( "text" ) && !formato.equals( "json" ) && !formato.equals( "github" ) ) {
@@ -455,6 +545,7 @@ public final class ProyectoMain {
         rutas.add( x );
       }
     }
+    Rotulos t = Rotulos.de( AREA, lang );
     if ( rutas.isEmpty() ) {
       rutas.add( "." );
     }
@@ -471,7 +562,7 @@ public final class ProyectoMain {
       } else if ( f.getName().toLowerCase( Locale.ROOT ).endsWith( ".ktr" ) ) {
         List<File> deKtr = PruebasArchivos.deTransformacion( f );
         if ( deKtr.isEmpty() ) {
-          err.println( "pentaho-live test: no tests for " + relativa( f ) + " (in its tests/ folders)" );
+          err.println( t.f( "test_none_for", relativa( f ) ) );
         }
         for ( File p : deKtr ) {
           agregar( p, pruebas );
@@ -488,22 +579,22 @@ public final class ProyectoMain {
         o.put( "passed", 0 ).put( "failed", 0 );
         out.println( bonito( o ) );
       } else {
-        out.println( "pentaho-live test: no tests (*" + DefPrueba.EXTENSION + ") in " + rutas + " - nothing to run." );
+        out.println( t.f( "test_none", DefPrueba.EXTENSION, rutas ) );
       }
-      escribirResumenPruebas( resumen, Collections.<ResultadoPrueba>emptyList() );
+      escribirResumenPruebas( resumen, Collections.<ResultadoPrueba>emptyList(), t );
       return OK;
     }
     List<PruebasProcesos.Tarea> tareas = new ArrayList<PruebasProcesos.Tarea>();
     for ( File p : pruebas ) {
       tareas.add( PruebasProcesos.Tarea.correr( p, null ) );
     }
-    ( json ? err : out ).println( "Running " + pruebas.size() + " test(s) in a separate JVM..." );
+    ( json ? err : out ).println( t.f( "test_running", pruebas.size() ) );
     List<ResultadoPrueba> rs;
     try {
       rs = PruebasProcesos.correrYEsperar( tareas, espera * 1000L, new ArrayList<File>() );
     } catch ( InterruptedException e ) {
       Thread.currentThread().interrupt();
-      err.println( "pentaho-live test: interrupted" );
+      err.println( t.s( "test_interrupted" ) );
       return ERROR;
     }
     for ( int i = 0; i < rs.size(); i++ ) {
@@ -531,11 +622,11 @@ public final class ProyectoMain {
       out.println( bonito( o ) );
     } else {
       if ( formato.equals( "github" ) ) {
-        githubPruebas( rs );
+        githubPruebas( rs, t );
       }
-      textoPruebas( rs );
+      textoPruebas( rs, t );
     }
-    escribirResumenPruebas( resumen, rs );
+    escribirResumenPruebas( resumen, rs, t );
     for ( ResultadoPrueba r : rs ) {
       if ( !r.paso() ) {
         return DEBAJO;
@@ -571,46 +662,101 @@ public final class ProyectoMain {
     }
   }
 
+  /** Los textos de test (informes/textos/proyecto_*.properties). */
+  static final String AREA = "proyecto";
+
   /** Lo que falló de una prueba, en una línea por salida (para la consola, las anotaciones y el resumen). */
-  static List<String> detalle( ResultadoPrueba r ) {
+  static List<String> detalle( ResultadoPrueba r, Rotulos t ) {
     List<String> l = new ArrayList<String>();
     for ( ResultadoPrueba.Resumen s : r.salidas ) {
       if ( s.paso ) {
         continue;
       }
-      StringBuilder b = new StringBuilder( ResultadoPrueba.Resumen.TABLA.equals( s.tipo ) ? "table " : "output " );
-      b.append( '"' ).append( s.nombre ).append( "\": " );
+      StringBuilder b = new StringBuilder( t.f( ResultadoPrueba.Resumen.TABLA.equals( s.tipo ) ? "d_table" : "d_output",
+        s.nombre ) ).append( ": " );
       if ( s.problema != null ) {
-        b.append( s.problema.replace( '_', ' ' ) );
+        b.append( t.tiene( "d_" + s.problema ) ? t.s( "d_" + s.problema ) : s.problema.replace( '_', ' ' ) );
       } else {
         List<String> p = new ArrayList<String>();
         if ( s.faltan != null && s.faltan > 0 ) {
-          p.add( s.faltan + " missing" );
+          p.add( t.f( "d_missing", s.faltan ) );
         }
         if ( s.sobran != null && s.sobran > 0 ) {
-          p.add( s.sobran + " extra" );
+          p.add( t.f( "d_extra", s.sobran ) );
         }
         if ( s.distintas != null && s.distintas > 0 ) {
-          p.add( s.distintas + " changed" );
+          p.add( t.f( "d_changed", s.distintas ) );
         }
         if ( s.clavesRepetidas != null && s.clavesRepetidas > 0 ) {
-          p.add( s.clavesRepetidas + " duplicate keys" );
+          p.add( t.f( "d_dup", s.clavesRepetidas ) );
         }
         if ( s.columnasFaltan != null && !s.columnasFaltan.isEmpty() ) {
-          p.add( "missing columns " + s.columnasFaltan );
+          p.add( t.f( "d_missing_cols", s.columnasFaltan ) );
         }
         if ( s.columnasSobran != null && !s.columnasSobran.isEmpty() ) {
-          p.add( "extra columns " + s.columnasSobran );
+          p.add( t.f( "d_extra_cols", s.columnasSobran ) );
         }
-        b.append( p.isEmpty() ? "differs" : String.join( ", ", p ) );
+        b.append( p.isEmpty() ? t.s( "d_differs" ) : String.join( ", ", p ) );
         if ( s.filasEsperadas != null && s.filasReales != null ) {
-          b.append( " (rows expected " ).append( s.filasEsperadas ).append( ", got " ).append( s.filasReales )
-            .append( ')' );
+          b.append( ' ' ).append( t.f( "d_rows", s.filasEsperadas, s.filasReales ) );
+        }
+        String e = ejemplo( r, s.nombre, t );
+        if ( e != null ) {
+          b.append( "; " ).append( e );
         }
       }
       l.add( b.toString() );
     }
     return l;
+  }
+
+  /**
+   * La primera diferencia de esa salida (una celda que cambió, una fila que falta o sobra, una clave repetida), para que
+   * la anotación y el resumen digan qué cambió sin abrir Spoon. null si la prueba no trae ejemplos.
+   */
+  static String ejemplo( ResultadoPrueba r, String salida, Rotulos t ) {
+    if ( r.caso == null || r.caso.tablas == null || salida == null ) {
+      return null;
+    }
+    for ( ResultadoCaso.ComparacionTabla ct : r.caso.tablas ) {
+      if ( ct == null || !salida.equals( ct.tabla ) || ct.comparacion == null || ct.comparacion.ejemplos == null ) {
+        continue;
+      }
+      Comparacion.Ejemplos e = ct.comparacion.ejemplos;
+      if ( e.distintas != null && !e.distintas.isEmpty() ) {
+        Comparacion.Ejemplo x = e.distintas.get( 0 );
+        return t.f( "d_example_changed", clave( x ), x.columna, x.esperado, x.real );
+      }
+      if ( e.faltan != null && !e.faltan.isEmpty() ) {
+        return t.f( "d_example_missing", clave( e.faltan.get( 0 ) ) );
+      }
+      if ( e.sobran != null && !e.sobran.isEmpty() ) {
+        return t.f( "d_example_extra", clave( e.sobran.get( 0 ) ) );
+      }
+      if ( e.clavesRepetidas != null && !e.clavesRepetidas.isEmpty() ) {
+        Comparacion.Ejemplo x = e.clavesRepetidas.get( 0 );
+        return t.f( "d_example_dup", clave( x ), x.veces == null ? 2 : x.veces );
+      }
+    }
+    return null;
+  }
+
+  private static String clave( Comparacion.Ejemplo x ) {
+    return x.clave != null ? x.clave : x.fila != null ? String.valueOf( x.fila ) : "?";
+  }
+
+  /** El estado de una prueba en el idioma (passed, failed, error, cancelled; otro, tal cual). */
+  static String estado( ResultadoPrueba r, Rotulos t ) {
+    return r.estado != null && t.tiene( "st_" + r.estado ) ? t.s( "st_" + r.estado ) : String.valueOf( r.estado );
+  }
+
+  /** Los segundos como los da la prueba (0.87), con coma decimal en es y pt. */
+  static String segundos( ResultadoPrueba r, Rotulos t ) {
+    if ( r.segundos == null ) {
+      return null;
+    }
+    String s = String.valueOf( r.segundos );
+    return "en".equals( t.idioma() ) ? s : s.replace( '.', ',' );
   }
 
   private static String primera( String s ) {
@@ -621,76 +767,80 @@ public final class ProyectoMain {
     return ( i < 0 ? s : s.substring( 0, i ) ).trim();
   }
 
-  private void textoPruebas( List<ResultadoPrueba> rs ) {
+  void textoPruebas( List<ResultadoPrueba> rs, Rotulos t ) {
     int pasan = 0;
+    String ok4 = String.format( "%-4s", t.s( "test_ok" ) );
+    String mal4 = String.format( "%-4s", t.s( "test_fail" ) );
     for ( ResultadoPrueba r : rs ) {
       boolean ok = r.paso();
       pasan += ok ? 1 : 0;
       String archivo = r.archivoPrueba == null ? "" : "  " + relativa( new File( r.archivoPrueba ) );
-      out.println( "  " + ( ok ? "ok  " : "FAIL" ) + "  " + r.prueba + "  " + r.estado + ( r.segundos == null ? ""
-        : " in " + r.segundos + " s" ) + archivo );
+      String seg = segundos( r, t );
+      out.println( "  " + ( ok ? ok4 : mal4 ) + "  " + r.prueba + "  " + estado( r, t ) + ( seg == null ? "" : " " + t
+        .f( "test_in", seg ) ) + archivo );
       if ( !ok ) {
         if ( r.mensaje != null ) {
           out.println( "        " + primera( r.mensaje ) );
         }
-        for ( String d : detalle( r ) ) {
+        for ( String d : detalle( r, t ) ) {
           out.println( "        " + d );
         }
       }
     }
     int fallan = rs.size() - pasan;
-    out.println( rs.size() + " test(s): " + pasan + " passed" + ( fallan > 0 ? ", " + fallan
-      + " failed, with errors or not finished" : "" ) + "." );
+    out.println( fallan > 0 ? t.f( "test_total_failed", rs.size(), pasan, fallan ) : t.f( "test_total", rs.size(),
+      pasan ) );
   }
 
   /** Anotaciones de GitHub Actions: un ::error en el archivo de cada prueba que no pasa. */
-  private void githubPruebas( List<ResultadoPrueba> rs ) {
+  void githubPruebas( List<ResultadoPrueba> rs, Rotulos t ) {
     for ( ResultadoPrueba r : rs ) {
       if ( r.paso() ) {
         continue;
       }
-      StringBuilder m = new StringBuilder( "Test " + r.prueba + " " + r.estado );
+      StringBuilder m = new StringBuilder( t.f( "gh_message", r.prueba, estado( r, t ) ) );
       if ( r.mensaje != null ) {
         m.append( ": " ).append( primera( r.mensaje ) );
       }
-      for ( String d : detalle( r ) ) {
+      for ( String d : detalle( r, t ) ) {
         m.append( '\n' ).append( d );
       }
       out.println( "::error file=" + prop( r.archivoPrueba == null ? "" : relativa( new File( r.archivoPrueba ) ) )
-        + ",title=" + prop( "pentaho-live test " + r.prueba ) + "::" + datos( m.toString() ) );
+        + ",title=" + prop( t.f( "gh_title", r.prueba ) ) + "::" + datos( m.toString() ) );
     }
   }
 
   /** --summary: una tabla Markdown al final del archivo (el $GITHUB_STEP_SUMMARY de Actions). */
-  private void escribirResumenPruebas( String ruta, List<ResultadoPrueba> rs ) {
+  void escribirResumenPruebas( String ruta, List<ResultadoPrueba> rs, Rotulos t ) {
     if ( ruta == null || ruta.trim().isEmpty() ) {
       return;
     }
-    StringBuilder b = new StringBuilder( "## Pentaho Live tests\n\n" );
+    StringBuilder b = new StringBuilder( "## " ).append( t.s( "md_title" ) ).append( "\n\n" );
     if ( rs.isEmpty() ) {
-      b.append( "No golden-dataset tests (*" ).append( DefPrueba.EXTENSION ).append( ") to run.\n" );
+      b.append( t.f( "md_none", DefPrueba.EXTENSION ) ).append( '\n' );
     } else {
       int pasan = 0;
       for ( ResultadoPrueba r : rs ) {
         pasan += r.paso() ? 1 : 0;
       }
-      b.append( pasan == rs.size() ? "All " + rs.size() + " passed." : ( rs.size() - pasan ) + " of " + rs.size()
-        + " did not pass." ).append( "\n\n| Test | File | Result | Seconds | Detail |\n|---|---|---|---|---|\n" );
+      b.append( pasan == rs.size() ? t.f( "md_all", rs.size() ) : t.f( "md_some", rs.size() - pasan, rs.size() ) )
+        .append( "\n\n" ).append( t.s( "md_head" ) ).append( "\n|---|---|---|---|---|\n" );
       for ( ResultadoPrueba r : rs ) {
-        List<String> d = detalle( r );
+        List<String> d = detalle( r, t );
         String det = r.paso() ? "" : md( ( r.mensaje == null ? "" : primera( r.mensaje ) ) + ( d.isEmpty() ? ""
           : ( r.mensaje == null ? "" : "; " ) + String.join( "; ", d ) ) );
+        String seg = segundos( r, t );
         b.append( "| " ).append( md( r.prueba ) ).append( " | `" ).append( r.archivoPrueba == null ? "" : relativa(
-          new File( r.archivoPrueba ) ).replace( "`", "" ) ).append( "` | " ).append( r.paso() ? "passed" : "**" + r.estado
-            + "**" ).append( " | " ).append( r.segundos == null ? "-" : String.valueOf( r.segundos ) ).append( " | " )
-          .append( det ).append( " |\n" );
+          new File( r.archivoPrueba ) ).replace( "`", "" ) ).append( "` | " ).append( r.paso() ? estado( r, t ) : "**"
+            + estado( r, t ) + "**" ).append( " | " ).append( seg == null ? "-" : seg ).append( " | " ).append( det )
+          .append( " |\n" );
       }
     }
     b.append( '\n' );
     try ( Writer w = new OutputStreamWriter( new FileOutputStream( absoluto( ruta ), true ), StandardCharsets.UTF_8 ) ) {
       w.write( b.toString() );
     } catch ( IOException e ) {
-      err.println( "pentaho-live test: could not write the summary to " + ruta + ": " + e.getMessage() );
+      err.println( t.f( "test_no_summary", ruta, e.getMessage() ) );
     }
   }
 

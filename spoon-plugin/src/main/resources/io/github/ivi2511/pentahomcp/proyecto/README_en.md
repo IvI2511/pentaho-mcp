@@ -30,6 +30,7 @@ ETL project with Pentaho Data Integration 9.4 and [Pentaho Live](https://github.
 pentaho-live lint etl              # uses .pentaho-live/lint.yaml; exits with 1 if one is below the minimum
 pentaho-live lint etl --format json
 pentaho-live test --all            # every *.test.json; exits with 1 if one fails
+pentaho-live test --all --lang es  # the same in Spanish (en, es, pt; by default your system's language)
 pentaho-live diff --rev main --format markdown   # what changed in each .ktr/.kjb since main, by meaning
 ```
 
@@ -38,6 +39,8 @@ In Spoon: **IDC > Check quality...** shows "Profile: {{NAME}}" and the conventio
 ## Continuous integration
 
 `.github/workflows/pentaho-live.yml` installs PDI CE 9.4 with Pentaho Live (cached) and, on every pull request and push to `main`, lints all of `etl/` with the profile, runs the golden-dataset tests and writes the semantic diff of the changed `.ktr`/`.kjb` against the base branch to the job summary. The same diff can go as a comment on the pull request: set `PENTAHO_LIVE_PR_COMMENT: "true"` and uncomment `pull-requests: write` in the workflow.
+
+**Reading a run.** Open the run in the repository's **Actions** tab (or **Details** next to the check of the pull request). Every lint finding and every test that does not pass is an annotation (`::error` / `::warning`) on its file: you see them in the run's **Annotations** box and, on a pull request, also in **Files changed** when the file is part of it. The run's **Summary** page has three sections: the lint score of each file, each test with the first difference it found (key, column, expected and actual value) and the semantic diff of the changed `.ktr`/`.kjb`. A red ✗ on the tests step means that a golden output changed: if the change was on purpose, create the test again (`test_create` with `replace: true`) in the same pull request. More in [manual/13-proyecto.md](https://github.com/IvI2511/pentaho-mcp/blob/main/claude/skills/pentaho-etl/manual/13-proyecto.md#reading-a-ci-run).
 
 ## Readable diffs in git
 
