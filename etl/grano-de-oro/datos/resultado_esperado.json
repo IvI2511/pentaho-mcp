@@ -1,0 +1,225 @@
+{
+  "semilla": 20260901,
+  "ficheros": {
+    "ventas": {
+      "fichero": "ventas_2026_09.csv",
+      "lineas": 3000,
+      "lineas_unicas": 2940,
+      "tickets": 1507
+    },
+    "productos": {
+      "fichero": "productos.xlsx",
+      "filas": 28,
+      "nombres_con_espacios": 8,
+      "categorias_mal_escritas": 17
+    },
+    "tiendas": {
+      "fichero": "tiendas.json",
+      "tiendas": 4
+    }
+  },
+  "formatos": {
+    "fecha_dd_mm_aaaa": 838,
+    "fecha_aaaa_mm_dd": 2162,
+    "precio_con_coma": 575,
+    "precio_con_punto": 2425,
+    "metodo_pago_tal_cual": {
+      "TARJETA": 960,
+      "EFECTIVO": 352,
+      "tarjeta": 343,
+      "BIZUM": 334,
+      "Tarjeta ": 240,
+      " tarjeta": 183,
+      "Bizum": 155,
+      "efectivo": 138,
+      "Efectivo ": 122,
+      "bizum ": 116,
+      "  EFECTIVO": 57
+    }
+  },
+  "errores_inyectados": {
+    "duplicados_exactos": 60,
+    "tienda_vacia": 15,
+    "cantidad_negativa": 11,
+    "cantidad_cero": 7,
+    "producto_inexistente": 22
+  },
+  "esperado": {
+    "dim_tienda": 4,
+    "dim_producto": 28,
+    "dim_fecha": 30,
+    "hechos_ventas": 2885,
+    "rechazos_total": 115,
+    "rechazos_por_motivo": {
+      "DUPLICADO": 60,
+      "TIENDA_VACIA": 15,
+      "CANTIDAD_NO_VALIDA": 18,
+      "TIENDA_DESCONOCIDA": 0,
+      "PRODUCTO_DESCONOCIDO": 22,
+      "FECHA_NO_VALIDA": 0
+    },
+    "hechos_por_metodo_pago": {
+      "BIZUM": 579,
+      "EFECTIVO": 645,
+      "TARJETA": 1661
+    },
+    "categorias": [
+      "Bebidas",
+      "Bollería",
+      "Café",
+      "Infusiones",
+      "Salado"
+    ],
+    "importe_total_cadena": "8957.30",
+    "tickets_cadena": 1493,
+    "ticket_medio_cadena": "6.00",
+    "kpi_ticket_medio_tienda": [
+      {
+        "tienda": "Chamberí",
+        "importe_total": "2089.80",
+        "num_tickets": 354,
+        "ticket_medio": "5.90"
+      },
+      {
+        "tienda": "Malasaña",
+        "importe_total": "2822.50",
+        "num_tickets": 460,
+        "ticket_medio": "6.14"
+      },
+      {
+        "tienda": "Retiro",
+        "importe_total": "1696.10",
+        "num_tickets": 287,
+        "ticket_medio": "5.91"
+      },
+      {
+        "tienda": "Salamanca",
+        "importe_total": "2348.90",
+        "num_tickets": 392,
+        "ticket_medio": "5.99"
+      }
+    ],
+    "kpi_ventas_tienda_categoria": [
+      {
+        "tienda": "Chamberí",
+        "categoria": "Bebidas",
+        "unidades": 91,
+        "importe": "248.70"
+      },
+      {
+        "tienda": "Chamberí",
+        "categoria": "Bollería",
+        "unidades": 166,
+        "importe": "388.40"
+      },
+      {
+        "tienda": "Chamberí",
+        "categoria": "Café",
+        "unidades": 359,
+        "importe": "787.10"
+      },
+      {
+        "tienda": "Chamberí",
+        "categoria": "Infusiones",
+        "unidades": 75,
+        "importe": "201.70"
+      },
+      {
+        "tienda": "Chamberí",
+        "categoria": "Salado",
+        "unidades": 139,
+        "importe": "463.90"
+      },
+      {
+        "tienda": "Malasaña",
+        "categoria": "Bebidas",
+        "unidades": 117,
+        "importe": "317.70"
+      },
+      {
+        "tienda": "Malasaña",
+        "categoria": "Bollería",
+        "unidades": 247,
+        "importe": "577.70"
+      },
+      {
+        "tienda": "Malasaña",
+        "categoria": "Café",
+        "unidades": 495,
+        "importe": "1069.40"
+      },
+      {
+        "tienda": "Malasaña",
+        "categoria": "Infusiones",
+        "unidades": 115,
+        "importe": "295.90"
+      },
+      {
+        "tienda": "Malasaña",
+        "categoria": "Salado",
+        "unidades": 155,
+        "importe": "561.80"
+      },
+      {
+        "tienda": "Retiro",
+        "categoria": "Bebidas",
+        "unidades": 59,
+        "importe": "149.80"
+      },
+      {
+        "tienda": "Retiro",
+        "categoria": "Bollería",
+        "unidades": 152,
+        "importe": "346.00"
+      },
+      {
+        "tienda": "Retiro",
+        "categoria": "Café",
+        "unidades": 316,
+        "importe": "683.80"
+      },
+      {
+        "tienda": "Retiro",
+        "categoria": "Infusiones",
+        "unidades": 72,
+        "importe": "194.70"
+      },
+      {
+        "tienda": "Retiro",
+        "categoria": "Salado",
+        "unidades": 93,
+        "importe": "321.80"
+      },
+      {
+        "tienda": "Salamanca",
+        "categoria": "Bebidas",
+        "unidades": 109,
+        "importe": "296.10"
+      },
+      {
+        "tienda": "Salamanca",
+        "categoria": "Bollería",
+        "unidades": 197,
+        "importe": "445.50"
+      },
+      {
+        "tienda": "Salamanca",
+        "categoria": "Café",
+        "unidades": 410,
+        "importe": "891.90"
+      },
+      {
+        "tienda": "Salamanca",
+        "categoria": "Infusiones",
+        "unidades": 90,
+        "importe": "246.40"
+      },
+      {
+        "tienda": "Salamanca",
+        "categoria": "Salado",
+        "unidades": 138,
+        "importe": "469.00"
+      }
+    ]
+  }
+}

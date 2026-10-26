@@ -1,0 +1,17 @@
+# Pentaho Live project (created by `pentaho-live init`)
+
+# Kettle files are XML text; datasets keep their bytes as they are
+*.ktr text
+*.kjb text
+*.csv -text
+*.xlsx binary
+*.xls binary
+*.sqlite binary
+
+# Readable diffs of .ktr/.kjb: steps, hops and settings instead of raw XML.
+# Needs `pentaho-live textconv` (Pentaho Live 0.7+) and, once in each clone:
+#   git config diff.kettle.textconv "pentaho-live textconv"
+#   git config diff.kettle.cachetextconv true
+# (`pentaho-live git-setup` prints these lines; `pentaho-live normalize` puts .ktr/.kjb in canonical form.)
+*.ktr diff=kettle
+*.kjb diff=kettle

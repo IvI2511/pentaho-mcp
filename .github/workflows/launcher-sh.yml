@@ -1,0 +1,81 @@
+# Throwaway check (test fixture only): Pentaho Live's shell launcher (launcher/pentaho-live, copied to
+# ci-tools/) on Linux and macOS, with the PDI CE 9.4 + plugin zip of the release.
+name: launcher-sh
+
+on:
+  push:
+    branches: [ci/proyecto-ejemplo]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sh:
+    name: shell launcher (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Cache PDI CE 9.4 + Pentaho Live
+        id: pdi-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pdi
+          key: pdi-ce-9.4-pentaho-live-0.7.0-${{ runner.os }}-${{ hashFiles('ci-tools/overlay.zip') }}
+
+      - name: Install PDI CE 9.4 + Pentaho Live
+        if: steps.pdi-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/pdi"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/pdi.zip" \
+            https://github.com/IvI2511/pentaho-mcp/releases/download/v0.7.0/pdi-ce-9.4-con-pentaho-mcp.zip
+          unzip -q "$RUNNER_TEMP/pdi.zip" -d "$RUNNER_TEMP/pdi"
+          rm "$RUNNER_TEMP/pdi.zip"
+
+      - name: Plugin classes under test (ci-tools/overlay.zip, if any)
+        run: |
+          if [ -f ci-tools/overlay.zip ]; then
+            core=$(ls "$RUNNER_TEMP"/pdi/data-integration/plugins/pentaho-mcp/pentaho-mcp-core-*.jar)
+            cp "$core" "$RUNNER_TEMP/core-orig.jar"
+            mkdir -p "$RUNNER_TEMP/overlay" && unzip -q -o ci-tools/overlay.zip -d "$RUNNER_TEMP/overlay"
+            (cd "$RUNNER_TEMP/overlay" && jar uf "$core" .)
+            echo "overlay applied to $core"
+          fi
+
+      - name: Project commands through the shell launcher
+        env:
+          LANG: en_US.UTF-8
+        run: |
+          set -u
+          export PDI_HOME="$RUNNER_TEMP/pdi/data-integration"
+          export KETTLE_HOME="$RUNNER_TEMP/kettle-home"; mkdir -p "$KETTLE_HOME/.kettle"
+          pl="sh ci-tools/pentaho-live"
+          fail=0
+          check() { want=$1; shift; "$@" > "$RUNNER_TEMP/o.txt" 2> "$RUNNER_TEMP/e.txt"; got=$?
+            echo "== $* -> exit $got (want $want), stdout $(wc -l < "$RUNNER_TEMP/o.txt") lines, stderr $(wc -l < "$RUNNER_TEMP/e.txt") lines"
+            head -n 15 "$RUNNER_TEMP/o.txt"; echo "-- stderr:"; head -n 8 "$RUNNER_TEMP/e.txt"
+            [ "$got" = "$want" ] || { echo "::error::$* exited $got, expected $want"; fail=1; }; }
+          check 0 $pl init "$RUNNER_TEMP/nuevo" --lang es
+          check 0 $pl lint etl
+          check 0 $pl profile etl
+          check 0 $pl test --all
+          check 0 $pl test --all --lang es
+          check 2 $pl test tests/does-not-exist
+          check 1 $pl diff etl/ejemplos/01_generar_constantes.ktr etl/ejemplos/02_filtrar_clientes.ktr
+          check 0 $pl diff --rev HEAD etl
+          check 0 $pl textconv etl/ejemplos/01_generar_constantes.ktr
+          check 0 $pl git-setup
+          exit $fail

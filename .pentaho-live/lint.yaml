@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=lint.schema.json
+# Pentaho Live lint profile: the conventions of this project or course.
+# lint_etl (Claude), the IDC menu's "Check quality...", the Quality section of the reports, the
+# grader (rubric line lint:profile) and `pentaho-live lint` (CI) use it on their own: they look
+# for .pentaho-live/lint.yaml going up the folders from the .ktr/.kjb's folder.
+# Full format: manual/13-proyecto.md of the pentaho-etl skill.
+version: 1
+name: "Proyecto de ejemplo"
+description: The team's conventions for ETL with Pentaho Data Integration 9.4.
+
+# Minimum score (0-100) for a .ktr/.kjb to be accepted. With an error the score never goes above 74.
+min_score: 75
+
+# Rules (ids in pentaho://lint/rules): off, on, or the severity you want (error, warning, info).
+rules:
+  absolute_path: error        # no C:\Users\... in a shared project
+  password_in_file: error
+  default_step_name: warning  # "Text file output 2" documents nothing
+  # select_star: off
+
+# Prefixes per step category: input, output, lookup, filter, join, transform, aggregate,
+# flow, script, validation, utility, mapping, other; and by_type for a given step type.
+naming:
+  steps:
+    input: IN_
+    output: OUT_
+    lookup: LKP_
+    filter: FLT_
+    # by_type: { TableInput: SRC_ }
+  entries:
+    transformation: TR_
+    job: JB_
+
+# A description on every step (right-click > Edit description).
+step_description:
+  required: false
+  except: [Dummy]
+
+# Variables required instead of paths and hosts written by hand.
+required_variables:
+  paths: [DIR_DATOS, Internal.Entry.Current.Directory]
+  hosts: [DB_HOST]
+
+# The team's own rules: patterns (regular expressions), never code.
+# where: name | path | sql | description | xml; must: not_match (default) | match.
+team_rules:
+  - id: no_tmp_folder
+    title: Nothing in temporary folders
+    message: "'{where}' uses a temporary folder ({match}): use ${DIR_DATOS} or salida/."
+    severity: warning
+    where: path
+    pattern: '(?i)(^|[\\/])te?mp([\\/]|$)'

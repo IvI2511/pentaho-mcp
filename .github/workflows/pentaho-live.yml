@@ -1,0 +1,126 @@
+# Pentaho Live CI (created by `pentaho-live init`, Pentaho Live 0.7.0).
+# On every pull request and push to main: installs PDI CE 9.4 with the Pentaho Live plugin (cached), then
+#  1. lints every .ktr/.kjb under etl/ with the project's profile (.pentaho-live/lint.yaml) and fails if one
+#     is below its min_score (`pentaho-live lint etl`);
+#  2. runs the golden-dataset tests (every *.test.json, see `test_create`) in a separate JVM and fails if one
+#     does not pass (`pentaho-live test --all`);
+#  3. on a pull request, writes the semantic diff of the changed .ktr/.kjb against the base branch to the job
+#     summary (`pentaho-live diff --rev origin/<base> --format markdown`): steps, settings, hops and
+#     connections that changed, never passwords. Optionally also as a comment on the pull request.
+# The three steps are the same commands you can run on your computer with Pentaho Live installed.
+name: pentaho-live
+
+on:
+  pull_request:
+  push:
+    branches: [main, ci/proyecto-ejemplo]   # ci/proyecto-ejemplo: test fixture only
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PENTAHO_LIVE_VERSION: "0.7.0"
+  # PDI CE 9.4 with the plugin already inside (the same zip as the release's installers)
+  PDI_ZIP_URL: https://github.com/IvI2511/pentaho-mcp/releases/download/v0.7.0/pdi-ce-9.4-con-pentaho-mcp.zip
+  # "true" also posts the semantic diff as a comment on the pull request (it updates its own comment).
+  # It needs `pull-requests: write` in the job's permissions below; pull requests from forks get a read-only
+  # token, so there the comment is skipped and the diff stays in the job summary.
+  PENTAHO_LIVE_PR_COMMENT: "true"
+
+jobs:
+  check:
+    name: Lint, tests and semantic diff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Cache PDI CE 9.4 + Pentaho Live
+        id: pdi-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pdi
+          key: pdi-ce-9.4-pentaho-live-${{ env.PENTAHO_LIVE_VERSION }}-${{ hashFiles('ci-tools/overlay.zip') }}   # fixture: + overlay
+
+      - name: Install PDI CE 9.4 + Pentaho Live (about 400 MB, only without cache)
+        if: steps.pdi-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/pdi"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/pdi.zip" "$PDI_ZIP_URL"
+          unzip -q "$RUNNER_TEMP/pdi.zip" -d "$RUNNER_TEMP/pdi"
+          rm "$RUNNER_TEMP/pdi.zip"
+          ls "$RUNNER_TEMP/pdi/data-integration/plugins/pentaho-mcp"
+
+      - name: "Fixture only: plugin classes under test (ci-tools/overlay.zip, if any)"
+        if: hashFiles('ci-tools/overlay.zip') != ''
+        run: |
+          core=$(ls "$RUNNER_TEMP"/pdi/data-integration/plugins/pentaho-mcp/pentaho-mcp-core-*.jar)
+          mkdir -p "$RUNNER_TEMP/overlay" && unzip -q -o ci-tools/overlay.zip -d "$RUNNER_TEMP/overlay"
+          (cd "$RUNNER_TEMP/overlay" && jar uf "$core" .)
+          echo "overlay applied to $core"
+
+      - name: Put the pentaho-live command on the PATH
+        id: setup
+        run: |
+          PDI="$RUNNER_TEMP/pdi/data-integration"
+          mkdir -p "$RUNNER_TEMP/bin" "$RUNNER_TEMP/kettle-home/.kettle"
+          # the same as Pentaho Live's launcher/pentaho-live on Linux, with this PDI
+          cat > "$RUNNER_TEMP/bin/pentaho-live" <<'EOF'
+          #!/bin/sh
+          pdi="$PDI_HOME"
+          case "$1" in
+            normalize|diff|textconv|pre-commit|git-setup)
+              exec java -Xmx512m -Dfile.encoding=UTF-8 -cp "$pdi/plugins/pentaho-mcp/*" \
+                io.github.ivi2511.pentahomcp.diff.LineaComandos "$@" ;;
+          esac
+          exec java -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 \
+            --add-opens java.base/java.net=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED \
+            --add-opens java.base/sun.net.www.protocol.jar=ALL-UNNAMED \
+            -DKETTLE_PLUGIN_BASE_FOLDERS="$pdi/plugins" \
+            -cp "$pdi/lib/*:$pdi/plugins/pentaho-mcp/*:$pdi/plugins/pentaho-mcp/lib/*:$pdi/classes" \
+            io.github.ivi2511.pentahomcp.ProyectoMain "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/pentaho-live"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          echo "PDI_HOME=$PDI" >> "$GITHUB_ENV"
+          echo "KETTLE_HOME=$RUNNER_TEMP/kettle-home" >> "$GITHUB_ENV"
+
+      - name: Lint with the project profile
+        run: pentaho-live lint etl --format github --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Tests with golden datasets
+        # runs even when the lint step failed, so one push shows everything
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: pentaho-live test --all --format github --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Semantic diff against the base branch
+        id: diff
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && github.event_name == 'pull_request' }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+          # exit code: 0 no changes, 1 changes, 2 error
+          status=0
+          pentaho-live diff --rev "origin/$BASE_REF" --format markdown > "$RUNNER_TEMP/pentaho-live-diff.md" || status=$?
+          cat "$RUNNER_TEMP/pentaho-live-diff.md" >> "$GITHUB_STEP_SUMMARY"
+          [ "$status" -le 1 ]
+
+      - name: Comment the semantic diff on the pull request
+        if: ${{ !cancelled() && steps.diff.outcome == 'success' && env.PENTAHO_LIVE_PR_COMMENT == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/pentaho-live-diff.md" --edit-last --create-if-none \
+            || gh pr comment "$PR" --body-file "$RUNNER_TEMP/pentaho-live-diff.md"

@@ -1,0 +1,32 @@
+# Pentaho Live project (created by `pentaho-live init`)
+
+# Secrets: never commit passwords or real hosts. env/dev.properties is the shared example;
+# each person keeps their own values in env/local.properties (or *.secret.properties).
+env/local.properties
+env/*.secret.properties
+*.secret.properties
+.env
+.kettle/
+kettle.properties
+shared.xml
+repositories.xml
+
+# Run outputs (Pan/Kitchen, Spoon previews, reports)
+salida/
+output/
+*.log
+runs.sqlite
+.pentaho-live/cache/
+
+# SQLite databases written by the ETLs; the small test databases in datasets/ and tests/ are kept
+*.sqlite
+*.sqlite-journal
+*.db-journal
+!datasets/**/*.sqlite
+!tests/**/*.sqlite
+
+# Spoon and editors
+*.ktr.bak
+*.kjb.bak
+.DS_Store
+Thumbs.db

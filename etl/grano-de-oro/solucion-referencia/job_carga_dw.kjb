@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<job>
+  <name>job_carga_dw</name>
+  <description>Orquesta la carga del almacén: dimensiones, hechos y KPI</description>
+  <extended_description>Comprueba que existen los ficheros de entrada, crea la carpeta salida/ y el modelo estrella en SQLite, carga las tres dimensiones, después los hechos (que buscan las claves subrogadas en ellas) y por último los KPI. Si cualquier entrada falla, el hop rojo escribe el error en el log y aborta el job, que termina con código de salida distinto de 0.</extended_description>
+  <job_version/>
+  <job_status>0</job_status>
+  <directory>/</directory>
+  <created_user>-</created_user>
+  <created_date>2026/10/20 10:00:00.000</created_date>
+  <modified_user>-</modified_user>
+  <modified_date>2026/10/20 10:00:00.000</modified_date>
+  <parameters>
+  </parameters>
+  <connection>
+    <name>dw_grano_de_oro</name>
+    <server/>
+    <type>SQLITE</type>
+    <access>Native</access>
+    <database>${Internal.Entry.Current.Directory}/../salida/grano_de_oro_dw.sqlite</database>
+    <port>-1</port>
+    <username/>
+    <password/>
+    <servername/>
+    <data_tablespace/>
+    <index_tablespace/>
+    <attributes>
+      <attribute>
+        <code>FORCE_IDENTIFIERS_TO_LOWERCASE</code>
+        <attribute>N</attribute>
+      </attribute>
+      <attribute>
+        <code>FORCE_IDENTIFIERS_TO_UPPERCASE</code>
+        <attribute>N</attribute>
+      </attribute>
+      <attribute>
+        <code>IS_CLUSTERED</code>
+        <attribute>N</attribute>
+      </attribute>
+      <attribute>
+        <code>PORT_NUMBER</code>
+        <attribute>-1</attribute>
+      </attribute>
+      <attribute>
+        <code>PRESERVE_RESERVED_WORD_CASE</code>
+        <attribute>Y</attribute>
+      </attribute>
+      <attribute>
+        <code>QUOTE_ALL_FIELDS</code>
+        <attribute>N</attribute>
+      </attribute>
+      <attribute>
+        <code>SUPPORTS_BOOLEAN_DATA_TYPE</code>
+        <attribute>Y</attribute>
+      </attribute>
+      <attribute>
+        <code>SUPPORTS_TIMESTAMP_DATA_TYPE</code>
+        <attribute>Y</attribute>
+      </attribute>
+      <attribute>
+        <code>USE_POOLING</code>
+        <attribute>N</attribute>
+      </attribute>
+    </attributes>
+  </connection>
+  <slaveservers>
+  </slaveservers>
+  <pass_batchid>N</pass_batchid>
+  <shared_objects_file/>
+  <entries>
+    <entry>
+      <name>START</name>
+      <description/>
+      <type>SPECIAL</type>
+      <attributes/>
+      <start>Y</start>
+      <dummy>N</dummy>
+      <repeat>N</repeat>
+      <schedulerType>0</schedulerType>
+      <intervalSeconds>0</intervalSeconds>
+      <intervalMinutes>60</intervalMinutes>
+      <hour>12</hour>
+      <minutes>0</minutes>
+      <weekDay>1</weekDay>
+      <DayOfMonth>1</DayOfMonth>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>96</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Comprobar ficheros de entrada</name>
+      <description>Los tres ficheros de datos/ tienen que existir.</description>
+      <type>FILES_EXIST</type>
+      <attributes/>
+      <filename/>
+      <fields>
+        <field>
+          <name>${Internal.Entry.Current.Directory}/../datos/ventas_2026_09.csv</name>
+        </field>
+        <field>
+          <name>${Internal.Entry.Current.Directory}/../datos/productos.xlsx</name>
+        </field>
+        <field>
+          <name>${Internal.Entry.Current.Directory}/../datos/tiendas.json</name>
+        </field>
+      </fields>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>256</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Crear carpeta salida</name>
+      <description>Carpeta del almacén SQLite, los rechazos y los KPI.</description>
+      <type>CREATE_FOLDER</type>
+      <attributes/>
+      <foldername>${Internal.Entry.Current.Directory}/../salida</foldername>
+      <fail_of_folder_exists>N</fail_of_folder_exists>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>416</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Crear modelo estrella</name>
+      <description>Borra y vuelve a crear las tablas: la carga es completa e idempotente.</description>
+      <type>SQL</type>
+      <attributes/>
+      <sql>DROP TABLE IF EXISTS hechos_ventas;&#xa;DROP TABLE IF EXISTS kpi_ventas_tienda_categoria;&#xa;DROP TABLE IF EXISTS kpi_ticket_medio_tienda;&#xa;DROP TABLE IF EXISTS dim_tienda;&#xa;DROP TABLE IF EXISTS dim_producto;&#xa;DROP TABLE IF EXISTS dim_fecha;&#xa;&#xa;CREATE TABLE dim_tienda (&#xa;  sk_tienda      INTEGER PRIMARY KEY,&#xa;  id_tienda      TEXT NOT NULL UNIQUE,&#xa;  nombre         TEXT NOT NULL,&#xa;  barrio         TEXT,&#xa;  distrito       TEXT,&#xa;  codigo_postal  TEXT,&#xa;  fecha_apertura TEXT,&#xa;  superficie_m2  INTEGER,&#xa;  plazas         INTEGER&#xa;);&#xa;&#xa;CREATE TABLE dim_producto (&#xa;  sk_producto     INTEGER PRIMARY KEY,&#xa;  codigo_producto TEXT NOT NULL UNIQUE,&#xa;  nombre          TEXT NOT NULL,&#xa;  categoria       TEXT NOT NULL,&#xa;  precio_venta    REAL&#xa;);&#xa;&#xa;CREATE TABLE dim_fecha (&#xa;  sk_fecha         INTEGER PRIMARY KEY,&#xa;  fecha            TEXT NOT NULL UNIQUE,&#xa;  anio             INTEGER NOT NULL,&#xa;  mes              INTEGER NOT NULL,&#xa;  dia              INTEGER NOT NULL,&#xa;  dia_semana       INTEGER NOT NULL,&#xa;  nombre_dia       TEXT NOT NULL,&#xa;  es_fin_de_semana TEXT NOT NULL&#xa;);&#xa;&#xa;CREATE TABLE hechos_ventas (&#xa;  id_ticket       TEXT    NOT NULL,&#xa;  linea           INTEGER NOT NULL,&#xa;  sk_fecha        INTEGER NOT NULL REFERENCES dim_fecha (sk_fecha),&#xa;  sk_tienda       INTEGER NOT NULL REFERENCES dim_tienda (sk_tienda),&#xa;  sk_producto     INTEGER NOT NULL REFERENCES dim_producto (sk_producto),&#xa;  cantidad        INTEGER NOT NULL,&#xa;  precio_unitario REAL    NOT NULL,&#xa;  importe         REAL    NOT NULL,&#xa;  metodo_pago     TEXT    NOT NULL,&#xa;  PRIMARY KEY (id_ticket, linea)&#xa;);&#xa;&#xa;CREATE TABLE kpi_ventas_tienda_categoria (&#xa;  tienda    TEXT NOT NULL,&#xa;  categoria TEXT NOT NULL,&#xa;  unidades  INTEGER NOT NULL,&#xa;  importe   REAL NOT NULL,&#xa;  PRIMARY KEY (tienda, categoria)&#xa;);&#xa;&#xa;CREATE TABLE kpi_ticket_medio_tienda (&#xa;  tienda        TEXT PRIMARY KEY,&#xa;  importe_total REAL NOT NULL,&#xa;  num_tickets   INTEGER NOT NULL,&#xa;  ticket_medio  REAL NOT NULL&#xa;);&#xa;</sql>
+      <useVariableSubstitution>F</useVariableSubstitution>
+      <sqlfromfile>F</sqlfromfile>
+      <sqlfilename/>
+      <sendOneStatement>F</sendOneStatement>
+      <connection>dw_grano_de_oro</connection>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>576</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Cargar dim_tienda</name>
+      <description>Dimensión de tiendas.</description>
+      <type>TRANS</type>
+      <attributes/>
+      <specification_method>filename</specification_method>
+      <trans_object_id/>
+      <filename>${Internal.Entry.Current.Directory}/01_dim_tienda.ktr</filename>
+      <transname/>
+      <arg_from_previous>N</arg_from_previous>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <set_logfile>N</set_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <cluster>N</cluster>
+      <slave_server_name/>
+      <set_append_logfile>N</set_append_logfile>
+      <wait_until_finished>Y</wait_until_finished>
+      <follow_abort_remote>N</follow_abort_remote>
+      <create_parent_folder>N</create_parent_folder>
+      <logging_remote_work>N</logging_remote_work>
+      <run_configuration>Pentaho local</run_configuration>
+      <suppress_result_data>N</suppress_result_data>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>736</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Cargar dim_producto</name>
+      <description>Dimensión de productos.</description>
+      <type>TRANS</type>
+      <attributes/>
+      <specification_method>filename</specification_method>
+      <trans_object_id/>
+      <filename>${Internal.Entry.Current.Directory}/02_dim_producto.ktr</filename>
+      <transname/>
+      <arg_from_previous>N</arg_from_previous>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <set_logfile>N</set_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <cluster>N</cluster>
+      <slave_server_name/>
+      <set_append_logfile>N</set_append_logfile>
+      <wait_until_finished>Y</wait_until_finished>
+      <follow_abort_remote>N</follow_abort_remote>
+      <create_parent_folder>N</create_parent_folder>
+      <logging_remote_work>N</logging_remote_work>
+      <run_configuration>Pentaho local</run_configuration>
+      <suppress_result_data>N</suppress_result_data>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>896</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Cargar dim_fecha</name>
+      <description>Dimensión de fechas.</description>
+      <type>TRANS</type>
+      <attributes/>
+      <specification_method>filename</specification_method>
+      <trans_object_id/>
+      <filename>${Internal.Entry.Current.Directory}/03_dim_fecha.ktr</filename>
+      <transname/>
+      <arg_from_previous>N</arg_from_previous>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <set_logfile>N</set_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <cluster>N</cluster>
+      <slave_server_name/>
+      <set_append_logfile>N</set_append_logfile>
+      <wait_until_finished>Y</wait_until_finished>
+      <follow_abort_remote>N</follow_abort_remote>
+      <create_parent_folder>N</create_parent_folder>
+      <logging_remote_work>N</logging_remote_work>
+      <run_configuration>Pentaho local</run_configuration>
+      <suppress_result_data>N</suppress_result_data>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>1056</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Cargar hechos_ventas</name>
+      <description>Hechos y rechazos: necesita las tres dimensiones.</description>
+      <type>TRANS</type>
+      <attributes/>
+      <specification_method>filename</specification_method>
+      <trans_object_id/>
+      <filename>${Internal.Entry.Current.Directory}/04_hechos_ventas.ktr</filename>
+      <transname/>
+      <arg_from_previous>N</arg_from_previous>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <set_logfile>N</set_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <cluster>N</cluster>
+      <slave_server_name/>
+      <set_append_logfile>N</set_append_logfile>
+      <wait_until_finished>Y</wait_until_finished>
+      <follow_abort_remote>N</follow_abort_remote>
+      <create_parent_folder>N</create_parent_folder>
+      <logging_remote_work>N</logging_remote_work>
+      <run_configuration>Pentaho local</run_configuration>
+      <suppress_result_data>N</suppress_result_data>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>1216</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Calcular KPI</name>
+      <description>KPI a partir del modelo estrella.</description>
+      <type>TRANS</type>
+      <attributes/>
+      <specification_method>filename</specification_method>
+      <trans_object_id/>
+      <filename>${Internal.Entry.Current.Directory}/05_kpi_ventas.ktr</filename>
+      <transname/>
+      <arg_from_previous>N</arg_from_previous>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <set_logfile>N</set_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <cluster>N</cluster>
+      <slave_server_name/>
+      <set_append_logfile>N</set_append_logfile>
+      <wait_until_finished>Y</wait_until_finished>
+      <follow_abort_remote>N</follow_abort_remote>
+      <create_parent_folder>N</create_parent_folder>
+      <logging_remote_work>N</logging_remote_work>
+      <run_configuration>Pentaho local</run_configuration>
+      <suppress_result_data>N</suppress_result_data>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>1376</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Carga correcta</name>
+      <description/>
+      <type>SUCCESS</type>
+      <attributes/>
+
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>1536</xloc>
+      <yloc>128</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Registrar el error</name>
+      <description>Mensaje claro en el log antes de abortar.</description>
+      <type>WRITE_TO_LOG</type>
+      <attributes/>
+      <logmessage>La carga del almacén de Grano de Oro ha fallado: la entrada que ha fallado es la última que aparece como «Starting entry» antes de este mensaje.</logmessage>
+      <loglevel>Error</loglevel>
+      <logsubject>Grano de Oro</logsubject>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>816</xloc>
+      <yloc>352</yloc>
+      <attributes_kjc/>
+    </entry>
+    <entry>
+      <name>Abortar la carga</name>
+      <description>El job termina con error.</description>
+      <type>ABORT</type>
+      <attributes/>
+      <message>Carga abortada: el almacén puede haber quedado a medias. Corrige el error y vuelve a lanzar el job.</message>
+      <parallel>N</parallel>
+      <draw>Y</draw>
+      <nr>0</nr>
+      <xloc>976</xloc>
+      <yloc>352</yloc>
+      <attributes_kjc/>
+    </entry>
+  </entries>
+  <hops>
+    <hop>
+      <from>START</from>
+      <to>Comprobar ficheros de entrada</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>Y</unconditional>
+    </hop>
+    <hop>
+      <from>Comprobar ficheros de entrada</from>
+      <to>Crear carpeta salida</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Crear carpeta salida</from>
+      <to>Crear modelo estrella</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Crear modelo estrella</from>
+      <to>Cargar dim_tienda</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar dim_tienda</from>
+      <to>Cargar dim_producto</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar dim_producto</from>
+      <to>Cargar dim_fecha</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar dim_fecha</from>
+      <to>Cargar hechos_ventas</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar hechos_ventas</from>
+      <to>Calcular KPI</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Calcular KPI</from>
+      <to>Carga correcta</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Comprobar ficheros de entrada</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Crear carpeta salida</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Crear modelo estrella</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar dim_tienda</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar dim_producto</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar dim_fecha</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Cargar hechos_ventas</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Calcular KPI</from>
+      <to>Registrar el error</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+    </hop>
+    <hop>
+      <from>Registrar el error</from>
+      <to>Abortar la carga</to>
+      <from_nr>0</from_nr>
+      <to_nr>0</to_nr>
+      <enabled>Y</enabled>
+      <evaluation>Y</evaluation>
+      <unconditional>Y</unconditional>
+    </hop>
+  </hops>
+  <notepads>
+    <notepad>
+      <note>Carga completa del almacén de Grano de Oro (septiembre de 2026)&#xa;Primero las dimensiones, después los hechos (necesitan sus claves) y al final los KPI.&#xa;Verde: sigue si la entrada termina bien · rojo: cualquier fallo registra el error y aborta</note>
+      <xloc>80</xloc>
+      <yloc>16</yloc>
+      <width>560</width>
+      <heigth>58</heigth>
+      <fontname/>
+      <fontsize>-1</fontsize>
+      <fontbold>N</fontbold>
+      <fontitalic>N</fontitalic>
+      <fontcolorred>0</fontcolorred>
+      <fontcolorgreen>0</fontcolorgreen>
+      <fontcolorblue>0</fontcolorblue>
+      <backgroundcolorred>255</backgroundcolorred>
+      <backgroundcolorgreen>205</backgroundcolorgreen>
+      <backgroundcolorblue>112</backgroundcolorblue>
+      <bordercolorred>100</bordercolorred>
+      <bordercolorgreen>100</bordercolorgreen>
+      <bordercolorblue>100</bordercolorblue>
+      <drawshadow>Y</drawshadow>
+    </notepad>
+  </notepads>
+  <attributes/>
+</job>
