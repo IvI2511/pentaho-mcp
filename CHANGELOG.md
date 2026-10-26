@@ -40,6 +40,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Test files no longer carry the case defaults `"weight": 1.0, "hidden": false` (old files still load; the
   grader's packs are unchanged). The example tests in `ejemplo/pruebas/` were cleaned.
 
+### Fixed
+
+- `test_create` with `tweaks: []` (and **Create test from preview…** with *Skip the steps that write* unchecked)
+  applied the default tweaks anyway: an empty list did not reach the test JVM. `input_steps: []` likewise.
+
 ## [0.7.0] - 2026-10-26
 
 ### Added
