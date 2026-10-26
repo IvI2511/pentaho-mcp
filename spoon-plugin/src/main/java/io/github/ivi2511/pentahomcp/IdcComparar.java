@@ -370,7 +370,7 @@ final class IdcComparar {
       titulo.setFont( IdcCalidad.negrita( titulo, 1.15 ) );
       Label sub = new Label( shell, SWT.WRAP );
       GridData gs = new GridData( SWT.FILL, SWT.TOP, true, false );
-      gs.widthHint = 780;
+      gs.widthHint = 480; // envuelve al ancho de la ventana (el de la tabla)
       sub.setLayoutData( gs );
       sub.setText( r.f( "before_after", n( res.etiquetaAntes ), n( res.etiquetaDespues ) ) + "\n"
         + ( res.iguales() ? r.s( "cmp.identical" ) : Salidas.resumen( res, r ) ) );
@@ -379,7 +379,6 @@ final class IdcComparar {
       tabla.setLinesVisible( true );
       GridData gt = new GridData( SWT.FILL, SWT.FILL, true, true );
       gt.heightHint = 300;
-      gt.widthHint = 810;
       tabla.setLayoutData( gt );
       int[] anchos = { 110, 300, 390 };
       String[] cols = { r.s( "cmp.col_change" ), r.s( "cmp.col_what" ), r.s( "cmp.col_detail" ) };
@@ -389,6 +388,7 @@ final class IdcComparar {
         c.setWidth( anchos[ i ] );
       }
       llenar();
+      IdcDetalle.tooltips( tabla );
       tabla.addListener( SWT.Selection, e -> seleccionar( tabla.getSelectionIndex() ) );
       Label ayuda = new Label( shell, SWT.WRAP );
       ayuda.setText( r.s( "cmp.list_hint" ) + " " + r.s( "cmp.close_tip" ) );
@@ -419,14 +419,69 @@ final class IdcComparar {
       shell.addListener( SWT.Dispose, e -> limpiar() );
     }
 
+    /** Clave de las preferencias: el tamaño de la ventana y el ancho de las columnas que dejó la persona. */
+    static final String PREF = "cmp.list";
+
+    /**
+     * Las columnas a lo que miden su título y sus filas (la de «qué» hasta 560 px, la de detalle hasta 900) y la
+     * ventana a la tabla entera, sin pasar del 92 % del ancho ni del 80 % del alto de la pantalla donde está Spoon. Si
+     * la persona ya la agrandó o achicó, vale lo que dejó (IdcDetalle.tamano / columnas). (UI)
+     */
+    org.eclipse.swt.graphics.Point medir( org.eclipse.swt.graphics.Rectangle pantalla ) {
+      TableColumn[] cs = tabla.getColumns();
+      int[] tope = { 220, 560, 900 };
+      int suma = 0;
+      for ( int i = 0; i < cs.length; i++ ) {
+        cs[ i ].pack();
+        cs[ i ].setWidth( Math.max( i == 2 ? 240 : 90, Math.min( tope[ i ], cs[ i ].getWidth() + 12 ) ) );
+        suma += cs[ i ].getWidth();
+      }
+      int barra = tabla.getVerticalBar() == null ? 18 : tabla.getVerticalBar().getSize().x;
+      int extra = barra + 2 * tabla.getBorderWidth() + 2 * 12 + 8;
+      int tope2 = pantalla.width * 92 / 100;
+      int ancho = suma + extra;
+      if ( ancho > tope2 ) {
+        // no entra: la de «qué» cede hasta 300 px y después la de detalle (el texto entero queda en el tooltip)
+        int sobra = ancho - tope2;
+        int q = Math.min( sobra, Math.max( 0, cs[ 1 ].getWidth() - 300 ) );
+        cs[ 1 ].setWidth( cs[ 1 ].getWidth() - q );
+        sobra -= q;
+        cs[ 2 ].setWidth( Math.max( 240, cs[ 2 ].getWidth() - sobra ) );
+        ancho = cs[ 0 ].getWidth() + cs[ 1 ].getWidth() + cs[ 2 ].getWidth() + extra;
+      }
+      ancho = Math.max( 560, Math.min( ancho, tope2 ) );
+      int filas = Math.max( 6, Math.min( 22, tabla.getItemCount() + 1 ) );
+      ( (GridData) tabla.getLayoutData() ).heightHint = tabla.getHeaderHeight() + filas * tabla.getItemHeight();
+      int alto = shell.computeSize( ancho, SWT.DEFAULT, true ).y;
+      alto = Math.min( alto, pantalla.height * 80 / 100 );
+      return new org.eclipse.swt.graphics.Point( ancho, alto );
+    }
+
+    /** El tamaño: el que dejó la persona la última vez o el de {@link #medir}; los anchos de columna, igual. (UI) */
+    void dimensionar( org.eclipse.swt.graphics.Rectangle pantalla ) {
+      org.eclipse.swt.graphics.Point t0 = medir( pantalla );
+      IdcDetalle.tamano( shell, PREF, t0.x, t0.y );
+      IdcDetalle.columnas( tabla, PREF, 2 );
+      shell.layout( true, true );
+    }
+
     void abrir() {
-      shell.pack();
       Shell padre = (Shell) shell.getParent();
+      org.eclipse.swt.graphics.Rectangle pantalla = padre != null && !padre.isDisposed() && padre.getMonitor() != null
+        ? padre.getMonitor().getClientArea() : shell.getDisplay().getClientArea();
+      dimensionar( pantalla );
+      org.eclipse.swt.graphics.Point t = shell.getSize();
+      int x = pantalla.x + ( pantalla.width - t.x ) / 2;
+      int y = pantalla.y + ( pantalla.height - t.y ) / 2;
       if ( padre != null && !padre.isDisposed() ) {
         org.eclipse.swt.graphics.Rectangle p = padre.getBounds();
-        org.eclipse.swt.graphics.Point t = shell.getSize();
-        shell.setLocation( p.x + Math.max( 0, p.width - t.x - 40 ), p.y + Math.max( 0, p.height - t.y - 60 ) );
+        x = p.x + Math.max( 0, p.width - t.x - 40 );
+        y = p.y + Math.max( 0, p.height - t.y - 60 );
       }
+      // siempre entera dentro de la pantalla
+      x = Math.max( pantalla.x, Math.min( x, pantalla.x + pantalla.width - t.x ) );
+      y = Math.max( pantalla.y, Math.min( y, pantalla.y + pantalla.height - t.y ) );
+      shell.setLocation( x, y );
       if ( shell.getDisplay().getActiveShell() != null ) {
         shell.open();
       } else {
@@ -451,10 +506,22 @@ final class IdcComparar {
           it.setText( 0, df.como.simbolo + "  " + r.s( "w." + df.como.id ) );
           it.setForeground( 0, colores[ df.como.ordinal() ] );
           it.setText( 1, r.s( "sec." + q.id ) + " · " + Salidas.cabeceraCorta( df, r ) );
-          it.setText( 2, detalle( df ) );
+          String det = detalle( df );
+          it.setText( 2, det );
+          it.setData( "tip2", detalleCompleto( df ) );
           filas.add( df );
         }
       }
+    }
+
+    /** Todas las propiedades, una por línea (el tooltip de la celda de detalle). */
+    private String detalleCompleto( Diferencia df ) {
+      StringBuilder sb = new StringBuilder();
+      for ( Propiedad p : df.propiedades ) {
+        Salidas.lineasPropiedad( df, p, r, "", sb );
+      }
+      String t = sb.toString().trim();
+      return t.length() > 2000 ? t.substring( 0, 1999 ) + "…" : t;
     }
 
     /** La primera propiedad (o las primeras) en una línea. */

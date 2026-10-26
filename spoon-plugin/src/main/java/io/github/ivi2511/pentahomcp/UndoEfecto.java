@@ -1,11 +1,13 @@
 package io.github.ivi2511.pentahomcp;
 
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 import org.pentaho.di.base.AbstractMeta;
+import org.pentaho.di.core.database.DatabaseMeta;
 import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.job.entry.JobEntryCopy;
 import org.pentaho.di.trans.TransMeta;
@@ -29,10 +31,18 @@ final class UndoEfecto {
   private UndoEfecto() {
   }
 
-  /** Los parámetros (nombre → {default, descripción}, en orden) y la descripción de un documento. */
+  /**
+   * Los parámetros (nombre → {default, descripción}, en orden) y la descripción de un documento; desde 0.7.1 también la
+   * descripción de cada step o entrada y el host, el puerto y la base de cada conexión (los arreglos de
+   * step_without_description y required_variable), que Spoon no deshace en un job.
+   */
   static final class Foto {
     final Map<String, String[]> parametros = new LinkedHashMap<String, String[]>();
     String descripcion;
+    /** StepMeta o JobEntryCopy (por identidad) → su descripción. */
+    final Map<Object, String> descripciones = new IdentityHashMap<Object, String>();
+    /** DatabaseMeta (por identidad) → {host, puerto, base}. */
+    final Map<DatabaseMeta, String[]> conexiones = new IdentityHashMap<DatabaseMeta, String[]>();
 
     static Foto de( AbstractMeta m ) {
       Foto f = new Foto();
@@ -49,6 +59,19 @@ final class UndoEfecto {
         f.parametros.put( p, new String[] { d == null ? "" : d, x == null ? "" : x } );
       }
       f.descripcion = m.getDescription();
+      if ( m instanceof TransMeta ) {
+        for ( StepMeta s : ( (TransMeta) m ).getSteps() ) {
+          f.descripciones.put( s, s.getDescription() );
+        }
+      } else if ( m instanceof JobMeta ) {
+        for ( JobEntryCopy c : ( (JobMeta) m ).getJobCopies() ) {
+          f.descripciones.put( c, c.getDescription() );
+        }
+      }
+      for ( DatabaseMeta db : m.getDatabases() ) {
+        f.conexiones.put( db, new String[] { db.getHostname(), db.getDatabasePortNumberString(), db
+          .getDatabaseName() } );
+      }
       return f;
     }
 
@@ -68,6 +91,30 @@ final class UndoEfecto {
       if ( !Objects.equals( descripcion, m.getDescription() ) ) {
         m.setDescription( descripcion );
       }
+      for ( Map.Entry<Object, String> e : descripciones.entrySet() ) {
+        Object o = e.getKey();
+        if ( o instanceof StepMeta && m instanceof TransMeta && ( (TransMeta) m ).indexOfStep( (StepMeta) o ) >= 0
+          && !Objects.equals( e.getValue(), ( (StepMeta) o ).getDescription() ) ) {
+          ( (StepMeta) o ).setDescription( e.getValue() );
+        } else if ( o instanceof JobEntryCopy && m instanceof JobMeta && ( (JobMeta) m ).indexOfJobEntry(
+          (JobEntryCopy) o ) >= 0 && !Objects.equals( e.getValue(), ( (JobEntryCopy) o ).getDescription() ) ) {
+          ( (JobEntryCopy) o ).setDescription( e.getValue() );
+        }
+      }
+      for ( Map.Entry<DatabaseMeta, String[]> e : conexiones.entrySet() ) {
+        DatabaseMeta db = e.getKey();
+        if ( m.indexOfDatabase( db ) < 0 ) {
+          continue;
+        }
+        String[] v = e.getValue();
+        if ( !Objects.equals( v[ 0 ], db.getHostname() ) || !Objects.equals( v[ 1 ], db.getDatabasePortNumberString() )
+          || !Objects.equals( v[ 2 ], db.getDatabaseName() ) ) {
+          db.setHostname( v[ 0 ] );
+          db.setDBPort( v[ 1 ] );
+          db.setDBName( v[ 2 ] );
+          db.setChanged();
+        }
+      }
       m.setChanged();
     }
 
@@ -84,10 +131,24 @@ final class UndoEfecto {
     }
 
     boolean igual( Foto o ) {
-      return igualParametros( o ) && Objects.equals( descripcion, o.descripcion );
+      if ( !igualParametros( o ) || !Objects.equals( descripcion, o.descripcion ) ) {
+        return false;
+      }
+      for ( Map.Entry<Object, String> e : descripciones.entrySet() ) {
+        if ( o.descripciones.containsKey( e.getKey() ) && !Objects.equals( e.getValue(), o.descripciones.get( e
+          .getKey() ) ) ) {
+          return false;
+        }
+      }
+      for ( Map.Entry<DatabaseMeta, String[]> e : conexiones.entrySet() ) {
+        if ( o.conexiones.containsKey( e.getKey() ) && !Arrays.equals( e.getValue(), o.conexiones.get( e
+          .getKey() ) ) ) {
+          return false;
+        }
+      }
+      return true;
     }
   }
-
   /** Un step del historial de undo que, cuando Spoon lo clona para deshacer o rehacer, pone su foto en el documento. */
   static final class PasoConFoto extends StepMeta {
     final transient AbstractMeta meta;
@@ -99,6 +160,14 @@ final class UndoEfecto {
       setStepErrorMeta( base.getStepErrorMeta() );
       this.meta = meta;
       this.foto = foto;
+    }
+
+    /** El step que carga la acción con la descripción de la foto (si no, el clon la pisaría al deshacer). */
+    PasoConFoto con( StepMeta real ) {
+      if ( foto.descripciones.containsKey( real ) ) {
+        setDescription( foto.descripciones.get( real ) );
+      }
+      return this;
     }
 
     @Override
@@ -124,6 +193,13 @@ final class UndoEfecto {
       this.foto = foto;
     }
 
+    EntradaConFoto con( JobEntryCopy real ) {
+      if ( foto.descripciones.containsKey( real ) ) {
+        setDescription( foto.descripciones.get( real ) );
+      }
+      return this;
+    }
+
     @Override
     public Object clone() {
       try {
@@ -133,6 +209,68 @@ final class UndoEfecto {
       }
       return super.clone();
     }
+  }
+
+  /**
+   * Una entrada de job del historial que, cuando Spoon la clona para deshacer o rehacer, pone en su lugar las entradas y
+   * las notas de su foto de posiciones. Es como un job deshace «Ordenar lienzo» de un solo Ctrl+Z: SpoonJobDelegate no
+   * encadena acciones (ver UndoGrupo), así que las entradas y las notas que se movieron van en UNA acción de cambio
+   * sobre la primera entrada, cuya propia posición es la de la foto.
+   */
+  static final class PosicionesConFoto extends JobEntryCopy {
+    final transient JobMeta meta;
+    final transient Object[] objetos;
+    final transient org.pentaho.di.core.gui.Point[] lugares;
+
+    PosicionesConFoto( JobEntryCopy base, JobMeta meta, Object[] objetos, org.pentaho.di.core.gui.Point[] lugares,
+                       org.pentaho.di.core.gui.Point propio ) {
+      super();
+      replaceMeta( base );
+      setLocation( propio.x, propio.y );
+      this.meta = meta;
+      this.objetos = objetos;
+      this.lugares = lugares;
+    }
+
+    @Override
+    public Object clone() {
+      try {
+        for ( int i = 0; i < objetos.length; i++ ) {
+          org.pentaho.di.core.gui.Point p = lugares[ i ];
+          if ( objetos[ i ] instanceof JobEntryCopy && meta.indexOfJobEntry( (JobEntryCopy) objetos[ i ] ) >= 0 ) {
+            ( (JobEntryCopy) objetos[ i ] ).setLocation( p.x, p.y );
+          } else if ( objetos[ i ] instanceof org.pentaho.di.core.NotePadMeta
+            && meta.indexOfNote( (org.pentaho.di.core.NotePadMeta) objetos[ i ] ) >= 0 ) {
+            ( (org.pentaho.di.core.NotePadMeta) objetos[ i ] ).setLocation( p.x, p.y );
+          }
+        }
+      } catch ( RuntimeException e ) {
+        McpLifecycleListener.LOG.logDebug( "Pentaho Live: could not restore the positions on undo: " + e );
+      }
+      return super.clone();
+    }
+  }
+
+  /**
+   * Registra como UNA acción (un Ctrl+Z en un job) el movimiento de entradas y notas: 'objetos' (entradas y notas, ya
+   * movidas a 'despues') estaban en 'antes'. Cuelga de la primera entrada del job; false si el job no tiene entradas.
+   */
+  static boolean registrarPosiciones( UndoGrupo undo, JobMeta jm, Object[] objetos,
+                                      org.pentaho.di.core.gui.Point[] antes, org.pentaho.di.core.gui.Point[] despues ) {
+    if ( jm.nrJobEntries() == 0 || objetos.length == 0 ) {
+      return false;
+    }
+    JobEntryCopy c = jm.getJobEntry( 0 );
+    org.pentaho.di.core.gui.Point ahora = new org.pentaho.di.core.gui.Point( c.getLocation().x, c.getLocation().y );
+    org.pentaho.di.core.gui.Point antesPropio = ahora;
+    for ( int i = 0; i < objetos.length; i++ ) {
+      if ( objetos[ i ] == c ) {
+        antesPropio = antes[ i ];
+      }
+    }
+    undo.cambio( new Object[] { new PosicionesConFoto( c, jm, objetos, antes, antesPropio ) },
+      new Object[] { new PosicionesConFoto( c, jm, objetos, despues, ahora ) }, new int[] { 0 } );
+    return true;
   }
 
   /**
@@ -150,8 +288,8 @@ final class UndoEfecto {
         return false;
       }
       StepMeta s = tm.getStep( 0 );
-      undo.cambio( new Object[] { new PasoConFoto( RobustecerAplicar.instantanea( s ), m, antes ) },
-        new Object[] { new PasoConFoto( RobustecerAplicar.instantanea( s ), m, despues ) }, new int[] { 0 } );
+      undo.cambio( new Object[] { new PasoConFoto( RobustecerAplicar.instantanea( s ), m, antes ).con( s ) },
+        new Object[] { new PasoConFoto( RobustecerAplicar.instantanea( s ), m, despues ).con( s ) }, new int[] { 0 } );
       return true;
     }
     if ( m instanceof JobMeta ) {
@@ -160,8 +298,8 @@ final class UndoEfecto {
         return false;
       }
       JobEntryCopy c = jm.getJobEntry( 0 );
-      undo.cambio( new Object[] { new EntradaConFoto( (JobEntryCopy) c.clone(), m, antes ) },
-        new Object[] { new EntradaConFoto( (JobEntryCopy) c.clone(), m, despues ) }, new int[] { 0 } );
+      undo.cambio( new Object[] { new EntradaConFoto( (JobEntryCopy) c.clone(), m, antes ).con( c ) },
+        new Object[] { new EntradaConFoto( (JobEntryCopy) c.clone(), m, despues ).con( c ) }, new int[] { 0 } );
       return true;
     }
     return false;

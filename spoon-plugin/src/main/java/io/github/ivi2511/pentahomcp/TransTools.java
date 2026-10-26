@@ -555,7 +555,7 @@ final class TransTools {
         + "notes=keep_near (default) each note follows the steps it was next to; with notes=margin they go in a band "
         + "above the drawing. A transformation with lesson notes (class mode) uses the class rule instead. Returns "
         + "how many steps/notes moved and the canvas metrics before and after (hop crossings, hops through steps, "
-        + "overlaps). Undo with one Ctrl+Z (in a job, moved notes are a second Ctrl+Z: Spoon does not chain job undo).",
+        + "overlaps). Undo with one Ctrl+Z (also in a job: entries and notes go in one undo action).",
       Tools.schema().document()
         .strEnum( "mode", "readable (default: room for every name) or compact (tighter columns and lanes)", false,
           "readable", "compact" )
@@ -586,9 +586,7 @@ final class TransTools {
             o.set( "before", mov.medidaAntes.json() );
             o.set( "after", mov.medidaDespues.json() );
           }
-          if ( m instanceof org.pentaho.di.job.JobMeta && !mov.objetos.isEmpty() && !mov.notas.isEmpty() ) {
-            o.put( "undo", "Two Ctrl+Z: Spoon undoes the entries and the notes of a job separately" );
-          }
+
           return o;
         } );
       } ) );

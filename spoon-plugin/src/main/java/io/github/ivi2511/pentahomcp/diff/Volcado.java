@@ -31,13 +31,22 @@ public final class Volcado {
   }
 
   public static String texto( Documento d, boolean posiciones, String idioma ) {
+    return texto( d, posiciones, idioma, null );
+  }
+
+  /**
+   * Con {@code clave} (la clave local del clon, {@link ClaveSecretos}), cada contraseña sale como «(oculta · #1a2b3c4d)»:
+   * una marca que cambia cuando la contraseña cambia, así {@code git diff} muestra la línea cambiada, pero que no es la
+   * contraseña ni su hash (un HMAC con una clave que nunca sale del clon). Sin clave, «(oculta)» a secas.
+   */
+  public static String texto( Documento d, boolean posiciones, String idioma, byte[] clave ) {
     Rotulos t = Salidas.rotulos( idioma );
     StringBuilder sb = new StringBuilder();
     sb.append( t.s( d.esJob() ? "dump.job" : "dump.transformation" ) ).append( ": " ).append( d.nombre )
       .append( '\n' );
     java.util.LinkedHashMap<String, String> props = new java.util.LinkedHashMap<String, String>( d.propiedades );
     props.remove( "name" ); // ya está en la cabecera
-    propiedades( props, "  ", t, sb, false );
+    propiedades( props, "  ", t, sb, false, clave );
     if ( !d.parametros.isEmpty() ) {
       sb.append( t.s( "dump.parameters" ) ).append( ":\n" );
       for ( Map.Entry<String, String[]> e : d.parametros.entrySet() ) {
@@ -52,7 +61,7 @@ public final class Volcado {
       sb.append( t.s( "dump.connections" ) ).append( ":\n" );
       for ( Map.Entry<String, java.util.LinkedHashMap<String, String>> e : d.conexiones.entrySet() ) {
         sb.append( "  " ).append( e.getKey() ).append( '\n' );
-        propiedades( e.getValue(), "    ", t, sb, false );
+        propiedades( e.getValue(), "    ", t, sb, false, clave );
       }
     }
     sb.append( t.s( d.esJob() ? "dump.entries" : "dump.steps" ) ).append( ":\n" );
@@ -61,7 +70,7 @@ public final class Volcado {
       if ( posiciones ) {
         sb.append( "    @ " ).append( n.x ).append( ',' ).append( n.y ).append( '\n' );
       }
-      propiedades( n.config, "    ", t, sb, true );
+      propiedades( n.config, "    ", t, sb, true, clave );
     }
     if ( !d.saltos.isEmpty() ) {
       sb.append( t.s( "dump.hops" ) ).append( ":\n" );
@@ -83,7 +92,7 @@ public final class Volcado {
       sb.append( t.s( "dump.error_handling" ) ).append( ":\n" );
       for ( Map.Entry<String, java.util.LinkedHashMap<String, String>> e : d.errores.entrySet() ) {
         sb.append( "  " ).append( e.getKey() ).append( '\n' );
-        propiedades( e.getValue(), "    ", t, sb, false );
+        propiedades( e.getValue(), "    ", t, sb, false, clave );
       }
     }
     if ( !d.notas.isEmpty() ) {
@@ -102,7 +111,7 @@ public final class Volcado {
   }
 
   private static void propiedades( Map<String, String> m, String sangria, Rotulos t, StringBuilder sb,
-                                   boolean envoltorio ) {
+                                   boolean envoltorio, byte[] clave ) {
     for ( Map.Entry<String, String> e : m.entrySet() ) {
       String k = e.getKey();
       String v = e.getValue();
@@ -118,7 +127,9 @@ public final class Volcado {
       }
       String et = Salidas.etiqueta( k, t );
       if ( Aplanar.esSecreto( v ) ) {
-        sb.append( sangria ).append( et ).append( ": " ).append( t.s( "secret.hidden" ) ).append( '\n' );
+        String marca = clave == null ? null : ClaveSecretos.marca( clave, v );
+        sb.append( sangria ).append( et ).append( ": " ).append( marca == null ? t.s( "secret.hidden" ) : t.f(
+          "secret.tag", marca ) ).append( '\n' );
       } else if ( v.indexOf( '\n' ) >= 0 ) {
         sb.append( sangria ).append( et ).append( ":\n" );
         for ( String l : v.split( "\n", -1 ) ) {

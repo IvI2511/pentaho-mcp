@@ -64,6 +64,8 @@ final class DiffTools {
         .strEnum( "language", "Language of the readable texts: en (default), es or pt.", false, "en", "es", "pt" )
         .bool( "show_on_canvas", "Also show the changes in Spoon: badges on the canvas of the open document and the "
           + "list of changes (clicking one selects its step). Only for an open document. Default false.", false )
+        .bool( "two_tabs", "With show_on_canvas: also open the other version in a new tab, both canvases with badges "
+          + "(as Compare... > Two tabs). Default false.", false )
         .build(),
       a -> diff( a ) ) );
   }
@@ -76,6 +78,10 @@ final class DiffTools {
       throw new ToolError( "format is json, text or markdown" );
     }
     boolean mostrar = Tools.optBool( a, "show_on_canvas", false );
+    final boolean dos = Tools.optBool( a, "two_tabs", false );
+    if ( dos && !mostrar ) {
+      throw new ToolError( "two_tabs goes with show_on_canvas=true" );
+    }
     String ruta = Tools.optStr( a, "path", null );
     Comparacion c;
     final AbstractMeta[] abierto = new AbstractMeta[ 1 ];
@@ -112,7 +118,7 @@ final class DiffTools {
       final Comparacion cc = c;
       Docs.ui( () -> {
         Docs.activar( abierto[ 0 ] );
-        IdcComparar.mostrar( Docs.spoon(), abierto[ 0 ], cc, false, idioma );
+        IdcComparar.mostrar( Docs.spoon(), abierto[ 0 ], cc, dos, idioma );
         return null;
       } );
     }

@@ -141,7 +141,7 @@ E error, W warning, I info. Fix: **auto** = `apply_lint_fixes` does it without a
 | `parameter_without_default` | I | Parameter without a default (credentials excluded) | value: the default | — |
 | `placeholder_step` | W | A sketch placeholder of `plan_build` (a Dummy with a TO DO note) is still on the canvas: that piece is not built | by hand: `fill_placeholder` | `10-plano.md` |
 | `db_output_without_error_handling`, `job_entry_without_failure_hop` | I | **Off by default**, never scored: only when named in `rules` | — | — |
-| `naming_convention`, `step_without_description`, `required_variable`, `team_pattern` | I / W / per rule | **Off without a project profile** (0.7): `.pentaho-live/lint.yaml` turns them on and then they count. Prefix per step or entry category, a description on every step, `${DIR_DATOS}` / `${DB_HOST}` instead of literal paths and hosts, the team's own pattern rules | rename (one Ctrl+Z) / path value | `13-proyecto.md` |
+| `naming_convention`, `step_without_description`, `required_variable`, `team_pattern` | I / W / per rule | **Off without a project profile** (0.7): `.pentaho-live/lint.yaml` turns them on and then they count. Prefix per step or entry category, a description on every step, `${DIR_DATOS}` / `${DB_HOST}` instead of literal paths and hosts, the team's own pattern rules | rename (one Ctrl+Z) / path value / **description proposed from the step's type and configuration** (auto+c, 0.7.1) / **host, port and database to `${DB_HOST_<CONN>}`…** (auto+c, 0.7.1) | `13-proyecto.md` |
 | the robustness family (below) | W / I | **Off by default** in `lint_etl`: `robustness: true` runs them with a score of their own (the reports' `quality` section always does, §9) | `harden_etl` | `09-robustez.md` |
 | `kettle_check` | E / W | What Spoon's Verify says (`include_kettle_checks`), listed apart | — | — |
 
@@ -241,6 +241,18 @@ messages can quote values it read (a group key, `2.50`): mind it if the data is 
 - **Undo**: in a transformation everything is **one Ctrl+Z**, declared parameters, parameter defaults and the
   document description included (since 0.7.0); in a job each change is its own Ctrl+Z (`undo_steps` says how
   many). Not undoable (the response says it per key): connection passwords in jobs and slave server passwords.
+- **Step descriptions** (`step_without_description`, 0.7.1, `set_step_description`, auto+c): the proposal says what
+  the step does from its type and configuration: `Lee clientes.csv (6 campos)`, `Filtra filas con saldo >= 1000.0
+  AND activo = 'S'`, `Ordena por cliente, fecha`, `Escribe en la tabla dim_tienda (dw)`, `Runs the transformation
+  01_dim_tienda.ktr`; a type it does not know says `Step of type …`. Show the proposals and wait for the yes (or pass
+  a better one in `values[key]`; the IDC details window lets the person edit it). One Ctrl+Z, also in a job.
+- **Connection hosts** (`required_variable` with `required_variables.hosts`, 0.7.1, `use_connection_variables`,
+  auto+c): host, port and database of the connection become `${DB_HOST_<CONN>}`, `${DB_PORT_<CONN>}` and
+  `${DB_NAME_<CONN>}` (the profile's variable, with the connection name in capitals without accents: `ventas dw` →
+  `DB_HOST_VENTAS_DW`; a port or database that is already a variable stays). The `notes` give the
+  `kettle.properties` lines with today's values (`DB_HOST_VENTAS_DW=192.0.2.5`…): tell the person to add them (one
+  value per environment). The password is never read nor touched; a shared connection (`shared.xml`) is skipped.
+  One Ctrl+Z, also in a job.
 - `change`, `reason` and `notes` come in `language` (English by default).
 - Renames update the references (Filter rows targets, Stream lookup `<from>`, Merge join `step1`/`step2`, error
   handling), never references from other files (Mapping, Metadata injection).

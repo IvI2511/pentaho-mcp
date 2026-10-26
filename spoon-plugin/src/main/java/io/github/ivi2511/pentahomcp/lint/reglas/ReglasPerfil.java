@@ -18,6 +18,7 @@ import org.w3c.dom.Element;
 import io.github.ivi2511.pentahomcp.lint.Arreglo;
 import io.github.ivi2511.pentahomcp.lint.CategoriasStep;
 import io.github.ivi2511.pentahomcp.lint.Ctx;
+import io.github.ivi2511.pentahomcp.lint.DescribirStep;
 import io.github.ivi2511.pentahomcp.lint.Hallazgo;
 import io.github.ivi2511.pentahomcp.lint.Nodos;
 import io.github.ivi2511.pentahomcp.lint.NombresPorDefecto;
@@ -71,6 +72,49 @@ public final class ReglasPerfil {
       }
     }
     return l;
+  }
+
+  /** Las variables de host, puerto y base de una conexión (ver VariableObligatoria.variablesConexion). */
+  public static String[] variablesConexion( String base, String conexion ) {
+    return VariableObligatoria.variablesConexion( base, conexion );
+  }
+
+  /** El XML de un step para describirlo; null si no se puede leer (la descripción cae a la genérica). */
+  static Element xmlOnull( Ctx ctx, StepMeta s ) {
+    try {
+      return ctx.xml( s );
+    } catch ( Exception e ) {
+      return null;
+    }
+  }
+
+  static Element xmlOnull( Ctx ctx, JobEntryCopy c ) {
+    try {
+      return ctx.xml( c );
+    } catch ( Exception e ) {
+      return null;
+    }
+  }
+
+  /** El nombre del tipo de step como lo muestra Spoon («Text file input»); el id si no está registrado. */
+  static String nombreTipo( StepMeta s ) {
+    try {
+      org.pentaho.di.core.plugins.PluginInterface pi = org.pentaho.di.core.plugins.PluginRegistry.getInstance()
+        .findPluginWithId( org.pentaho.di.core.plugins.StepPluginType.class, s.getStepID() );
+      return pi == null ? s.getStepID() : pi.getName();
+    } catch ( Throwable t ) {
+      return s.getStepID();
+    }
+  }
+
+  /** El host usa una de las variables del perfil, sola o con sufijo por conexión (${DB_HOST} o ${DB_HOST_VENTAS}). */
+  static boolean usaHost( String host, List<String> vars ) {
+    for ( String x : vars ) {
+      if ( Pattern.compile( "(\\$\\{|%%)" + Pattern.quote( x ) + "(_[A-Za-z0-9_]+)?(\\}|%%)" ).matcher( host ).find() ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // ================================================================ naming_convention
@@ -155,6 +199,8 @@ public final class ReglasPerfil {
           if ( !p.descripcionExcepto.contains( s.getStepID() ) && ReglasEstilo.vacio( s.getDescription() ) ) {
             Hallazgo h = ctx.enStep( Sev.INFO, s, "description" );
             h.message = ctx.t( "step_without_description.msg", "step", s.getName() );
+            String d = DescribirStep.step( ctx, s.getStepID(), xmlOnull( ctx, s ), nombreTipo( s ) );
+            h.fix = Arreglo.conConfirmacion( Arreglo.SET_STEP_DESCRIPTION ).vista( d ).param( "type", s.getStepID() );
             out.add( h );
           }
         }
@@ -168,6 +214,9 @@ public final class ReglasPerfil {
         if ( ReglasEstilo.vacio( c.getDescription() ) ) {
           Hallazgo h = ctx.enEntrada( Sev.INFO, c, "description" );
           h.message = ctx.t( "step_without_description.msg.entry", "entry", c.getName() );
+          String d = DescribirStep.entrada( ctx, pid, xmlOnull( ctx, c ), c.getEntry() == null ? pid : c.getEntry()
+            .getPluginId() );
+          h.fix = Arreglo.conConfirmacion( Arreglo.SET_STEP_DESCRIPTION ).vista( d ).param( "type", pid );
           out.add( h );
         }
       }
@@ -208,7 +257,7 @@ public final class ReglasPerfil {
       if ( !p.variablesHost.isEmpty() ) {
         for ( DatabaseMeta db : ctx.meta().getDatabases() ) {
           String host = db.getHostname();
-          if ( host == null || host.trim().isEmpty() || usa( host, p.variablesHost, false ) ) {
+          if ( host == null || host.trim().isEmpty() || usaHost( host, p.variablesHost ) ) {
             continue;
           }
           Hallazgo h = ctx.enObjeto( Sev.WARNING, Hallazgo.CONNECTION, db.getName(), "hostname" );
@@ -217,6 +266,25 @@ public final class ReglasPerfil {
             v );
           h.howToFix = ctx.t( "required_variable.fix.host", "variable", v, "value", host.trim() );
           h.evidencia( "value", host.trim() ).evidencia( "variable", v );
+          if ( !db.isShared() ) {
+            // host, puerto y base a variables del perfil por conexión: ${DB_HOST_VENTAS}, ${DB_PORT_VENTAS}...
+            String[] vars = variablesConexion( p.variablesHost.get( 0 ), db.getName() );
+            String hv = "${" + vars[ 0 ] + "}";
+            String pv = esVariable( db.getDatabasePortNumberString() ) ? db.getDatabasePortNumberString() : "${" + vars[ 1 ]
+              + "}";
+            String dv = esVariable( db.getDatabaseName() ) ? db.getDatabaseName() : "${" + vars[ 2 ] + "}";
+            StringBuilder lineas = new StringBuilder();
+            lineas.append( vars[ 0 ] ).append( '=' ).append( host.trim() );
+            if ( !esVariable( db.getDatabasePortNumberString() ) ) {
+              lineas.append( '\n' ).append( vars[ 1 ] ).append( '=' ).append( nn( db.getDatabasePortNumberString() ) );
+            }
+            if ( !esVariable( db.getDatabaseName() ) ) {
+              lineas.append( '\n' ).append( vars[ 2 ] ).append( '=' ).append( nn( db.getDatabaseName() ) );
+            }
+            h.fix = Arreglo.conConfirmacion( Arreglo.USE_CONNECTION_VARIABLES ).vista( hv + " · " + pv + " · " + dv )
+              .param( "host", hv ).param( "port", pv ).param( "database", dv ).param( "properties", lineas );
+            h.howToFix = ctx.t( "required_variable.fix.host.auto", "host", hv, "port", pv, "database", dv );
+          }
           out.add( h );
         }
       }
@@ -243,6 +311,30 @@ public final class ReglasPerfil {
         h.fix = Arreglo.asistido( Arreglo.REPLACE_VALUE ).param( "tag", r.tag );
       }
       out.add( h );
+    }
+
+    /**
+     * Las variables de una conexión a partir de la del perfil: DB_HOST y la conexión «ventas dw» dan DB_HOST_VENTAS_DW,
+     * DB_PORT_VENTAS_DW y DB_NAME_VENTAS_DW (sin HOST en el nombre: X_VENTAS_DW, X_PORT_VENTAS_DW, X_NAME_VENTAS_DW).
+     */
+    static String[] variablesConexion( String base, String conexion ) {
+      String c = conexion == null ? "" : java.text.Normalizer.normalize( conexion, java.text.Normalizer.Form.NFD )
+        .replaceAll( "\\p{M}", "" ).toUpperCase( Locale.ROOT ).replaceAll( "[^A-Z0-9]+", "_" ).replaceAll( "^_+|_+$",
+          "" );
+      String suf = c.isEmpty() ? "" : "_" + c;
+      String b = base.toUpperCase( Locale.ROOT );
+      int i = b.lastIndexOf( "HOST" );
+      String puerto = i >= 0 ? base.substring( 0, i ) + "PORT" + base.substring( i + 4 ) : base + "_PORT";
+      String nombre = i >= 0 ? base.substring( 0, i ) + "NAME" + base.substring( i + 4 ) : base + "_NAME";
+      return new String[] { base + suf, puerto + suf, nombre + suf };
+    }
+
+    static boolean esVariable( String v ) {
+      return v != null && ( v.contains( "${" ) || v.contains( "%%" ) );
+    }
+
+    private static String nn( String v ) {
+      return v == null ? "" : v.trim();
     }
 
     /** El valor empieza con una de las variables (o es solo esa variable); con alPrincipio=false, la usa en algún lado. */

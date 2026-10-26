@@ -177,8 +177,16 @@ public class PruebaDiffLienzo {
     // el fantasma «Descartados» (quitado) en 256,224 con su nombre
     contiene( t, "drawText[Descartados, ", "nombre del fantasma" );
     contiene( t, "setLineStyle[DASH]", "rayado" );
-    // el salto quitado, de Activos con saldo (256,112) a Descartados (256,224), de centro a centro
-    contiene( t, "drawLine[282, 148, 282, 260]", "salto fantasma" );
+    // el salto quitado, de Activos con saldo (256,112) a Descartados (256,224): de borde a borde, como los hops de
+    // Spoon (sale 18 px debajo del centro del icono real y llega 20 px antes del centro del fantasma), con su flecha
+    contiene( t, "drawLine[282, 166, 282, 240]", "salto fantasma recortado: " + t );
+    noContiene( t, "drawLine[282, 148, 282, 260]", "nunca de centro a centro por encima del icono" );
+    contiene( t, "drawLine[282, 240, ", "la punta de la flecha" );
+    // la insignia de un salto, corrida del medio para no tapar el icono de condición de Spoon
+    igual( "50,-13", DiffLienzo.medioDeSalto( 0, 0, 100, 0 )[ 0 ] + "," + DiffLienzo.medioDeSalto( 0, 0, 100, 0 )[ 1 ],
+      "horizontal: arriba" );
+    igual( "13,50", DiffLienzo.medioDeSalto( 0, 0, 0, 100 )[ 0 ] + "," + DiffLienzo.medioDeSalto( 0, 0, 0, 100 )[ 1 ],
+      "vertical: al costado" );
     // deja el GC como estaba
     String fin = llamadas.subList( llamadas.size() - 5, llamadas.size() ).toString();
     contiene( fin, "setLineStyle[SOLID]", "estilo restituido" );
@@ -235,7 +243,9 @@ public class PruebaDiffLienzo {
     final IdcComparar.Lista l = ui( () -> {
       DiffLienzo.poner( display, despues, DiffLienzo.marcas( res, false, true ) );
       IdcComparar.Lista x2 = new IdcComparar.Lista( host, despues, null, res, r );
-      x2.shell.pack();
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".size", "" );
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".cols", "" );
+      x2.dimensionar( new Rectangle( 0, 0, 1920, 1040 ) );
       mostrar( x2.shell );
       return x2;
     } );
@@ -253,6 +263,28 @@ public class PruebaDiffLienzo {
         contiene( t, "Steps · Columnas finales (SelectValues), renombrado, antes «Elegir columnas»", "renombrado" );
         contiene( t, "condición: saldo >= 1000.0 AND activo = 'S' → saldo > 1000.0 AND activo = 'S'", "detalle" );
         noContiene( t, "\u0000", "sin secretos" );
+        // a la medida del contenido: la columna de detalle muestra su texto entero (hasta 900 px) y la ventana, las
+        // tres columnas (0.7.0 la abría de 702 px y cortaba el detalle)
+        org.eclipse.swt.graphics.GC g = new org.eclipse.swt.graphics.GC( l.tabla );
+        int largo = 0;
+        try {
+          g.setFont( l.tabla.getFont() );
+          for ( int i = 0; i < l.tabla.getItemCount(); i++ ) {
+            largo = Math.max( largo, g.textExtent( l.tabla.getItem( i ).getText( 2 ) ).x );
+          }
+        } finally {
+          g.dispose();
+        }
+        int ancho = l.tabla.getColumn( 2 ).getWidth();
+        cierto( ancho >= Math.min( 900, largo ), "el detalle entra: " + ancho + " >= " + largo );
+        int suma = 0;
+        for ( org.eclipse.swt.widgets.TableColumn c : l.tabla.getColumns() ) {
+          suma += c.getWidth();
+        }
+        cierto( l.shell.getSize().x >= suma, "la ventana muestra las tres columnas: " + l.shell.getSize().x + " >= "
+          + suma );
+        cierto( l.shell.getSize().x <= 1920 * 92 / 100, "sin pasar del ancho de la pantalla" );
+        contiene( String.valueOf( l.tabla.getItem( 0 ).getData( "tip2" ) ), "", "tooltip con el detalle entero" );
         l.seleccionar( 0 ); // sin Spoon: no lanza
         return null;
       } );
@@ -262,6 +294,33 @@ public class PruebaDiffLienzo {
     }
     ui( () -> {
       falso( DiffLienzo.tiene( display, despues ), "al cerrar la lista se van las marcas" );
+      // el tamaño que dejó queda recordado y la próxima lista abre así
+      String rec = IdcDetalle.pref( IdcComparar.Lista.PREF + ".size" );
+      cierto( rec != null && rec.matches( "\\d+,\\d+" ), "al cerrarla se recuerda su tamaño: " + rec );
+      // pantalla angosta: la de «qué» cede primero, el detalle no baja de 240 px y todo entra en la ventana
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".size", "" );
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".cols", "" );
+      IdcComparar.Lista angosta = new IdcComparar.Lista( host, despues, null, res, r );
+      try {
+        org.eclipse.swt.graphics.Point t = angosta.medir( new Rectangle( 0, 0, 800, 600 ) );
+        cierto( t.x <= 800 * 92 / 100, "no pasa del 92 % de la pantalla: " + t.x );
+        int suma = 0;
+        for ( org.eclipse.swt.widgets.TableColumn c : angosta.tabla.getColumns() ) {
+          suma += c.getWidth();
+        }
+        cierto( suma < t.x, "las tres columnas entran en la ventana: " + suma + " < " + t.x );
+        cierto( angosta.tabla.getColumn( 2 ).getWidth() >= 240, "el detalle, al menos 240 px" );
+      } finally {
+        angosta.shell.dispose();
+      }
+      IdcDetalle.guardarPref( IdcComparar.Lista.PREF + ".size", "1000,520" );
+      IdcComparar.Lista otra = new IdcComparar.Lista( host, despues, null, res, r );
+      try {
+        otra.dimensionar( new Rectangle( 0, 0, 1920, 1040 ) );
+        igual( "1000,520", otra.shell.getSize().x + "," + otra.shell.getSize().y, "abre con el tamaño recordado" );
+      } finally {
+        otra.shell.dispose();
+      }
       return null;
     } );
   }

@@ -81,6 +81,10 @@ final class UndoGrupo {
     return acciones;
   }
 
+  AbstractMeta meta() {
+    return meta;
+  }
+
   void nuevo( Object[] objs, int[] idx ) {
     if ( vacio( objs ) ) {
       return;
