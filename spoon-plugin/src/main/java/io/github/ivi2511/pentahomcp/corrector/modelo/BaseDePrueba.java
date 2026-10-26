@@ -37,7 +37,7 @@ public final class BaseDePrueba {
   public static final List<String> TIPOS = Collections.unmodifiableList( Arrays.asList( MYSQL, MARIADB, POSTGRESQL,
     H2 ) );
 
-  /** Nombre de la conexion en la solucion ("GYM_DW"): las de la entrega con ese nombre pasan a esta base. */
+  /** Nombre de la conexion en la solucion ("CLUB_DW"): las de la entrega con ese nombre pasan a esta base. */
   @JsonProperty( "connection" )
   public String conexion;
   /** Uno de {@link #TIPOS}. */
@@ -47,10 +47,10 @@ public final class BaseDePrueba {
   public String servidor;
   @JsonProperty( "port" )
   public String puerto;
-  /** La base (en MySQL, el esquema) que el corrector recrea: "gym_dw_correccion". */
+  /** La base (en MySQL, el esquema) que el corrector recrea: "club_dw_correccion". */
   @JsonProperty( "database" )
   public String base;
-  /** La base de la solucion ("gym_dw"): nunca se toca y {@link #base} no puede ser esta. */
+  /** La base de la solucion ("club_dw"): nunca se toca y {@link #base} no puede ser esta. */
   @JsonProperty( "original_database" )
   public String baseOriginal;
   @JsonProperty( "user" )
@@ -100,7 +100,7 @@ public final class BaseDePrueba {
     return i < 0 ? b : b.substring( i + 1 );
   }
 
-  /** La base con el sufijo del worker: "gym_dw_correccion" + "_w2" (H2 de archivo: al final de la ruta). */
+  /** La base con el sufijo del worker: "club_dw_correccion" + "_w2" (H2 de archivo: al final de la ruta). */
   public static String conSufijo( String base, String sufijo ) {
     return sufijo == null || sufijo.isEmpty() ? base : base + sufijo;
   }

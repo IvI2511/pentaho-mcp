@@ -75,8 +75,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (HMAC with a random key kept in the clone's `.git/pentaho-live/textconv.key`), so a password change is visible
   in `git diff`; never the value nor its hash.
 - **Schemas and qualified names go to the test database** in the tests and in the grader, for MySQL, MariaDB,
-  PostgreSQL and H2: a step's `schema`, a `schema.table` name and qualified names in SQL (`gym_dw.ventas`,
-  `USE gym_dw`) that name the original database (or the one the connection pointed to) are rewritten.
+  PostgreSQL and H2: a step's `schema`, a `schema.table` name and qualified names in SQL (`club_dw.ventas`,
+  `USE club_dw`) that name the original database (or the one the connection pointed to) are rewritten.
   Conservative: only names that qualify another one change, never a table, column or alias called like the
   database. In tests, a schema or SQL that would leave the test databases is an `error`; `tables[]` may name
   `schema.table`. Sub-transformations started by a job are redirected too.

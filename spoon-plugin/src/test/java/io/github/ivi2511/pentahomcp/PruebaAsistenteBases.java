@@ -79,14 +79,14 @@ public class PruebaAsistenteBases {
     BasesH2.escribir( new File( profe, "pack-viejo/bd/crear_origen.sql" ), BasesH2.CREAR_ORIGEN );
     BasesH2.escribir( new File( profe, "pack-viejo/pack.json" ), "{}" );
     // en la carpeta de arriba, uno que nombra la base del DW
-    BasesH2.escribir( new File( dir, "curso/gym_dw_completo.sql" ), "-- todo el dw\nUSE gym_dw;\n"
+    BasesH2.escribir( new File( dir, "curso/dw_club_completo.sql" ), "-- todo el dw\nUSE club_dw;\n"
       + "CREATE TABLE fechas (id INT);\n" );
     Map<String, List<File>> m = CorrectorScripts.detectar( profe, Nodos.parse( new String( Files.readAllBytes(
       sol.toPath() ), StandardCharsets.UTF_8 ) ) );
     igual( Arrays.asList( "crear_origen.sql", "datos_oculto.sql", "datos_visible.sql" ), nombres( m.get(
       BasesH2.ORIGEN ) ), "origen: el que crea primero, despues los datos" );
-    igual( Arrays.asList( "crear_dw.sql", "gym_dw_completo.sql" ), nombres( m.get( BasesH2.DW ) ),
-      "dw: por la tabla y por USE gym_dw" );
+    igual( Arrays.asList( "crear_dw.sql", "dw_club_completo.sql" ), nombres( m.get( BasesH2.DW ) ),
+      "dw: por la tabla y por USE club_dw" );
     cierto( CorrectorScripts.esOculto( m.get( BasesH2.ORIGEN ).get( 1 ) ), "el del caso oculto se reconoce" );
     falso( CorrectorScripts.esOculto( m.get( BasesH2.ORIGEN ).get( 2 ) ), "el visible no" );
     igual( 2, m.size(), "otra_cosa.sql no es de ninguna conexion" );
@@ -96,7 +96,7 @@ public class PruebaAsistenteBases {
 
   public void pruebaB_VolcadoSoloLectura() throws Exception {
     BasesH2 s = h2();
-    String url = "jdbc:h2:tcp://localhost:" + s.puerto + "/gym_original";
+    String url = "jdbc:h2:tcp://localhost:" + s.puerto + "/club_original";
     try ( Connection c = DriverManager.getConnection( url, BasesH2.USUARIO, BasesH2.CLAVE );
           Statement st = c.createStatement() ) {
       st.execute( "CREATE TABLE ciudades (id INT PRIMARY KEY, nombre VARCHAR(40) NOT NULL)" );
@@ -112,11 +112,11 @@ public class PruebaAsistenteBases {
       st.execute( "GRANT SELECT ON ciudades, clientes, dim_cliente TO lector" );
     }
     String antes = foto( url );
-    BaseDePrueba b = new BaseDePrueba( "GYM_OLTP", BaseDePrueba.H2, "localhost", String.valueOf( s.puerto ),
+    BaseDePrueba b = new BaseDePrueba( "CLUB_OLTP", BaseDePrueba.H2, "localhost", String.valueOf( s.puerto ),
       "no_se_usa_correccion", "lector" );
-    File script = new File( dir, "volcado/gym_original_generado.sql" );
+    File script = new File( dir, "volcado/club_original_generado.sql" );
     script.getParentFile().mkdirs();
-    CorrectorVolcado.Volcado v = CorrectorVolcado.volcar( b, "gym_original", "solo-leo-1", Collections.singletonList(
+    CorrectorVolcado.Volcado v = CorrectorVolcado.volcar( b, "club_original", "solo-leo-1", Collections.singletonList(
       "DIM_CLIENTE" ), script, 1000 );
     igual( antes, foto( url ), "la base original queda igual" );
     igual( 3, v.tablas.size(), "tres tablas" );
@@ -162,11 +162,11 @@ public class PruebaAsistenteBases {
 
     // corta en maxFilas
     File corto = new File( dir, "volcado/corto.sql" );
-    CorrectorVolcado.Volcado v2 = CorrectorVolcado.volcar( b, "gym_original", "solo-leo-1", null, corto, 2 );
+    CorrectorVolcado.Volcado v2 = CorrectorVolcado.volcar( b, "club_original", "solo-leo-1", null, corto, 2 );
     igual( Collections.singletonList( "CLIENTES" ), v2.cortadas, "clientes tiene 3 > 2" );
     // contraseña mala: falla sin dejar archivo
     File mal = new File( dir, "volcado/mal.sql" );
-    lanza( Exception.class, () -> CorrectorVolcado.volcar( b, "gym_original", "otra", null, mal, 10 ),
+    lanza( Exception.class, () -> CorrectorVolcado.volcar( b, "club_original", "otra", null, mal, 10 ),
       "contraseña mala" );
     falso( mal.exists(), "sin archivo" );
     cierto( CorrectorVolcado.sinParcial( mal ), "ni .parcial" );
@@ -176,23 +176,23 @@ public class PruebaAsistenteBases {
 
   public void pruebaC_ProbarConexion() throws Exception {
     BasesH2 s = h2();
-    BaseDePrueba b = s.base( BasesH2.DW, "gym_dw_correccion", "gym_dw" );
+    BaseDePrueba b = s.base( BasesH2.DW, "club_dw_correccion", "club_dw" );
     Pack p = new Pack();
     p.formato = Pack.FORMATO_2;
     p.completar();
     p.bases.add( b );
     new CorrectorBases.Sesion( p, null, "", BasesH2.claves( BasesH2.CLAVE ) ).probar();
-    cierto( s.existe( "gym_dw_correccion" ), "se creo la de prueba" );
-    falso( s.existe( "gym_dw" ), "nunca la original" );
+    cierto( s.existe( "club_dw_correccion" ), "se creo la de prueba" );
+    falso( s.existe( "club_dw" ), "nunca la original" );
     CorrectorBases.Falla f = lanza( CorrectorBases.Falla.class, () -> new CorrectorBases.Sesion( p, null, "",
       BasesH2.claves( "mala" ) ).probar(), "contraseña mala" );
-    contiene( f.mensaje.texto( "es" ), "gym_dw_correccion", "nombra la base" );
-    BaseDePrueba orig = s.base( BasesH2.DW, "gym_dw", "gym_dw" );
+    contiene( f.mensaje.texto( "es" ), "club_dw_correccion", "nombra la base" );
+    BaseDePrueba orig = s.base( BasesH2.DW, "club_dw", "club_dw" );
     p.bases.set( 0, orig );
     CorrectorBases.Falla f2 = lanza( CorrectorBases.Falla.class, () -> new CorrectorBases.Sesion( p, null, "",
       BasesH2.claves( BasesH2.CLAVE ) ).probar(), "la original: no" );
     contiene( f2.mensaje.texto( "es" ), "es una base de la solución", "en español" );
-    falso( s.existe( "gym_dw" ), "la original no se toco" );
+    falso( s.existe( "club_dw" ), "la original no se toco" );
   }
 
   // ---------------------------------------------------------------- ayudas

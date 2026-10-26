@@ -181,8 +181,8 @@ public class PruebaCorrectorTemporales {
       op.titulo = "Carga con temporales";
       op.idioma = "es";
       op.captura = Pack.Salida.CAPTURA_TABLAS;
-      op.bases = new ArrayList<BaseDePrueba>( Arrays.asList( h2.base( BasesH2.ORIGEN, "gym_oltp_correccion",
-        "gym_oltp" ), h2.base( BasesH2.DW, "gym_dw_correccion", "gym_dw" ) ) );
+      op.bases = new ArrayList<BaseDePrueba>( Arrays.asList( h2.base( BasesH2.ORIGEN, "club_oltp_correccion",
+        "club_oltp" ), h2.base( BasesH2.DW, "club_dw_correccion", "club_dw" ) ) );
       op.scriptsBase = new LinkedHashMap<String, List<File>>();
       op.scriptsBase.put( BasesH2.ORIGEN, Arrays.asList( BasesH2.escribir( new File( scripts, "crear_origen.sql" ),
         BasesH2.CREAR_ORIGEN ), BasesH2.escribir( new File( scripts, "datos.sql" ), BasesH2.DATOS_VISIBLE ) ) );
@@ -198,7 +198,7 @@ public class PruebaCorrectorTemporales {
       ResultadoCorreccion r = corregir( pack, sol, "e" );
       igual( ResultadoCorreccion.CORREGIDA, r.estado, "corregida (" + r.detalle + ")" );
       igual( 10.0, r.nota, "10" );
-      falso( h2.existe( "gym_oltp" ) || h2.existe( "gym_dw" ), "las originales nunca" );
+      falso( h2.existe( "club_oltp" ) || h2.existe( "club_dw" ), "las originales nunca" );
     } finally {
       h2.parar();
     }
@@ -267,9 +267,9 @@ public class PruebaCorrectorTemporales {
   static TransMeta transBase( BasesH2 h2 ) {
     TransMeta tm = new TransMeta();
     tm.setName( "carga" );
-    DatabaseMeta origen = new DatabaseMeta( BasesH2.ORIGEN, "H2", "Native", "localhost", "gym_oltp", String.valueOf(
+    DatabaseMeta origen = new DatabaseMeta( BasesH2.ORIGEN, "H2", "Native", "localhost", "club_oltp", String.valueOf(
       h2.puerto ), BasesH2.USUARIO, BasesH2.CLAVE );
-    DatabaseMeta dw = new DatabaseMeta( BasesH2.DW, "H2", "Native", "localhost", "gym_dw", String.valueOf( h2.puerto ),
+    DatabaseMeta dw = new DatabaseMeta( BasesH2.DW, "H2", "Native", "localhost", "club_dw", String.valueOf( h2.puerto ),
       BasesH2.USUARIO, BasesH2.CLAVE );
     tm.addDatabase( origen );
     tm.addDatabase( dw );

@@ -256,8 +256,8 @@ messages can quote values it read (a group key, `2.50`): mind it if the data is 
 - `change`, `reason` and `notes` come in `language` (English by default).
 - Renames update the references (Filter rows targets, Stream lookup `<from>`, Merge join `step1`/`step2`, error
   handling), never references from other files (Mapping, Metadata injection).
-- Passwords: it only accepts a variable (`${DB_PASSWORD_GYM_DW}`); never pass, write, print or log the password
-  itself. Tell the user to add the line `DB_PASSWORD_GYM_DW=<their password>` to `kettle.properties` (Spoon: Edit >
+- Passwords: it only accepts a variable (`${DB_PASSWORD_CLUB_DW}`); never pass, write, print or log the password
+  itself. Tell the user to add the line `DB_PASSWORD_CLUB_DW=<their password>` to `kettle.properties` (Spoon: Edit >
   Edit the kettle.properties file) before running: the connection fails until they do.
 - `insert_sort` normally adds a Sort rows; it adds `ORDER BY` to the query instead only when a simple Table input
   feeds a grouping step directly.

@@ -675,7 +675,7 @@ public class PruebaPanelCorrector {
       contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "DIM_CLIENTE", "el combo nombra la tabla" );
       contiene( ui( () -> ( (Combo) a.buscar( "as_captura" ) ).getText() ), "base de datos", "en palabras" );
       cierto( caps.contains( "step" ), "y las filas del step" );
-      contiene( ui( () -> ( (Label) a.buscar( "as_solucion" ) ).getText() ), "GYM_DW", "la solucion usa una base" );
+      contiene( ui( () -> ( (Label) a.buscar( "as_solucion" ) ).getText() ), "CLUB_DW", "la solucion usa una base" );
       final File destino = new File( dir, "packs/creado-bd" );
       ui( () -> {
         ( (Text) a.buscar( "as_destino" ) ).setText( destino.getPath() );
@@ -685,48 +685,48 @@ public class PruebaPanelCorrector {
       igual( 1, a.pagina(), "paso 2: datos de prueba" );
       contiene( ui( () -> ( (Label) a.buscar( "as_base_por_que" ) ).getText() ), "copia desechable",
         "por que hace falta una base de prueba" );
-      igual( "gym_dw_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).getText() ),
+      igual( "club_dw_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:CLUB_DW" ) ).getText() ),
         "la base de prueba propuesta" );
-      igual( "gym_oltp_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:GYM_OLTP" ) ).getText() ),
+      igual( "club_oltp_correccion", ui( () -> ( (Text) a.buscar( "as_base_nombre:CLUB_OLTP" ) ).getText() ),
         "la del origen" );
-      igual( "localhost", ui( () -> ( (Text) a.buscar( "as_base_servidor:GYM_DW" ) ).getText() ), "el servidor" );
-      igual( String.valueOf( h2.puerto ), ui( () -> ( (Text) a.buscar( "as_base_puerto:GYM_DW" ) ).getText() ),
+      igual( "localhost", ui( () -> ( (Text) a.buscar( "as_base_servidor:CLUB_DW" ) ).getText() ), "el servidor" );
+      igual( String.valueOf( h2.puerto ), ui( () -> ( (Text) a.buscar( "as_base_puerto:CLUB_DW" ) ).getText() ),
         "el puerto" );
-      igual( "", ui( () -> ( (Text) a.buscar( "as_base_clave:GYM_DW" ) ).getText() ), "la contraseña, vacia" );
-      String so = ui( () -> ( (Text) a.buscar( "as_base_scripts:GYM_OLTP" ) ).getText() );
+      igual( "", ui( () -> ( (Text) a.buscar( "as_base_clave:CLUB_DW" ) ).getText() ), "la contraseña, vacia" );
+      String so = ui( () -> ( (Text) a.buscar( "as_base_scripts:CLUB_OLTP" ) ).getText() );
       cierto( so.indexOf( "crear_origen.sql" ) >= 0 && so.indexOf( "crear_origen.sql" ) < so.indexOf(
         "datos_visible.sql" ), "los scripts del origen, ya puestos y en orden: " + so );
-      contiene( ui( () -> ( (Text) a.buscar( "as_base_scripts:GYM_DW" ) ).getText() ), "crear_dw.sql", "el del DW" );
-      contiene( ui( () -> ( (Text) a.buscar( "as_base_oculto:GYM_OLTP" ) ).getText() ), "datos_oculto.sql",
+      contiene( ui( () -> ( (Text) a.buscar( "as_base_scripts:CLUB_DW" ) ).getText() ), "crear_dw.sql", "el del DW" );
+      contiene( ui( () -> ( (Text) a.buscar( "as_base_oculto:CLUB_OLTP" ) ).getText() ), "datos_oculto.sql",
         "el del caso oculto, aparte" );
-      contiene( ui( () -> ( (Label) a.buscar( "as_base_detectados:GYM_DW" ) ).getText() ), "Encontrados",
+      contiene( ui( () -> ( (Label) a.buscar( "as_base_detectados:CLUB_DW" ) ).getText() ), "Encontrados",
         "dice que los encontro" );
       ui( () -> {
-        for ( String cx : new String[] { "GYM_OLTP", "GYM_DW" } ) {
+        for ( String cx : new String[] { "CLUB_OLTP", "CLUB_DW" } ) {
           ( (Text) a.buscar( "as_base_clave:" + cx ) ).setText( BasesH2.CLAVE );
         }
         ( (Button) a.buscar( "as_dos_veces" ) ).setSelection( true );
         return null;
       } );
       // probar conexion: crea y borra (en H2, vacia) solo la base de prueba
-      clicEn( a, "as_base_probar:GYM_DW" );
-      esperar( "prueba la conexion", () -> !a.trabajando() && a.resultadoBase( "GYM_DW", false ).contains(
+      clicEn( a, "as_base_probar:CLUB_DW" );
+      esperar( "prueba la conexion", () -> !a.trabajando() && a.resultadoBase( "CLUB_DW", false ).contains(
         "Conexión correcta" ), 60000 );
-      cierto( h2.existe( "gym_dw_correccion" ), "la de prueba si" );
-      falso( h2.existe( "gym_dw" ), "la original no" );
+      cierto( h2.existe( "club_dw_correccion" ), "la de prueba si" );
+      falso( h2.existe( "club_dw" ), "la original no" );
       // la base original como base de prueba: en rojo al lado, sin ejecutar
       ui( () -> {
-        ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).setText( "gym_dw" );
+        ( (Text) a.buscar( "as_base_nombre:CLUB_DW" ) ).setText( "club_dw" );
         return null;
       } );
       clicEn( a, "as_siguiente" );
       igual( 1, a.pagina(), "sigue en el paso 2" );
       falso( a.trabajando(), "no ejecuto nada" );
-      contiene( ui( () -> a.errorDe( "as_base_nombre:GYM_DW" ) ), "es una base de la solución", "en rojo al lado" );
-      noContiene( ui( () -> a.errorDe( "as_base_nombre:GYM_DW" ) ), "the grader", "nada en ingles" );
+      contiene( ui( () -> a.errorDe( "as_base_nombre:CLUB_DW" ) ), "es una base de la solución", "en rojo al lado" );
+      noContiene( ui( () -> a.errorDe( "as_base_nombre:CLUB_DW" ) ), "the grader", "nada en ingles" );
       archivo( pantallaShell( a.shell, "asistente-base-2-error.png" ), 2000, "captura del error en linea" );
       ui( () -> {
-        ( (Text) a.buscar( "as_base_nombre:GYM_DW" ) ).setText( "gym_dw_correccion" );
+        ( (Text) a.buscar( "as_base_nombre:CLUB_DW" ) ).setText( "club_dw_correccion" );
         return null;
       } );
       archivo( pantallaShell( a.shell, "asistente-base-2-datos.png" ), 2000, "captura del paso 2" );
@@ -751,7 +751,7 @@ public class PruebaPanelCorrector {
       } );
       igual( Collections.singletonList( "CIUDAD" ), ui( () -> a.ignoradas( "DIM_CLIENTE" ) ), "no comparar CIUDAD" );
       archivo( pantallaShell( a.shell, "asistente-base-3-tablas.png" ), 2000, "captura del paso 3" );
-      falso( h2.existe( "gym_dw" ) || h2.existe( "gym_oltp" ), "las originales nunca" );
+      falso( h2.existe( "club_dw" ) || h2.existe( "club_oltp" ), "las originales nunca" );
       // el caso comun: Guardar ya desde el paso 3
       t0 = System.currentTimeMillis();
       clicEn( a, "as_guardar" );
@@ -761,7 +761,7 @@ public class PruebaPanelCorrector {
       String res = ui( () -> a.resumen() );
       contiene( res, "DIM_CLIENTE", "resumen: la tabla" );
       contiene( res, "no se compara: CIUDAD", "resumen: lo que no se compara" );
-      contiene( res, "gym_dw_correccion", "resumen: la base de prueba" );
+      contiene( res, "club_dw_correccion", "resumen: la base de prueba" );
       contiene( res, "dos veces", "resumen: dos ejecuciones" );
       archivo( pantallaShell( a.shell, "asistente-base-5-guardado.png" ), 2000, "captura guardado" );
       try ( CorrectorPack cp = CorrectorPack.abrir( destino ) ) {
@@ -771,14 +771,14 @@ public class PruebaPanelCorrector {
         igual( 2, p.casos.size(), "visible y oculto (por su script)" );
         igual( Integer.valueOf( 2 ), p.casos.get( 0 ).ejecuciones, "dos ejecuciones" );
       }
-      falso( h2.existe( "gym_dw" ) || h2.existe( "gym_oltp" ), "las originales nunca" );
+      falso( h2.existe( "club_dw" ) || h2.existe( "club_oltp" ), "las originales nunca" );
       ui( () -> {
         a.cerrar();
         return null;
       } );
 
       // el dialogo de contraseñas del panel: lo escrito queda solo en memoria
-      final io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba b = h2.base( "GYM_X", "x_correccion", "x" );
+      final io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba b = h2.base( "CLUB_X", "x_correccion", "x" );
       b.usuario = "otro-usuario";
       final boolean[] ok = new boolean[ 1 ];
       ui( () -> {
@@ -788,7 +788,7 @@ public class PruebaPanelCorrector {
       falso( CorrectorBases.recordada( b ), "todavia no" );
       ui( () -> {
         for ( Shell s2 : display.getShells() ) {
-          Control c = PanelCorrector.buscar( s2, "clave:GYM_X" );
+          Control c = PanelCorrector.buscar( s2, "clave:CLUB_X" );
           if ( c != null ) {
             ( (Text) c ).setText( "secreta" );
             PanelCorrector.buscar( s2, "claves_aceptar" ).notifyListeners( SWT.Selection, new Event() );
@@ -815,7 +815,7 @@ public class PruebaPanelCorrector {
     try {
       // la base original del docente (la crea la prueba: la del ejercicio en chico)
       try ( java.sql.Connection c = java.sql.DriverManager.getConnection( "jdbc:h2:tcp://localhost:" + h2.puerto
-        + "/gym_oltp", BasesH2.USUARIO, BasesH2.CLAVE ); java.sql.Statement st = c.createStatement() ) {
+        + "/club_oltp", BasesH2.USUARIO, BasesH2.CLAVE ); java.sql.Statement st = c.createStatement() ) {
         for ( String x : CorrectorBases.sentencias( BasesH2.CREAR_ORIGEN + BasesH2.DATOS_VISIBLE, false ) ) {
           st.execute( x );
         }
@@ -828,29 +828,29 @@ public class PruebaPanelCorrector {
       esperar( "abre el asistente", () -> panel().asistente() != null && !panel().asistente().cerrado(), 5000 );
       final AsistentePack a = panel().asistente();
       clicEn( a, "as_siguiente" );
-      contiene( ui( () -> ( (Label) a.buscar( "as_base_detectados:GYM_OLTP" ) ).getText() ), "No encontré",
+      contiene( ui( () -> ( (Label) a.buscar( "as_base_detectados:CLUB_OLTP" ) ).getText() ), "No encontré",
         "sin scripts del origen" );
-      final File script = new File( profe, "gym_oltp_generado.sql" );
+      final File script = new File( profe, "club_oltp_generado.sql" );
       ui( () -> {
-        ( (Text) a.buscar( "as_base_clave:GYM_OLTP" ) ).setText( BasesH2.CLAVE );
-        ( (Text) a.buscar( "as_base_clave:GYM_DW" ) ).setText( BasesH2.CLAVE );
-        a.generarScript( "GYM_OLTP", script );
+        ( (Text) a.buscar( "as_base_clave:CLUB_OLTP" ) ).setText( BasesH2.CLAVE );
+        ( (Text) a.buscar( "as_base_clave:CLUB_DW" ) ).setText( BasesH2.CLAVE );
+        a.generarScript( "CLUB_OLTP", script );
         return null;
       } );
-      esperar( "genera el script", () -> !a.trabajando() && a.resultadoBase( "GYM_OLTP", true ).contains(
+      esperar( "genera el script", () -> !a.trabajando() && a.resultadoBase( "CLUB_OLTP", true ).contains(
         "Script generado" ), 60000 );
       cierto( script.isFile(), "el script" );
       contiene( new String( Files.readAllBytes( script.toPath() ), StandardCharsets.UTF_8 ), "'Bruno'",
         "con los datos" );
-      contiene( ui( () -> a.resultadoBase( "GYM_OLTP", true ) ), "<a>gym_oltp_generado.sql</a>", "enlace" );
-      cierto( ui( () -> ( (Text) a.buscar( "as_base_scripts:GYM_OLTP" ) ).getText() ).startsWith( script.getPath() ),
+      contiene( ui( () -> a.resultadoBase( "CLUB_OLTP", true ) ), "<a>club_oltp_generado.sql</a>", "enlace" );
+      cierto( ui( () -> ( (Text) a.buscar( "as_base_scripts:CLUB_OLTP" ) ).getText() ).startsWith( script.getPath() ),
         "el primero en Scripts" );
-      igual( 3L, h2.contar( "gym_oltp", "SELECT COUNT(*) FROM CLIENTES" ), "la original igual" );
+      igual( 3L, h2.contar( "club_oltp", "SELECT COUNT(*) FROM CLIENTES" ), "la original igual" );
       archivo( pantallaShell( a.shell, "asistente-base-2-generado.png" ), 2000, "captura del script generado" );
 
       // una solucion que no termina bien: el error entero, con el step, en el recuadro rojo
       ui( () -> {
-        ( (Text) a.buscar( "as_base_scripts:GYM_DW" ) ).setText( "" );
+        ( (Text) a.buscar( "as_base_scripts:CLUB_DW" ) ).setText( "" );
         return null;
       } );
       clicEn( a, "as_siguiente" );

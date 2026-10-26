@@ -783,9 +783,9 @@ final class CorrectorSandbox {
    * <li>hojas {@code schema}: una base original ({@code renombres}) pasa a la de prueba. En MySQL el esquema es una
    * base del servidor: uno que no es de prueba bloquea ({@code foreign_schema}), igual que uno con variables. En H2 y
    * PostgreSQL un esquema vive dentro de la base de prueba: los demas quedan como estan.</li>
-   * <li>hojas {@code table} con un nombre calificado ({@code gym_dw.ventas}): el calificador, igual.</li>
-   * <li>hojas de SQL: solo los nombres calificados con una base original ({@code gym_dw.ventas},
-   * {@code USE gym_dw}) pasan a la de prueba ({@link CorrectorBases#renombrarCalificados}: un nombre que en el mismo
+   * <li>hojas {@code table} con un nombre calificado ({@code club_dw.ventas}): el calificador, igual.</li>
+   * <li>hojas de SQL: solo los nombres calificados con una base original ({@code club_dw.ventas},
+   * {@code USE club_dw}) pasan a la de prueba ({@link CorrectorBases#renombrarCalificados}: un nombre que en el mismo
    * SQL tambien es una tabla o un alias no se toca), y el SQL no puede salir de las bases de prueba
    * ({@code forbidden_sql}, {@link CorrectorBases#sqlAjeno}).</li>
    * </ul>
@@ -836,7 +836,7 @@ final class CorrectorSandbox {
         continue;
       }
       if ( tag.contains( "sql" ) || tag.equals( "query" ) || tag.equals( "statement" ) ) {
-        // primero los nombres calificados con una base original pasan a la de prueba (gym_dw.dim → gym_dw_test.dim)
+        // primero los nombres calificados con una base original pasan a la de prueba (club_dw.dim → club_dw_test.dim)
         Set<String> ambiguos = new HashSet<String>();
         String nuevo = CorrectorBases.renombrarCalificados( crudo, renombres, ambiguos );
         String sustNuevo = CorrectorBases.renombrarCalificados( valor, renombres, ambiguos );

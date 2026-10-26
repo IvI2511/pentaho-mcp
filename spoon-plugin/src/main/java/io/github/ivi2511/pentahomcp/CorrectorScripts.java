@@ -24,7 +24,7 @@ import io.github.ivi2511.pentahomcp.lint.Nodos;
 
 /**
  * Los scripts SQL de un ejercicio con base de datos, buscados al lado de la solucion para el asistente «Crear pack»
- * (0.7.0): el docente casi siempre tiene un {@code crear_gym.sql} o un {@code gym.sql} junto al .ktr y no sabe que
+ * (0.7.0): el docente casi siempre tiene un {@code crear_club.sql} o un {@code club.sql} junto al .ktr y no sabe que
  * tiene que ponerlo en «Scripts». Solo lee archivos .sql (nada corre ni se conecta):
  * <ul>
  * <li><b>Donde</b>: la carpeta de la solucion y sus subcarpetas (dos niveles) y la carpeta de arriba (solo sus .sql),
@@ -276,7 +276,7 @@ final class CorrectorScripts {
     return m;
   }
 
-  /** «`gym`.`Clientes`» → «clientes». */
+  /** «`club`.`Clientes`» → «clientes». */
   static String tabla( String nombre ) {
     String t = nombre == null ? "" : nombre.replaceAll( "[`\"\\[\\]\\s]", "" );
     int i = t.lastIndexOf( '.' );

@@ -289,13 +289,13 @@ final class CorrectorTools {
     ObjectNode it = o.putObject( "items" ).put( "type", "object" );
     ObjectNode p = it.putObject( "properties" );
     p.putObject( "connection" ).put( "type", "string" ).put( "description", "Name of the connection in the solution "
-      + "(e.g. GYM_DW)" );
+      + "(e.g. CLUB_DW)" );
     p.putObject( "type" ).put( "type", "string" ).put( "description", "MYSQL, MARIADB, POSTGRESQL or H2 (default: "
       + "the connection's)" );
     p.putObject( "host" ).put( "type", "string" ).put( "description", "Server (default: the connection's)" );
     p.putObject( "port" ).put( "type", "string" ).put( "description", "Port (default: the connection's)" );
     p.putObject( "database" ).put( "type", "string" ).put( "description", "The disposable test database (in MySQL, "
-      + "the schema), e.g. gym_dw_correccion. Default: the connection's database + _correccion. It is DROPPED and "
+      + "the schema), e.g. club_dw_correccion. Default: the connection's database + _correccion. It is DROPPED and "
       + "created again before each case" );
     p.putObject( "user" ).put( "type", "string" ).put( "description", "User (default: the connection's). Best a user "
       + "with rights only on the test databases" );

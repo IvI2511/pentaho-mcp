@@ -982,7 +982,7 @@ final class PruebasMotor {
 
   /**
    * (0.7.1) Los esquemas y el SQL de los steps que usan una conexion redirigida, como en el corrector
-   * ({@link CorrectorSandbox#esquemasDeStep}): {@code schema} y {@code gym_dw.ventas} de la base original pasan a la
+   * ({@link CorrectorSandbox#esquemasDeStep}): {@code schema} y {@code club_dw.ventas} de la base original pasan a la
    * de prueba. Lo que saldria de las bases de prueba (otro esquema de MySQL, SQL que nombra otra base o lee archivos
    * del servidor) es un error: la prueba no corre.
    */

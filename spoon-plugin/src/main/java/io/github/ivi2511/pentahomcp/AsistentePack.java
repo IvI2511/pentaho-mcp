@@ -2026,7 +2026,7 @@ final class AsistentePack {
     }
   }
 
-  /** «Ejercicio 2.ktr · 23 pasos · base de datos: GYM_DW (MySQL), GYM_Origen (MySQL)». */
+  /** «Ejercicio 2.ktr · 23 pasos · base de datos: CLUB_DW (MySQL), CLUB_Origen (MySQL)». */
   private String resumenSolucion() {
     List<String> cxs = new ArrayList<String>();
     for ( CorrectorBases.Conexion c : inventario.usadas() ) {

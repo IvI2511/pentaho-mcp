@@ -103,36 +103,36 @@ public class PruebaCorrectorBases {
       + "LANGUAGE plpgsql;\nSELECT 2;", false );
     igual( 2, pg.size(), "PostgreSQL: el bloque $$ es una sola sentencia: " + pg );
 
-    List<String> dump = CorrectorBases.sentencias( "/*!40101 SET NAMES utf8 */;\nCREATE DATABASE IF NOT EXISTS gym_dw;\n"
-      + "USE gym_dw;\n", true );
+    List<String> dump = CorrectorBases.sentencias( "/*!40101 SET NAMES utf8 */;\nCREATE DATABASE IF NOT EXISTS club_dw;\n"
+      + "USE club_dw;\n", true );
     igual( 3, dump.size(), "mysqldump: " + dump );
     cierto( dump.get( 0 ).startsWith( "/*!40101" ), "el comentario ejecutable queda" );
   }
 
   public void pruebaB_Renombrar() throws Exception {
-    Map<String, String> m = Collections.singletonMap( "gym_dw", "gym_dw_correccion" );
-    igual( "USE gym_dw_correccion; INSERT INTO gym_dw_correccion.dim (n, gym_dw_x) VALUES ('gym_dw'); "
-      + "SELECT * FROM `gym_dw_correccion`.x -- gym_dw\n", CorrectorBases.renombrar( "USE gym_dw; INSERT INTO "
-      + "gym_dw.dim (n, gym_dw_x) VALUES ('gym_dw'); SELECT * FROM `GYM_DW`.x -- gym_dw\n", m ),
+    Map<String, String> m = Collections.singletonMap( "club_dw", "club_dw_correccion" );
+    igual( "USE club_dw_correccion; INSERT INTO club_dw_correccion.dim (n, club_dw_x) VALUES ('club_dw'); "
+      + "SELECT * FROM `club_dw_correccion`.x -- club_dw\n", CorrectorBases.renombrar( "USE club_dw; INSERT INTO "
+      + "club_dw.dim (n, club_dw_x) VALUES ('club_dw'); SELECT * FROM `CLUB_DW`.x -- club_dw\n", m ),
       "solo los identificadores: ni cadenas, ni comentarios, ni otros nombres" );
-    Set<String> pruebas = Collections.singleton( "gym_dw_correccion" );
+    Set<String> pruebas = Collections.singleton( "club_dw_correccion" );
     igual( "USE otra", CorrectorBases.scriptAjeno( "USE otra", pruebas ), "un script que nombra otra base" );
-    nulo( CorrectorBases.scriptAjeno( "USE gym_dw_correccion", pruebas ), "la de prueba vale" );
-    cierto( CorrectorBases.crearOBorrarBase( "CREATE DATABASE IF NOT EXISTS gym_dw_correccion", true ),
+    nulo( CorrectorBases.scriptAjeno( "USE club_dw_correccion", pruebas ), "la de prueba vale" );
+    cierto( CorrectorBases.crearOBorrarBase( "CREATE DATABASE IF NOT EXISTS club_dw_correccion", true ),
       "CREATE DATABASE de la de prueba: se salta" );
     falso( CorrectorBases.crearOBorrarBase( "CREATE SCHEMA ventas", false ), "en PostgreSQL un esquema es otra cosa" );
   }
 
   public void pruebaC_SqlAjeno() throws Exception {
-    Set<String> pruebas = new HashSet<String>( Arrays.asList( "gym_dw_correccion" ) );
-    Set<String> prohibidas = new HashSet<String>( Arrays.asList( "gym_dw", "mysql" ) );
+    Set<String> pruebas = new HashSet<String>( Arrays.asList( "club_dw_correccion" ) );
+    Set<String> prohibidas = new HashSet<String>( Arrays.asList( "club_dw", "mysql" ) );
     String[][] casos = { { "SELECT * FROM t INTO OUTFILE '/tmp/x'", "INTO OUTFILE" },
-      { "LOAD DATA INFILE 'x' INTO TABLE t", "LOAD DATA" }, { "USE gym_dw", "USE gym_dw" },
-      { "SELECT * FROM gym_dw.dim", "gym_dw." }, { "SELECT * FROM mysql.user", "mysql." },
+      { "LOAD DATA INFILE 'x' INTO TABLE t", "LOAD DATA" }, { "USE club_dw", "USE club_dw" },
+      { "SELECT * FROM club_dw.dim", "club_dw." }, { "SELECT * FROM mysql.user", "mysql." },
       { "CALL CSVWRITE('x.csv', 'SELECT 1')", "CSVWRITE / FILE_READ" }, { "DROP DATABASE otra", "DROP DATABASE otra" },
       { "GRANT ALL ON *.* TO x", "GRANT" }, { "COPY t TO '/tmp/x'", "COPY TO/FROM" },
       { "SELECT 'INTO OUTFILE' AS x FROM t", null }, { "SELECT a.x FROM t a", null },
-      { "USE gym_dw_correccion", null }, { "INSERT INTO gym_dw_correccion.dim VALUES (1)", null },
+      { "USE club_dw_correccion", null }, { "INSERT INTO club_dw_correccion.dim VALUES (1)", null },
       { "SELECT grant_id FROM t", null } };
     for ( String[] c : casos ) {
       igual( c[ 1 ], CorrectorBases.sqlAjeno( c[ 0 ], pruebas, prohibidas ), c[ 0 ] );
@@ -144,8 +144,8 @@ public class PruebaCorrectorBases {
   private Pack packConBase( String base ) {
     Pack p = new Pack();
     p.id = "dw";
-    BaseDePrueba b = new BaseDePrueba( "GYM_DW", "MYSQL", "localhost", "3306", base, "profe" );
-    b.baseOriginal = "gym_dw";
+    BaseDePrueba b = new BaseDePrueba( "CLUB_DW", "MYSQL", "localhost", "3306", base, "profe" );
+    b.baseOriginal = "club_dw";
     p.bases.add( b );
     return p.completar();
   }
@@ -159,40 +159,40 @@ public class PruebaCorrectorBases {
   }
 
   public void pruebaD_Seguridad() throws Exception {
-    igual( "[]", claves( CorrectorBases.inseguras( packConBase( "gym_dw_correccion" ), null, null ) ), "la buena" );
-    igual( "[db.unsafe.original, db.unsafe.suffix]", claves( CorrectorBases.inseguras( packConBase( "gym_dw" ), null,
+    igual( "[]", claves( CorrectorBases.inseguras( packConBase( "club_dw_correccion" ), null, null ) ), "la buena" );
+    igual( "[db.unsafe.original, db.unsafe.suffix]", claves( CorrectorBases.inseguras( packConBase( "club_dw" ), null,
       null ) ), "la original: nunca" );
-    igual( "[db.unsafe.suffix]", claves( CorrectorBases.inseguras( packConBase( "gym_dw_copia" ), null, null ) ),
+    igual( "[db.unsafe.suffix]", claves( CorrectorBases.inseguras( packConBase( "club_dw_copia" ), null, null ) ),
       "sin sufijo de prueba" );
-    Pack libre = packConBase( "gym_dw_copia" );
+    Pack libre = packConBase( "club_dw_copia" );
     libre.seguridad = new SeguridadBases();
     libre.seguridad.cualquierNombre = true;
     igual( "[]", claves( CorrectorBases.inseguras( libre, null, null ) ), "allow_any_name: decision del docente" );
     libre.bases.get( 0 ).base = "mysql";
     igual( "[db.unsafe.system]", claves( CorrectorBases.inseguras( libre, null, null ) ),
       "una del sistema, ni con allow_any_name" );
-    Pack deny = packConBase( "gym_dw_correccion" );
+    Pack deny = packConBase( "club_dw_correccion" );
     deny.seguridad = new SeguridadBases();
-    deny.seguridad.prohibidas.add( "gym_*" );
+    deny.seguridad.prohibidas.add( "club_*" );
     igual( "[db.unsafe.denied]", claves( CorrectorBases.inseguras( deny, null, null ) ), "deny con comodin" );
-    igual( "[db.unsafe.original]", claves( CorrectorBases.inseguras( packConBase( "gym_dw_correccion" ), null,
-      Collections.singletonList( "gym_dw_correccion" ) ) ), "una base de la solucion leida del .ktr" );
+    igual( "[db.unsafe.original]", claves( CorrectorBases.inseguras( packConBase( "club_dw_correccion" ), null,
+      Collections.singletonList( "club_dw_correccion" ) ) ), "una base de la solucion leida del .ktr" );
     igual( "[db.unsafe.chars]", claves( CorrectorBases.inseguras( packConBase( "x`; DROP DATABASE y" ), null,
       null ) ), "caracteres raros" );
-    Pack tipo = packConBase( "gym_dw_correccion" );
+    Pack tipo = packConBase( "club_dw_correccion" );
     tipo.bases.get( 0 ).tipo = "ORACLE";
     igual( "[db.unsafe.type]", claves( CorrectorBases.inseguras( tipo, null, null ) ), "tipo que no sabe recrear" );
-    igual( Arrays.asList( "_w1", "_w2" ), CorrectorBases.sufijos( packConBase( "gym_dw_correccion" ), 2 ),
+    igual( Arrays.asList( "_w1", "_w2" ), CorrectorBases.sufijos( packConBase( "club_dw_correccion" ), 2 ),
       "un sufijo por worker" );
-    igual( Collections.singletonList( "" ), CorrectorBases.sufijos( packConBase( "gym_dw_correccion" ), 1 ),
+    igual( Collections.singletonList( "" ), CorrectorBases.sufijos( packConBase( "club_dw_correccion" ), 1 ),
       "con uno, sin sufijo" );
-    Pack uno = packConBase( "gym_dw_correccion" );
+    Pack uno = packConBase( "club_dw_correccion" );
     uno.seguridad = new SeguridadBases();
     uno.seguridad.unWorker = true;
     igual( 1, CorrectorBases.workersPermitidos( uno, 3 ), "single_worker" );
-    igual( "gym_dw_correccion", CorrectorBases.propuesta( "gym_dw" ), "la propuesta del asistente" );
+    igual( "club_dw_correccion", CorrectorBases.propuesta( "club_dw" ), "la propuesta del asistente" );
     igual( "ya_test", CorrectorBases.propuesta( "ya_test" ), "una que ya es de prueba queda igual" );
-    String es = CorrectorBases.inseguras( packConBase( "gym_dw" ), null, null ).get( 0 ).texto( "es" );
+    String es = CorrectorBases.inseguras( packConBase( "club_dw" ), null, null ).get( 0 ).texto( "es" );
     contiene( es, "nunca puede ser una de las tuyas", "en español: " + es );
   }
 
@@ -205,7 +205,7 @@ public class PruebaCorrectorBases {
     BasesH2.escribir( new File( d, "enunciado.md" ), "# DW\n" );
     String json = CorrectorJson.escribir( p, true );
     if ( extraJson != null ) {
-      json = json.replaceFirst( "\"original_database\" : \"gym_dw\"", "\"original_database\" : \"gym_dw\", "
+      json = json.replaceFirst( "\"original_database\" : \"club_dw\"", "\"original_database\" : \"club_dw\", "
         + extraJson );
     }
     BasesH2.escribir( new File( d, "pack.json" ), json );
@@ -213,14 +213,14 @@ public class PruebaCorrectorBases {
   }
 
   private Pack pack2() {
-    Pack p = packConBase( "gym_dw_correccion" );
+    Pack p = packConBase( "club_dw_correccion" );
     p.formato = Pack.FORMATO_2;
     p.titulo = "DW";
     p.enunciado = "enunciado.md";
     p.bases.get( 0 ).scripts.add( "bd/crear_dw.sql" );
     p.casos.add( new Caso( "visible", null, "esperado/visible", false ) );
     p.salida.captura = Pack.Salida.CAPTURA_TABLAS;
-    TablaSalida t = new TablaSalida( "GYM_DW", "DIM_CLIENTE" );
+    TablaSalida t = new TablaSalida( "CLUB_DW", "DIM_CLIENTE" );
     t.columnasClave.add( "ID_CLIENTE" );
     t.columnas.add( new Pack.Columna( "ID_CLIENTE", "Integer" ) );
     t.columnas.add( new Pack.Columna( "NOMBRE", "String" ) );
@@ -241,7 +241,7 @@ public class PruebaCorrectorBases {
   public void pruebaE_Pack2() throws Exception {
     try ( CorrectorPack cp = CorrectorPack.abrir( packEnDisco( "bueno", pack2(), null ) ) ) {
       cierto( cp.valido(), "el pack 2 valida: " + cp.textoProblemas( "en" ) );
-      igual( "gym_dw_correccion", cp.pack().bases.get( 0 ).base, "la base de prueba" );
+      igual( "club_dw_correccion", cp.pack().bases.get( 0 ).base, "la base de prueba" );
       igual( 1, cp.pack().salida.tablas.size(), "la tabla" );
     }
     String json = new String( Files.readAllBytes( new File( dir, "packs/bueno/pack.json" ).toPath() ),
@@ -260,7 +260,7 @@ public class PruebaCorrectorBases {
       contiene( codigos( cp ), CorrectorPack.CLAVE_EN_PACK, "la contraseña en el pack" );
     }
     Pack original = pack2();
-    original.bases.get( 0 ).base = "gym_dw";
+    original.bases.get( 0 ).base = "club_dw";
     try ( CorrectorPack cp = CorrectorPack.abrir( packEnDisco( "original", original, null ) ) ) {
       falso( cp.valido(), "una base de prueba que es la original no valida" );
       contiene( codigos( cp ), CorrectorPack.BASE_INSEGURA, "el codigo" );
@@ -367,18 +367,18 @@ public class PruebaCorrectorBases {
     igual( "[]", mal.toString(), "textos de " + claves.size() + " claves" );
 
     // el mensaje del usuario, en una UI en español: nada en ingles
-    Mensaje det = new Mensaje( "det.connection.not_pack.step", "GYM_DW", "MYSQL", "Buscar clave cliente" );
+    Mensaje det = new Mensaje( "det.connection.not_pack.step", "CLUB_DW", "MYSQL", "Buscar clave cliente" );
     CorrectorCrearPack.Fallo f = new CorrectorCrearPack.Fallo( "solution_blocked", new Mensaje(
       "crear.err.blocked_case", "visible", CorrectorTextos.clave( "motivo.foreign_connection" ), det.anidado() ) );
     Rotulos t = Rotulos.de( CorrectorTextos.AREA, "es" );
     String ui = t.f( "ui.as_error", f.nombre( t ), f.texto( t ) );
     igual( "No se pudo armar el pack (el corrector no ejecutaría la solución): Caso visible: el corrector no "
-      + "ejecutaría la solución (conexión ajena al ejercicio): la conexión «GYM_DW» (MYSQL), que usa el step «Buscar "
+      + "ejecutaría la solución (conexión ajena al ejercicio): la conexión «CLUB_DW» (MYSQL), que usa el step «Buscar "
       + "clave cliente», no es la base del pack", ui, "el error del asistente en español" );
     for ( String ingles : Arrays.asList( "grader", "would not", "connection", "used by", "is not" ) ) {
       noContiene( ui, ingles, "sin ingles" );
     }
-    contiene( f.getMessage(), "connection 'GYM_DW' (MYSQL) used by step 'Buscar clave cliente' is not the pack "
+    contiene( f.getMessage(), "connection 'CLUB_DW' (MYSQL) used by step 'Buscar clave cliente' is not the pack "
       + "database", "por MCP sigue en ingles" );
     contiene( new Mensaje( "crear.err.blocked_case", "visible", CorrectorTextos.clave( "motivo.foreign_connection" ),
       det.anidado() ).texto( "pt" ), "não é a base do pack", "en portugues" );
@@ -391,7 +391,7 @@ public class PruebaCorrectorBases {
     Pack p = new Pack();
     p.id = "dw";
     p.formato = Pack.FORMATO_2;
-    for ( String[] b : new String[][] { { BasesH2.ORIGEN, "gym_oltp" }, { BasesH2.DW, "gym_dw" } } ) {
+    for ( String[] b : new String[][] { { BasesH2.ORIGEN, "club_oltp" }, { BasesH2.DW, "club_dw" } } ) {
       BaseDePrueba x = new BaseDePrueba( b[ 0 ], tipo, "localhost", "9", b[ 1 ] + "_correccion", "sa" );
       x.baseOriginal = b[ 1 ];
       p.bases.add( x );
@@ -405,7 +405,7 @@ public class PruebaCorrectorBases {
   private Preparacion preparar( Pack p, File ktr, String sufijo ) throws Exception {
     Entrega e = CorrectorPolitica.cargar( ktr );
     CorrectorSandbox.Opciones op = new CorrectorSandbox.Opciones();
-    op.bases = new CorrectorBases.Sesion( p, dir, sufijo, Collections.singletonMap( "gym_dw", "secreta" ) );
+    op.bases = new CorrectorBases.Sesion( p, dir, sufijo, Collections.singletonMap( "club_dw", "secreta" ) );
     return CorrectorSandbox.preparar( p, dir, p.casos.get( 0 ), e, new File( dir, "sandbox/" + ktr.getName()
       .replace( ".ktr", "" ) ), op );
   }
@@ -417,14 +417,14 @@ public class PruebaCorrectorBases {
     falso( p.bloqueada(), "la solucion corre: " + p.detalle );
     igual( new HashSet<String>( Arrays.asList( BasesH2.ORIGEN, BasesH2.DW ) ), p.conexionesPrueba.keySet(),
       "las dos conexiones van a su base de prueba" );
-    igual( "gym_dw_correccion_w2", p.conexionesPrueba.get( BasesH2.DW ).nombre, "con el sufijo del worker" );
+    igual( "club_dw_correccion_w2", p.conexionesPrueba.get( BasesH2.DW ).nombre, "con el sufijo del worker" );
     String xml = new String( Files.readAllBytes( p.ktr.toPath() ), StandardCharsets.UTF_8 );
-    contiene( xml, "<database>gym_dw_correccion_w2</database>", "la copia apunta a la de prueba" );
-    contiene( xml, "<database>gym_oltp_correccion_w2</database>", "el origen tambien" );
-    noContiene( xml, "<database>gym_dw</database>", "nada apunta a la original" );
+    contiene( xml, "<database>club_dw_correccion_w2</database>", "la copia apunta a la de prueba" );
+    contiene( xml, "<database>club_oltp_correccion_w2</database>", "el origen tambien" );
+    noContiene( xml, "<database>club_dw</database>", "nada apunta a la original" );
     noContiene( xml, BasesH2.CLAVE, "sin la contraseña de la solucion" );
     noContiene( xml, "Encrypted", "ninguna contraseña en la copia" );
-    contiene( p.redirecciones.toString(), "test database gym_dw_correccion_w2", "la nota del docente" );
+    contiene( p.redirecciones.toString(), "test database club_dw_correccion_w2", "la nota del docente" );
 
     // una conexion que no es de ninguna base de prueba: bloquea, con el texto en el idioma de la UI
     Preparacion ajena = preparar( packH2( "H2" ), sinServidor.guardar( BasesH2.Variante.CONEXION_AJENA, new File( dir,
@@ -442,9 +442,9 @@ public class PruebaCorrectorBases {
     // MySQL: los esquemas de los steps y el SQL con el nombre original pasan a la de prueba; otro esquema bloquea
     org.pentaho.di.trans.TransMeta tm = sinServidor.trans( BasesH2.Variante.TABLE_OUTPUT );
     ( (org.pentaho.di.trans.steps.tableoutput.TableOutputMeta) tm.findStep( "Cargar dim_cliente" )
-      .getStepMetaInterface() ).setSchemaName( "gym_dw" );
+      .getStepMetaInterface() ).setSchemaName( "club_dw" );
     ( (org.pentaho.di.trans.steps.tableinput.TableInputMeta) tm.findStep( "Leer clientes" ).getStepMetaInterface() )
-      .setSQL( "SELECT id, nombre, id_ciudad FROM gym_oltp.clientes" );
+      .setSQL( "SELECT id, nombre, id_ciudad FROM club_oltp.clientes" );
     for ( org.pentaho.di.core.database.DatabaseMeta d : tm.getDatabases() ) {
       d.setDatabaseType( "MYSQL" );
     }
@@ -452,8 +452,8 @@ public class PruebaCorrectorBases {
     Preparacion pm = preparar( packH2( "MYSQL" ), my, "" );
     falso( pm.bloqueada(), "MySQL con los nombres originales: corre: " + pm.detalle );
     String xm = new String( Files.readAllBytes( pm.ktr.toPath() ), StandardCharsets.UTF_8 );
-    contiene( xm, "<schema>gym_dw_correccion</schema>", "el esquema del Table output" );
-    contiene( xm, "gym_oltp_correccion.clientes", "el SQL del Table input" );
+    contiene( xm, "<schema>club_dw_correccion</schema>", "el esquema del Table output" );
+    contiene( xm, "club_oltp_correccion.clientes", "el SQL del Table input" );
     ( (org.pentaho.di.trans.steps.tableoutput.TableOutputMeta) tm.findStep( "Cargar dim_cliente" )
       .getStepMetaInterface() ).setSchemaName( "contabilidad" );
     Preparacion otro = preparar( packH2( "MYSQL" ), BasesH2.escribir( new File( dir, "ktr/mysql2.ktr" ),
@@ -465,15 +465,15 @@ public class PruebaCorrectorBases {
     // otro esquema vive dentro de la base de prueba y no bloquea
     org.pentaho.di.trans.TransMeta th = sinServidor.trans( BasesH2.Variante.TABLE_OUTPUT );
     ( (org.pentaho.di.trans.steps.tableoutput.TableOutputMeta) th.findStep( "Cargar dim_cliente" )
-      .getStepMetaInterface() ).setSchemaName( "gym_dw" );
+      .getStepMetaInterface() ).setSchemaName( "club_dw" );
     ( (org.pentaho.di.trans.steps.tableinput.TableInputMeta) th.findStep( "Leer clientes" ).getStepMetaInterface() )
-      .setSQL( "SELECT c.id, c.nombre, c.id_ciudad FROM gym_oltp.clientes c" );
+      .setSQL( "SELECT c.id, c.nombre, c.id_ciudad FROM club_oltp.clientes c" );
     Preparacion ph = preparar( packH2( "H2" ), BasesH2.escribir( new File( dir, "ktr/h2esquema.ktr" ),
       th.getXML() ), "" );
     falso( ph.bloqueada(), "H2 con los nombres originales: corre: " + ph.detalle );
     String xh = new String( Files.readAllBytes( ph.ktr.toPath() ), StandardCharsets.UTF_8 );
-    contiene( xh, "<schema>gym_dw_correccion</schema>", "el esquema del Table output en H2" );
-    contiene( xh, "gym_oltp_correccion.clientes c", "el SQL calificado en H2" );
+    contiene( xh, "<schema>club_dw_correccion</schema>", "el esquema del Table output en H2" );
+    contiene( xh, "club_oltp_correccion.clientes c", "el SQL calificado en H2" );
     contiene( xh, "c.id, c.nombre", "el alias no se toca" );
     ( (org.pentaho.di.trans.steps.tableoutput.TableOutputMeta) th.findStep( "Cargar dim_cliente" )
       .getStepMetaInterface() ).setSchemaName( "staging" );
@@ -486,14 +486,14 @@ public class PruebaCorrectorBases {
 
   /** 0.7.1: solo los nombres que califican a otro (o van tras USE) cambian; un nombre que tambien es tabla, no. */
   public void pruebaB2_RenombrarCalificados() throws Exception {
-    java.util.Map<String, String> m = Collections.singletonMap( "gym_dw", "gym_dw_test" );
+    java.util.Map<String, String> m = Collections.singletonMap( "club_dw", "club_dw_test" );
     java.util.Set<String> amb = new HashSet<String>();
-    igual( "SELECT * FROM gym_dw_test.ventas v JOIN `gym_dw_test`.`dim` d ON v.id = d.id WHERE x = 'gym_dw.a' -- gym_dw.b",
-      CorrectorBases.renombrarCalificados( "SELECT * FROM gym_dw.ventas v JOIN `gym_dw`.`dim` d ON v.id = d.id "
-        + "WHERE x = 'gym_dw.a' -- gym_dw.b", m, amb ), "calificados, sin cadenas ni comentarios" );
+    igual( "SELECT * FROM club_dw_test.ventas v JOIN `club_dw_test`.`dim` d ON v.id = d.id WHERE x = 'club_dw.a' -- club_dw.b",
+      CorrectorBases.renombrarCalificados( "SELECT * FROM club_dw.ventas v JOIN `club_dw`.`dim` d ON v.id = d.id "
+        + "WHERE x = 'club_dw.a' -- club_dw.b", m, amb ), "calificados, sin cadenas ni comentarios" );
     cierto( amb.isEmpty(), "sin ambiguos" );
-    igual( "USE gym_dw_test", CorrectorBases.renombrarCalificados( "USE gym_dw", m, amb ), "USE" );
-    igual( "SELECT gym_dw FROM t", CorrectorBases.renombrarCalificados( "SELECT gym_dw FROM t", m, amb ),
+    igual( "USE club_dw_test", CorrectorBases.renombrarCalificados( "USE club_dw", m, amb ), "USE" );
+    igual( "SELECT club_dw FROM t", CorrectorBases.renombrarCalificados( "SELECT club_dw FROM t", m, amb ),
       "una columna con ese nombre no" );
     String ventas = "SELECT ventas.importe FROM ventas";
     igual( ventas, CorrectorBases.renombrarCalificados( ventas, Collections.singletonMap( "ventas", "ventas_test" ),
@@ -568,7 +568,7 @@ public class PruebaCorrectorBases {
       igual( Pack.FORMATO_2, p.formato, "formato 2" );
       igual( Pack.Salida.CAPTURA_TABLAS, p.salida.captura, "captura tables" );
       igual( 2, p.bases.size(), "dos bases de prueba" );
-      igual( "gym_dw", p.base( BasesH2.DW ).baseOriginal, "la original queda anotada" );
+      igual( "club_dw", p.base( BasesH2.DW ).baseOriginal, "la original queda anotada" );
       igual( Integer.valueOf( 2 ), p.casos.get( 0 ).ejecuciones, "dos ejecuciones" );
       cierto( p.politica.permite( "TableOutput" ), "los steps de base quedan permitidos" );
       String esp = new String( Files.readAllBytes( cp.esperado( p.casos.get( 1 ), p.salida.tablas.get( 0 ) )
@@ -578,8 +578,8 @@ public class PruebaCorrectorBases {
       contiene( esp, "Vigo", "con la ciudad del lookup" );
     }
     sinClave( pack, "el pack" );
-    falso( s.existe( "gym_oltp" ) || s.existe( "gym_dw" ), "las bases originales no se tocaron" );
-    cierto( s.existe( "gym_dw_correccion" ), "la de prueba se creo" );
+    falso( s.existe( "club_oltp" ) || s.existe( "club_dw" ), "las bases originales no se tocaron" );
+    cierto( s.existe( "club_dw_correccion" ), "la de prueba se creo" );
     // la copia para alumnos: sin la solucion, sin el caso oculto ni sus scripts
     File alumnos = new File( dir, "packs/alumnos" );
     CorrectorPack.descomprimir( op.copiaAlumnos, alumnos, 1 << 26, 1000 );
@@ -609,12 +609,12 @@ public class PruebaCorrectorBases {
     igual( ResultadoCorreccion.BLOQUEADA, aj.estado, "ajena: bloqueada" );
     igual( ResultadoCaso.CONEXION_AJENA, aj.motivo, "por la conexion" );
     contiene( CorrectorTextos.detalle( Rotulos.de( CorrectorTextos.AREA, "es" ), aj ), "«OTRA»", "detalle en español" );
-    contiene( aj.pistas.toString(), "«GYM_OLTP»", "la pista nombra las conexiones del ejercicio" );
+    contiene( aj.pistas.toString(), "«CLUB_OLTP»", "la pista nombra las conexiones del ejercicio" );
     falso( s.existe( "otra_bd" ), "la base ajena no se toco" );
-    falso( s.existe( "gym_oltp" ) || s.existe( "gym_dw" ), "las originales tampoco" );
+    falso( s.existe( "club_oltp" ) || s.existe( "club_dw" ), "las originales tampoco" );
     // el ultimo caso que corrio fue el oculto: la base de prueba tiene solo sus 4 clientes
     // (duplica: 4 clientes x 2 ejecuciones; sin recrear habria tambien las 6 del visible)
-    igual( 8L, s.contar( "gym_dw_correccion", "SELECT COUNT(*) FROM DIM_CLIENTE" ), "recreada antes del oculto" );
+    igual( 8L, s.contar( "club_dw_correccion", "SELECT COUNT(*) FROM DIM_CLIENTE" ), "recreada antes del oculto" );
     sinClave( ultimaSalida, "los resultados y los sandboxes" );
   }
 
@@ -625,10 +625,10 @@ public class PruebaCorrectorBases {
     igual( 10.0, r.get( "correcta" ).nota, "correcta: 10" );
     cierto( r.get( "duplica" ).nota < 10, "duplica" );
     igual( ResultadoCorreccion.BLOQUEADA, r.get( "ajena" ).estado, "ajena" );
-    cierto( s.existe( "gym_dw_correccion_w1" ) && s.existe( "gym_dw_correccion_w2" ),
+    cierto( s.existe( "club_dw_correccion_w1" ) && s.existe( "club_dw_correccion_w2" ),
       "cada worker con su base de prueba" );
-    cierto( s.existe( "gym_oltp_correccion_w1" ) && s.existe( "gym_oltp_correccion_w2" ), "y su origen" );
-    falso( s.existe( "gym_dw" ), "la original nunca" );
+    cierto( s.existe( "club_oltp_correccion_w1" ) && s.existe( "club_oltp_correccion_w2" ), "y su origen" );
+    falso( s.existe( "club_dw" ), "la original nunca" );
   }
 
   /** Una base de prueba que es la original o sin sufijo: no se crea el pack, no se corrige; contraseña mala. */
@@ -637,30 +637,30 @@ public class PruebaCorrectorBases {
     File sol = s.guardar( BasesH2.Variante.SOLUCION, new File( dir, "profe2/carga_dw.ktr" ) );
     CorrectorCrearPack.Opciones op = s.opciones( sol, new File( dir, "packs/no" ), new File( dir, "profe2/scripts" ),
       BasesH2.CLAVE );
-    op.bases.get( 1 ).base = "gym_dw";
+    op.bases.get( 1 ).base = "club_dw";
     CorrectorCrearPack.Fallo f = lanza( CorrectorCrearPack.Fallo.class, () -> CorrectorCrearPack.crear( op ),
       "la base original" );
     igual( CorrectorCrearPack.E_BASE_INSEGURA, f.codigo, "el codigo" );
     contiene( f.texto( Rotulos.de( CorrectorTextos.AREA, "es" ) ), "es una base de la solución", "en español" );
     falso( new File( dir, "packs/no" ).exists(), "no se creo nada" );
-    op.bases.get( 1 ).base = "gym_dw_copia";
+    op.bases.get( 1 ).base = "club_dw_copia";
     f = lanza( CorrectorCrearPack.Fallo.class, () -> CorrectorCrearPack.crear( op ), "sin sufijo" );
     contiene( f.getMessage(), "does not end in a test suffix", "sin sufijo de prueba" );
-    falso( s.existe( "gym_dw_copia" ), "y no se creo la base" );
+    falso( s.existe( "club_dw_copia" ), "y no se creo la base" );
 
     // un pack cuya base de prueba se cambio a mano por la original: el lote no arranca
     Pack p;
     try ( CorrectorPack cp = CorrectorPack.abrir( pack ) ) {
       p = CorrectorJson.copia( cp.pack(), Pack.class ).completar();
     }
-    p.base( BasesH2.DW ).base = "gym_dw";
+    p.base( BasesH2.DW ).base = "club_dw";
     final Pack pf = p;
     CorrectorBases.Falla fa = lanza( CorrectorBases.Falla.class, () -> new CorrectorProcesos( pack, pf, new File( dir,
       "lote-no" ), procesos( 1 ), null ), "el lote se niega" );
     contiene( fa.mensaje.texto( "es" ), "No se pueden usar las bases de prueba", "en español" );
     // dos workers y el nombre con sufijo coincide con una base de la solucion: tambien
-    p.base( BasesH2.DW ).base = "gym_dw_correccion";
-    p.base( BasesH2.DW ).baseOriginal = "gym_dw_correccion_w2";
+    p.base( BasesH2.DW ).base = "club_dw_correccion";
+    p.base( BasesH2.DW ).baseOriginal = "club_dw_correccion_w2";
     lanza( CorrectorBases.Falla.class, () -> new CorrectorProcesos( pack, pf, new File( dir, "lote-no2" ), procesos(
       2 ), null ), "el sufijo del worker tambien se revisa" );
 

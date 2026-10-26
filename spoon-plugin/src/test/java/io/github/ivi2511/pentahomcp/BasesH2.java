@@ -34,7 +34,7 @@ import io.github.ivi2511.pentahomcp.corrector.modelo.BaseDePrueba;
  * docente» para las pruebas de las bases de prueba del corrector (0.6.2): nunca se usa un MySQL ni un PostgreSQL de
  * la maquina. Con {@code -ifNotExists} cada base se crea al conectarse por primera vez, asi que un archivo
  * {@code <base>.mv.db} en {@link #carpeta} prueba que alguien se conecto: las bases originales del ejercicio
- * ({@code gym_oltp}, {@code gym_dw}) no tienen que aparecer nunca.
+ * ({@code club_oltp}, {@code club_dw}) no tienen que aparecer nunca.
  * <p>
  * El ejercicio es el de la clase del usuario en chico: una base de origen (clientes y ciudades) y un data warehouse
  * con una dimension. La solucion lee los clientes, busca la ciudad con un Database lookup en el origen y carga la
@@ -45,8 +45,8 @@ class BasesH2 {
 
   static final String USUARIO = "sa";
   static final String CLAVE = "clave-H2-de-prueba-7";
-  static final String ORIGEN = "GYM_OLTP";
-  static final String DW = "GYM_DW";
+  static final String ORIGEN = "CLUB_OLTP";
+  static final String DW = "CLUB_DW";
 
   final File carpeta;
   final int puerto;
@@ -140,15 +140,15 @@ class BasesH2 {
   }
 
   /**
-   * La solucion (o una entrega) con las conexiones a las bases ORIGINALES del ejercicio ({@code gym_oltp},
-   * {@code gym_dw}) en este servidor: el corrector tiene que apuntarlas a las de prueba y no conectarse nunca a estas.
+   * La solucion (o una entrega) con las conexiones a las bases ORIGINALES del ejercicio ({@code club_oltp},
+   * {@code club_dw}) en este servidor: el corrector tiene que apuntarlas a las de prueba y no conectarse nunca a estas.
    */
   TransMeta trans( Variante v ) {
     TransMeta tm = new TransMeta();
     tm.setName( "carga_dw" );
-    DatabaseMeta origen = new DatabaseMeta( ORIGEN, "H2", "Native", "localhost", "gym_oltp", String.valueOf( puerto ),
+    DatabaseMeta origen = new DatabaseMeta( ORIGEN, "H2", "Native", "localhost", "club_oltp", String.valueOf( puerto ),
       USUARIO, CLAVE );
-    DatabaseMeta dw = new DatabaseMeta( DW, "H2", "Native", "localhost", "gym_dw", String.valueOf( puerto ), USUARIO,
+    DatabaseMeta dw = new DatabaseMeta( DW, "H2", "Native", "localhost", "club_dw", String.valueOf( puerto ), USUARIO,
       CLAVE );
     tm.addDatabase( origen );
     tm.addDatabase( dw );
@@ -242,8 +242,8 @@ class BasesH2 {
     op.idioma = "es";
     op.captura = io.github.ivi2511.pentahomcp.corrector.modelo.Pack.Salida.CAPTURA_TABLAS;
     op.bases = new ArrayList<BaseDePrueba>();
-    op.bases.add( base( ORIGEN, "gym_oltp_correccion", "gym_oltp" ) );
-    op.bases.add( base( DW, "gym_dw_correccion", "gym_dw" ) );
+    op.bases.add( base( ORIGEN, "club_oltp_correccion", "club_oltp" ) );
+    op.bases.add( base( DW, "club_dw_correccion", "club_dw" ) );
     op.scriptsBase = new LinkedHashMap<String, List<File>>();
     op.scriptsBase.put( ORIGEN, new ArrayList<File>( java.util.Arrays.asList( escribir( new File( scripts,
       "crear_origen.sql" ), CREAR_ORIGEN ) ) ) );

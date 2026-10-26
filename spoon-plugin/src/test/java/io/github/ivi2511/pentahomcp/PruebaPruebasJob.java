@@ -240,28 +240,28 @@ public class PruebaPruebasJob {
   // ================================================================ esquemas en las bases de prueba (H2)
 
   /** Kettle escribe el esquema y la tabla del Table output entre comillas: en H2 van en minusculas y entre comillas. */
-  private static final String SCRIPT = "CREATE SCHEMA \"gym_dw\";\n"
-    + "CREATE TABLE \"gym_dw\".origen (id INT PRIMARY KEY, nombre VARCHAR(20));\n"
-    + "INSERT INTO \"gym_dw\".origen VALUES (1, 'uno'), (2, 'dos');\n"
-    + "CREATE TABLE \"gym_dw\".\"destino\" (id INT PRIMARY KEY, nombre VARCHAR(20));\n";
+  private static final String SCRIPT = "CREATE SCHEMA \"club_dw\";\n"
+    + "CREATE TABLE \"club_dw\".origen (id INT PRIMARY KEY, nombre VARCHAR(20));\n"
+    + "INSERT INTO \"club_dw\".origen VALUES (1, 'uno'), (2, 'dos');\n"
+    + "CREATE TABLE \"club_dw\".\"destino\" (id INT PRIMARY KEY, nombre VARCHAR(20));\n";
 
-  /** Table input con gym_dw.origen y Table output con esquema gym_dw, en la base gym_dw (la original). */
+  /** Table input con club_dw.origen y Table output con esquema club_dw, en la base club_dw (la original). */
   private static TransMeta conEsquemas( BasesH2 h2 ) {
     TransMeta tm = new TransMeta();
     tm.setName( "esquemas" );
-    DatabaseMeta dw = new DatabaseMeta( BasesH2.DW, "H2", "Native", "localhost", "gym_dw", String.valueOf( h2.puerto ),
+    DatabaseMeta dw = new DatabaseMeta( BasesH2.DW, "H2", "Native", "localhost", "club_dw", String.valueOf( h2.puerto ),
       BasesH2.USUARIO, BasesH2.CLAVE );
     tm.addDatabase( dw );
     TableInputMeta ti = new TableInputMeta();
     ti.setDefault();
     ti.setDatabaseMeta( dw );
-    ti.setSQL( "SELECT o.id, o.nombre FROM \"gym_dw\".origen o ORDER BY o.id" );
+    ti.setSQL( "SELECT o.id, o.nombre FROM \"club_dw\".origen o ORDER BY o.id" );
     StepMeta leer = new StepMeta( "TableInput", "Leer origen", ti );
     tm.addStep( leer );
     TableOutputMeta to = new TableOutputMeta();
     to.setDefault();
     to.setDatabaseMeta( dw );
-    to.setSchemaName( "gym_dw" );
+    to.setSchemaName( "club_dw" );
     to.setTableName( "destino" );
     StepMeta escribir = new StepMeta( "TableOutput", "Cargar destino", to );
     tm.addStep( escribir );
@@ -269,7 +269,7 @@ public class PruebaPruebasJob {
     return tm;
   }
 
-  /** Una prueba de transformacion y una de job (con una entrada SQL) en H2 con esquemas: todo va a gym_dw_test. */
+  /** Una prueba de transformacion y una de job (con una entrada SQL) en H2 con esquemas: todo va a club_dw_test. */
   public void pruebaD_EsquemasH2() throws Exception {
     BasesH2 h2 = new BasesH2( new File( base, "h2" ) );
     try {
@@ -277,9 +277,9 @@ public class PruebaPruebasJob {
       BasesH2.escribir( new File( dir, "esquemas.ktr" ), conEsquemas( h2 ).getXML() );
       File tests = new File( dir, "tests" );
       BasesH2.escribir( new File( tests, "bd/dw.sql" ), SCRIPT );
-      BaseDePrueba b = h2.base( BasesH2.DW, "gym_dw_test", "gym_dw" );
+      BaseDePrueba b = h2.base( BasesH2.DW, "club_dw_test", "club_dw" );
       b.scripts.add( "bd/dw.sql" );
-      TablaSalida t = new TablaSalida( BasesH2.DW, "gym_dw.destino" );
+      TablaSalida t = new TablaSalida( BasesH2.DW, "club_dw.destino" );
       t.columnasClave.add( "ID" );
 
       PruebasMotor.Pedido p = new PruebasMotor.Pedido();
@@ -293,14 +293,14 @@ public class PruebaPruebasJob {
       op.claves.putAll( BasesH2.claves( BasesH2.CLAVE ) );
       ResultadoPrueba r = PruebasMotor.crear( p, op );
       igual( ResultadoPrueba.PASO, r.estado, "transformacion con esquemas: " + r.mensaje + " " + r.notas );
-      igual( 2, r.salida( "gym_dw.destino" ).filasReales.intValue(), "las 2 filas en gym_dw_test.destino" );
-      contiene( r.notas.toString(), "schema 'Cargar destino': gym_dw -> gym_dw_test", "el esquema del Table output" );
+      igual( 2, r.salida( "club_dw.destino" ).filasReales.intValue(), "las 2 filas en club_dw_test.destino" );
+      contiene( r.notas.toString(), "schema 'Cargar destino': club_dw -> club_dw_test", "el esquema del Table output" );
       contiene( r.notas.toString(), "sql 'Leer origen'", "el SQL calificado" );
-      falso( h2.existe( "gym_dw" ), "la base original nunca se toco" );
+      falso( h2.existe( "club_dw" ), "la base original nunca se toco" );
 
-      // un job con una entrada SQL que escribe en gym_dw.origen y despues la transformacion
+      // un job con una entrada SQL que escribe en club_dw.origen y despues la transformacion
       String sql = "    <entry>\n      <name>Agregar fila</name>\n      <description/>\n      <type>SQL</type>\n"
-        + "      <attributes/>\n      <sql>INSERT INTO &quot;gym_dw&quot;.origen VALUES (3, 'tres')</sql>\n"
+        + "      <attributes/>\n      <sql>INSERT INTO &quot;club_dw&quot;.origen VALUES (3, 'tres')</sql>\n"
         + "      <useVariableSubstitution>F</useVariableSubstitution>\n      <sqlfromfile>F</sqlfromfile>\n"
         + "      <sqlfilename/>\n      <sendOneStatement>F</sendOneStatement>\n      <connection>" + BasesH2.DW
         + "</connection>\n      <parallel>N</parallel>\n      <draw>Y</draw>\n      <nr>0</nr>\n      <xloc>200</xloc>\n"
@@ -318,11 +318,11 @@ public class PruebaPruebasJob {
       pj.tablas.add( t );
       ResultadoPrueba rj = PruebasMotor.crear( pj, op );
       igual( ResultadoPrueba.PASO, rj.estado, "job con esquemas: " + rj.mensaje + " " + rj.notas );
-      igual( 3, rj.salida( "gym_dw.destino" ).filasReales.intValue(), "la entrada SQL agrego una fila" );
+      igual( 3, rj.salida( "club_dw.destino" ).filasReales.intValue(), "la entrada SQL agrego una fila" );
       contiene( rj.notas.toString(), "sql 'Agregar fila'", "el SQL de la entrada del job tambien" );
-      contiene( rj.notas.toString(), "connection 'GYM_DW' (gym_dw) -> test database gym_dw_test", "la del job" );
+      contiene( rj.notas.toString(), "connection 'CLUB_DW' (club_dw) -> test database club_dw_test", "la del job" );
       falso( CorrectorJson.escribir( rj, false ).contains( BasesH2.CLAVE ), "sin la contraseña" );
-      falso( h2.existe( "gym_dw" ), "la base original nunca se toco" );
+      falso( h2.existe( "club_dw" ), "la base original nunca se toco" );
     } finally {
       h2.parar();
     }

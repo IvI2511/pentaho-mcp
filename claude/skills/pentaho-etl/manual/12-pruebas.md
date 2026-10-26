@@ -118,14 +118,14 @@ the grader, never from the file. `tables` lists the tables read after the run an
 into datasets: their data comes from the scripts.
 
 **Schemas and qualified names** (0.7.1, like the grader, `manual/07-corrector.md` §5): a `schema` written in a
-step (Table output, Insert/Update, Database lookup…) or a table name `gym_dw.ventas` that names the original
+step (Table output, Insert/Update, Database lookup…) or a table name `club_dw.ventas` that names the original
 database (`original_database`, or the database the connection pointed to) goes to the test database, and so do
-the qualified names in SQL (`SELECT … FROM gym_dw.ventas`, `USE gym_dw`) — only when they qualify another name:
+the qualified names in SQL (`SELECT … FROM club_dw.ventas`, `USE club_dw`) — only when they qualify another name:
 a table, column or alias called like the database is left alone. In H2 and PostgreSQL a schema lives inside the
-test database (create it in the scripts: `CREATE SCHEMA gym_dw` becomes `gym_dw_test` there too); in MySQL a
+test database (create it in the scripts: `CREATE SCHEMA club_dw` becomes `club_dw_test` there too); in MySQL a
 schema is a database, so another one is an `error`. SQL that would leave the test databases (another database,
 `INTO OUTFILE`, `COPY … TO`…) is an `error` too: a test never touches a real database. `tables` may name
-`schema.table` (`gym_dw.destino`). Without `test_databases`, the notes say which connections are the real ones.
+`schema.table` (`club_dw.destino`). Without `test_databases`, the notes say which connections are the real ones.
 
 ## 4b. Jobs (0.7.1)
 

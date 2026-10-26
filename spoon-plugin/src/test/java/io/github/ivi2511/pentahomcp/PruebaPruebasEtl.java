@@ -243,9 +243,9 @@ public class PruebaPruebasEtl {
       BasesH2.escribir( new File( tests, "bd/datos.sql" ), BasesH2.DATOS_VISIBLE );
       BasesH2.escribir( new File( tests, "bd/dw.sql" ), BasesH2.CREAR_DW );
       PruebasMotor.Pedido p = pedido( dir, "carga_dw.ktr", "carga", "Buscar ciudad" );
-      BaseDePrueba o = h2.base( BasesH2.ORIGEN, "gym_oltp_test", "gym_oltp" );
+      BaseDePrueba o = h2.base( BasesH2.ORIGEN, "club_oltp_test", "club_oltp" );
       o.scripts.add( "bd/origen.sql" );
-      BaseDePrueba w = h2.base( BasesH2.DW, "gym_dw_test", "gym_dw" );
+      BaseDePrueba w = h2.base( BasesH2.DW, "club_dw_test", "club_dw" );
       w.scripts.add( "bd/dw.sql" );
       p.bases.add( o );
       p.bases.add( w );
@@ -263,9 +263,9 @@ public class PruebaPruebasEtl {
       igual( 3, s.filasReales.intValue(), "3 clientes cargados" );
       cierto( r.notas.toString().contains( "test database" ), "conexiones redirigidas: " + r.notas );
       falso( CorrectorJson.escribir( r, false ).contains( BasesH2.CLAVE ), "sin la contraseña en el JSON" );
-      falso( h2.existe( "gym_oltp" ), "la base original de origen nunca se toco" );
-      falso( h2.existe( "gym_dw" ), "la del DW tampoco" );
-      cierto( h2.existe( "gym_dw_test" ), "se uso la de prueba" );
+      falso( h2.existe( "club_oltp" ), "la base original de origen nunca se toco" );
+      falso( h2.existe( "club_dw" ), "la del DW tampoco" );
+      cierto( h2.existe( "club_dw_test" ), "se uso la de prueba" );
 
       // otros datos de origen: la tabla cambia
       BasesH2.escribir( new File( tests, "bd/datos.sql" ), BasesH2.DATOS_VISIBLE.replace( "(10, 'Ana', 1)",

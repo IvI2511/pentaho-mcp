@@ -261,18 +261,18 @@ them) declares one **test database** per server connection of the solution:
 
 ```json
 "test_databases": [
-  { "connection": "GYM_OLTP", "type": "MYSQL", "host": "localhost", "port": "3306",
-    "database": "gym_oltp_correccion", "original_database": "gym_oltp", "user": "corrector",
-    "password_variable": "GYM_TEST_PASSWORD", "scripts": ["bd/crear_origen.sql"] },
-  { "connection": "GYM_DW", "type": "MYSQL", "host": "localhost", "port": "3306",
-    "database": "gym_dw_correccion", "original_database": "gym_dw", "user": "corrector",
-    "password_variable": "GYM_TEST_PASSWORD", "scripts": ["bd/crear_dw.sql"] } ],
+  { "connection": "CLUB_OLTP", "type": "MYSQL", "host": "localhost", "port": "3306",
+    "database": "club_oltp_correccion", "original_database": "club_oltp", "user": "corrector",
+    "password_variable": "CLUB_TEST_PASSWORD", "scripts": ["bd/crear_origen.sql"] },
+  { "connection": "CLUB_DW", "type": "MYSQL", "host": "localhost", "port": "3306",
+    "database": "club_dw_correccion", "original_database": "club_dw", "user": "corrector",
+    "password_variable": "CLUB_TEST_PASSWORD", "scripts": ["bd/crear_dw.sql"] } ],
 "cases": [ { "id": "visible", "expected": "esperado/visible", "executions": 2,
-             "db_scripts": { "GYM_OLTP": ["bd/visible/datos.sql"] } },
+             "db_scripts": { "CLUB_OLTP": ["bd/visible/datos.sql"] } },
            { "id": "oculto", "expected": "esperado/oculto", "hidden": true, "executions": 2,
-             "db_scripts": { "GYM_OLTP": ["bd/oculto/datos.sql"] } } ],
+             "db_scripts": { "CLUB_OLTP": ["bd/oculto/datos.sql"] } } ],
 "output": { "capture": "tables",
-            "tables": [ { "connection": "GYM_DW", "name": "dim_cliente", "key_columns": ["id_cliente"],
+            "tables": [ { "connection": "CLUB_DW", "name": "dim_cliente", "key_columns": ["id_cliente"],
                           "ignore_columns": ["fecha_carga"] } ] }
 ```
 
@@ -297,8 +297,8 @@ any capture works with `test_databases`.
 | It must end in a test suffix: `_correccion`, `_test`, `_prueba`, `_grading` (`database_safety.test_suffixes`) | a typo cannot hit a real database; `database_safety.allow_any_name: true` is an explicit override |
 | Never a system database (`mysql`, `information_schema`, `sys`, `postgres`…) nor one of `database_safety.deny` (`*` allowed) | |
 | The grader never connects to the original databases | the student's connections are rewritten before anything runs |
-| A step's schema (Table output, Insert/Update, Database lookup…), a `schema.table` name and the qualified names in its SQL (`gym_dw.ventas`, `USE gym_dw`) that name the original database (or the one the student's connection pointed to) go to the test database — in MySQL, MariaDB, PostgreSQL and H2 (0.7.1). Only names that qualify another one change: a table, column or alias called like the database is left alone. In MySQL a schema is a database, so another one blocks; in H2 and PostgreSQL a schema lives inside the test database (create it in the scripts). SQL that names another database or reads or writes server files, users or permissions (`INTO OUTFILE`, `LOAD DATA`, `GRANT`, `COPY … TO`, `CSVWRITE`…) blocks | `foreign_schema`, `forbidden_sql` |
-| With several workers each one gets its own databases: `gym_dw_correccion_w1`, `_w2`… (`database_safety.single_worker: true` = one worker) | two submissions never share a database |
+| A step's schema (Table output, Insert/Update, Database lookup…), a `schema.table` name and the qualified names in its SQL (`club_dw.ventas`, `USE club_dw`) that name the original database (or the one the student's connection pointed to) go to the test database — in MySQL, MariaDB, PostgreSQL and H2 (0.7.1). Only names that qualify another one change: a table, column or alias called like the database is left alone. In MySQL a schema is a database, so another one blocks; in H2 and PostgreSQL a schema lives inside the test database (create it in the scripts). SQL that names another database or reads or writes server files, users or permissions (`INTO OUTFILE`, `LOAD DATA`, `GRANT`, `COPY … TO`, `CSVWRITE`…) blocks | `foreign_schema`, `forbidden_sql` |
+| With several workers each one gets its own databases: `club_dw_correccion_w1`, `_w2`… (`database_safety.single_worker: true` = one worker) | two submissions never share a database |
 
 These checks reduce the risk; the real protection is a **database user with rights only on the test databases**
 (MySQL: ``GRANT ALL ON `%\_correccion`.* TO 'corrector'@'localhost'``). Never use an administrator account.
@@ -314,14 +314,14 @@ Step 2, **Test data**, explains in one sentence why a test database is needed an
 
 - **Server, Port, User, Password**: the same server, port and user as the solution; the password stays in memory
   until Spoon closes.
-- **Test database**: the original with `_correccion` (`gym_dw` → `gym_dw_correccion`). **Test connection** only
+- **Test database**: the original with `_correccion` (`club_dw` → `club_dw_correccion`). **Test connection** only
   creates and drops that test database (in H2 it empties it) and says ✓ or why not; a name that breaks a safety rule
   is marked in red under the field before anything runs.
 - **Scripts** — what they are: the `.sql` files that build the starting point of every run, in order, inside the
   empty test database: they create the tables the solution reads and writes and load the visible case's source data
   (`CREATE TABLE …; INSERT INTO …`). The wizard **looks for them next to the solution** (its folder and two levels of
-  subfolders, and the folder above): a script goes to the connection whose original database it names (`USE gym`,
-  `CREATE DATABASE gym`) or whose tables it creates or loads; scripts that create tables go first; a script whose name
+  subfolders, and the folder above): a script goes to the connection whose original database it names (`USE club`,
+  `CREATE DATABASE club`) or whose tables it creates or loads; scripts that create tables go first; a script whose name
   says `oculto`, `hidden` or `secret` goes to **Hidden case scripts**; packs and scripts of no connection are skipped.
   Without any script the test database is empty and the solution will not find its tables (orange warning).
 - **Generate the script from the current database…**: reads the **original** database **read-only** — the connection

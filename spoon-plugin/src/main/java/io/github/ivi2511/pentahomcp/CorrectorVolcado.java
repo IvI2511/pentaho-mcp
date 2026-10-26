@@ -430,7 +430,7 @@ final class CorrectorVolcado {
     return st.executeQuery( sql );
   }
 
-  /** El nombre propuesto para el script de una base: «gym_generado.sql». */
+  /** El nombre propuesto para el script de una base: «club_generado.sql». */
   static String nombreArchivo( String base ) {
     String b = BaseDePrueba.nombreSolo( base ).replaceAll( "[^A-Za-z0-9_.-]", "_" );
     return ( b.isEmpty() ? "base" : b ) + "_generado.sql";

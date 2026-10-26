@@ -74,7 +74,7 @@ public final class TablaSalida {
     return this;
   }
 
-  /** Clave de la tabla para encontrarla sin mayusculas: "gym_dw/dim_cliente". */
+  /** Clave de la tabla para encontrarla sin mayusculas: "club_dw/dim_cliente". */
   public String clave() {
     return ( conexion == null ? "" : conexion.trim().toLowerCase( Locale.ROOT ) ) + "/" + ( nombre == null ? ""
       : nombre.trim().toLowerCase( Locale.ROOT ) );

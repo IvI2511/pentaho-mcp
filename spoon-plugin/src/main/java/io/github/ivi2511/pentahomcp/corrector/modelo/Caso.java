@@ -34,7 +34,7 @@ public final class Caso {
   @JsonProperty( "hidden" )
   public boolean oculto;
   /**
-   * Formato 2: scripts SQL de este caso por conexion ("GYM_OLTP" → ["bd/oculto/datos.sql"]), que corren despues de
+   * Formato 2: scripts SQL de este caso por conexion ("CLUB_OLTP" → ["bd/oculto/datos.sql"]), que corren despues de
    * los de la base ({@code test_databases[].scripts}): los datos de origen de cada caso.
    */
   @JsonProperty( "db_scripts" )

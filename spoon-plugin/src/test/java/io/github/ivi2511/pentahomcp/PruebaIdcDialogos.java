@@ -460,7 +460,7 @@ public class PruebaIdcDialogos {
       ui( () -> {
         String q = (String) d.queHara.getData( "plano" );
         contiene( q, "No se va a poder ejecutar", "lo avisa antes" );
-        contiene( q, "bases de datos que no son archivos SQLite/H2 (GYM_DW (MYSQL)", "con el porqué" );
+        contiene( q, "bases de datos que no son archivos SQLite/H2 (CLUB_DW (MYSQL)", "con el porqué" );
         contiene( q, "haz una copia de la transformación que cargue en una base SQLite", "y qué hacer" );
         return null;
       } );
@@ -891,7 +891,7 @@ public class PruebaIdcDialogos {
     volatile boolean conBaseMysql;
     volatile EstresProcesos.Corte corte;
 
-    static final String NO_CORRE = "la transformación usa bases de datos que no son archivos SQLite/H2 (GYM_DW (MYSQL) "
+    static final String NO_CORRE = "la transformación usa bases de datos que no son archivos SQLite/H2 (CLUB_DW (MYSQL) "
       + "used by Cargar fecha): stress_test nunca se conecta a ellas";
 
     @Override
@@ -944,7 +944,7 @@ public class PruebaIdcDialogos {
       o.putArray( "file_outputs" );
       ArrayNode db = o.putArray( "databases_not_files" );
       if ( conBaseMysql ) {
-        db.add( "GYM_DW (MYSQL) used by Cargar fecha" );
+        db.add( "CLUB_DW (MYSQL) used by Cargar fecha" );
         o.put( "will_run", false ).put( "not_run_reason", NO_CORRE );
       } else {
         o.put( "will_run", true );

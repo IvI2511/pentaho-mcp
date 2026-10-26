@@ -541,7 +541,7 @@ final class CorrectorBases {
     return l;
   }
 
-  /** "gym_dw" → "gym_dw_correccion"; una base que ya termina en un sufijo de prueba queda igual. */
+  /** "club_dw" → "club_dw_correccion"; una base que ya termina en un sufijo de prueba queda igual. */
   static String propuesta( String original ) {
     String o = original == null ? "" : original.trim();
     if ( o.isEmpty() ) {
@@ -699,8 +699,8 @@ final class CorrectorBases {
 
   /**
    * El SQL con cada identificador que es una base original (sin comillas, entre {@code `} o entre {@code "}, sin
-   * mayusculas) cambiado por su base de prueba, fuera de cadenas y comentarios: {@code USE gym_dw},
-   * {@code gym_dw.dim_cliente}.
+   * mayusculas) cambiado por su base de prueba, fuera de cadenas y comentarios: {@code USE club_dw},
+   * {@code club_dw.dim_cliente}.
    */
   static String renombrar( String sql, Map<String, String> renombres ) {
     if ( sql == null || renombres == null || renombres.isEmpty() ) {
@@ -755,7 +755,7 @@ final class CorrectorBases {
 
   /**
    * (0.7.1) Como {@link #renombrar}, pero conservador, para el SQL de los steps: solo cambia un nombre que es una base
-   * original cuando califica a otro ({@code gym_dw.ventas}, {@code `gym_dw`.`ventas`}, {@code "gym_dw".ventas}) o va
+   * original cuando califica a otro ({@code club_dw.ventas}, {@code `club_dw`.`ventas`}, {@code "club_dw".ventas}) o va
    * despues de {@code USE}; nunca una tabla, columna o alias que se llame igual. Si en el mismo SQL el nombre tambien
    * aparece solo (una tabla «ventas» con la base «ventas»: {@code ventas.importe} es la columna de la tabla), no se
    * toca y queda en {@code ambiguos} (sin mayusculas).
@@ -1029,7 +1029,7 @@ final class CorrectorBases {
 
     final BaseDePrueba base;
     final int indice;
-    /** "gym_dw_correccion" o "gym_dw_correccion_w2". */
+    /** "club_dw_correccion" o "club_dw_correccion_w2". */
     final String nombre;
     final String clave;
 
@@ -1040,7 +1040,7 @@ final class CorrectorBases {
       this.clave = clave;
     }
 
-    /** "gym_dw_correccion (MYSQL localhost:3306)". */
+    /** "club_dw_correccion (MYSQL localhost:3306)". */
     String describir() {
       return BaseDePrueba.nombreSolo( nombre ) + " (" + base.tipoNormal() + ( vacio( base.servidor ) ? ""
         : " " + base.servidor.trim() + ( vacio( base.puerto ) ? "" : ":" + base.puerto.trim() ) ) + ")";
@@ -1322,7 +1322,7 @@ final class CorrectorBases {
         Connection cn = db.getConnection();
         String sql = "SELECT * FROM " + db.getDatabaseMeta().quoteField( t.nombre.trim() );
         int punto = t.nombre.trim().indexOf( '.' );
-        if ( punto > 0 ) { // 0.7.1: "gym_dw.ventas", con el esquema de la base original llevado a la de prueba
+        if ( punto > 0 ) { // 0.7.1: "club_dw.ventas", con el esquema de la base original llevado a la de prueba
           String esquema = t.nombre.trim().substring( 0, punto ).trim();
           String nuevo = renombres().get( esquema.toLowerCase( Locale.ROOT ) );
           sql = "SELECT * FROM " + db.getDatabaseMeta().getQuotedSchemaTableCombination( nuevo != null ? nuevo
