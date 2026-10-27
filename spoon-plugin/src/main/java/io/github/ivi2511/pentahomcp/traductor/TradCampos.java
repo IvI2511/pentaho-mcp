@@ -239,13 +239,24 @@ final class TradCampos {
 
   /** Redondeo en PySpark: HALF_UP (F.round) y HALF_EVEN (F.bround) son exactos; el resto se aproxima. */
   static String redondeoSpark( String x, String d, String modo, Bloque b, CtxTrad ctx ) {
+    if ( !d.matches( "-?[0-9]+" ) && !modo.equals( "HALF_CEILING" ) ) {
+      // F.round sólo admite decimales fijos: con decimales en un campo, en decimal exacto
+      String p = "F.pow(F.lit(10), " + d + ").cast(\"decimal(38,12)\")";
+      if ( !modo.equals( "HALF_UP" ) ) {
+        b.aproximado( ctx.t( "Redondeo " + modo + " con decimales variables en PySpark: se usa HALF_UP.", "Rounding "
+          + modo + " with variable decimals in PySpark: HALF_UP is used.", "Arredondamento " + modo + " com decimais "
+            + "variáveis em PySpark: usa-se HALF_UP." ) );
+      }
+      return "(F.signum(" + x + ") * F.floor(F.abs(" + x + ").cast(\"decimal(38,12)\") * " + p + " + 0.5) / " + p
+        + ").cast(\"double\")";
+    }
     switch ( modo ) {
       case "HALF_UP":
         return "F.round(" + x + ", " + d + ")";
       case "HALF_EVEN":
         return "F.bround(" + x + ", " + d + ")";
       case "HALF_CEILING": { // como Math.round: mitades hacia arriba, en decimal exacto
-        String p = d.matches( "-?\d+" ) ? "10 ** " + d : "F.pow(F.lit(10), " + d + ").cast(\"decimal(38,12)\")";
+        String p = d.matches( "-?[0-9]+" ) ? "10 ** " + d : "F.pow(F.lit(10), " + d + ").cast(\"decimal(38,12)\")";
         return "(F.floor(" + x + ".cast(\"decimal(38,12)\") * " + p + " + 0.5) / " + p + ").cast(\"double\")";
       }
       case "CEILING":
@@ -708,7 +719,7 @@ final class TradCampos {
       case CalculatorMetaFunction.CALC_INITCAP:
         return r( pd ? sa + ".title()" : "F.initcap(" + a + ")", 'S' );
       case CalculatorMetaFunction.CALC_STRING_LEN:
-        return r( pd ? sa + ".len()" : "F.length(" + a + ")", 'I' );
+        return r( pd ? sa + ".len().fillna(0)" : "F.coalesce(F.length(" + a + "), F.lit(0))", 'I' );
       case CalculatorMetaFunction.CALC_REMOVE_CR:
         return r( quitar( a, "\\r", ctx ), 'S' );
       case CalculatorMetaFunction.CALC_REMOVE_LF:
@@ -2230,11 +2241,33 @@ final class TradCampos {
       String err = ctx.dfError( s );
       String campoCod = s.getStepErrorMeta().getErrorCodesValuename();
       String campoN = s.getStepErrorMeta().getNrErrorsValuename();
-      if ( pd ) {
+      boolean porRegla = m.isValidatingAll() && !m.isConcatenatingErrors() && reglas.size() > 1;
+      if ( porRegla ) {
+        // PDI manda una fila de error por cada regla que falla (validar todo, sin concatenar errores)
+        List<String> partes = new ArrayList<>();
+        for ( int i = 0; i < reglas.size(); i++ ) {
+          String cod = vacio( campoCod ) ? "" : pd ? ".assign(**{" + CtxTrad.lit( campoCod ) + ": " + codigos.get( i )
+            + "})" : ".withColumn(" + CtxTrad.lit( campoCod ) + ", F.lit(" + codigos.get( i ) + "))";
+          partes.add( pd ? in + "[~" + reglas.get( i ) + "]" + cod : in + ".filter(~" + reglas.get( i ) + ")" + cod );
+        }
+        if ( pd ) {
+          b.l( err + " = pd.concat([" + String.join( ", ", partes ) + "]).sort_index(kind=\"stable\").reset_index("
+            + "drop=True)" );
+        } else {
+          String u = partes.get( 0 );
+          for ( int i = 1; i < partes.size(); i++ ) {
+            u = u + ".unionByName(" + partes.get( i ) + ")";
+          }
+          b.l( err + " = " + u );
+        }
+        if ( !vacio( campoN ) ) {
+          b.l( pd ? err + "[" + CtxTrad.lit( campoN ) + "] = 1" : err + " = " + err + ".withColumn(" + CtxTrad.lit(
+            campoN ) + ", F.lit(1))" );
+        }
+      } else if ( pd ) {
         b.l( err + " = " + in + "[~" + valido + "].copy()" );
         if ( !vacio( campoN ) ) {
-          b.l( err + "[" + CtxTrad.lit( campoN ) + "] = (~pd.concat([" + String.join( ", ", reglas ) + "], axis=1))"
-            + ".sum(axis=1)[~" + valido + "].astype(\"Int64\")" );
+          b.l( err + "[" + CtxTrad.lit( campoN ) + "] = 1" );
         }
         if ( !vacio( campoCod ) && !reglas.isEmpty() ) {
           b.l( err + "[" + CtxTrad.lit( campoCod ) + "] = np.select([" + negar( reglas ) + "], [" + String.join( ", ",

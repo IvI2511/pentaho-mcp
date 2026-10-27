@@ -52,8 +52,8 @@ public final class TradCondicion {
           case Condition.OPERATOR_OR_NOT:
             e = "(" + e + " | ~" + x + ")";
             break;
-          case Condition.OPERATOR_XOR:
-            e = "(" + e + " ^ " + x + ")";
+          case Condition.OPERATOR_XOR: // en PySpark las Column no tienen ^
+            e = ctx.pandas() ? "(" + e + " ^ " + x + ")" : "(" + e + " != " + x + ")";
             break;
           default:
             e = "(" + e + " & " + x + ")";

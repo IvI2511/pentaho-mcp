@@ -579,6 +579,8 @@ public class PruebaTradCampos {
     "        return v.strftime('%Y-%m-%d 00:00:00')",
     "    s = str(v)",
     "    return '~' if s == '' else s",
+    "os.environ['PYSPARK_PYTHON'] = sys.executable",
+    "os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable",
     "for caso, archivo, pares in CASOS:",
     "    g = {'__file__': archivo, '__name__': '__main__'}",
     "    try:",
