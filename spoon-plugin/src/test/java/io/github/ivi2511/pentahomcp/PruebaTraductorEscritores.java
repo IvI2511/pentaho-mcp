@@ -137,7 +137,7 @@ public class PruebaTraductorEscritores {
     contiene( nb, "## Análisis exploratorio", "EDA" );
     contiene( nb, "eda(df_leer_ventas", "EDA de la entrada" );
     contiene( nb, "eda(df_resultado", "EDA de la salida" );
-    contiene( nb, "| 1 | Leer ventas | `CsvInput` | aproximado |", "tabla resumen" );
+    contiene( nb, "| 1 | Leer ventas | `CsvInput` | exacto |", "tabla resumen" );
     contiene( nb, "df_resultado.head(10)", "vista previa" );
     File f = new File( dir, "ventas.ipynb" );
     Files.write( f.toPath(), nb.getBytes( StandardCharsets.UTF_8 ) );

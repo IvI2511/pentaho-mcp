@@ -68,8 +68,8 @@ public class PruebaTraducirTools {
     igual( py.getAbsolutePath(), r.get( "path" ).asText(), "ruta por defecto" );
     cierto( py.isFile(), "escribió el .py" );
     igual( 2, r.get( "steps" ).size(), "dos steps" );
-    igual( 1, r.get( "counts" ).get( "exact" ).asInt(), "Dummy exacto" );
-    igual( 1, r.get( "counts" ).get( "approximate" ).asInt(), "CsvInput aproximado" );
+    igual( 2, r.get( "counts" ).get( "exact" ).asInt(), "CSV input y Dummy exactos" );
+    igual( 0, r.get( "counts" ).get( "approximate" ).asInt(), "ninguno aproximado" );
     ToolError e = lanza( ToolError.class, () -> TraducirTools.traducirTool( args( ktr, "py" ) ), "no pisa" );
     contiene( e.getMessage(), "overwrite=true", "dice cómo pisar" );
     ObjectNode a = args( ktr, "ipynb" );
