@@ -13,4 +13,9 @@ public final class TradFormatosAcceso {
   public static String fechaPy( String java ) {
     return TradSalidas.fechaPy( java );
   }
+
+  /** Texto → fecha con máscara, como lo escribe el traductor (con los nombres de mes si la máscara los lee). */
+  public static String aFecha( String x, String mascara, CtxTrad ctx ) {
+    return TradCampos.aFecha( x, mascara, ctx );
+  }
 }

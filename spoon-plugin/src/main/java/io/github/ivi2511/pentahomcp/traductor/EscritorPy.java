@@ -266,6 +266,20 @@ public final class EscritorPy {
     return s.substring( s.lastIndexOf( '/' ) + 1 );
   }
 
+  /**
+   * Los procesos de Spark con el mismo Python que corre el código: con dos Python instalados (Anaconda y otro) Spark
+   * puede lanzar el otro y falla con «Python in worker has different version».
+   */
+  static List<String> pythonDeSpark( CtxTrad c ) {
+    List<String> r = new ArrayList<>();
+    r.add( "# " + c.t( "Spark con el mismo Python que este código (con dos Python instalados, Spark puede usar el otro)",
+      "Spark with the same Python as this code (with two Pythons installed, Spark may use the other one)",
+      "Spark com o mesmo Python deste código (com dois Python instalados, o Spark pode usar o outro)" ) );
+    r.add( "os.environ.setdefault(\"PYSPARK_PYTHON\", sys.executable)" );
+    r.add( "os.environ.setdefault(\"PYSPARK_DRIVER_PYTHON\", sys.executable)" );
+    return r;
+  }
+
   /** Imports, SparkSession, conexiones, VARS y ayudantes (las conexiones primero: registran variables). */
   public static List<String> preambulo( Programa p ) {
     CtxTrad c = p.ctx;
@@ -276,6 +290,7 @@ public final class EscritorPy {
     List<String> r = new ArrayList<>( c.imports );
     r.add( "" );
     if ( c.spark() ) {
+      r.addAll( pythonDeSpark( c ) );
       r.add( "_builder = SparkSession.builder.appName(" + CtxTrad.lit( p.nombre ) + ")" );
       r.add( "if os.name == \"nt\":  # " + c.t( "Windows: Spark local en localhost (un nombre de equipo con _ lo rompe)",
         "Windows: local Spark on localhost (a host name with _ breaks it)",

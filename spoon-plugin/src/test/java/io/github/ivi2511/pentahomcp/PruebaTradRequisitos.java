@@ -92,6 +92,25 @@ public class PruebaTradRequisitos {
 
     PythonPrueba.Resultado bien = correr( Arrays.asList( "pandas", "pandas>=1.0" ), "es" );
     igual( 0, bien.codigo, "con todo instalado sigue: " + bien.salida );
+    contiene( bien.salida, "SIGUE", "y corre lo de después" );
+    contiene( falta.salida, "pon INSTALAR = True", "dice cómo instalar solo" );
+  }
+
+  /** Con INSTALAR = True prueba con pip; si no puede (paquete inexistente, sin internet), lo dice y corta. */
+  public void pruebaInstalarNoPuede() throws Exception {
+    if ( PythonPrueba.python() == null ) {
+      saltear( "sin Python" );
+      return;
+    }
+    String py = String.join( "\n", Requisitos.comprobacion( Arrays.asList( "paquete-que-no-existe-xyz" ), "es" ) )
+      .replace( "INSTALAR = False", "INSTALAR = True" ) + "\nprint(\"SIGUE\")\n";
+    File f = escribir( "chequeo_instalar.py", py );
+    PythonPrueba.Resultado r = PythonPrueba.correr( f.getParentFile(), 300, PythonPrueba.python(), f
+      .getAbsolutePath() );
+    cierto( r.codigo != 0, "corta si no pudo instalar" );
+    contiene( r.salida, "Instalando: paquete-que-no-existe-xyz", "avisa que instala" );
+    contiene( r.salida, "No se pudieron instalar", "dice que no pudo" );
+    cierto( !r.salida.contains( "SIGUE" ), "no sigue" );
   }
 
   public void pruebaRequirementsSeCompleta() throws Exception {

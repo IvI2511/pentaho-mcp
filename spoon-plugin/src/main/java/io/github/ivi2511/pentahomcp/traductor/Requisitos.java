@@ -93,7 +93,8 @@ public final class Requisitos {
 
   /**
    * Las líneas de Python que comprueban las bibliotecas antes de los imports: si falta alguna, o tiene una versión
-   * menor que la pedida, termina con un mensaje que dice cuáles y cómo instalarlas.
+   * menor que la pedida, termina con un mensaje que dice cuáles y cómo instalarlas; con INSTALAR = True las instala
+   * antes con pip (el Python que corre el código: en un notebook, el del kernel) y vuelve a comprobar.
    */
   public static List<String> comprobacion( List<String> reqs, String idioma ) {
     List<String> r = new ArrayList<>();
@@ -101,39 +102,68 @@ public final class Requisitos {
       + "mismas que " + ARCHIVO + ")", "First of all: are the libraries this code uses installed? (the same as in "
         + ARCHIVO + ")", "Antes de tudo: as bibliotecas que este código usa estão instaladas? (as mesmas do " + ARCHIVO
           + ")" ) );
-    r.add( "def _comprobar_bibliotecas(requisitos):" );
-    r.add( "    import importlib.util, importlib.metadata, re" );
-    r.add( "    faltan = []" );
-    r.add( "    for req, modulo in requisitos:" );
-    r.add( "        if importlib.util.find_spec(modulo) is None:" );
-    r.add( "            faltan.append(req)" );
-    r.add( "            continue" );
-    r.add( "        minima = re.match(r\"([A-Za-z0-9_.-]+)\\s*>=\\s*([0-9.]+)\", req)" );
-    r.add( "        if minima:" );
-    r.add( "            try:" );
-    r.add( "                tiene = tuple(int(x) for x in re.findall(r\"\\d+\", importlib.metadata.version("
-      + "minima.group(1)))[:3])" );
-    r.add( "            except Exception:" );
-    r.add( "                continue" );
-    r.add( "            if tiene < tuple(int(x) for x in minima.group(2).split(\".\")):" );
+    r.add( "def _comprobar_bibliotecas(requisitos, instalar=False):" );
+    r.add( "    import importlib, importlib.util, importlib.metadata, re, subprocess, sys, warnings" );
+    r.add( "" );
+    r.add( "    def faltantes():" );
+    r.add( "        importlib.invalidate_caches()" );
+    r.add( "        faltan = []" );
+    r.add( "        for req, modulo in requisitos:" );
+    r.add( "            if importlib.util.find_spec(modulo) is None:" );
     r.add( "                faltan.append(req)" );
+    r.add( "                continue" );
+    r.add( "            minima = re.match(r\"([A-Za-z0-9_.-]+)\\s*>=\\s*([0-9.]+)\", req)" );
+    r.add( "            if minima:" );
+    r.add( "                try:" );
+    r.add( "                    tiene = tuple(int(x) for x in re.findall(r\"\\d+\", importlib.metadata.version("
+      + "minima.group(1)))[:3])" );
+    r.add( "                except Exception:" );
+    r.add( "                    continue" );
+    r.add( "                if tiene < tuple(int(x) for x in minima.group(2).split(\".\")):" );
+    r.add( "                    faltan.append(req)" );
+    r.add( "        return faltan" );
+    r.add( "" );
+    r.add( "    faltan = faltantes()" );
+    r.add( "    if faltan and instalar:" );
+    r.add( "        print(" + CtxTrad.lit( EscritorPy.t( idioma, "Instalando: ", "Installing: ", "Instalando: " ) )
+      + " + \", \".join(faltan))" );
+    r.add( "        # " + EscritorPy.t( idioma, "con el mismo Python que corre este código (en un notebook, el del kernel)",
+      "with the same Python that runs this code (in a notebook, the kernel's)",
+      "com o mesmo Python que roda este código (num notebook, o do kernel)" ) );
+    r.add( "        subprocess.run([sys.executable, \"-m\", \"pip\", \"install\", *faltan])" );
+    r.add( "        faltan = faltantes()" );
+    r.add( "        if not faltan:" );
+    r.add( "            print(" + CtxTrad.lit( EscritorPy.t( idioma, "Listo: ya están todas.", "Done: they are all "
+      + "there now.", "Pronto: já estão todas." ) ) + ")" );
     r.add( "    if faltan:" );
     r.add( "        comando = \"pip install \" + \" \".join('\"%s\"' % f if \">\" in f else f for f in faltan)" );
-    r.add( "        raise SystemExit(" + CtxTrad.lit( EscritorPy.t( idioma,
+    r.add( "        mensaje = (" + CtxTrad.lit( EscritorPy.t( idioma,
       "Faltan bibliotecas de Python (o su versión es antigua): ", "Missing Python libraries (or too old): ",
       "Faltam bibliotecas do Python (ou a versão é antiga): " ) ) + " + \", \".join(faltan) + \"\\n\" + " + CtxTrad.lit(
         EscritorPy.t( idioma, "Instálalas con: ", "Install them with: ", "Instale-as com: " ) ) + " + comando + " + CtxTrad
-          .lit( EscritorPy.t( idioma, "  (o pip install -r " + ARCHIVO + "; en un notebook, %pip install ...). Hace "
-            + "falta internet o un repositorio local de paquetes.", "  (or pip install -r " + ARCHIVO + "; in a "
-              + "notebook, %pip install ...). It needs internet or a local package repository.", "  (ou pip install -r "
-                + ARCHIVO + "; num notebook, %pip install ...). É preciso internet ou um repositório local de pacotes." ) )
-      + ")" );
+          .lit( EscritorPy.t( idioma, "  (o pip install -r " + ARCHIVO + "). ", "  (or pip install -r " + ARCHIVO
+            + "). ", "  (ou pip install -r " + ARCHIVO + "). " ) ) + " + (" + CtxTrad.lit( EscritorPy.t( idioma,
+              "No se pudieron instalar: ¿hay internet (o un repositorio local de paquetes)?", "They could not be "
+                + "installed: is there internet (or a local package repository)?", "Não foi possível instalá-las: há "
+                  + "internet (ou um repositório local de pacotes)?" ) ) + " if instalar else " + CtxTrad.lit(
+                    EscritorPy.t( idioma, "O pon INSTALAR = True y vuelve a ejecutar (hace falta internet).",
+                      "Or set INSTALAR = True and run again (it needs internet).",
+                      "Ou ponha INSTALAR = True e execute de novo (é preciso internet)." ) ) + "))" );
+    r.add( "        # " + EscritorPy.t( idioma, "en Jupyter, sin el aviso «To exit: use 'exit'...»",
+      "in Jupyter, without the 'To exit: use 'exit'...' warning", "no Jupyter, sem o aviso «To exit: use 'exit'...»" ) );
+    r.add( "        warnings.filterwarnings(\"ignore\", message=\"To exit\")" );
+    r.add( "        raise SystemExit(mensaje)" );
+    r.add( "" );
+    r.add( "" );
+    r.add( "INSTALAR = False  # " + EscritorPy.t( idioma, "pon True para que instale lo que falte (hace falta internet)",
+      "set it to True to install what is missing (it needs internet)",
+      "ponha True para instalar o que faltar (é preciso internet)" ) );
     StringBuilder lista = new StringBuilder( "_comprobar_bibliotecas([" );
     for ( int i = 0; i < reqs.size(); i++ ) {
       lista.append( i == 0 ? "" : ", " ).append( '(' ).append( CtxTrad.lit( reqs.get( i ) ) ).append( ", " ).append(
         CtxTrad.lit( modulo( reqs.get( i ) ) ) ).append( ')' );
     }
-    r.add( lista.append( "])" ).toString() );
+    r.add( lista.append( "], instalar=INSTALAR)" ).toString() );
     return r;
   }
 

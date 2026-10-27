@@ -1133,10 +1133,85 @@ final class TradCampos {
   /** Texto → fecha con máscara (pandas / PySpark). */
   static String aFecha( String x, String mascara, CtxTrad ctx ) {
     String m = vacio( mascara ) ? "yyyy/MM/dd HH:mm:ss.SSS" : mascara;
+    if ( conNombreMes( m ) ) {
+      x = meses( x, ctx );
+      m = sinNombreMes( m );
+    }
     if ( ctx.pandas() ) {
       return "pd.to_datetime(" + x + ", format=" + CtxTrad.lit( strftime( m ) ) + ")";
     }
     return "F.to_timestamp(" + x + ", " + CtxTrad.lit( m ) + ")";
+  }
+
+  /** ¿La máscara de Java lee el mes por su nombre (MMM, MMMM)? */
+  static boolean conNombreMes( String java ) {
+    return java != null && java.replaceAll( "'[^']*'", "" ).contains( "MMM" );
+  }
+
+  /** La máscara con el mes en número (M) donde decía su nombre (MMM, MMMM), fuera de los literales. */
+  static String sinNombreMes( String java ) {
+    StringBuilder r = new StringBuilder();
+    boolean literal = false;
+    for ( int i = 0; i < java.length(); i++ ) {
+      char ch = java.charAt( i );
+      if ( ch == '\'' ) {
+        literal = !literal;
+      }
+      if ( !literal && ch == 'M' ) {
+        int j = i;
+        while ( j < java.length() && java.charAt( j ) == 'M' ) {
+          j++;
+        }
+        r.append( j - i >= 3 ? "M" : java.substring( i, j ) );
+        i = j - 1;
+      } else {
+        r.append( ch );
+      }
+    }
+    return r.toString();
+  }
+
+  /** Los nombres de mes que se reconocen: español, portugués e inglés, completos y abreviados. */
+  private static final String MESES_PDI = String.join( "\n",
+    "_MESES_PDI = {",
+    "    1: (\"enero\", \"ene\", \"janeiro\", \"january\", \"jan\"),",
+    "    2: (\"febrero\", \"feb\", \"fevereiro\", \"fev\", \"february\"),",
+    "    3: (\"marzo\", \"março\", \"marco\", \"mar\", \"march\"),",
+    "    4: (\"abril\", \"abr\", \"april\", \"apr\"),",
+    "    5: (\"mayo\", \"may\", \"maio\", \"mai\"),",
+    "    6: (\"junio\", \"jun\", \"junho\", \"june\"),",
+    "    7: (\"julio\", \"jul\", \"julho\", \"july\"),",
+    "    8: (\"agosto\", \"ago\", \"august\", \"aug\"),",
+    "    9: (\"septiembre\", \"setiembre\", \"sept\", \"sep\", \"setembro\", \"set\", \"september\"),",
+    "    10: (\"octubre\", \"oct\", \"outubro\", \"out\", \"october\"),",
+    "    11: (\"noviembre\", \"nov\", \"novembro\", \"november\"),",
+    "    12: (\"diciembre\", \"dic\", \"dezembro\", \"dez\", \"december\", \"dec\"),",
+    "}" );
+
+  /**
+   * El texto con los nombres de mes cambiados por su número: PDI lee «Enero 10, 2008» con MMMM en el idioma de Spoon,
+   * pandas y Spark sólo en inglés.
+   */
+  static String meses( String x, CtxTrad ctx ) {
+    String doc = "    \"\"\"" + ctx.t( "Nombres de mes (español, portugués o inglés, completos o abreviados) → su número: "
+      + "PDI los lee en el idioma de Spoon; pandas y Spark, sólo en inglés.", "Month names (Spanish, Portuguese or "
+        + "English, full or short) → their number: PDI reads them in Spoon's language; pandas and Spark, only in "
+        + "English.", "Nomes de mês (espanhol, português ou inglês, completos ou abreviados) → o seu número: o PDI "
+          + "lê-os no idioma do Spoon; pandas e Spark, só em inglês." ) + "\"\"\"";
+    if ( ctx.pandas() ) {
+      ctx.ayudante( "_meses_pdi", MESES_PDI + "\n\n\ndef _meses_pdi(s):\n" + doc + "\n"
+        + "    s = s.astype(\"string\")\n"
+        + "    for n, nombres in _MESES_PDI.items():\n"
+        + "        s = s.str.replace(r\"(?<![^\\W\\d_])(?:\" + \"|\".join(nombres) + r\")\\.?(?![^\\W\\d_])\", str(n),\n"
+        + "                          case=False, regex=True)\n"
+        + "    return s" );
+    } else {
+      ctx.ayudante( "_meses_pdi", MESES_PDI + "\n\n\ndef _meses_pdi(c):\n" + doc + "\n"
+        + "    for n, nombres in _MESES_PDI.items():\n"
+        + "        c = F.regexp_replace(c, r\"(?i)(?<!\\p{L})(?:\" + \"|\".join(nombres) + r\")\\.?(?!\\p{L})\", str(n))\n"
+        + "    return c" );
+    }
+    return "_meses_pdi(" + x + ")";
   }
 
   /** Fecha → texto con máscara. */
@@ -1623,8 +1698,10 @@ final class TradCampos {
     String partes = ctx.nuevo( "partes" );
     if ( pd ) {
       b.l( out + " = " + in + ".copy()" );
-      b.l( partes + " = " + out + "[" + CtxTrad.lit( m.getSplitField() ) + "].str.split(" + CtxTrad.lit( delim )
-        + ", n=" + ( n - 1 ) + ", expand=True, regex=False).reindex(columns=range(" + n + "))" );
+      // como texto siempre: una columna vacía (todo nulo) o sin el separador en ninguna fila no es texto para pandas
+      b.l( partes + " = " + out + "[" + CtxTrad.lit( m.getSplitField() ) + "].astype(\"string\").str.split("
+        + CtxTrad.lit( delim ) + ", n=" + ( n - 1 ) + ", expand=True, regex=False).reindex(columns=range(" + n
+        + ")).astype(\"string\")" );
     } else {
       b.l( partes + " = F.split(F.col(" + CtxTrad.lit( m.getSplitField() ) + "), " + CtxTrad.lit( java.util.regex.Pattern
         .quote( delim ).replace( "\\Q", "" ).replace( "\\E", "" ).replaceAll( "([.|*+?^$()\\[\\]{}\\\\])", "\\\\$1" ) )
@@ -1693,7 +1770,7 @@ final class TradCampos {
     String reJava = m.isDelimiterRegex() ? delim : delim.replaceAll( "([.|*+?^$()\\[\\]{}\\\\])", "\\\\$1" );
     if ( pd ) {
       b.l( out + " = " + in + ".assign(**{" + CtxTrad.lit( nuevo ) + ": " + in + "[" + CtxTrad.lit( campo )
-        + "].str.split(" + CtxTrad.lit( m.isDelimiterRegex() ? delim : delim ) + ", regex=" + ( m.isDelimiterRegex()
+        + "].astype(\"string\").str.split(" + CtxTrad.lit( delim ) + ", regex=" + ( m.isDelimiterRegex()
           ? "True" : "False" ) + ")})" );
       if ( !vacio( m.getRowNumberField() ) ) {
         b.l( out + " = " + out + ".explode(" + CtxTrad.lit( nuevo ) + ")" );

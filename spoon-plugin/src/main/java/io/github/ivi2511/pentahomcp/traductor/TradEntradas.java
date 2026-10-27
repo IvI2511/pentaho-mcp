@@ -155,8 +155,13 @@ final class TradEntradas {
             e = num + ".map(Decimal, na_action=\"ignore\")";
             break;
           case "Date": case "Timestamp":
-            e = "pd.to_datetime(" + s + ( fmt.isEmpty() ? "" : ", format=" + CtxTrad.lit( TradSalidas.fechaPy( fmt ) ) )
-              + ")";
+            if ( TradCampos.conNombreMes( fmt ) ) { // «Enero 10, 2008»: el mes por su nombre, en el idioma de Spoon
+              e = "pd.to_datetime(" + TradCampos.meses( s, ctx ) + ", format=" + CtxTrad.lit( TradSalidas.fechaPy(
+                TradCampos.sinNombreMes( fmt ) ) ) + ")";
+            } else {
+              e = "pd.to_datetime(" + s + ( fmt.isEmpty() ? "" : ", format=" + CtxTrad.lit( TradSalidas.fechaPy( fmt ) ) )
+                + ")";
+            }
             break;
           case "Boolean":
             e = s + ".str.upper().isin([\"Y\", \"YES\", \"TRUE\", \"1\"]).astype(\"boolean\").mask(" + col + ".isna())";
@@ -192,7 +197,9 @@ final class TradEntradas {
           case "Number": e = num + ".cast(\"double\")" + ( fmt.contains( "%" ) ? " / 100" : "" ); break;
           case "BigNumber": e = num + ".cast(\"decimal(38,18)\")"; break;
           case "Date": case "Timestamp":
-            e = fmt.isEmpty() ? s + ".cast(\"timestamp\")" : "F.to_timestamp(" + s + ", " + CtxTrad.lit( fmt ) + ")";
+            e = fmt.isEmpty() ? s + ".cast(\"timestamp\")" : TradCampos.conNombreMes( fmt ) ? "F.to_timestamp("
+              + TradCampos.meses( s, ctx ) + ", " + CtxTrad.lit( TradCampos.sinNombreMes( fmt ) ) + ")"
+              : "F.to_timestamp(" + s + ", " + CtxTrad.lit( fmt ) + ")";
             break;
           case "Boolean":
             e = "F.when(" + s + ".isNotNull(), F.upper(" + s + ").isin(\"Y\", \"YES\", \"TRUE\", \"1\"))";

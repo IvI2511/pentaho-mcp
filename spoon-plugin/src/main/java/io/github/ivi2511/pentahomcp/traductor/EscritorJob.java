@@ -150,6 +150,7 @@ public final class EscritorJob {
     List<String> r = new ArrayList<>( c.imports );
     r.add( "" );
     if ( c.spark() ) {
+      r.addAll( EscritorPy.pythonDeSpark( c ) );
       r.add( "_builder = SparkSession.builder.appName(" + CtxTrad.lit( p.nombre ) + ")" );
       r.add( "if os.name == \"nt\":  # " + c.t(
         "Windows: Spark local en localhost (un nombre de equipo con _ lo rompe)",

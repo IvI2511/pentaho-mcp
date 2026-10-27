@@ -78,6 +78,7 @@ public final class CtxTrad {
     usados.add( "VARS" );
     usados.add( "AQUI" );
     if ( destino == Destino.PYSPARK ) {
+      importar( "import sys" );
       importar( "from pyspark.sql import SparkSession, functions as F, types as T, Window" );
     } else {
       importar( "import pandas as pd" );

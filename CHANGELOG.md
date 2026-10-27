@@ -43,7 +43,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   next to the script or notebook with exactly what the code uses, including the database driver of each connection
   (`pymysql`, `psycopg2-binary`...); the code starts by checking them, so a missing library, or one too old, stops
   with a clear message in the chosen language and the `pip install` command, instead of a `ModuleNotFoundError`
-  halfway through.
+  halfway through. With `INSTALAR = True` (one line at the top) it installs what is missing with pip, using the same
+  Python that runs the code (in a notebook, the kernel's), checks again and goes on; in Jupyter the message no longer
+  comes with the "To exit" warning.
 - **Verification without touching anything**: *Verify with the data* runs the transformation (skipping the steps
   that write, as the golden tests do) and a variant of the Python that dumps what it would write, and compares them.
 - Connections become SQLAlchemy engines (pandas) or JDBC options (PySpark); passwords come from
@@ -65,6 +67,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Initial capitals (Calculator and String operations) exactly as PDI (after any character that is not a letter,
   digit or `_`), in pandas and PySpark; Database lookup in pandas keeps whole numbers as integers when a key is not
   found; the "how to run it" line asks for SQLAlchemy 2.0.36 or later (pandas 3 refuses older ones).
+- Dates whose mask reads the month by its name (`MMMM d, yyyy`, `dd-MMM-yy`): PDI reads them in Spoon's language
+  ("Enero 10, 2008"), pandas and Spark only in English, so every row of a Spanish file went to the error hop. The
+  month names (Spanish, Portuguese or English, full or short) become their number before the conversion.
+- Split fields and Split field to rows always work on text: an empty input, or a field without the delimiter in any
+  row, no longer stops the pandas script with "Can only use .str accessor with string values".
+- PySpark scripts start Spark's workers with the same Python that runs them (with two Pythons installed, Spark failed
+  with "Python in worker has different version").
 
 ## [0.7.1] - 2026-10-26
 
