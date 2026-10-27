@@ -28,10 +28,12 @@ subjects or when the data does not fit in memory.
 broken by position on the canvas), each one a **block** that reads the DataFrames of the steps before it and
 leaves its own output in `df_<step>`.
 
-**A job** becomes one script with **a function per transformation** (the body of its translation) and a
-`main()` that follows the job's hops: success (`if ok:`), failure (`if not ok:`) and unconditional. Other
-entries (Start, Success, Abort, Write to log, file and folder entries, SQL, Set variables…) are translated in
-place inside `main()` when they have a translation; the rest are MANUAL.
+**A job** becomes one script (or notebook) with **a function per entry** (a Transformation entry's function holds
+the body of its translation; a sub-job becomes its own set of functions) and a `main()` that follows the job's
+hops: success (`if ok:`), failure (`if not ok:`) and unconditional, returning True like Kitchen's exit code 0.
+Entries with a translation (Success, Abort, Write to log, Set variables, file and folder entries, SQL, evaluations,
+mail, HTTP, shell…) get their code; the rest are MANUAL. Job translations are not verified with the data (only
+transformations are), and previews and EDA apply to transformations only.
 
 Each block has a **status**:
 
