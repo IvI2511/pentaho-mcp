@@ -47,7 +47,7 @@ public final class Conexiones {
           + clave + ", host=" + host + ", port=int(" + puerto + ") if " + puerto + " else None, database=" + base
           + "))" );
       } else {
-        r.add( "# TODO: " + ctx.t( "conexión de tipo " + tipo + ": completá la URL de SQLAlchemy",
+        r.add( "# TODO: " + ctx.t( "conexión de tipo " + tipo + ": completa la URL de SQLAlchemy",
           "connection of type " + tipo + ": fill in the SQLAlchemy URL", "conexão do tipo " + tipo
             + ": complete a URL do SQLAlchemy" ) );
         r.add( v + " = create_engine(\"sqlite://\")" );

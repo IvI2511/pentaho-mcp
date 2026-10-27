@@ -72,7 +72,7 @@ public final class TraductorTrans {
     TraductorStep tr = Registro.buscar( id );
     Bloque b;
     if ( tr == null ) {
-      b = sinTraduccion( s, ctx, ctx.t( "El step «" + id + "» todavía no tiene traducción: completalo a mano.",
+      b = sinTraduccion( s, ctx, ctx.t( "El step «" + id + "» todavía no tiene traducción: complétalo a mano.",
         "Step type '" + id + "' has no translation yet: complete it by hand.",
         "O step «" + id + "» ainda não tem tradução: complete-o à mão." ) );
     } else {
