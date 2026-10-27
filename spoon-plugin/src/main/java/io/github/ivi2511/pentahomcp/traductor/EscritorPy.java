@@ -1,6 +1,5 @@
 package io.github.ivi2511.pentahomcp.traductor;
 
-import java.lang.reflect.Constructor;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -372,18 +371,13 @@ public final class EscritorPy {
   }
 
   /**
-   * DescribirStep del lint (una línea por tipo de step, «Lee ventas.csv (8 campos)», «Filtra filas con...»). Su
-   * contexto no tiene constructor público: se arma por reflexión (si falla, null).
+   * DescribirStep del lint (una línea por tipo de step, «Lee ventas.csv (8 campos)», «Filtra filas con...»).
    */
   static String describir( AbstractMeta meta, String tipo, Element x, String idioma ) throws Exception {
     io.github.ivi2511.pentahomcp.lint.Opciones op = new io.github.ivi2511.pentahomcp.lint.Opciones();
     op.lang = idioma;
-    Constructor<?> k = io.github.ivi2511.pentahomcp.lint.Ctx.class.getDeclaredConstructor( AbstractMeta.class,
-      io.github.ivi2511.pentahomcp.lint.Opciones.class );
-    k.setAccessible( true );
-    Object ctx = k.newInstance( meta, op );
-    String d = io.github.ivi2511.pentahomcp.lint.DescribirStep.step( (io.github.ivi2511.pentahomcp.lint.Ctx) ctx, tipo,
-      x, tipo );
+    String d = io.github.ivi2511.pentahomcp.lint.DescribirStep.step( io.github.ivi2511.pentahomcp.lint.Ctx.para( meta,
+      op ), tipo, x, tipo );
     return d == null || d.trim().isEmpty() ? null : d.trim();
   }
 

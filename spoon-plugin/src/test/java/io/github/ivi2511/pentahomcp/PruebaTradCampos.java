@@ -315,7 +315,6 @@ public class PruebaTradCampos {
     m.setCalculation( l.toArray( new CalculatorMetaFunction[ 0 ] ) );
     agregar( tm, "Calc", m, "Datos" );
     Caso c = new Caso( "calculadora", tm, "Calc" );
-    c.sinSpark.add( "c_initcap" ); // F.initcap: APROXIMADO (anotado)
     casos.add( c );
   }
 

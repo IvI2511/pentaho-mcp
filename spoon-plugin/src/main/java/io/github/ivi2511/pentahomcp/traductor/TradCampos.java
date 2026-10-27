@@ -717,12 +717,7 @@ final class TradCampos {
       case CalculatorMetaFunction.CALC_LOWER_CASE:
         return r( pd ? sa + ".lower()" : "F.lower(" + a + ")", 'S' );
       case CalculatorMetaFunction.CALC_INITCAP:
-        if ( !pd ) {
-          b.aproximado( ctx.t( "F.initcap sólo pone mayúscula tras un espacio; PDI, tras cualquier carácter que no "
-            + "sea letra.", "F.initcap only capitalizes after a space; PDI after any non-letter.", "F.initcap só põe "
-              + "maiúscula após um espaço; o PDI, após qualquer carácter que não seja letra." ) );
-        }
-        return r( pd ? sa + ".title()" : "F.initcap(" + a + ")", 'S' );
+        return r( initcap( a, ctx ), 'S' );
       case CalculatorMetaFunction.CALC_STRING_LEN:
         return r( pd ? sa + ".len().fillna(0)" : "F.coalesce(F.length(" + a + "), F.lit(0))", 'I' );
       case CalculatorMetaFunction.CALC_REMOVE_CR:
@@ -1381,7 +1376,7 @@ final class TradCampos {
       }
       int ic = indice( StringOperationsMeta.initCapCode, de( m.getInitCap(), i ) );
       if ( ic > 0 ) {
-        e = pd ? e + ".str.title()" : "F.initcap(" + e + ")";
+        e = initcap( e, ctx );
       }
       int mx = indice( StringOperationsMeta.maskXMLCode, de( m.getMaskXML(), i ) );
       if ( mx > 0 ) {
@@ -2356,5 +2351,26 @@ final class TradCampos {
     }
     b.vista = out;
     return b;
+  }
+
+  /**
+   * Initcap exacto de PDI (Const.initCap): todo en minúsculas y mayúscula al empezar cada palabra, es decir, tras
+   * cualquier carácter que no sea letra, dígito ni «_» («o'neil x1y a_b» da «O'Neil X1y A_b»). str.title() y
+   * F.initcap no lo hacen igual, así que va en un ayudante.
+   */
+  static String initcap( String e, CtxTrad ctx ) {
+    String doc = ctx.t( "Mayúscula al empezar cada palabra (tras lo que no sea letra, dígito ni _), como PDI.",
+      "Capital letter at the start of each word (after anything but a letter, digit or _), like PDI.",
+      "Maiúscula no início de cada palavra (após o que não seja letra, dígito nem _), como o PDI." );
+    if ( ctx.destino == Destino.PANDAS ) {
+      ctx.ayudante( "_initcap_pdi", "def _initcap_pdi(s):\n    \"\"\"" + doc + "\"\"\"\n"
+        + "    return s.str.lower().str.replace(r\"(?<!\\w)\\w\", lambda m: m.group(0).upper(), regex=True)\n" );
+    } else {
+      ctx.ayudante( "_initcap_pdi", "def _initcap_pdi(c):\n    \"\"\"" + doc + "\"\"\"\n"
+        + "    letras = F.split(F.lower(c), \"\")\n"
+        + "    return F.array_join(F.transform(letras, lambda x, i: F.when(\n"
+        + "        (i > 0) & F.element_at(letras, i).rlike(r\"[\\p{L}\\p{N}_]\"), x).otherwise(F.upper(x))), \"\")\n" );
+    }
+    return "_initcap_pdi(" + e + ")";
   }
 }

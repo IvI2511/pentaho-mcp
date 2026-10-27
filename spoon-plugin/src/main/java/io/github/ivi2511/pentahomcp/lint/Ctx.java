@@ -49,6 +49,11 @@ public final class Ctx {
   /** Los ids de las reglas que corren en este análisis (LintMotor). */
   java.util.Set<String> corren = new java.util.HashSet<String>();
 
+  /** Contexto para usar el lint desde fuera del paquete (p. ej. DescribirStep desde el traductor). */
+  public static Ctx para( AbstractMeta meta, Opciones op ) {
+    return new Ctx( meta, op );
+  }
+
   Ctx( AbstractMeta meta, Opciones op ) {
     this.meta = meta;
     this.tm = meta instanceof TransMeta ? (TransMeta) meta : null;
