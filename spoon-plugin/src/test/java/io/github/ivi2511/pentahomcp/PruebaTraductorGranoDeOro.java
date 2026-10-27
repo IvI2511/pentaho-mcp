@@ -77,6 +77,13 @@ public class PruebaTraductorGranoDeOro {
       Opciones ep = new Opciones();
       ep.formato = "py";
       escribir( new File( muestra, base + ".py" ), EscritorPy.escribir( p, ep ) );
+      if ( base.startsWith( "06" ) ) { // el KPI desde ficheros también en PySpark (lee y escribe archivos)
+        Opciones es = new Opciones();
+        es.eda = true;
+        es.destino = Destino.PYSPARK;
+        escribir( new File( muestra, base + "_pyspark.ipynb" ), EscritorIpynb.escribir( TraductorTrans.traducir( t,
+          Destino.PYSPARK, "es" ), es ) );
+      }
       estados.append( base ).append( ": " ).append( p.cuantos( Estado.EXACTO ) ).append( " exactos, " ).append(
         p.cuantos( Estado.APROXIMADO ) ).append( " aproximados, " ).append( p.cuantos( Estado.MANUAL ) ).append(
           " manuales\n" );
