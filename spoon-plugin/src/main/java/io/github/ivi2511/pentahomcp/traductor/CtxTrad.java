@@ -310,7 +310,7 @@ public final class CtxTrad {
     try {
       RowMetaInterface r = trans.getPrevStepFields( s );
       return r == null ? new RowMeta() : r;
-    } catch ( Exception e ) {
+    } catch ( Exception | StackOverflowError e ) { // un ciclo de saltos: Kettle no termina
       return new RowMeta();
     }
   }
@@ -320,7 +320,7 @@ public final class CtxTrad {
     try {
       RowMetaInterface r = trans.getStepFields( s );
       return r == null ? new RowMeta() : r;
-    } catch ( Exception e ) {
+    } catch ( Exception | StackOverflowError e ) { // un ciclo de saltos: Kettle no termina
       return new RowMeta();
     }
   }
