@@ -2,11 +2,9 @@ package io.github.ivi2511.pentahomcp;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -20,10 +18,15 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.pentaho.di.base.AbstractMeta;
+import org.pentaho.di.core.plugins.JobEntryPluginType;
 import org.pentaho.di.core.plugins.PluginInterface;
 import org.pentaho.di.core.plugins.PluginRegistry;
 import org.pentaho.di.core.plugins.StepPluginType;
+import org.pentaho.di.job.JobHopMeta;
 import org.pentaho.di.job.JobMeta;
+import org.pentaho.di.job.entries.special.JobEntrySpecial;
+import org.pentaho.di.job.entry.JobEntryCopy;
+import org.pentaho.di.job.entry.JobEntryInterface;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInterface;
@@ -35,11 +38,14 @@ import io.github.ivi2511.pentahomcp.pruebas.modelo.ResultadoPrueba;
 import io.github.ivi2511.pentahomcp.traductor.Bloque;
 import io.github.ivi2511.pentahomcp.traductor.Destino;
 import io.github.ivi2511.pentahomcp.traductor.EscritorIpynb;
+import io.github.ivi2511.pentahomcp.traductor.EscritorJob;
 import io.github.ivi2511.pentahomcp.traductor.EscritorPy;
 import io.github.ivi2511.pentahomcp.traductor.Estado;
 import io.github.ivi2511.pentahomcp.traductor.Opciones;
 import io.github.ivi2511.pentahomcp.traductor.Programa;
+import io.github.ivi2511.pentahomcp.traductor.ProgramaJob;
 import io.github.ivi2511.pentahomcp.traductor.Registro;
+import io.github.ivi2511.pentahomcp.traductor.TraductorJob;
 import io.github.ivi2511.pentahomcp.traductor.TraductorStep;
 import io.github.ivi2511.pentahomcp.traductor.TraductorTrans;
 import io.github.ivi2511.pentahomcp.traductor.Verificacion;
@@ -49,15 +55,12 @@ import io.github.ivi2511.pentahomcp.traductor.Verificacion;
  * o un notebook, pandas o PySpark, con verificación opcional) y {@code translate_coverage} (qué ids de step y de
  * entrada de job tienen traducción). El diálogo IDC › Traducir a Python… usa {@link #traducir}.
  *
- * <p>Jobs: la parte de jobs ({@code TraductorJob.traducir(JobMeta, Opciones)} y
- * {@code EscritorJob.escribir(ProgramaJob, Opciones)}) se llama por reflexión, así esta clase compila sin ella.
+ * <p>Jobs: {@link TraductorJob} y {@link EscritorJob} (sin verificación: sólo transformaciones).
  */
 final class TraducirTools {
 
   /** Las pruebas corren PDI en esta JVM (EntornoKettle); en Spoon, la verificación lanza la JVM de las pruebas. */
   static volatile boolean pdiEnEstaJvm;
-
-  private static final String PAQ = "io.github.ivi2511.pentahomcp.traductor.";
 
   private TraducirTools() {
   }
@@ -332,74 +335,22 @@ final class TraducirTools {
     }
   }
 
-  /**
-   * Un job: TraductorJob.traducir(JobMeta, Opciones) y EscritorJob.escribir(ProgramaJob, Opciones) por reflexión (la
-   * parte de jobs). Los bloques: el campo «bloques» del ProgramaJob, si lo tiene.
-   */
-  @SuppressWarnings( "unchecked" )
+  /** Un job: TraductorJob + EscritorJob; los bloques son los de sus entradas y los de sus transformaciones. */
   static String traducirJob( JobMeta jm, String xml, Opciones o, Hecho h ) throws Exception {
-    Class<?> tj;
-    Class<?> ej;
-    try {
-      tj = Class.forName( PAQ + "TraductorJob" );
-      ej = Class.forName( PAQ + "EscritorJob" );
-    } catch ( ClassNotFoundException e ) {
-      throw new ToolError( "Translating jobs is not available in this build" );
-    }
-    Method tr = buscarMetodo( tj, "traducir", JobMeta.class, Opciones.class );
-    if ( tr == null ) {
-      throw new ToolError( "Translating jobs is not available in this build (TraductorJob.traducir)" );
-    }
     JobMeta copia = new JobMeta( new ByteArrayInputStream( xml.getBytes( StandardCharsets.UTF_8 ) ), null, null );
     if ( jm.getFilename() != null ) {
       copia.setFilename( jm.getFilename() );
     }
-    Object prog;
-    try {
-      prog = tr.invoke( null, copia, o );
-    } catch ( java.lang.reflect.InvocationTargetException e ) {
-      throw e.getCause() instanceof Exception ? (Exception) e.getCause() : e;
-    }
-    Method es = buscarMetodo( ej, "escribir", prog.getClass(), Opciones.class );
-    if ( es == null ) {
-      throw new ToolError( "Translating jobs is not available in this build (EscritorJob.escribir)" );
-    }
-    try {
-      java.lang.reflect.Field f = prog.getClass().getField( "bloques" );
-      Object l = f.get( prog );
-      if ( l instanceof Collection ) {
-        List<Bloque> bs = new ArrayList<>();
-        for ( Object x : (Collection<Object>) l ) {
-          if ( x instanceof Bloque ) {
-            bs.add( (Bloque) x );
-          }
-        }
-        contar( h, bs );
-      }
-    } catch ( NoSuchFieldException e ) {
-      // sin bloques visibles: sólo el archivo
-    }
-    try {
-      return String.valueOf( es.invoke( null, prog, o ) );
-    } catch ( java.lang.reflect.InvocationTargetException e ) {
-      throw e.getCause() instanceof Exception ? (Exception) e.getCause() : e;
-    }
-  }
-
-  private static Method buscarMetodo( Class<?> c, String nombre, Class<?>... tipos ) {
-    for ( Method m : c.getMethods() ) {
-      if ( !m.getName().equals( nombre ) || m.getParameterCount() != tipos.length ) {
-        continue;
-      }
-      boolean ok = true;
-      for ( int i = 0; i < tipos.length; i++ ) {
-        ok &= m.getParameterTypes()[ i ].isAssignableFrom( tipos[ i ] );
-      }
-      if ( ok ) {
-        return m;
+    ProgramaJob p = TraductorJob.traducir( copia, o );
+    List<Bloque> bs = new ArrayList<>();
+    for ( ProgramaJob.Funcion f : p.funciones ) {
+      bs.add( f.bloque );
+      if ( f.programa != null ) {
+        bs.addAll( f.programa.bloques );
       }
     }
-    return null;
+    contar( h, bs );
+    return EscritorJob.escribir( p, o );
   }
 
   // ================================================================ verificación
@@ -600,12 +551,15 @@ final class TraducirTools {
       }
       r.add( c );
     }
-    for ( Map.Entry<String, Object> e : entradasJob().entrySet() ) {
+    for ( Map.Entry<String, String> e : entradasJob().entrySet() ) {
       Cubierto c = new Cubierto();
       c.id = e.getKey();
       c.tipo = "job_entry";
-      c.familia = familia( e.getValue() );
-      c.nombre = "";
+      c.familia = "job entries";
+      PluginInterface pi = PluginRegistry.getInstance().findPluginWithId( JobEntryPluginType.class, e.getKey() );
+      c.nombre = pi == null ? "" : pi.getName();
+      c.pandas = e.getValue();
+      c.pyspark = e.getValue();
       r.add( c );
     }
     return r;
@@ -641,22 +595,49 @@ final class TraducirTools {
     }
   }
 
-  /** Las entradas de job con traducción, por reflexión (RegistroJob.entradas() o TraductorJob.entradas()). */
-  @SuppressWarnings( "unchecked" )
-  static Map<String, Object> entradasJob() {
-    for ( String[] cm : new String[][] { { "RegistroJob", "entradas" }, { "TraductorJob", "entradas" },
-      { "RegistroJob", "steps" } } ) {
+  /**
+   * Las entradas de job con traducción: cada plugin de entrada, solo detrás de START en un job, por TraductorJob; las
+   * que quedan MANUAL con «has no translation yet» no tienen. id → estado (pandas).
+   */
+  static Map<String, String> entradasJob() {
+    Map<String, String> r = new TreeMap<>();
+    for ( PluginInterface pi : PluginRegistry.getInstance().getPlugins( JobEntryPluginType.class ) ) {
+      String id = pi.getIds()[ 0 ];
+      if ( "SPECIAL".equals( id ) ) {
+        r.put( id, "exact" );
+        continue;
+      }
       try {
-        Method m = Class.forName( PAQ + cm[ 0 ] ).getMethod( cm[ 1 ] );
-        Object x = m.invoke( null );
-        if ( x instanceof Map ) {
-          return new TreeMap<>( (Map<String, Object>) x );
+        JobMeta jm = new JobMeta();
+        JobEntryCopy inicio = new JobEntryCopy( new JobEntrySpecial( "START", true, false ) );
+        inicio.setLocation( 50, 50 );
+        jm.addJobEntry( inicio );
+        JobEntryInterface je = (JobEntryInterface) PluginRegistry.getInstance().loadClass( pi );
+        je.setName( "Entrada" );
+        je.setPluginId( id );
+        JobEntryCopy ce = new JobEntryCopy( je );
+        ce.setLocation( 200, 50 );
+        jm.addJobEntry( ce );
+        jm.addJobHop( new JobHopMeta( inicio, ce ) );
+        Opciones o = new Opciones();
+        o.idioma = "en";
+        ProgramaJob p = TraductorJob.traducir( jm, o );
+        for ( ProgramaJob.Funcion f : p.funciones ) {
+          if ( "Entrada".equals( f.bloque.paso ) ) {
+            boolean sin = false;
+            for ( String n : f.bloque.notas ) {
+              sin |= n.contains( "has no translation yet" );
+            }
+            if ( !sin ) {
+              r.put( id, estadoId( f.bloque.estado ) );
+            }
+          }
         }
       } catch ( Exception | LinkageError e ) {
-        // sin la parte de jobs
+        // esa entrada no se puede armar sola
       }
     }
-    return new LinkedHashMap<>();
+    return r;
   }
 
   /** El estado que da un step con su configuración por defecto (en una transformación de un solo step). */

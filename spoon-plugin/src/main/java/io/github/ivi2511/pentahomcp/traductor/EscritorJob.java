@@ -33,7 +33,7 @@ public final class EscritorJob {
       b.append( l ).append( '\n' );
     }
     for ( Funcion f : p.funciones ) {
-      b.append( "\n\n" ).append( funcion( p, f ) );
+      b.append( "\n\n" ).append( funcion( p, f, o ) );
     }
     b.append( "\n\n" ).append( principal( p ) );
     b.append( "\n\nif __name__ == \"__main__\":\n    sys.exit(0 if main() else 1)\n" );
@@ -58,21 +58,21 @@ public final class EscritorJob {
       if ( k.estado != Estado.EXACTO ) {
         m.append( " · **" ).append( k.estado.id() ).append( "**" );
       }
-      if ( k.explicacion != null ) {
+      if ( k.explicacion != null && ( o == null || o.explicaciones ) ) {
         m.append( "\n\n" ).append( k.explicacion );
       }
-      for ( String n : k.notas ) {
+      for ( String n : conNotas( o, k ) ? k.notas : new ArrayList<String>() ) {
         m.append( "\n\n> " ).append( c.t( "Nota: ", "Note: ", "Nota: " ) ).append( n );
       }
       EscritorIpynb.texto( celdas, m.toString() );
-      EscritorIpynb.codigo( celdas, funcion( p, f ).replaceAll( "\n+$", "" ) );
+      EscritorIpynb.codigo( celdas, funcion( p, f, o ).replaceAll( "\n+$", "" ) );
     }
     StringBuilder m = new StringBuilder( "## " + c.t( "Flujo del job", "Job flow", "Fluxo do job" ) + "\n\n" + c.t(
       "main() sigue los hops desde START: los verdes si la entrada va bien, los rojos si falla, los negros siempre.",
       "main() follows the hops from START: green ones if the entry succeeds, red ones if it fails, black ones always.",
       "main() segue os hops a partir do START: os verdes se a entrada correr bem, os vermelhos se falhar, os pretos "
         + "sempre." ) );
-    for ( String n : p.notas ) {
+    for ( String n : o == null || o.notas ? p.notas : new ArrayList<String>() ) {
       m.append( "\n\n> " ).append( c.t( "Nota: ", "Note: ", "Nota: " ) ).append( n );
     }
     EscritorIpynb.texto( celdas, m.toString() );
@@ -183,6 +183,19 @@ public final class EscritorJob {
 
   /** Una función: decorador, def, docstring, notas y cuerpo (con la transformación dentro si la tiene). */
   public static String funcion( ProgramaJob p, Funcion f ) {
+    return funcion( p, f, null );
+  }
+
+  /** ¿Van las notas del bloque? (las de un bloque MANUAL siempre: dicen qué completar). */
+  static boolean conNotas( Opciones o, Bloque k ) {
+    return o == null || o.notas || k.estado == Estado.MANUAL;
+  }
+
+  /**
+   * Con opciones (null: como antes): notas si o.notas; la transformación de dentro con sus explicaciones (o
+   * DescribirStep) y sus notas según las opciones.
+   */
+  public static String funcion( ProgramaJob p, Funcion f, Opciones o ) {
     CtxTrad c = p.ctx;
     Bloque k = f.bloque;
     StringBuilder b = new StringBuilder();
@@ -197,13 +210,14 @@ public final class EscritorJob {
     if ( k.estado != Estado.EXACTO ) {
       b.append( "    # " ).append( c.t( "estado: ", "status: ", "estado: " ) ).append( k.estado.id() ).append( '\n' );
     }
-    for ( String n : k.notas ) {
+    for ( String n : conNotas( o, k ) ? k.notas : new ArrayList<String>() ) {
       b.append( "    # " ).append( c.t( "NOTA: ", "NOTE: ", "NOTA: " ) ).append( n.replace( '\n', ' ' ) ).append(
         '\n' );
     }
     for ( int i = 0; i <= k.codigo.size(); i++ ) {
       if ( i == f.posicion && f.programa != null ) {
-        b.append( EscritorPy.cuerpo( f.programa, f.sangria ) );
+        b.append( o == null ? EscritorPy.cuerpo( f.programa, f.sangria ) : EscritorPy.cuerpo( f.programa, f.sangria,
+          o ) );
       }
       if ( i < k.codigo.size() ) {
         String l = k.codigo.get( i );

@@ -63,6 +63,7 @@ public class PruebaTraducirTools {
     File ktr = PruebaTraductorEscritores.ejemplo( dir );
     File py = new File( dir, "ventas.py" );
     py.delete();
+    new File( dir, "ventas_pyspark.ipynb" ).delete();
     JsonNode r = (JsonNode) TraducirTools.traducirTool( args( ktr, "py" ) );
     igual( py.getAbsolutePath(), r.get( "path" ).asText(), "ruta por defecto" );
     cierto( py.isFile(), "escribió el .py" );
@@ -122,14 +123,37 @@ public class PruebaTraducirTools {
     if ( entradas == 0 ) {
       b.append( "None yet.\n" );
     } else {
-      b.append( "| Id | Family |\n|---|---|\n" );
+      b.append( "| Id | Status (pandas and PySpark) |\n|---|---|\n" );
       for ( TraducirTools.Cubierto x : l ) {
         if ( !"step".equals( x.tipo ) ) {
-          b.append( "| `" ).append( x.id ).append( "` | " ).append( x.familia ).append( " |\n" );
+          b.append( "| `" ).append( x.id ).append( "` | " ).append( x.pandas ).append( " |\n" );
         }
       }
     }
-    Files.write( new File( docs, "traductor-cobertura.md" ).toPath(), b.toString().getBytes( StandardCharsets.UTF_8 ) );
+    cierto( entradas >= 10, "entradas de job cubiertas: " + entradas );
+    Files.write( new File( docs, "traductor-cobertura.md" ).toPath(), b.toString().getBytes(
+      StandardCharsets.UTF_8 ) );
+  }
+
+  /** Un job (el del ejemplo del curso) por la herramienta: .py y notebook, sin notas cuando se piden sin notas. */
+  public void pruebaJob() throws Exception {
+    File ej = new File( EntornoKettle.recursos(), "../../../../ejemplo/solucion-referencia" ).getCanonicalFile();
+    File dir = EntornoKettle.salida( "traducir-tools/job" );
+    File py = new File( dir, "job.py" );
+    ObjectNode a = args( new File( ej, "job_carga_dw.kjb" ), "py" );
+    a.put( "output", py.getAbsolutePath() ).put( "overwrite", true ).put( "notes", false ).put( "title", "Carga" );
+    JsonNode r = (JsonNode) TraducirTools.traducirTool( a );
+    cierto( py.isFile(), "escribió el .py del job" );
+    cierto( r.get( "steps" ).size() > 5, "entradas y steps en la lista: " + r.get( "steps" ).size() );
+    String t = new String( Files.readAllBytes( py.toPath() ), StandardCharsets.UTF_8 );
+    contiene( t, "def main():", "main()" );
+    contiene( t, "Carga", "título" );
+    PythonPrueba.compila( py );
+    File nb = new File( dir, "job.ipynb" );
+    ObjectNode b = args( new File( ej, "job_carga_dw.kjb" ), "ipynb" );
+    b.put( "output", nb.getAbsolutePath() ).put( "overwrite", true );
+    TraducirTools.traducirTool( b );
+    contiene( new String( Files.readAllBytes( nb.toPath() ), StandardCharsets.UTF_8 ), "\"nbformat\" : 4", "notebook" );
   }
 
   // ================================================================ verificación

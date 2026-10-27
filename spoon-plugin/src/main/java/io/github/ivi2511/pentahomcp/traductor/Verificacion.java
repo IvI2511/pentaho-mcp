@@ -21,8 +21,8 @@ import org.pentaho.di.trans.step.StepMeta;
  * Python generado, sin escribir en los archivos ni en las bases de la persona.
  *
  * <p>Python: corre una variante del script ({@link #variante}) en la que los bloques que escriben
- * ({@link Bloque#escribe}) no escriben: dejan lo que iban a escribir ({@link Bloque#escribeDf}) en un CSV de una carpeta temporal; los que leen
- * corren tal cual (sólo leen). Los steps finales que no escriben también se vuelcan. PDI: el {@link Motor} (las
+ * ({@link Bloque#escribe}) no escriben: dejan lo que iban a escribir ({@link Bloque#escribeDf}) en un CSV de una
+ * carpeta temporal; los que leen corren tal cual (sólo leen). Los steps finales que no escriben también se vuelcan. PDI: el {@link Motor} (las
  * pruebas doradas de la 0.7.0, en el paquete del plugin) corre la transformación con los steps que escriben saltados,
  * captura lo que habrían recibido y compara cada salida con su CSV de Python.
  */
