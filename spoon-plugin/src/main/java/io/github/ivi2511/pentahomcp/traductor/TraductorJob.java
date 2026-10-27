@@ -93,7 +93,8 @@ public final class TraductorJob {
         "Abort job: interrompe o job inteiro (main() ou o sub-job devolve False)." ) + "\"\"\"" ) );
     c.ayudante( "entrada", String.join( "\n",
       "def entrada(f):",
-      "    \"\"\"" + c.t( "Una entrada del job: devuelve True (éxito) o False (fallo); una excepción cuenta como fallo, "
+      "    \"\"\"" + c.t( "Una entrada del job: devuelve True (éxito) o False (fallo); una excepción cuenta "
+        + "como fallo, "
         + "como en PDI.", "A job entry: returns True (success) or False (failure); an exception counts as a failure, "
           + "as in PDI.", "Uma entrada do job: devolve True (sucesso) ou False (falha); uma exceção conta como "
             + "falha, como no PDI." ) + "\"\"\"",
@@ -334,7 +335,8 @@ public final class TraductorJob {
     String cuerpo = EscritorPy.cuerpo( p, "" );
     for ( Map.Entry<String, String> v : pc.vars.entrySet() ) {
       String k = v.getKey();
-      if ( k.equals( "Internal.Transformation.Filename.Directory" ) || k.equals( "Internal.Entry.Current.Directory" ) ) {
+      if ( k.equals( "Internal.Transformation.Filename.Directory" )
+        || k.equals( "Internal.Entry.Current.Directory" ) ) {
         c.vars.putIfAbsent( k, v.getValue() );
         continue;
       }
@@ -664,7 +666,8 @@ public final class TraductorJob {
     r.add( "while pendientes:" );
     r.add( "    actual = pendientes.pop()" );
     r.add( "    ok = actual()" );
-    r.add( "    pendientes += reversed([sig for sig, cuando in flujo.get(actual, []) if cuando is None or cuando == ok])" );
+    r.add( "    siguientes = [sig for sig, cuando in flujo.get(actual, []) if cuando is None or cuando == ok]" );
+    r.add( "    pendientes += reversed(siguientes)" );
     r.add( "return ok" );
   }
 

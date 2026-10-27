@@ -73,7 +73,8 @@ public class PruebaTradJob {
       String py = EscritorJob.escribir( p, op( d, "py" ) );
       contiene( py, "def tr_generar_constantes():", "una función por transformación" );
       contiene( py, "with con_variables({\"ARCHIVO_SALIDA\": \"01_desde_job\"}):", "parámetro de la entrada" );
-      contiene( py, "        if not tr_generar_constantes():\n            return e_abortar()\n", "camino de fallo recto" );
+      contiene( py, "        if not tr_generar_constantes():\n            return e_abortar()\n",
+        "camino de fallo recto" );
       contiene( py, "    except Abortar as e:", "Abort corta el job" );
       contiene( py, "    return e_success()", "fin con éxito" );
       contiene( py, "RESULT = {}", "RESULT" );
@@ -204,7 +205,8 @@ public class PruebaTradJob {
 
     String xml() {
       return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<job><name>" + nombre + "</name><description/>"
-        + "<parameters></parameters>" + conexion + "<entries>\n" + entradas + "</entries><hops>\n" + hops + "</hops><notepads>"
+        + "<parameters></parameters>" + conexion + "<entries>\n" + entradas + "</entries><hops>\n" + hops
+        + "</hops><notepads>"
         + "</notepads></job>\n";
     }
   }
@@ -212,7 +214,8 @@ public class PruebaTradJob {
   private static final String D = "${Internal.Entry.Current.Directory}";
 
   private static String escribirArchivo( String ruta, String texto, boolean anadir ) {
-    return "<filename>" + D + "/" + ruta + "</filename><createParentFolder>Y</createParentFolder><appendFile>" + ( anadir
+    return "<filename>" + D + "/" + ruta + "</filename><createParentFolder>Y</createParentFolder><appendFile>"
+      + ( anadir
       ? "Y" : "N" ) + "</appendFile><content>" + texto + "</content><encoding>UTF-8</encoding>";
   }
 

@@ -95,7 +95,8 @@ public final class EscritorJob {
     if ( o != null && o.titulo != null ) {
       b.append( sinComillas( o.titulo ) ).append( "\n\n" );
     }
-    b.append( c.t( "Traducción a Python del job «", "Python translation of the job '", "Tradução para Python do job «" ) )
+    b.append( c.t( "Traducción a Python del job «", "Python translation of the job '",
+      "Tradução para Python do job «" ) )
       .append( p.nombre ).append( c.t( "»", "'", "»" ) ).append( " (" ).append( p.destino().id() ).append( ").\n" );
     if ( p.archivo != null ) {
       b.append( c.t( "Origen: ", "Source: ", "Origem: " ) ).append( EscritorPy.nombreArchivo( p.archivo ) ).append(
@@ -140,10 +141,12 @@ public final class EscritorJob {
     r.add( "" );
     if ( c.spark() ) {
       r.add( "_builder = SparkSession.builder.appName(" + CtxTrad.lit( p.nombre ) + ")" );
-      r.add( "if os.name == \"nt\":  # " + c.t( "Windows: Spark local en localhost (un nombre de equipo con _ lo rompe)",
+      r.add( "if os.name == \"nt\":  # " + c.t(
+        "Windows: Spark local en localhost (un nombre de equipo con _ lo rompe)",
         "Windows: local Spark on localhost (a host name with _ breaks it)",
         "Windows: Spark local em localhost (um nome de máquina com _ o quebra)" ) );
-      r.add( "    _builder = _builder.config(\"spark.driver.host\", \"localhost\").config(\"spark.driver.bindAddress\", "
+      r.add( "    _builder = _builder.config(\"spark.driver.host\", \"localhost\")"
+        + ".config(\"spark.driver.bindAddress\", "
         + "\"127.0.0.1\")" );
       r.add( "spark = _builder.getOrCreate()" );
       r.add( "" );
@@ -152,7 +155,8 @@ public final class EscritorJob {
     r.add( "log = logging.getLogger(" + CtxTrad.lit( p.nombre ) + ")" );
     r.add( "" );
     r.add( "# " + c.t( "carpeta del script (o del notebook): la misma que la del .kjb",
-      "folder of the script (or notebook): the same as the .kjb's", "pasta do script (ou do notebook): a mesma do .kjb" ) );
+      "folder of the script (or notebook): the same as the .kjb's",
+      "pasta do script (ou do notebook): a mesma do .kjb" ) );
     r.add( "AQUI = os.path.dirname(os.path.abspath(__file__)) if \"__file__\" in globals() else os.getcwd()" );
     r.add( "VARS = {" );
     for ( Map.Entry<String, String> e : c.vars.entrySet() ) {
