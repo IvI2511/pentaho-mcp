@@ -1301,6 +1301,10 @@ final class TradFilas {
     String t = ctx.nuevo( "_tabla" );
     if ( ctx.pandas() ) {
       b.l( t + " = pd.read_sql(text(" + ctx.texto( sql ) + "), " + con + ")" );
+      b.l( "# " + ctx.t( "Enteros como Int64: si una clave no se encuentra, el valor queda <NA> y no pasa a float.",
+        "Integers as Int64: when a key is not found the value is <NA> instead of turning into float.",
+        "Inteiros como Int64: se uma chave não for encontrada, o valor fica <NA> e não passa a float." ) );
+      b.l( t + " = " + t + ".astype({c: \"Int64\" for c in " + t + ".select_dtypes(\"integer\").columns})" );
     } else {
       b.l( t + " = spark.read.format(\"jdbc\").options(**" + con + ").option(\"query\", " + ctx.texto( sql )
         + ").load()" );
