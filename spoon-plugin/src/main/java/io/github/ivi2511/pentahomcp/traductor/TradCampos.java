@@ -1049,17 +1049,32 @@ final class TradCampos {
         j++;
       }
       int n = j - i;
-      if ( ch == '\'' ) {
-        int f = java.indexOf( '\'', i + 1 );
-        if ( f < 0 ) {
-          f = java.length();
+      if ( ch == '\'' ) { // literal entre comillas; '' es una comilla (fuera o dentro del literal)
+        int k = i + 1;
+        if ( k < java.length() && java.charAt( k ) == '\'' ) {
+          r.append( '\'' );
+          i = k + 1;
+          continue;
         }
-        r.append( java.substring( i + 1, f ).replace( "%", "%%" ) );
-        i = f + 1;
+        while ( k < java.length() ) {
+          char c2 = java.charAt( k );
+          if ( c2 == '\'' ) {
+            if ( k + 1 < java.length() && java.charAt( k + 1 ) == '\'' ) {
+              r.append( '\'' );
+              k += 2;
+              continue;
+            }
+            break;
+          }
+          r.append( c2 == '%' ? "%%" : String.valueOf( c2 ) );
+          k++;
+        }
+        i = k + 1;
         continue;
       }
       switch ( ch ) {
         case 'y':
+        case 'Y':
           r.append( n == 2 ? "%y" : "%Y" );
           break;
         case 'M':
@@ -1069,10 +1084,18 @@ final class TradCampos {
           r.append( "%d" );
           break;
         case 'H':
-          r.append( "%H" );
+        case 'k':
+          r.append( "%H" ); // al leer, %H acepta también una cifra (H); al escribir siempre pone dos
           break;
         case 'h':
+        case 'K':
           r.append( "%I" );
+          break;
+        case 'u':
+          r.append( "%u" );
+          break;
+        case 'w':
+          r.append( "%V" );
           break;
         case 'm':
           r.append( "%M" );
@@ -1092,6 +1115,7 @@ final class TradCampos {
         case 'D':
           r.append( "%j" );
           break;
+        case 'z':
         case 'Z':
         case 'X':
           r.append( "%z" );

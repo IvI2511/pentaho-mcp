@@ -161,45 +161,9 @@ final class TradSalidas {
 
   // ================================================================ formatos
 
-  /** Máscara de fecha de Java (SimpleDateFormat) a strftime. */
+  /** Máscara de fecha de Java (SimpleDateFormat) a strftime: una sola conversión, la de {@link TradCampos#strftime}. */
   static String fechaPy( String java ) {
-    StringBuilder r = new StringBuilder();
-    int i = 0;
-    while ( i < java.length() ) {
-      char c = java.charAt( i );
-      if ( c == '\'' ) {
-        int j = java.indexOf( '\'', i + 1 );
-        if ( j < 0 ) {
-          j = java.length();
-        }
-        r.append( j == i + 1 ? "'" : java.substring( i + 1, j ).replace( "%", "%%" ) );
-        i = j + 1;
-        continue;
-      }
-      int j = i;
-      while ( j < java.length() && java.charAt( j ) == c ) {
-        j++;
-      }
-      int n = j - i;
-      switch ( c ) {
-        case 'y': case 'Y': r.append( n == 2 ? "%y" : "%Y" ); break;
-        case 'M': r.append( n >= 4 ? "%B" : n == 3 ? "%b" : "%m" ); break;
-        case 'd': r.append( "%d" ); break;
-        case 'H': case 'k': r.append( "%H" ); break;
-        case 'h': case 'K': r.append( "%I" ); break;
-        case 'm': r.append( "%M" ); break;
-        case 's': r.append( "%S" ); break;
-        case 'S': r.append( "%f" ); break;
-        case 'a': r.append( "%p" ); break;
-        case 'E': r.append( n >= 4 ? "%A" : "%a" ); break;
-        case 'D': r.append( "%j" ); break;
-        case 'z': case 'Z': case 'X': r.append( "%z" ); break;
-        default:
-          r.append( java.substring( i, j ).replace( "%", "%%" ) );
-      }
-      i = j;
-    }
-    return r.toString();
+    return java == null || java.isEmpty() ? "" : TradCampos.strftime( java );
   }
 
   /** Código Python que convierte una fecha (Series datetime) a texto con la máscara de Java dada. */
