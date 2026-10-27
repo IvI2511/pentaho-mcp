@@ -39,6 +39,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   failure and unconditional hops (straight code, or a small state machine when there is a loop), Abort that stops the
   job, about 45 PDI 9.4 entries (files, zip, SQL, variables, evaluations, shell, HTTP, mail...) and Kitchen's exit
   code. Compared with Kitchen on the files and tables each job leaves.
+- **The libraries, checked before running**: a `requirements.txt` is written (or completed, keeping what it had)
+  next to the script or notebook with exactly what the code uses, including the database driver of each connection
+  (`pymysql`, `psycopg2-binary`...); the code starts by checking them, so a missing library, or one too old, stops
+  with a clear message in the chosen language and the `pip install` command, instead of a `ModuleNotFoundError`
+  halfway through.
 - **Verification without touching anything**: *Verify with the data* runs the transformation (skipping the steps
   that write, as the golden tests do) and a variant of the Python that dumps what it would write, and compares them.
 - Connections become SQLAlchemy engines (pandas) or JDBC options (PySpark); passwords come from

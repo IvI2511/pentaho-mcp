@@ -29,6 +29,10 @@ public final class EscritorJob {
 
   public static String py( ProgramaJob p, Opciones o ) {
     StringBuilder b = new StringBuilder( cabecera( p, o ) );
+    for ( String l : Requisitos.comprobacion( Requisitos.de( p, o ), p.ctx.idioma ) ) {
+      b.append( l ).append( '\n' );
+    }
+    b.append( '\n' );
     for ( String l : preambulo( p ) ) {
       b.append( l ).append( '\n' );
     }
@@ -51,6 +55,7 @@ public final class EscritorJob {
       t.append( "\n\n" ).append( o.introduccion );
     }
     EscritorIpynb.texto( celdas, t.toString() );
+    EscritorIpynb.codigo( celdas, String.join( "\n", Requisitos.comprobacion( Requisitos.de( p, o ), c.idioma ) ) );
     EscritorIpynb.codigo( celdas, String.join( "\n", preambulo( p ) ) );
     for ( Funcion f : p.funciones ) {
       Bloque k = f.bloque;
@@ -120,6 +125,11 @@ public final class EscritorJob {
                 "transformations: ", "transformações: " ) ).append( p.transformaciones().size() ).append( " (" )
       .append( pasos ).append( " steps, " ).append( manual ).append( c.t( " a completar).", " to complete).",
         " a completar)." ) ).append( '\n' );
+    String req = "pip install -r " + Requisitos.ARCHIVO;
+    String pip = Requisitos.pip( Requisitos.de( p, o ) );
+    b.append( c.t( "Bibliotecas: " + req + " (o " + pip + "); el código comprueba al empezar que estén todas.",
+      "Libraries: " + req + " (or " + pip + "); the code checks at the start that they are all there.",
+      "Bibliotecas: " + req + " (ou " + pip + "); o código verifica no início se estão todas." ) ).append( '\n' );
     b.append( c.t( "Ejecútalo como Kitchen: python script.py (código de salida 0 si el job termina bien).",
       "Run it like Kitchen: python script.py (exit code 0 if the job ends well).",
       "Execute-o como o Kitchen: python script.py (código de saída 0 se o job terminar bem)." ) ).append( '\n' );

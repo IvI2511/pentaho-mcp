@@ -455,6 +455,9 @@ final class TraducirDialogo {
     }
     int total = h.exactos + h.aproximados + h.manuales;
     b.append( r.f( "t_counts", total, h.exactos, h.aproximados, h.manuales ) );
+    if ( !h.requisitos.isEmpty() ) {
+      b.append( '\n' ).append( r.f( "t_requirements", String.join( ", ", h.requisitos ) ) );
+    }
     List<String> manuales = new ArrayList<String>();
     for ( Bloque k : h.bloques ) {
       if ( k.estado == Estado.MANUAL ) {

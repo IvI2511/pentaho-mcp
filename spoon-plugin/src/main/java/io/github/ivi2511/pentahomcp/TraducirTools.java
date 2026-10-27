@@ -2,6 +2,7 @@ package io.github.ivi2511.pentahomcp;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import io.github.ivi2511.pentahomcp.traductor.EscritorPy;
 import io.github.ivi2511.pentahomcp.traductor.Estado;
 import io.github.ivi2511.pentahomcp.traductor.Opciones;
 import io.github.ivi2511.pentahomcp.traductor.Programa;
+import io.github.ivi2511.pentahomcp.traductor.Requisitos;
 import io.github.ivi2511.pentahomcp.traductor.ProgramaJob;
 import io.github.ivi2511.pentahomcp.traductor.Registro;
 import io.github.ivi2511.pentahomcp.traductor.TraductorJob;
@@ -75,6 +77,10 @@ final class TraducirTools {
     /** null si no se pidió verificar. */
     Verificacion.Resultado verificacion;
     final List<String> avisos = new ArrayList<>();
+    /** Las bibliotecas que usa el código (las del requirements.txt). */
+    List<String> requisitos = new ArrayList<>();
+    /** El requirements.txt escrito o completado al lado (null si no se pudo). */
+    File requirements;
   }
 
   // ================================================================ herramientas
@@ -165,6 +171,13 @@ final class TraducirTools {
     r.put( "path", h.archivo.getAbsolutePath() );
     r.put( "format", o.formato );
     r.put( "engine", o.destino.id() );
+    ArrayNode req = r.putArray( "requirements" );
+    for ( String s : h.requisitos ) {
+      req.add( s );
+    }
+    if ( h.requirements != null ) {
+      r.put( "requirements_file", h.requirements.getAbsolutePath() );
+    }
     ObjectNode c = r.putObject( "counts" );
     c.put( "exact", h.exactos ).put( "approximate", h.aproximados ).put( "manual", h.manuales );
     ArrayNode pasos = r.putArray( "steps" );
@@ -285,6 +298,7 @@ final class TraducirTools {
       TransMeta copia = copiaTrans( (TransMeta) meta, xml );
       Programa p = TraductorTrans.traducir( copia, o.destino, o.idioma );
       texto = o.notebook() ? EscritorIpynb.escribir( p, o ) : EscritorPy.escribir( p, o );
+      h.requisitos = Requisitos.de( p, o );
       contar( h, p.bloques );
       if ( verificar ) {
         h.verificacion = verificar( p, xml, origen, o );
@@ -300,6 +314,13 @@ final class TraducirTools {
       throw new ToolError( "Cannot create the folder " + dir );
     }
     Files.write( destino.toPath(), texto.getBytes( StandardCharsets.UTF_8 ) );
+    try {
+      h.requirements = Requisitos.escribir( dir != null ? dir : new File( "." ), h.requisitos );
+    } catch ( IOException e ) {
+      h.avisos.add( t( o, "No se pudo escribir " + Requisitos.ARCHIVO + ": " + e.getMessage(), "Could not write "
+        + Requisitos.ARCHIVO + ": " + e.getMessage(), "Não foi possível escrever " + Requisitos.ARCHIVO + ": "
+          + e.getMessage() ) );
+    }
     return h;
   }
 
@@ -350,6 +371,7 @@ final class TraducirTools {
       }
     }
     contar( h, bs );
+    h.requisitos = Requisitos.de( p, o );
     return EscritorJob.escribir( p, o );
   }
 

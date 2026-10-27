@@ -69,6 +69,9 @@ public final class EscritorIpynb {
     }
     texto( celdas, id, como.toString().trim() );
 
+    // comprobación de las bibliotecas (antes de cualquier import)
+    codigo( celdas, id, String.join( "\n", Requisitos.comprobacion( EscritorPy.paquetes( p, o ), i ) ) );
+
     // preámbulo
     List<String> pre = EscritorPy.preambulo( p );
     String preambulo = String.join( "\n", pre ).trim();

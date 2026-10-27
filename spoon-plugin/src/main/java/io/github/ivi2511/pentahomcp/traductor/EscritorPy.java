@@ -42,6 +42,10 @@ public final class EscritorPy {
     StringBuilder b = new StringBuilder();
     List<String> pre = preambulo( p );
     b.append( cabecera( p, o ) );
+    for ( String l : Requisitos.comprobacion( paquetes( p, o ), o.idioma ) ) {
+      b.append( l ).append( '\n' );
+    }
+    b.append( '\n' );
     for ( String l : pre ) {
       b.append( l ).append( '\n' );
     }
@@ -119,9 +123,14 @@ public final class EscritorPy {
   static List<String> comoCorrer( Programa p, Opciones o, boolean markdown ) {
     String i = o.idioma;
     List<String> r = new ArrayList<>();
-    String pip = "pip install " + String.join( " ", paquetes( p, o ) );
+    String pip = Requisitos.pip( paquetes( p, o ) );
+    String req = "pip install -r " + Requisitos.ARCHIVO;
     r.add( t( i, "1. Instala las bibliotecas: ", "1. Install the libraries: ", "1. Instale as bibliotecas: " )
-      + ( markdown ? "`" + pip + "`" : pip ) );
+      + ( markdown ? "`" + req + "`" : req ) + t( i, " (el archivo queda al lado) o ", " (the file is next to this "
+        + "one) or ", " (o arquivo fica ao lado) ou " ) + ( markdown ? "`" + pip + "`" : pip ) + t( i, ". El código "
+          + "comprueba al empezar que estén todas y, si falta alguna, dice cuál.", ". The code checks at the start "
+            + "that they are all there and, if one is missing, says which.", ". O código verifica no início se "
+              + "estão todas e, se faltar alguma, diz qual." ) );
     if ( p.destino() == Destino.PYSPARK ) {
       r.add( t( i, "   PySpark necesita Java 17 o posterior (JAVA_HOME).", "   PySpark needs Java 17 or later "
         + "(JAVA_HOME).", "   O PySpark precisa do Java 17 ou posterior (JAVA_HOME)." ) );
@@ -227,13 +236,16 @@ public final class EscritorPy {
         r.add( "pandas" );
       }
     }
+    if ( p.destino() == Destino.PYSPARK && c.contains( ".toPandas(" ) ) {
+      r.add( "pandas" );
+    }
     if ( r.isEmpty() ) {
       r.add( p.destino() == Destino.PYSPARK ? "pyspark" : "pandas" );
     }
     List<String> l = new ArrayList<>( r );
     int i = l.indexOf( "sqlalchemy" );
     if ( i >= 0 ) { // pandas 3 no acepta un SQLAlchemy anterior (to_sql falla con «'Engine' has no attribute 'cursor'»)
-      l.set( i, "\"sqlalchemy>=2.0.36\"" );
+      l.set( i, "sqlalchemy>=2.0.36" );
     }
     return l;
   }
