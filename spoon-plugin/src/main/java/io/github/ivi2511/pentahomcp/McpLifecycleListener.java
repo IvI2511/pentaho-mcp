@@ -152,6 +152,7 @@ public class McpLifecycleListener implements LifecycleListener {
       DiffTools.register( server );
       PlanoTools.register( server ); // 0.7.0: plano ETL, boceto (D1, D2)
       MapeoTools.register( server ); // 0.7.0: hoja de mapeo (D3)
+      TraducirTools.register( server ); // 0.8.0: traductor a Python (pandas, PySpark)
       McpResources.register( server );
       server.start();
       LOG.logBasic( "Pentaho MCP " + VERSION + " escuchando en http://127.0.0.1:" + port + "/mcp ("
