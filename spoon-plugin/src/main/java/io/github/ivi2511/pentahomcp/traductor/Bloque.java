@@ -25,6 +25,15 @@ public final class Bloque {
   public String vista;
   /** Sugerencia de gráfico para el notebook (null = ninguno): ver {@link Grafico}. */
   public Grafico grafico;
+  /**
+   * El bloque escribe fuera del programa (archivo, tabla, dimensión, SQL que modifica). La verificación corre una
+   * variante que no ejecuta estos bloques: guarda {@link #escribeDf} (lo que iba a escribir) para comparar.
+   */
+  public boolean escribe;
+  /** El DataFrame que el bloque escribe (normalmente su entrada), si {@link #escribe}. */
+  public String escribeDf;
+  /** El bloque lee de fuera (archivo, base, sistema): la verificación lo deja correr tal cual (sólo lee). */
+  public boolean lee;
 
   public Bloque( String paso, String tipo ) {
     this.paso = paso;

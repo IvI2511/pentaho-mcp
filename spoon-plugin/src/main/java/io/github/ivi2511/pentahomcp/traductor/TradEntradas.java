@@ -40,6 +40,7 @@ final class TradEntradas {
     }
     b.aproximado( ctx.t( "Esqueleto inicial: falta convertir tipos y formatos.", "Initial skeleton: types and formats "
       + "still to convert.", "Esqueleto inicial: falta converter tipos e formatos." ) );
+    b.lee = true;
     b.vista = df;
     return b;
   }
