@@ -231,7 +231,12 @@ public final class EscritorPy {
     if ( r.isEmpty() ) {
       r.add( p.destino() == Destino.PYSPARK ? "pyspark" : "pandas" );
     }
-    return new ArrayList<>( r );
+    List<String> l = new ArrayList<>( r );
+    int i = l.indexOf( "sqlalchemy" );
+    if ( i >= 0 ) { // pandas 3 no acepta un SQLAlchemy anterior (to_sql falla con «'Engine' has no attribute 'cursor'»)
+      l.set( i, "\"sqlalchemy>=2.0.36\"" );
+    }
+    return l;
   }
 
   private static List<String> preambuloConexiones( Programa p ) {
