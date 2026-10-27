@@ -325,6 +325,15 @@ Full policy: [`PRIVACY.md`](PRIVACY.md).
 - Class mode works on **transformations only** (not jobs yet), one lesson per transformation; beyond 12
   steps it warns and suggests splitting it. A lesson that previews rows needs the `.ktr` saved next to its data first.
 
+## New in 0.8.0
+
+**From blocks to Python** (90 MCP tools): *IDC > Translate to Python…* turns a transformation or a job into
+readable **pandas** or **PySpark** code, as a `.py` script or a Jupyter notebook, with comments and explanations in
+English, Spanish or Portuguese, optional title, author, introduction, previews and EDA charts. Every step is marked
+exact, approximate or to complete, and *Verify with the data* compares the Python with PDI without writing anything.
+The Grano de Oro reference solution is translated in [`ejemplo/python/`](ejemplo/python/): the translated job passes
+the same 29 checks as Kitchen. See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## New in 0.7.1
 
 - **Golden tests for jobs**: freeze a whole `.kjb` run (step outputs, tables and the files it leaves) and

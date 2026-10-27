@@ -116,8 +116,9 @@ public class PruebaTradJob {
       contiene( py, "        if not tr_cargar_dim_tienda():\n            return rama_registrar_el_error()\n",
         "rama de fallo compartida como función" );
       noContiene( py, "\"user\": \"${", "sin variables sin resolver" );
-      noContiene( py, "OneDrive", "sin rutas personales" );
-      noContiene( py, "ivanc", "sin rutas personales" );
+      noContiene( py, ":/Users/", "sin rutas personales" );
+      noContiene( py, ":\\\\Users\\\\", "sin rutas personales" );
+      noContiene( py, System.getProperty( "user.name" ), "sin el usuario del equipo" );
       escribir( p, "job_carga_dw", d );
     }
   }

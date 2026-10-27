@@ -340,6 +340,16 @@ Política completa: [`PRIVACY.md`](PRIVACY.md) (en inglés).
 - El modo clase funciona **solo con transformaciones** (todavía no con jobs), una lección por
   transformación; con más de 12 pasos avisa y propone partirla. Si la lección muestra filas, guarda antes el `.ktr` junto a sus datos.
 
+## Lo nuevo en 0.8.0
+
+**De bloques a Python** (90 herramientas MCP): *IDC › Traducir a Python…* convierte una transformación o un job en
+código **pandas** o **PySpark** legible, como script `.py` o notebook de Jupyter, con comentarios y explicaciones en
+español, inglés o portugués, y si quieres título, autor, introducción, vistas previas y gráficos de análisis
+exploratorio. Cada step queda marcado como exacto, aproximado o a completar, y *Verificar con los datos* compara el
+Python con PDI sin escribir nada. La solución de referencia de Grano de Oro está traducida en
+[`ejemplo/python/`](ejemplo/python/): el job traducido cuadra las mismas 29 comprobaciones que Kitchen. Consulta
+[`CHANGELOG.md`](CHANGELOG.md).
+
 ## Lo nuevo en 0.7.1
 
 - **Pruebas de referencia para jobs**: congela una ejecución completa de un `.kjb` (salidas de steps, tablas y

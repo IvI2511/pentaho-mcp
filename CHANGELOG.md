@@ -7,6 +7,47 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-27
+
+"De bloques a Python": 90 MCP tools.
+
+### Added
+
+- **Translate to Python** (IDC menu > *Translate to Python…*, and the `translate_to_python` / `translate_coverage`
+  tools): a transformation (`.ktr`) or a job (`.kjb`) becomes readable **pandas** or **PySpark** code, as a `.py`
+  script or a Jupyter **notebook** (`.ipynb`). The dialog asks for the format, the library and the language of the
+  comments and Markdown cells (English, Spanish or Portuguese), and optionally a title, an author, an introduction of
+  your own, an explanation per step, previews, exploratory-analysis (EDA) charts with matplotlib and notes on what
+  differs from PDI. The notebook has a "how to run it" cell (the `pip install` line and the environment variables for
+  database passwords, never the passwords) and a summary table; every step is marked **exact**, **approximate** or
+  **to complete**.
+- **Steps**: inputs (CSV, text with masks, fixed width, Excel, JSON, XML, table, data grid, generate rows,
+  variables, system info, random values, file names, file content), fields and conditions (Filter rows with every
+  condition, Switch / Case, Java filter, Join rows, Calculator with 55+ functions and PDI's rounding modes, Formula,
+  User Defined Java Expression, simple JavaScript, Select values with date and number masks, String operations,
+  Replace in string, Strings cut, Concat fields, Split fields / to rows, Value mapper, If null, Null if, Number range,
+  Set value, Add constants / sequence / checksum, Regex evaluation, Data validator with its error hop, Clone row),
+  rows and lookups (Sort rows, Unique rows, Group by with all 20 aggregates and PDI's consecutive-group semantics,
+  Memory group by, Analytic query, Row (de)normaliser and flattener, Stream / Database lookup, Database join, Merge
+  join, Merge rows, Multiway merge join, Append, Sorted merge, Fuzzy match, Sample / Reservoir sampling, Blocking,
+  Abort, Detect empty / last row, rows to / from result) and outputs (text, Excel, JSON, XML, SQL file, table,
+  insert / update, update, delete, synchronize after merge, SCD type 1/2 dimension, combination lookup, SQL scripts,
+  write to log). Every translator was compared row by row with Kettle on small inputs, in pandas and in PySpark.
+  What has no reasonable translation (sub-transformations, executors, complex JavaScript) stays a block to complete
+  with the step's settings commented.
+- **Jobs**: one function per entry (transformations and sub-jobs inside), a `main()` that follows the success,
+  failure and unconditional hops (straight code, or a small state machine when there is a loop), Abort that stops the
+  job, about 45 PDI 9.4 entries (files, zip, SQL, variables, evaluations, shell, HTTP, mail...) and Kitchen's exit
+  code. Compared with Kitchen on the files and tables each job leaves.
+- **Verification without touching anything**: *Verify with the data* runs the transformation (skipping the steps
+  that write, as the golden tests do) and a variant of the Python that dumps what it would write, and compares them.
+- Connections become SQLAlchemy engines (pandas) or JDBC options (PySpark); passwords come from
+  `PDI_PASSWORD_<CONNECTION>`, never from the `.ktr`, and no local path is written.
+- `ejemplo/python/`: the Grano de Oro reference solution translated (all steps exact). The translated job, run on a
+  copy of the data, passes the 29 checks of `comprobar_resultados.py`, like Kitchen.
+- Manual chapter 14 (`manual/14-python.md`) and `docs/traductor-cobertura.md`.
+
+
 ## [0.7.1] - 2026-10-26
 
 ### Added
@@ -941,7 +982,8 @@ canvas. **Robustness** makes a load tolerate dirty data and proves it with broke
 
 - Tested with PDI 9.4.0.0-343 CE on Java 21 (Windows).
 
-[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/IvI2511/pentaho-mcp/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IvI2511/pentaho-mcp/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/IvI2511/pentaho-mcp/compare/v0.6.1...v0.6.2
