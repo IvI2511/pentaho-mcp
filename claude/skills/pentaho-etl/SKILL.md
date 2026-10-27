@@ -1,6 +1,6 @@
 ---
 name: pentaho-etl
-description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), grade students' exercises against an expected output (exercise packs, rubric, gradebook), teach it step by step on the canvas (class mode, lessons), make a load tolerate dirty data (rejects with a reason, harden_etl, stress_test), plan an ETL before building it (design file, data-flow and UML diagrams, sketch on the canvas, source-to-target mapping sheet), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
+description: Build, modify, review, document or debug Pentaho Data Integration 9.4 (Spoon/Kettle) ETLs — .ktr transformations and .kjb jobs. Use when the user asks to build a Pentaho/PDI/Kettle/Spoon transformation or job, add steps (CSV input, Filter rows, Group by, Stream lookup, Table output...), connect to a database from Pentaho, write a report of an ETL, check its good practices (lint, 0-100 quality score, fixes), grade students' exercises against an expected output (exercise packs, rubric, gradebook), teach it step by step on the canvas (class mode, lessons), make a load tolerate dirty data (rejects with a reason, harden_etl, stress_test), plan an ETL before building it (design file, data-flow and UML diagrams, sketch on the canvas, source-to-target mapping sheet), translate it to Python (pandas or PySpark, .py script or Jupyter notebook), or find out why a .ktr/.kjb fails or gives a wrong result. Works live through the "pentaho" MCP (Spoon open) or by writing the XML and checking it with Pan/Kitchen.
 ---
 
 # Pentaho Data Integration 9.4 — ETLs
@@ -210,6 +210,20 @@ intended. Tests live in `tests/` next to the `.ktr`; in Spoon, **IDC › Tests�
 A **job** can be tested too (`job_file`; steps as `"Entry :: Step"`, plus `files` and `tables` it leaves).
 Format, jobs, databases and troubleshooting: `manual/12-pruebas.md`.
 
+## Python: translating an ETL to pandas or PySpark
+
+When the person asks to convert, translate or export an ETL to Python, pandas, PySpark, a notebook or Jupyter
+(*pásalo a Python, quiero un notebook de esta transformación, tradúcelo a PySpark*): `translate_to_python`.
+**Always ask first** what they did not say: a **`.py` script or a `.ipynb` notebook**, and **pandas or
+PySpark** (also, if it matters to them: language, title, author, an introduction, EDA charts). Suggest
+`verify: true` when Python is available: PDI and the Python run on the same data, nothing is written to their
+files or databases, and each output comes back equal / different / not verified. Report the counts
+(exact / approximate / manual) and go over the approximate and manual steps with their notes. A job becomes
+one script with a function per transformation and a `main()` that follows the hops. Which ids translate:
+`translate_coverage` (or `docs/traductor-cobertura.md` of the repo). In Spoon: **IDC › Translate to
+Python…**. Options, notebook layout, PDI vs pandas differences, verification and PySpark on Windows:
+`manual/14-python.md`.
+
 ## Where everything is
 
 | I need… | Read |
@@ -226,6 +240,7 @@ Format, jobs, databases and troubleshooting: `manual/12-pruebas.md`.
 | What changed between two versions (`diff_documents`, Compare…), readable `git diff`, `pentaho-live normalize`, the pre-commit hook | `manual/11-versiones.md` |
 | Regression tests with golden datasets: `test_create`, `test_run`, the test file, test databases, run on save | `manual/12-pruebas.md` |
 | Team projects: the lint profile `.pentaho-live/lint.yaml`, `lint_profile`, `project_init` / `pentaho-live init`, `pentaho-live lint` / `test` / `diff`, CI | `manual/13-proyecto.md` |
+| Translating to Python (pandas / PySpark, `.py` / `.ipynb`): `translate_to_python`, `translate_coverage`, the notebook, verification, PySpark on Windows | `manual/14-python.md`, `docs/traductor-cobertura.md` of the repo |
 | The exact id of a step or entry, by category | `catalogo/INDICE.md` |
 | How to configure a common step, with an example and its pitfalls | `catalogo/steps-comunes.md` (~45 steps) |
 | The default XML of ANY step / entry | `catalogo/steps/<id>.xml`, `catalogo/job-entries/<id>.xml` |

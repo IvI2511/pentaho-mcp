@@ -675,20 +675,22 @@ public class PruebaIdcDialogos {
         final List<String> elegidos = new ArrayList<String>();
         IdcMenu.llenar( m, IdcMenu.modelo( r, c ), elegidos::add );
         MenuItem[] items = m.getItems();
-        igual( 14, items.length, "9 acciones (0.7.0: Comparar…, Pruebas…, Diseño…, Hoja de mapeo… y Preparar "
-          + "proyecto…), 2 separadores, 2 perspectivas y acerca" );
+        igual( 15, items.length, "10 acciones (0.7.0: Comparar…, Pruebas…, Diseño…, Hoja de mapeo… y Preparar "
+          + "proyecto…; 0.8.0: Traducir a Python…), 2 separadores, 2 perspectivas y acerca" );
         igual( "Revisar calidad…", items[ 0 ].getText(), "primera" );
         falso( items[ 1 ].getEnabled(), "robustecer con un job" );
         igual( "Comparar…", items[ 3 ].getText(), "comparar" );
         cierto( items[ 4 ].getEnabled(), "pruebas con un job (0.7.1)" );
-        falso( items[ 7 ].getEnabled(), "hoja de mapeo con un job" );
-        igual( "Preparar proyecto…", items[ 8 ].getText(), "preparar proyecto" );
-        cierto( ( items[ 9 ].getStyle() & SWT.SEPARATOR ) != 0, "separador" );
-        cierto( ( items[ 11 ].getStyle() & SWT.RADIO ) != 0, "perspectiva como radio" );
-        cierto( items[ 11 ].getSelection(), "Informes marcada" );
+        igual( "Traducir a Python…", items[ 5 ].getText(), "traducir (0.8.0)" );
+        cierto( items[ 5 ].getEnabled(), "traducir con un job" );
+        falso( items[ 8 ].getEnabled(), "hoja de mapeo con un job" );
+        igual( "Preparar proyecto…", items[ 9 ].getText(), "preparar proyecto" );
+        cierto( ( items[ 10 ].getStyle() & SWT.SEPARATOR ) != 0, "separador" );
+        cierto( ( items[ 12 ].getStyle() & SWT.RADIO ) != 0, "perspectiva como radio" );
+        cierto( items[ 12 ].getSelection(), "Informes marcada" );
         items[ 0 ].notifyListeners( SWT.Selection, new Event() );
-        items[ 11 ].notifyListeners( SWT.Selection, new Event() );
-        items[ 13 ].notifyListeners( SWT.Selection, new Event() );
+        items[ 12 ].notifyListeners( SWT.Selection, new Event() );
+        items[ 14 ].notifyListeners( SWT.Selection, new Event() );
         igual( Arrays.asList( "quality", "perspective:b", "about" ), elegidos, "cada entrada su id" );
         m.dispose();
         img.dispose();
@@ -697,6 +699,136 @@ public class PruebaIdcDialogos {
       }
       return null;
     } );
+  }
+
+  /**
+   * «Traducir a Python…» (0.8.0): sin Python la verificación queda apagada y lo dice; la salida por defecto sigue al
+   * formato hasta que se escribe a mano; Generar pregunta si reemplaza, traduce en segundo plano (con las opciones
+   * elegidas) y muestra el resumen con la verificación; Abrir carpeta / archivo.
+   */
+  public void pruebaH_Traducir() throws Exception {
+    final TraducirDialogo.Traductor antes = TraducirDialogo.traductor;
+    final java.util.function.Supplier<String> pythonAntes = TraducirDialogo.buscadorPython;
+    final java.util.function.Consumer<String> abridorAntes2 = TraducirDialogo.abridor;
+    final java.util.function.BiFunction<Shell, String, Boolean> preguntadorAntes2 = TraducirDialogo.preguntador;
+    final List<Object[]> pedidos = Collections.synchronizedList( new ArrayList<Object[]>() );
+    final List<String> abiertos = Collections.synchronizedList( new ArrayList<String>() );
+    final List<String> preguntas = Collections.synchronizedList( new ArrayList<String>() );
+    final File destino = new File( capturas, "traducido.ipynb" );
+    destino.delete();
+    TraducirDialogo.buscadorPython = () -> null;
+    TraducirDialogo.abridor = abiertos::add;
+    TraducirDialogo.preguntador = ( sh, texto ) -> {
+      preguntas.add( texto );
+      return true;
+    };
+    TraducirDialogo.traductor = ( m, o, f, sob, verif ) -> {
+      pedidos.add( new Object[] { o, f, sob, verif } );
+      java.nio.file.Files.write( f.toPath(), "{}".getBytes( "UTF-8" ) );
+      TraducirTools.Hecho h = new TraducirTools.Hecho();
+      h.archivo = f;
+      h.exactos = 3;
+      h.aproximados = 1;
+      h.manuales = 1;
+      io.github.ivi2511.pentahomcp.traductor.Bloque b = new io.github.ivi2511.pentahomcp.traductor.Bloque( "Rarezas",
+        "Formula" );
+      b.manual( "x" );
+      h.bloques.add( b );
+      io.github.ivi2511.pentahomcp.traductor.Verificacion.Resultado v =
+        new io.github.ivi2511.pentahomcp.traductor.Verificacion.Resultado();
+      v.estado = io.github.ivi2511.pentahomcp.traductor.Verificacion.DISTINTO;
+      io.github.ivi2511.pentahomcp.traductor.Verificacion.Salida s1 =
+        new io.github.ivi2511.pentahomcp.traductor.Verificacion.Salida();
+      s1.paso = "Totales";
+      s1.estado = io.github.ivi2511.pentahomcp.traductor.Verificacion.IGUAL;
+      s1.filasPdi = 4;
+      s1.filasPython = 4;
+      io.github.ivi2511.pentahomcp.traductor.Verificacion.Salida s2 =
+        new io.github.ivi2511.pentahomcp.traductor.Verificacion.Salida();
+      s2.paso = "Clientes";
+      s2.estado = io.github.ivi2511.pentahomcp.traductor.Verificacion.DISTINTO;
+      s2.filasPdi = 5;
+      s2.filasPython = 6;
+      s2.diferencias.add( "fila 3, importe: PDI 1.5, Python 1.50001" );
+      v.salidas.add( s1 );
+      v.salidas.add( s2 );
+      h.verificacion = v;
+      h.avisos.add( "aviso de prueba" );
+      return h;
+    };
+    final org.pentaho.di.trans.TransMeta tm = EntornoKettle.trans( "03_ventas_por_producto.ktr" );
+    final Rotulos rt = Rotulos.de( TraducirDialogo.AREA, "es" );
+    final TraducirDialogo[] d = new TraducirDialogo[ 1 ];
+    try {
+      ui( () -> {
+        d[ 0 ] = new TraducirDialogo( host, tm, rt );
+        d[ 0 ].shell.pack();
+        mostrar( d[ 0 ].shell );
+        d[ 0 ].buscarPython();
+        return null;
+      } );
+      igual( "Traducir a Python: " + tm.getName(), ui( () -> d[ 0 ].shell.getText() ), "título" );
+      esperarUi( () -> d[ 0 ].verificar.getToolTipText() != null && d[ 0 ].verificar.getToolTipText().contains(
+        "PENTAHO_LIVE_PYTHON" ), "sin Python lo dice" );
+      falso( ui( () -> d[ 0 ].verificar.getEnabled() ), "sin Python no se verifica" );
+      igual( tm.getName(), ui( () -> d[ 0 ].titulo.getText() ), "título por defecto: el nombre" );
+      cierto( ui( () -> d[ 0 ].ipynb.getSelection() && d[ 0 ].pandas.getSelection() ), "notebook y pandas" );
+      pantalla( d[ 0 ].shell, "traducir.png" );
+      ui( () -> {
+        d[ 0 ].autor.setText( "Ada" );
+        d[ 0 ].intro.setText( "Hola" );
+        d[ 0 ].eda.setSelection( true );
+        d[ 0 ].pyspark.setSelection( true );
+        d[ 0 ].pandas.setSelection( false );
+        d[ 0 ].idioma.select( 1 );
+        d[ 0 ].salida.setText( destino.getPath() );
+        return null;
+      } );
+      cierto( ui( () -> d[ 0 ].salidaEditada ), "escrita a mano" );
+      ui( () -> {
+        d[ 0 ].salidaPorDefecto();
+        return null;
+      } );
+      igual( destino.getPath(), ui( () -> d[ 0 ].salida.getText() ), "a mano no se recalcula" );
+      java.nio.file.Files.write( destino.toPath(), "viejo".getBytes( "UTF-8" ) );
+      clic( d[ 0 ].generar );
+      esperarUi( () -> !d[ 0 ].ocupado && d[ 0 ].resumen.getText().length() > 0, "traducido" );
+      igual( 1, preguntas.size(), "pregunta si reemplaza" );
+      igual( 1, pedidos.size(), "una traducción" );
+      io.github.ivi2511.pentahomcp.traductor.Opciones o = (io.github.ivi2511.pentahomcp.traductor.Opciones)
+        pedidos.get( 0 )[ 0 ];
+      igual( "ipynb", o.formato, "formato" );
+      igual( io.github.ivi2511.pentahomcp.traductor.Destino.PYSPARK, o.destino, "PySpark" );
+      igual( "en", o.idioma, "idioma" );
+      igual( "Ada", o.autor, "autor" );
+      igual( "Hola", o.introduccion, "introducción" );
+      cierto( o.eda && o.explicaciones && o.vistas && o.notas, "qué agregar" );
+      igual( Boolean.TRUE, pedidos.get( 0 )[ 2 ], "sobrescribir tras preguntar" );
+      igual( Boolean.FALSE, pedidos.get( 0 )[ 3 ], "sin verificar (no hay Python)" );
+      String res = ui( () -> d[ 0 ].resumen.getText() );
+      contiene( res, "5 steps: 3 exactos, 1 aproximados, 1 a completar a mano", "conteos" );
+      contiene( res, "Rarezas (Formula)", "los manuales por nombre" );
+      contiene( res, "hay salidas distintas de PDI", "la verificación" );
+      contiene( res, "Totales: igual (4 filas)", "salida igual" );
+      contiene( res, "Clientes: distinto (PDI 5 filas, Python 6 filas)", "salida distinta" );
+      contiene( res, "aviso de prueba", "avisos" );
+      pantalla( d[ 0 ].shell, "traducir-hecho.png" );
+      clic( d[ 0 ].abrirArchivo );
+      clic( d[ 0 ].abrirCarpeta );
+      igual( Arrays.asList( destino.getAbsolutePath(), destino.getAbsoluteFile().getParentFile().getPath() ),
+        abiertos, "abre el archivo y la carpeta" );
+      igual( "Traducir a Python…", rt.s( "menu_translate" ), "texto del menú" );
+      igual( "Translate to Python…", Rotulos.de( TraducirDialogo.AREA, "en" ).s( "menu_translate" ), "en" );
+      igual( "Traduzir para Python…", Rotulos.de( TraducirDialogo.AREA, "pt" ).s( "menu_translate" ), "pt" );
+    } finally {
+      TraducirDialogo.traductor = antes;
+      TraducirDialogo.buscadorPython = pythonAntes;
+      TraducirDialogo.abridor = abridorAntes2;
+      TraducirDialogo.preguntador = preguntadorAntes2;
+      if ( d[ 0 ] != null ) {
+        cerrarShell( d[ 0 ].shell );
+      }
+    }
   }
 
   /** «Acerca de»: versión y enlace; se cierra con su botón. */
