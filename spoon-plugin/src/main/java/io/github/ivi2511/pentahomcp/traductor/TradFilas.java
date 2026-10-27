@@ -1228,20 +1228,22 @@ final class TradFilas {
       }
       for ( int i = 0; i < vals.length; i++ ) {
         String nn = nuevos != null && i < nuevos.length && !vacio( nuevos[i] ) ? nuevos[i] : vals[i];
-        sel.append( ", F.col(" ).append( CtxTrad.lit( vals[i] ) ).append( ").alias(" ).append( CtxTrad.lit( nn ) )
+        sel.append( sel.length() == 0 ? "" : ", " ).append( "F.col(" ).append( CtxTrad.lit( vals[i] ) ).append(
+          ").alias(" ).append( CtxTrad.lit( nn ) )
           .append( ")" );
       }
       b.l( t + " = " + lk + ".withColumn(\"_orden\", F.monotonically_increasing_id())" );
       b.l( t + " = " + t + ".withColumn(\"_ultima\", F." + ( "last".equals( queda ) ? "max" : "min" )
         + "(\"_orden\").over(Window.partitionBy(" + args( der ) + ")))" );
-      b.l( t + " = " + t + ".filter(F.col(\"_orden\") == F.col(\"_ultima\")).select(" + sel + ", F.lit(True).alias("
+      b.l( t + " = " + t + ".filter(F.col(\"_orden\") == F.col(\"_ultima\")).select("
+        + ( sel.length() == 0 ? "" : sel + ", " ) + "F.lit(True).alias("
         + "\"_hay\"))" );
       StringBuilder cond = new StringBuilder();
       for ( int i = 0; i < izq.size(); i++ ) {
         cond.append( i == 0 ? "" : " & " ).append( "F.col(" ).append( CtxTrad.lit( izq.get( i ) ) ).append(
           ").eqNullSafe(F.col(" ).append( CtxTrad.lit( kk.get( i ) ) ).append( "))" );
       }
-      b.l( out + " = " + in + ".join(F.broadcast(" + t + "), " + cond + ", " + ( comer ? "\"inner\"" : "\"left\"" )
+      b.l( out + " = " + in + ".join(F.broadcast(" + t + "), " + ( cond.length() == 0 ? "F.lit(True)" : cond ) + ", " + ( comer ? "\"inner\"" : "\"left\"" )
         + ")" );
       for ( int i = 0; i < vals.length; i++ ) {
         if ( defs != null && i < defs.length && !vacio( defs[i] ) && !comer ) {
