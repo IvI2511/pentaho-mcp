@@ -1293,6 +1293,8 @@ final class TradCampos {
       }
       RowMetaInterface antes = ctx.camposEntrada( s );
       Map<String, String> ren = new LinkedHashMap<>();
+      List<String> conv = new ArrayList<>();
+      List<String> fallos = new ArrayList<>();
       for ( SelectMetadataChange mc : meta ) {
         ValueMetaInterface de = antes.searchValueMeta( mc.getName() );
         if ( de == null ) {
@@ -1303,11 +1305,24 @@ final class TradCampos {
         if ( a != ValueMetaInterface.TYPE_NONE && ( de == null || de.getType() != a ) ) {
           String e = cambiarTipo( col, de, a, mc.getConversionMask(), mc.getDecimalSymbol(), mc.getGroupingSymbol(),
             ctx, b );
-          b.l( pd ? col + " = " + e : out + " = " + out + ".withColumn(" + CtxTrad.lit( mc.getName() ) + ", " + e + ")" );
+          conv.add( pd ? col + " = " + e : out + " = " + out + ".withColumn(" + CtxTrad.lit( mc.getName() ) + ", " + e
+            + ")" );
+          if ( de != null && de.getType() == ValueMetaInterface.TYPE_STRING ) {
+            String f = Errores.fallo( col, e, ctx );
+            if ( f != null ) {
+              fallos.add( f );
+            }
+          }
         }
         if ( !vacio( mc.getRename() ) && !mc.getRename().equals( mc.getName() ) ) {
           ren.put( mc.getName(), mc.getRename() );
         }
+      }
+      if ( CtxTrad.tieneError( s ) && !fallos.isEmpty() ) {
+        Errores.separar( s, ctx, b, out, fallos, "SELECT001" );
+      }
+      for ( String l : conv ) {
+        b.l( l );
       }
       for ( Map.Entry<String, String> e : ren.entrySet() ) {
         b.l( pd ? out + " = " + out + ".rename(columns={" + CtxTrad.lit( e.getKey() ) + ": " + CtxTrad.lit( e
