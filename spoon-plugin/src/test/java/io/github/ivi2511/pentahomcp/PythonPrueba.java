@@ -69,7 +69,7 @@ public final class PythonPrueba {
       pb.directory( dir );
     }
     pb.environment().put( "PYTHONIOENCODING", "utf-8" );
-    File log = File.createTempFile( "python-prueba", ".log" );
+    File log = File.createTempFile( "python", ".log" );
     pb.redirectOutput( log );
     Process p = pb.start();
     if ( !p.waitFor( segundos, TimeUnit.SECONDS ) ) {
