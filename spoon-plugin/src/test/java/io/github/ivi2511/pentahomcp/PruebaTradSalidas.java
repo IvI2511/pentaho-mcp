@@ -450,9 +450,10 @@ public class PruebaTradSalidas {
       for ( Caso c : casos ) {
         File py = ArnesTraduccion.script( c.ktr, d );
         String suya = ArnesTraduccion.salidaDe( salida, py );
-        if ( suya.contains( "NULL_DATA_SOURCE_OPTION" ) ) {
-          // las opciones JDBC de Conexiones traen "user": None (conexión sin usuario): Spark las rechaza
-          System.out.println( "  SALTEADO " + py.getName() + ": opciones JDBC con user None (Conexiones)" );
+        if ( suya.contains( "NULL_DATA_SOURCE_OPTION" ) || suya.contains( "No suitable driver" ) || suya.contains(
+          "ClassNotFoundException" ) ) {
+          // sin el .jar del driver JDBC (org.sqlite.JDBC) Spark no puede escribir: se saltea
+          System.out.println( "  SALTEADO " + py.getName() + ": falta el .jar del driver JDBC en Spark" );
           continue;
         }
         try {
