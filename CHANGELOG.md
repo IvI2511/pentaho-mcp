@@ -47,6 +47,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   copy of the data, passes the 29 checks of `comprobar_resultados.py`, like Kitchen.
 - Manual chapter 14 (`manual/14-python.md`) and `docs/traductor-cobertura.md`.
 
+### Fixed
+
+- Translator robustness, checked on every step plugin of PDI 9.4 with its default settings and on every `.ktr` /
+  `.kjb` of the repository, in pandas and PySpark, as `.py` and as notebook: a transformation whose hops make a loop
+  no longer crashes the translation, and Stream / Database lookup without keys give valid PySpark.
+- Select values: a type conversion that fails (text to number or date) sends the row to the error hop with PDI's
+  error fields, in pandas and PySpark, instead of an empty error hop.
+- Date and number masks: one converter for every step (quoted literals with `''`, `%` in literals, Y / k / K / u / w /
+  z), currency, percent and sign in number masks on read; UTF-8 files with BOM; windows-1252 and ISO-8859-1 also in
+  PySpark 4; doubled quotes inside an enclosure in PySpark's CSV reader.
+- Initial capitals (Calculator and String operations) exactly as PDI (after any character that is not a letter,
+  digit or `_`), in pandas and PySpark; Database lookup in pandas keeps whole numbers as integers when a key is not
+  found; the "how to run it" line asks for SQLAlchemy 2.0.36 or later (pandas 3 refuses older ones).
 
 ## [0.7.1] - 2026-10-26
 
