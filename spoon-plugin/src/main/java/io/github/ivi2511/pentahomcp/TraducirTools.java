@@ -441,8 +441,7 @@ final class TraducirTools {
     public void pdiYComparar( File ktr, Set<String> saltar, Map<String, File> csvPython, Verificacion.Resultado r,
                               String idioma ) throws Exception {
       File carpeta = java.nio.file.Files.createTempDirectory( "pentaho-live-verif-pdi-" ).toFile();
-      List<File> temporales = new ArrayList<>();
-      temporales.add( carpeta );
+      List<File> temporales = new ArrayList<>(); // los de la hija; la carpeta la borra el finally (después de leerla)
       try {
         TransMeta tm = new TransMeta( ktr.getAbsolutePath() );
         PruebasMain.Creacion c = new PruebasMain.Creacion();
@@ -623,7 +622,23 @@ final class TraducirTools {
     if ( k > 0 ) {
       n = n.substring( 0, k );
     }
-    return n.startsWith( "Trad" ) && n.length() > 4 ? n.substring( 4 ) : n;
+    n = n.startsWith( "Trad" ) && n.length() > 4 ? n.substring( 4 ) : n;
+    String en = FAMILIAS.get( n );
+    return en != null ? en : n.toLowerCase( Locale.ROOT );
+  }
+
+  /** Familias (clase TradX del traductor) con su nombre en inglés para la API y la cobertura. */
+  private static final Map<String, String> FAMILIAS = new LinkedHashMap<>();
+
+  static {
+    String[][] f = { { "Entradas", "inputs" }, { "Salidas", "outputs" }, { "Campos", "fields" }, { "Filas", "rows" },
+      { "Bases", "databases" }, { "Lookup", "lookups" }, { "Busquedas", "lookups" }, { "Uniones", "joins" },
+      { "Scripts", "scripting" }, { "Flujo", "flow" }, { "Dw", "data warehouse" }, { "Utilidades", "utilities" },
+      { "Validacion", "validation" }, { "Estadisticas", "statistics" }, { "Archivos", "files" },
+      { "Entradas Job", "job entries" }, { "Job", "job" } };
+    for ( String[] x : f ) {
+      FAMILIAS.put( x[ 0 ], x[ 1 ] );
+    }
   }
 
   /** Las entradas de job con traducción, por reflexión (RegistroJob.entradas() o TraductorJob.entradas()). */

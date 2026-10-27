@@ -84,7 +84,7 @@ public class PruebaTraducirTools {
     for ( JsonNode x : c.get( "steps" ) ) {
       if ( "Dummy".equals( x.get( "id" ).asText() ) ) {
         dummy = true;
-        igual( "Filas", x.get( "family" ).asText(), "familia de Dummy" );
+        igual( "rows", x.get( "family" ).asText(), "familia de Dummy" );
         igual( "exact", x.get( "pandas" ).asText(), "Dummy exacto en pandas" );
       }
     }
@@ -110,11 +110,11 @@ public class PruebaTraducirTools {
         entradas++;
       }
     }
-    b.append( "## Steps (" ).append( pasos ).append( ")\n\n| Id | Name | Family | pandas | PySpark |\n"
-      + "|---|---|---|---|---|\n" );
+    b.append( "## Steps (" ).append( pasos ).append( ")\n\n| Id | Family | pandas | PySpark |\n"
+      + "|---|---|---|---|\n" );
     for ( TraducirTools.Cubierto x : l ) {
       if ( "step".equals( x.tipo ) ) {
-        b.append( "| `" ).append( x.id ).append( "` | " ).append( x.nombre ).append( " | " ).append( x.familia )
+        b.append( "| `" ).append( x.id ).append( "` | " ).append( x.familia )
           .append( " | " ).append( x.pandas ).append( " | " ).append( x.pyspark ).append( " |\n" );
       }
     }
