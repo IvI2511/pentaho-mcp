@@ -25,8 +25,10 @@ import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.RowAdapter;
 import org.pentaho.di.trans.step.StepInterface;
 import org.pentaho.di.trans.steps.denormaliser.DenormaliserTargetField;
+import org.pentaho.di.trans.steps.fuzzymatch.FuzzyMatchMeta;
 import org.pentaho.di.trans.steps.groupby.GroupByMeta;
 import org.pentaho.di.trans.steps.memgroupby.MemoryGroupByMeta;
+import org.pentaho.di.trans.steps.multimerge.MultiMergeJoinMeta;
 
 import io.github.ivi2511.pentahomcp.traductor.Bloque;
 import io.github.ivi2511.pentahomcp.traductor.CtxTrad;
@@ -301,6 +303,11 @@ public class PruebaTradFilas {
     StringBuilder m = new StringBuilder( "import os, runpy, sys, traceback\n" );
     if ( spark ) {
       m.append( "os.environ[\"PYSPARK_PYTHON\"] = sys.executable\n" );
+      // una sesión chica y rápida: la que reusan los getOrCreate() de los scripts
+      m.append( "from pyspark.sql import SparkSession\n" );
+      m.append( "SparkSession.builder.master(\"local[2]\").config(\"spark.sql.shuffle.partitions\", \"2\")"
+        + ".config(\"spark.ui.enabled\", \"false\").config(\"spark.driver.host\", \"localhost\")"
+        + ".config(\"spark.driver.bindAddress\", \"127.0.0.1\").getOrCreate()\n" );
       m.append( "os.environ.setdefault(\"JAVA_HOME\", " ).append( CtxTrad.lit( System.getProperty( "java.home" )
         .replace( '\\', '/' ) ) ).append( ")\n" );
     }
@@ -510,7 +517,8 @@ public class PruebaTradFilas {
     StringBuilder tf = new StringBuilder();
     String[][] ts = { { "v", "ene", "t_ene", INT, DenormaliserTargetField.typeAggrDesc[0] },
       { "v", "feb", "t_feb", NUM, DenormaliserTargetField.typeAggrDesc[DenormaliserTargetField.TYPE_AGGR_SUM] },
-      { "v", "mar", "t_mar", STR, DenormaliserTargetField.typeAggrDesc[DenormaliserTargetField.TYPE_AGGR_CONCAT_COMMA] },
+      { "v", "mar", "t_mar", STR,
+        DenormaliserTargetField.typeAggrDesc[DenormaliserTargetField.TYPE_AGGR_CONCAT_COMMA] },
       { "v", "ene", "n_ene", INT, DenormaliserTargetField.typeAggrDesc[DenormaliserTargetField.TYPE_AGGR_COUNT_ALL] } };
     for ( String[] t : ts ) {
       tf.append( "<field><field_name>" ).append( t[0] ).append( "</field_name><key_value>" ).append( t[1] ).append(
@@ -571,6 +579,41 @@ public class PruebaTradFilas {
         + "5000</cache_size><compress>N</compress>" ).hop( "in", "bl" ).ver( "bl" ) );
     l.add( new Caso( "vacio" ).grid( "in", "k:Integer,s:String" ).paso( "de", "DetectEmptyStream", "" ).hop( "in",
       "de" ).ver( "de" ) );
+    // Multiway merge join (INNER y FULL OUTER) y Fuzzy match: el XML lo escribe la clase Meta
+    for ( String tipo : new String[] { "INNER", "FULL OUTER" } ) {
+      MultiMergeJoinMeta mm = new MultiMergeJoinMeta();
+      mm.setDefault();
+      mm.allocateInputSteps( 2 );
+      mm.allocateKeys( 2 );
+      mm.setInputSteps( new String[] { "a", "b" } );
+      mm.setKeyFields( new String[] { "k", "k" } );
+      mm.setJoinType( tipo );
+      Caso mw = new Caso( "multiway_" + tipo.split( " " )[0].toLowerCase() ).grid( "a", "k:Integer,va:String", "1|a1",
+        "2|a2", "4|a4" ).grid( "b", "k:Integer,vb:String", "2|b2", "3|b3", "4|b4" ).paso( "mw", "MultiwayMergeJoin",
+          mm.getXML() ).hop( "a", "mw" ).hop( "b", "mw" ).ver( "mw" );
+      mw.sinOrden = true;
+      l.add( mw );
+    }
+    for ( int alg : new int[] { FuzzyMatchMeta.OPERATION_TYPE_LEVENSHTEIN, FuzzyMatchMeta.OPERATION_TYPE_JARO_WINKLER,
+      FuzzyMatchMeta.OPERATION_TYPE_DAMERAU_LEVENSHTEIN } ) {
+      FuzzyMatchMeta fm = new FuzzyMatchMeta();
+      fm.setDefault();
+      fm.allocate( 0 );
+      fm.setMainStreamField( "nombre" );
+      fm.setLookupField( "ref" );
+      fm.setOutputMatchField( "parecido" );
+      fm.setOutputValueField( "medida" );
+      fm.setAlgorithmType( alg );
+      fm.setCaseSensitive( false );
+      fm.setGetCloserValue( true );
+      boolean dist = alg != FuzzyMatchMeta.OPERATION_TYPE_JARO_WINKLER;
+      fm.setMinimalValue( dist ? "0" : "0.5" );
+      fm.setMaximalValue( dist ? "3" : "1" );
+      String xml = fm.getXML().replaceAll( "<from>[^<]*</from>|<from/>", "<from>lk</from>" );
+      l.add( new Caso( "fuzzy_" + FuzzyMatchMeta.algorithmCode[alg] ).grid( "in", "id:Integer,nombre:String",
+        "1|Madrid", "2|barcelona", "3|Sevila", "4|Xyzzy", "5|" ).grid( "lk", "ref:String", "Madrid", "Barcelona",
+          "Sevilla", "Valencia" ).paso( "fz", "FuzzyMatch", xml ).hop( "in", "fz" ).hop( "lk", "fz" ).ver( "fz" ) );
+    }
     l.add( new Caso( "abort_no" ).grid( "in", "k:Integer", "10", "20" ).paso( "ab", "Abort", "<row_threshold>5"
       + "</row_threshold><message>demasiadas</message><always_log_rows>N</always_log_rows><abort_option>ABORT"
       + "</abort_option>" ).hop( "in", "ab" ).ver( "ab" ) );

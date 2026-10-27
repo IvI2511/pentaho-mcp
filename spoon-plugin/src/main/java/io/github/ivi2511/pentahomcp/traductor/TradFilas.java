@@ -385,8 +385,10 @@ final class TradFilas {
       b.l( out + " = " + in + ".orderBy(" + cols + ")" );
       if ( m.isOnlyPassingUniqueRows() ) {
         ayudaCambia( ctx );
-        b.l( out + " = pdi_rachas(" + out + ", " + lista( nombres ) + ").filter(F.col(\"_orden\") == F.min(\"_orden\")"
-          + ".over(Window.partitionBy(\"_racha\"))).orderBy(\"_orden\").drop(\"_orden\", \"_racha\")" );
+        b.l( out + " = pdi_rachas(" + out + ", " + lista( nombres ) + ").withColumn(\"_primera\", F.col(\"_orden\") == "
+          + "F.min(\"_orden\").over(Window.partitionBy(\"_racha\")))" );
+        b.l( out + " = " + out + ".filter(\"_primera\").orderBy(\"_orden\").drop(\"_orden\", \"_racha\", "
+          + "\"_primera\")" );
       }
       b.nota( ctx.t( "Spark no garantiza un orden estable entre filas con la misma clave.", "Spark does not guarantee "
         + "a stable order between rows with the same key.", "O Spark não garante ordem estável entre linhas com a "
@@ -499,8 +501,9 @@ final class TradFilas {
       } else {
         String d = ctx.nuevo( "_d" );
         b.l( d + " = " + in + ".withColumn(\"_orden\", F.monotonically_increasing_id())" );
-        b.l( out + " = " + d + ".filter(F.col(\"_orden\") == F.min(\"_orden\").over(Window.partitionBy("
-          + args( campos ) + "))).orderBy(\"_orden\").drop(\"_orden\")" );
+        b.l( d + " = " + d + ".withColumn(\"_primera\", F.col(\"_orden\") == F.min(\"_orden\").over(Window.partitionBy("
+          + args( campos ) + ")))" );
+        b.l( out + " = " + d + ".filter(\"_primera\").orderBy(\"_orden\").drop(\"_orden\", \"_primera\")" );
       }
       if ( error ) {
         String e = ctx.dfError( s );
@@ -630,16 +633,20 @@ final class TradFilas {
         }
       }
     } else {
-      ayudaCambia( ctx );
       String d = ctx.nuevo( "_d" );
-      b.l( d + " = pdi_rachas(" + in + ", " + lista( claves ) + ")" );
+      if ( porRachas ) {
+        ayudaCambia( ctx );
+        b.l( d + " = pdi_rachas(" + in + ", " + lista( claves ) + ")" );
+      } else {
+        b.l( d + " = " + in + ".withColumn(\"_orden\", F.monotonically_increasing_id())" );
+      }
       List<String> aggs = new ArrayList<>();
       List<String> acum = new ArrayList<>();
       for ( int i = 0; i < n; i++ ) {
         if ( todas && acumulado( tipos[i] ) ) {
-          String w = "Window.partitionBy(\"_racha\").orderBy(\"_orden\")";
+          String w = "_w";
           String c = "F.col(" + CtxTrad.lit( sujetos[i] ) + ")";
-          acum.add( ".withColumn(" + CtxTrad.lit( nombres[i] ) + ", " + ( tipos[i]
+          acum.add( "\n    .withColumn(" + CtxTrad.lit( nombres[i] ) + ", " + ( tipos[i]
             == GroupByMeta.TYPE_GROUP_CUMULATIVE_SUM ? "F.sum(" + c + ").over(" + w + ")" : "F.avg(" + c + ").over("
               + w + ")" ) + ")" );
         } else {
@@ -660,15 +667,19 @@ final class TradFilas {
         }
         String linea = "";
         if ( lineaNr != null && !lineaNr.isEmpty() ) {
-          linea = ".withColumn(" + CtxTrad.lit( lineaNr ) + ", F.row_number().over(Window.partitionBy(\"_racha\")"
-            + ".orderBy(\"_orden\")))";
+          linea = "\n    .withColumn(" + CtxTrad.lit( lineaNr ) + ", F.row_number().over(_w))";
           sel.append( ", " ).append( CtxTrad.lit( lineaNr ) );
         }
-        b.l( out + " = " + d + ".join(" + a + ", \"_racha\", \"left\")" + String.join( "", acum ) + linea );
-        b.l( out + " = " + out + ".orderBy(\"_orden\").select(" + sel + ")" );
+        b.l( "_w = Window.partitionBy(\"_racha\").orderBy(\"_orden\")  # " + ctx.t( "la racha, fila a fila",
+          "the run, row by row", "a sequência, linha a linha" ) );
+        b.l( out + " = (" + d + ".join(" + a + ", \"_racha\", \"left\")" + String.join( "", acum ) + linea
+          + "\n    .orderBy(\"_orden\").select(" + sel + "))" );
       } else {
-        String gb = claves.isEmpty() && siempreUna ? d : d + ".groupBy(\"_racha\"" + ( claves.isEmpty() ? "" : ", "
-          + args( claves ) ) + ")";
+        String gb = claves.isEmpty() && siempreUna ? d : !porRachas ? d + ".groupBy(" + args( claves ) + ")"
+          : d + ".groupBy(\"_racha\"" + ( claves.isEmpty() ? "" : ", " + args( claves ) ) + ")";
+        if ( !porRachas && !( claves.isEmpty() && siempreUna ) ) {
+          aggs.add( "F.min(\"_orden\").alias(\"_racha\")" ); // orden de aparición del grupo
+        }
         b.l( out + " = " + gb + ".agg(" );
         for ( String x : aggs ) {
           b.l( "    " + x + "," );
@@ -734,7 +745,7 @@ final class TradFilas {
     }
   }
 
-  /** La agregación de un campo con «incluir todas las filas»: el valor del grupo repetido (o acumulado) en cada fila. */
+  /** Agregación con «incluir todas las filas»: el valor del grupo repetido (o acumulado) en cada fila. */
   private static String aggPandasTodas( StepMeta s, CtxTrad ctx, Bloque b, String g, String sujeto, int t,
     String valor ) {
     String c = g + "[" + CtxTrad.lit( sujeto ) + "]";
@@ -832,7 +843,8 @@ final class TradFilas {
     ayudaCambia( ctx );
     if ( ctx.pandas() ) {
       String g = ctx.nuevo( "_g" );
-      b.l( g + " = " + in + ".groupby(" + ( claves.isEmpty() ? "np.zeros(len(" + in + "), dtype=int)" : "pdi_cambia(" + in + "["
+      b.l( g + " = " + in + ".groupby(" + ( claves.isEmpty() ? "np.zeros(len(" + in + "), dtype=int)" : "pdi_cambia("
+        + in + "["
         + lista( claves ) + "]).cumsum()" ) + ", sort=False)" );
       b.l( out + " = " + in + ".assign(**{" );
       for ( String[] c : campos ) {
@@ -1088,9 +1100,9 @@ final class TradFilas {
     if ( ctx.pandas() ) {
       String v = ctx.nuevo( "_v" );
       b.l( v + " = " + in + "[" + CtxTrad.lit( f ) + "].reset_index(drop=True)" );
-      b.l( "# " + ctx.t( "los demás campos salen de la última fila de cada bloque, como en PDI", "the other fields come "
-        + "from the last row of each block, as in PDI", "os outros campos vêm da última linha de cada bloco, como no "
-          + "PDI" ) );
+      b.l( "# " + ctx.t( "los demás campos salen de la última fila de cada bloque, como en PDI", "the other fields "
+        + "come from the last row of each block, as in PDI", "os outros campos vêm da última linha de cada bloco, "
+          + "como no PDI" ) );
       b.l( out + " = " + in + ".drop(columns=" + CtxTrad.lit( f ) + ").groupby(np.arange(len(" + in + ")) // " + n
         + ").tail(1).reset_index(drop=True)" );
       b.l( out + " = " + out + ".assign(**{" );
@@ -1473,8 +1485,8 @@ final class TradFilas {
   private static String sinChoque( CtxTrad ctx, Bloque b, String izq, String der, String sufijo ) {
     String v = ctx.nuevo( "_der" );
     if ( ctx.pandas() ) {
-      b.l( v + " = " + der + ".rename(columns={c: c + " + CtxTrad.lit( sufijo ) + " for c in " + der + ".columns if c in "
-        + izq + ".columns})" );
+      b.l( v + " = " + der + ".rename(columns={c: c + " + CtxTrad.lit( sufijo ) + " for c in " + der
+        + ".columns if c in " + izq + ".columns})" );
     } else {
       b.l( v + " = " + der + ".select([F.col(c).alias(c + " + CtxTrad.lit( sufijo ) + " if c in " + izq
         + ".columns else c) for c in " + der + ".columns])" );
@@ -1514,7 +1526,8 @@ final class TradFilas {
         "O Spark não mantém a ordem das linhas." ) );
     }
     b.nota( ctx.t( "PDI exige las dos entradas ordenadas por la clave; aquí no hace falta.", "PDI needs both inputs "
-      + "sorted by the key; not needed here.", "O PDI exige as duas entradas ordenadas pela chave; aqui não é preciso." ) );
+      + "sorted by the key; not needed here.", "O PDI exige as duas entradas ordenadas pela chave; aqui não é "
+        + "preciso." ) );
     b.vista = out;
     return b;
   }
@@ -1620,8 +1633,8 @@ final class TradFilas {
     if ( acc == null ) {
       b.l( out + " = " + sinFilas( ctx ) );
     }
-    b.nota( ctx.t( "Los campos repetidos de cada flujo llevan el sufijo _<número del flujo>.", "Repeated fields of each "
-      + "stream get the suffix _<stream number>.", "Os campos repetidos de cada fluxo levam o sufixo _<número do "
+    b.nota( ctx.t( "Los campos repetidos de cada flujo llevan el sufijo _<número del flujo>.", "Repeated fields of "
+      + "each stream get the suffix _<stream number>.", "Os campos repetidos de cada fluxo levam o sufixo _<número do "
         + "fluxo>." ) );
     b.vista = out;
     return b;
@@ -1790,7 +1803,8 @@ final class TradFilas {
       String u = ctx.nuevo( "_fuzzy" );
       b.l( u + " = F.udf(lambda v: pdi_fuzzy(v, " + cand + ", " + args + "), \"m string, v double\")" );
       b.l( out + " = " + in + ".withColumn(\"_f\", " + u + "(F.col(" + CtxTrad.lit( m.getMainStreamField() ) + ")))"
-        + ".withColumn(" + CtxTrad.lit( mf ) + ", F.col(\"_f.m\")).withColumn(" + CtxTrad.lit( vf ) + ", F.col(\"_f.v\"))"
+        + ".withColumn(" + CtxTrad.lit( mf ) + ", F.col(\"_f.m\")).withColumn(" + CtxTrad.lit( vf )
+        + ", F.col(\"_f.v\"))"
         + ".drop(\"_f\")" );
     }
     if ( m.getValue() != null && m.getValue().length > 0 ) {
