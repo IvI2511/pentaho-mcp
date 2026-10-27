@@ -178,11 +178,24 @@ public final class TraductorJob {
           "O START de «" + jm.getName() + "» está agendado (tipo " + tipo + ", repetir=" + repetir + "): em Python, "
             + "agende-o com o sistema (cron, Agendador de tarefas) ou um laço com time.sleep." );
         prog.notas.add( n );
-        r.add( "# " + c.t( "NOTA: ", "NOTE: ", "NOTA: " ) + n );
+        comentario( c.t( "NOTA: ", "NOTE: ", "NOTA: " ) + n, r );
       }
     } catch ( Exception e ) {
       // sin XML
     }
+  }
+
+  /** Un comentario largo en varias líneas de hasta ~100 caracteres. */
+  private static void comentario( String texto, List<String> r ) {
+    StringBuilder l = new StringBuilder( "#" );
+    for ( String p : texto.split( " " ) ) {
+      if ( l.length() + p.length() > 100 && l.length() > 1 ) {
+        r.add( l.toString() );
+        l = new StringBuilder( "#" );
+      }
+      l.append( ' ' ).append( p );
+    }
+    r.add( l.toString() );
   }
 
   /** Crea la función de una entrada y devuelve su nombre. */
@@ -593,7 +606,7 @@ public final class TraductorJob {
           + "its hops, in order).", "O fluxo tem um laço: é percorrido com uma pilha de entradas pendentes, na mesma "
             + "ordem que o PDI (cada entrada, e depois o que sai dela pelos seus hops, em ordem)." );
     prog.notas.add( n );
-    r.add( "# " + n );
+    comentario( n, r );
     r.add( "# " + c.t( "flujo: entrada → [(siguiente, None = siempre / True = si va bien / False = si falla)]",
       "flow: entry → [(next, None = always / True = on success / False = on failure)]",
       "fluxo: entrada → [(seguinte, None = sempre / True = se correr bem / False = se falhar)]" ) );
@@ -691,15 +704,20 @@ public final class TraductorJob {
       r.add( ind + "ok = " + ( llamada == null ? "True" : llamada ) );
       r.add( ind + "res = ok" );
       for ( Salto s : ss ) {
-        String si = s.cuando == null ? "" : s.cuando ? "if ok: " : "if not ok: ";
-        r.add( ind + si + "res = " + rama( s.destino ) + "()" );
+        if ( s.cuando == null ) {
+          r.add( ind + "res = " + rama( s.destino ) + "()" );
+        } else {
+          r.add( ind + ( s.cuando ? "if ok:" : "if not ok:" ) );
+          r.add( ind + "    res = " + rama( s.destino ) + "()" );
+        }
       }
       r.add( ind + "return res" );
     }
 
     void seguir( JobEntryCopy d, String ind, List<String> r ) {
       Integer n = g.entrantes.get( d );
-      if ( n != null && n > 1 && tamano( d ) > 3 ) {
+      int t = tamano( d );
+      if ( n != null && n > 1 && ( t > 3 || ( n > 2 && t > 1 ) ) ) { // compartida: una función en vez de repetirla
         r.add( ind + "return " + rama( d ) + "()" );
       } else {
         emitir( d, ind, r );

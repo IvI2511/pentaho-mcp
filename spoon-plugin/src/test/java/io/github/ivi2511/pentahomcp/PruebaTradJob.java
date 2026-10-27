@@ -111,6 +111,9 @@ public class PruebaTradJob {
       contiene( py, "ejecutar_sql(" + ( d == Destino.PANDAS ? "engine_" : "jdbc_" ) + "dw_grano_de_oro, sql)",
         "SQL con la conexión del job" );
       contiene( py, "DROP TABLE IF EXISTS hechos_ventas;", "SQL legible" );
+      contiene( py, "    if not tr_cargar_dim_tienda():\n        return rama_registrar_el_error()\n",
+        "rama de fallo compartida como función" );
+      noContiene( py, "\"user\": \"${", "sin variables sin resolver" );
       noContiene( py, "OneDrive", "sin rutas personales" );
       noContiene( py, "ivanc", "sin rutas personales" );
       escribir( p, "job_carga_dw", d );
@@ -212,6 +215,11 @@ public class PruebaTradJob {
 
   /** Corre el job en Kettle y su traducción en Python (pandas) en carpetas gemelas y compara archivos y resultado. */
   private void comparar( JobXml j ) throws Exception {
+    comparar( j, false );
+  }
+
+  /** Con spark: además corre la traducción PySpark (una sola SparkSession) y compara sus archivos. */
+  private void comparar( JobXml j, boolean spark ) throws Exception {
     if ( PythonPrueba.python() == null ) {
       Verificador.saltear( "sin Python" );
     }
@@ -243,6 +251,20 @@ public class PruebaTradJob {
     igual( okKettle, rp.codigo == 0, j.nombre + ": mismo resultado (Kettle " + ( r == null ? "?" : r.getResult() + "/"
       + r.getNrErrors() ) + ", Python " + rp.codigo + "): " + rp.salida );
     igual( listado( k ), listado( py ), j.nombre + ": mismos archivos" );
+    if ( spark && PythonPrueba.tiene( "pyspark" ) ) {
+      File ps = new File( raiz, "pyspark" );
+      File sp = new File( ps, j.nombre + ".py" );
+      ProgramaJob q = TraductorJob.traducir( new JobMeta( new File( raiz, j.nombre + ".kjb" ).getAbsolutePath(), null ),
+        op( Destino.PYSPARK, "py" ) );
+      EntornoKettle.escribir( sp, EscritorJob.escribir( q, op( Destino.PYSPARK, "py" ) ) );
+      String java = new File( System.getProperty( "java.home" ) ).getAbsolutePath().replace( "\\", "/" );
+      PythonPrueba.Resultado rs = PythonPrueba.correr( ps, 300, PythonPrueba.python(), "-c", "import os, runpy; "
+        + "os.environ.setdefault('JAVA_HOME', '" + java + "'); runpy.run_path('" + sp.getName() + "', run_name="
+        + "'__main__')" );
+      sp.renameTo( new File( raiz, j.nombre + "_pyspark.py" ) );
+      igual( okKettle, rs.codigo == 0, j.nombre + ": mismo resultado en PySpark: " + rs.salida );
+      igual( listado( k ), listado( ps ), j.nombre + ": mismos archivos en PySpark" );
+    }
   }
 
   private static String listado( File dir ) throws Exception {
@@ -324,7 +346,7 @@ public class PruebaTradJob {
     j.hop( "Vacia", "Fallo", "Y" ).hop( "Vacia", "No vacia", "N" ).hop( "No vacia", "Variables", "Y" )
       .hop( "Variables", "Evaluar", "Y" ).hop( "Evaluar", "Mayor", "Y" ).hop( "Evaluar", "Fallo", "N" )
       .hop( "Mayor", "Exito", "Y" ).hop( "Fallo", "Abortar", "U" );
-    comparar( j );
+    comparar( j, true );
   }
 
   /** Unzip: PDI compara la máscara con la URI completa (zip:file:///...!/nombre), así que "hola.*" no extrae nada. */
@@ -376,6 +398,16 @@ public class PruebaTradJob {
     ProgramaJob p = TraductorJob.traducir( new JobMeta( new File( sal, "kitchen_bucle/bucle.kjb" ).getAbsolutePath(),
       null ), op( Destino.PANDAS, "py" ) );
     contiene( EscritorJob.escribir( p, op( Destino.PANDAS, "py" ) ), "while pendientes:", "máquina de estados" );
+    if ( PythonPrueba.tiene( "nbclient" ) ) { // el notebook también corre (celda final: main())
+      File dir = new File( sal, "kitchen_bucle/notebook" );
+      File nb = new File( dir, "bucle.ipynb" );
+      EntornoKettle.escribir( nb, EscritorJob.escribir( p, op( Destino.PANDAS, "ipynb" ) ) );
+      PythonPrueba.Resultado r = PythonPrueba.correr( dir, 300, PythonPrueba.python(), "-c", "import nbformat, "
+        + "nbclient; nb = nbformat.read('bucle.ipynb', 4); nbclient.NotebookClient(nb, timeout=120, resources={"
+        + "'metadata': {'path': '.'}}).execute()" );
+      igual( 0, r.codigo, "notebook ejecutado: " + r.salida );
+      igual( "xxx", EntornoKettle.leer( new File( dir, "cont.txt" ) ), "el notebook hace lo mismo" );
+    }
     comparar( new JobXml( "ramas" )
       .entrada( "A", "WRITE_TO_FILE", escribirArchivo( "orden.txt", "a", true ) )
       .entrada( "B", "WRITE_TO_FILE", escribirArchivo( "orden.txt", "b", true ) )
