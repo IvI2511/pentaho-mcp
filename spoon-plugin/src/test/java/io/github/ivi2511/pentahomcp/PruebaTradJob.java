@@ -493,6 +493,34 @@ public class PruebaTradJob {
     comparar( padre );
   }
 
+  /** XML bien formado, finales de línea y comparar carpetas. */
+  public void pruebaKitchenXmlYCarpetas() throws Exception {
+    comparar( new JobXml( "xml_carpetas" )
+      .entrada( "Xml", "WRITE_TO_FILE", escribirArchivo( "d/a.xml", "&lt;a&gt;&lt;b/&gt;&lt;/a&gt;", false ) )
+      .entrada( "Txt", "WRITE_TO_FILE", escribirArchivo( "d/b.txt", "x&#xd;&#xa;y&#xd;&#xa;", false ) )
+      .entrada( "Bien formado", "XML_WELL_FORMED", "<arg_from_previous>N</arg_from_previous><include_subfolders>N"
+        + "</include_subfolders><nr_errors_less_than>10</nr_errors_less_than><success_condition>success_if_no_errors"
+        + "</success_condition><resultfilenames>all_filenames</resultfilenames><fields><field><source_filefolder>" + D
+        + "/d</source_filefolder><wildcard>.*\\.xml</wildcard></field></fields>" )
+      .entrada( "A unix", "DOS_UNIX_CONVERTER", "<arg_from_previous>N</arg_from_previous><include_subfolders>N"
+        + "</include_subfolders><nr_errors_less_than>10</nr_errors_less_than><success_condition>success_if_no_errors"
+        + "</success_condition><resultfilenames>all_filenames</resultfilenames><fields><field><source_filefolder>" + D
+        + "/d/b.txt</source_filefolder><wildcard/><ConversionType>1</ConversionType></field></fields>" )
+      .entrada( "Copiar", "COPY_FILES", "<copy_empty_folders>Y</copy_empty_folders><arg_from_previous>N"
+        + "</arg_from_previous><overwrite_files>N</overwrite_files><include_subfolders>N</include_subfolders>"
+        + "<remove_source_files>N</remove_source_files><add_result_filesname>N</add_result_filesname>"
+        + "<destination_is_a_file>N</destination_is_a_file><create_destination_folder>Y</create_destination_folder>"
+        + "<fields><field><source_filefolder>" + D + "/d</source_filefolder><destination_filefolder>" + D
+        + "/e</destination_filefolder><wildcard/></field></fields>" )
+      .entrada( "Comparar", "FOLDERS_COMPARE", "<include_subfolders>N</include_subfolders><compare_filecontent>Y"
+        + "</compare_filecontent><compare_filesize>N</compare_filesize><compareonly>all</compareonly><wildcard/>"
+        + "<filename1>" + D + "/d</filename1><filename2>" + D + "/e</filename2>" )
+      .entrada( "Iguales", "WRITE_TO_FILE", escribirArchivo( "iguales.txt", "si", false ) )
+      .hop( "START", "Xml", "U" ).hop( "Xml", "Txt", "Y" ).hop( "Txt", "Bien formado", "Y" )
+      .hop( "Bien formado", "A unix", "Y" ).hop( "A unix", "Copiar", "Y" ).hop( "Copiar", "Comparar", "Y" )
+      .hop( "Comparar", "Iguales", "Y" ) );
+  }
+
   /** Abort job corta el job entero: el hop que venía después en la misma entrada no se sigue. */
   public void pruebaKitchenAbortar() throws Exception {
     comparar( new JobXml( "abortar" )

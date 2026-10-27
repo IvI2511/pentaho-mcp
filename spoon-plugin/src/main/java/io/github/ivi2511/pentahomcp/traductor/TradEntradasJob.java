@@ -88,6 +88,11 @@ final class TradEntradasJob {
       case "TELNET": telnet(); break;
       case "MSGBOX_INFO": mensaje(); break;
       case "EVAL": javascript(); break;
+      case "WAIT_FOR_SQL": esperarSql(); break;
+      case "XML_WELL_FORMED": xmlBienFormado(); break;
+      case "DOS_UNIX_CONVERTER": finesDeLinea(); break;
+      case "FOLDERS_COMPARE": compararCarpetas(); break;
+      case "CHECK_FILES_LOCKED": archivosBloqueados(); break;
       case "ADD_RESULT_FILENAMES": case "DELETE_RESULT_FILENAMES": case "COPY_MOVE_RESULT_FILENAMES":
         archivosResultado(); break;
       default:
@@ -1139,6 +1144,161 @@ final class TradEntradasJob {
         + "escrito no log." );
     b.l( "log.info(" + c.texto( s( "titremessage" ) + ": " + s( "bodymessage" ) ) + ")" );
     b.l( "return True" );
+  }
+
+  /** lista = los archivos de las filas de &lt;fields&gt; (archivo, o carpeta + máscara). */
+  private void listaDeCampos() {
+    ayudanteArchivos();
+    resultadoAnterior();
+    boolean sub = si( "include_subfolders" );
+    b.l( "lista = []" );
+    for ( Map<String, String> f : campos() ) {
+      String o = c.texto( de( f, "source_filefolder", "name" ) );
+      String w = de( f, "wildcard" ).isEmpty() ? "None" : c.texto( de( f, "wildcard" ) );
+      b.l( "ruta = " + o );
+      b.l( "lista += [ruta] if os.path.isfile(ruta) else list(archivos(ruta, " + w + ", subcarpetas=" + py( sub )
+        + "))" );
+    }
+  }
+
+  private void esperarSql() {
+    expl( "Wait for SQL: espera hasta que el número de filas cumpla la condición (o se acabe el tiempo).",
+      "Wait for SQL: waits until the number of rows meets the condition (or time runs out).",
+      "Wait for SQL: espera até que o número de linhas cumpra a condição (ou acabe o tempo)." );
+    c.importar( "import time" );
+    DatabaseMeta d = db( s( "connection" ) );
+    String con = c.conexion( d );
+    String cond = s( "success_condition" ).replace( "rows_count_", "" );
+    String op = COMPARA.containsKey( cond ) ? COMPARA.get( cond ) : ">";
+    String lim = s( "rows_count_value" ).trim().matches( "-?[0-9]+" ) ? s( "rows_count_value" ).trim() : "int(" + v(
+      "rows_count_value" ) + ")";
+    boolean propia = si( "is_custom_sql" );
+    String q = propia ? ( si( "is_usevars" ) ? v( "custom_sql" ) : CtxTrad.lit( s( "custom_sql" ) ) )
+      : "\"SELECT COUNT(*) FROM \" + " + tablaSql( d, s( "schemaname" ), s( "tablename" ) );
+    b.l( "def filas():" );
+    if ( c.pandas() ) {
+      b.l( "    with " + con + ".connect() as con:" );
+      b.l( propia ? "        return len(con.exec_driver_sql(" + q + ").fetchall())"
+        : "        return con.exec_driver_sql(" + q + ").scalar()" );
+    } else {
+      String lee = "spark.read.format(\"jdbc\").options(**" + con + ").option(\"query\", " + q + ").load()";
+      b.l( propia ? "    return " + lee + ".count()" : "    return " + lee + ".first()[0]" );
+    }
+    int max = entero( "maximum_timeout", 0 );
+    b.l( "inicio = time.monotonic()" );
+    b.l( "while not filas() " + op + " " + lim + ":" );
+    if ( max > 0 ) {
+      b.l( "    if time.monotonic() - inicio >= " + max + ":" );
+      b.l( "        return " + py( si( "success_on_timeout" ) ) );
+    }
+    b.l( "    time.sleep(" + Math.max( 1, entero( "check_cycle_time", 60 ) ) + ")" );
+    b.l( "return True" );
+  }
+
+  private void xmlBienFormado() {
+    expl( "Check if XML file is well formed: éxito si todos los XML se pueden leer.", "Check if XML file is well "
+      + "formed: success if all the XML files can be parsed.", "Check if XML file is well formed: sucesso se todos "
+        + "os XML puderem ser lidos." );
+    c.importar( "import xml.etree.ElementTree as ET" );
+    listaDeCampos();
+    b.l( "errores = 0" );
+    b.l( "for a in lista:" );
+    b.l( "    try:" );
+    b.l( "        ET.parse(a)" );
+    b.l( "    except ET.ParseError as e:" );
+    b.l( "        log.warning(\"%s: %s\", a, e)" );
+    b.l( "        errores += 1" );
+    condicionErrores();
+  }
+
+  /** return según success_condition (sin errores, menos de N errores...). */
+  private void condicionErrores() {
+    String cond = s( "success_condition" );
+    if ( cond.equals( "success_when_bad_formed_files_less" ) || cond.equals( "success_if_errors_less" ) ) {
+      b.l( "return errores < " + entero( "nr_errors_less_than", 10 ) );
+    } else if ( cond.isEmpty() || cond.equals( "success_if_no_errors" ) ) {
+      b.l( "return errores == 0" );
+    } else {
+      b.aproximado( c.t( "Condición de éxito «" + cond + "»: aquí, éxito si no hay errores.", "Success condition '"
+        + cond + "': here, success if there are no errors.", "Condição de sucesso «" + cond + "»: aqui, sucesso se "
+          + "não houver erros." ) );
+      b.l( "return errores == 0" );
+    }
+  }
+
+  private void finesDeLinea() {
+    expl( "Convert file between Windows and Unix: cambia los finales de línea (CRLF / LF).", "Convert file between "
+      + "Windows and Unix: changes line endings (CRLF / LF).", "Convert file between Windows and Unix: muda os finais "
+        + "de linha (CRLF / LF)." );
+    listaDeCampos();
+    String tipo = "0";
+    for ( Map<String, String> f : campos() ) {
+      tipo = de( f, "ConversionType", "conversion_type" ).isEmpty() ? tipo : de( f, "ConversionType",
+        "conversion_type" );
+    }
+    b.l( "for a in lista:" );
+    b.l( "    with open(a, \"rb\") as f:" );
+    b.l( "        datos = f.read()" );
+    b.l( "    unix = datos.replace(b\"\\r\\n\", b\"\\n\")" );
+    if ( "1".equals( tipo ) ) {
+      b.l( "    nuevo = unix  # " + c.t( "de Windows a Unix", "Windows to Unix", "de Windows para Unix" ) );
+    } else if ( "2".equals( tipo ) ) {
+      b.l( "    nuevo = unix.replace(b\"\\n\", b\"\\r\\n\")  # " + c.t( "de Unix a Windows", "Unix to Windows",
+        "de Unix para Windows" ) );
+    } else {
+      b.l( "    # " + c.t( "adivina: si tiene CRLF pasa a Unix, si no a Windows", "guess: with CRLF go to Unix, else "
+        + "to Windows", "adivinha: se tiver CRLF passa a Unix, senão a Windows" ) );
+      b.l( "    nuevo = unix if b\"\\r\\n\" in datos else unix.replace(b\"\\n\", b\"\\r\\n\")" );
+    }
+    b.l( "    with open(a, \"wb\") as f:" );
+    b.l( "        f.write(nuevo)" );
+    b.l( "return True" );
+  }
+
+  private void compararCarpetas() {
+    expl( "Compare folders: éxito si las dos carpetas tienen lo mismo.", "Compare folders: success if both folders "
+      + "have the same contents.", "Compare folders: sucesso se as duas pastas tiverem o mesmo." );
+    ayudanteArchivos();
+    c.importar( "import filecmp" );
+    String sub = py( si( "include_subfolders" ) );
+    String solo = s( "compareonly" );
+    String w = "specify".equals( solo ) && !s( "wildcard" ).isEmpty() ? v( "wildcard" ) : "None";
+    b.l( "uno, otro = " + v( "filename1" ) + ", " + v( "filename2" ) );
+    b.l( "a = {os.path.relpath(f, uno) for f in archivos(uno, " + w + ", subcarpetas=" + sub + ")}" );
+    b.l( "b = {os.path.relpath(f, otro) for f in archivos(otro, " + w + ", subcarpetas=" + sub + ")}" );
+    b.l( "if a != b:" );
+    b.l( "    return False" );
+    if ( si( "compare_filecontent" ) ) {
+      b.l( "return all(filecmp.cmp(os.path.join(uno, r), os.path.join(otro, r), shallow=False) for r in a)" );
+    } else if ( si( "compare_filesize" ) ) {
+      b.l( "return all(os.path.getsize(os.path.join(uno, r)) == os.path.getsize(os.path.join(otro, r)) for r in a)" );
+    } else {
+      b.l( "return True" );
+    }
+    if ( "only_folders".equals( solo ) ) {
+      b.aproximado( c.t( "PDI compara sólo las subcarpetas: aquí se comparan los archivos.", "PDI compares only the "
+        + "subfolders: here the files are compared.", "O PDI compara só as subpastas: aqui comparam-se os "
+          + "arquivos." ) );
+    }
+  }
+
+  private void archivosBloqueados() {
+    expl( "Check files locked: éxito si ningún archivo está bloqueado por otro programa.", "Check files locked: "
+      + "success if no file is locked by another program.", "Check files locked: sucesso se nenhum arquivo estiver "
+        + "bloqueado por outro programa." );
+    listaDeCampos();
+    b.l( "bloqueados = []" );
+    b.l( "for a in lista:" );
+    b.l( "    try:" );
+    b.l( "        os.rename(a, a)  # " + c.t( "en Windows falla si otro programa lo tiene abierto",
+      "on Windows it fails if another program has it open", "no Windows falha se outro programa o tiver aberto" ) );
+    b.l( "    except OSError:" );
+    b.l( "        bloqueados.append(a)" );
+    b.l( "return not bloqueados" );
+    b.aproximado( c.t( "En Linux y macOS los archivos no se bloquean igual que en Windows: la comprobación sólo es "
+      + "fiable en Windows.", "On Linux and macOS files are not locked as on Windows: the check is only reliable on "
+        + "Windows.", "No Linux e macOS os arquivos não são bloqueados como no Windows: a verificação só é fiável no "
+          + "Windows." ) );
   }
 
   private void javascript() {
