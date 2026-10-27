@@ -73,7 +73,8 @@ public class PruebaTradJob {
       String py = EscritorJob.escribir( p, op( d, "py" ) );
       contiene( py, "def tr_generar_constantes():", "una función por transformación" );
       contiene( py, "with con_variables({\"ARCHIVO_SALIDA\": \"01_desde_job\"}):", "parámetro de la entrada" );
-      contiene( py, "    if not tr_generar_constantes():\n        return e_abortar()\n", "camino de fallo recto" );
+      contiene( py, "        if not tr_generar_constantes():\n            return e_abortar()\n", "camino de fallo recto" );
+      contiene( py, "    except Abortar as e:", "Abort corta el job" );
       contiene( py, "    return e_success()", "fin con éxito" );
       contiene( py, "RESULT = {}", "RESULT" );
       contiene( py, "sys.exit(0 if main() else 1)", "código de salida" );
@@ -111,7 +112,7 @@ public class PruebaTradJob {
       contiene( py, "ejecutar_sql(" + ( d == Destino.PANDAS ? "engine_" : "jdbc_" ) + "dw_grano_de_oro, sql)",
         "SQL con la conexión del job" );
       contiene( py, "DROP TABLE IF EXISTS hechos_ventas;", "SQL legible" );
-      contiene( py, "    if not tr_cargar_dim_tienda():\n        return rama_registrar_el_error()\n",
+      contiene( py, "        if not tr_cargar_dim_tienda():\n            return rama_registrar_el_error()\n",
         "rama de fallo compartida como función" );
       noContiene( py, "\"user\": \"${", "sin variables sin resolver" );
       noContiene( py, "OneDrive", "sin rutas personales" );
@@ -174,6 +175,8 @@ public class PruebaTradJob {
     final StringBuilder hops = new StringBuilder();
     int x = 50;
     final String nombre;
+    /** Otros archivos del job (sub-jobs): ruta relativa → contenido; van a las dos carpetas. */
+    final java.util.Map<String, String> otros = new java.util.LinkedHashMap<>();
     String conexion = "";
 
     JobXml( String nombre ) {
@@ -231,6 +234,10 @@ public class PruebaTradJob {
     py.mkdirs();
     File kjb = new File( k, j.nombre + ".kjb" );
     EntornoKettle.escribir( kjb, j.xml() );
+    for ( java.util.Map.Entry<String, String> o : j.otros.entrySet() ) {
+      EntornoKettle.escribir( new File( k, o.getKey() ), o.getValue() );
+      EntornoKettle.escribir( new File( py, o.getKey() ), o.getValue() );
+    }
     JobMeta jm = new JobMeta( kjb.getAbsolutePath(), null );
     Job job = new Job( null, jm );
     job.setLogLevel( LogLevel.MINIMAL );
@@ -456,6 +463,40 @@ public class PruebaTradJob {
     j.hop( "Vaciar", "Cero", "Y" ).hop( "Cero", "Fallo", "Y" ).hop( "Cero", "Comprobar", "N" )
       .hop( "Comprobar", "Ok", "Y" ).hop( "Comprobar", "Fallo", "N" );
     comparar( j );
+  }
+
+  /** Sub-job en una subcarpeta con un parámetro: la carpeta interna y el valor son los del sub-job. */
+  public void pruebaKitchenSubjob() throws Exception {
+    JobXml hijo = new JobXml( "hijo" )
+      .entrada( "Escribir", "WRITE_TO_FILE", escribirArchivo( "salida_${P}.txt", "${P}/${Q}", false ) )
+      .hop( "START", "Escribir", "U" );
+    String h = hijo.xml().replace( "<parameters></parameters>", "<parameters><parameter><name>P</name>"
+      + "<default_value>defecto</default_value><description/></parameter></parameters>" );
+    JobXml padre = new JobXml( "padre" )
+      .entrada( "Variables", "SET_VARIABLES", "<replacevars>Y</replacevars><filename/><file_variable_type>JVM"
+        + "</file_variable_type><fields><field><variable_name>Q</variable_name><variable_value>q1</variable_value>"
+        + "<variable_type>ROOT_JOB</variable_type></field></fields>" )
+      .entrada( "Hijo", "JOB", "<specification_method>filename</specification_method><filename>" + D
+        + "/sub/hijo.kjb</filename><arg_from_previous>N</arg_from_previous><params_from_previous>N"
+        + "</params_from_previous><exec_per_row>N</exec_per_row><wait_until_finished>Y</wait_until_finished>"
+        + "<parameters><pass_all_parameters>Y</pass_all_parameters><parameter><name>P</name><stream_name/>"
+        + "<value>desde_padre</value></parameter></parameters>" )
+      .entrada( "Hijo otra vez", "JOB", "<specification_method>filename</specification_method><filename>" + D
+        + "/sub/hijo.kjb</filename><arg_from_previous>N</arg_from_previous><params_from_previous>N"
+        + "</params_from_previous><exec_per_row>N</exec_per_row><wait_until_finished>Y</wait_until_finished>"
+        + "<parameters><pass_all_parameters>Y</pass_all_parameters></parameters>" )
+      .hop( "START", "Variables", "U" ).hop( "Variables", "Hijo", "Y" ).hop( "Hijo", "Hijo otra vez", "Y" );
+    padre.otros.put( "sub/hijo.kjb", h );
+    comparar( padre );
+  }
+
+  /** Abort job corta el job entero: el hop que venía después en la misma entrada no se sigue. */
+  public void pruebaKitchenAbortar() throws Exception {
+    comparar( new JobXml( "abortar" )
+      .entrada( "A", "WRITE_TO_FILE", escribirArchivo( "orden.txt", "a", true ) )
+      .entrada( "Abortar", "ABORT", "<message>fin</message>" )
+      .entrada( "B", "WRITE_TO_FILE", escribirArchivo( "orden.txt", "b", true ) )
+      .hop( "START", "A", "U" ).hop( "A", "Abortar", "U" ).hop( "A", "B", "U" ) );
   }
 
   public void pruebaEstado() throws Exception {

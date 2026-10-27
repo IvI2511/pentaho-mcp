@@ -3,6 +3,7 @@ package io.github.ivi2511.pentahomcp.traductor;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import org.pentaho.di.job.JobMeta;
 import org.pentaho.di.job.entry.JobEntryCopy;
 import org.pentaho.di.trans.TransMeta;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 import io.github.ivi2511.pentahomcp.traductor.ProgramaJob.Funcion;
 
@@ -84,6 +86,11 @@ public final class TraductorJob {
   }
 
   private void ayudantesBase() {
+    c.ayudante( "Abortar", String.join( "\n",
+      "class Abortar(Exception):",
+      "    \"\"\"" + c.t( "Abort job: corta el job entero (main() o el sub-job devuelve False).",
+        "Abort job: stops the whole job (main() or the sub-job returns False).",
+        "Abort job: interrompe o job inteiro (main() ou o sub-job devolve False)." ) + "\"\"\"" ) );
     c.ayudante( "entrada", String.join( "\n",
       "def entrada(f):",
       "    \"\"\"" + c.t( "Una entrada del job: devuelve True (éxito) o False (fallo); una excepción cuenta como fallo, "
@@ -95,6 +102,8 @@ public final class TraductorJob {
       "        log.info(\"%s\", f.__doc__.splitlines()[0] if f.__doc__ else f.__name__)",
       "        try:",
       "            return f() is not False",
+      "        except Abortar:",
+      "            raise",
       "        except Exception:",
       "            log.exception(\"" + c.t( "Falló", "Failed", "Falhou" ) + " %s\", f.__name__)",
       "            return False",
@@ -157,10 +166,26 @@ public final class TraductorJob {
         sueltas + " entry(ies) with no path from START: PDI does not run them and they are not translated.",
         sueltas + " entrada(s) sem caminho desde START: o PDI não as executa e não são traduzidas." ) );
     }
+    List<String> f = new ArrayList<>();
     if ( g.ciclo ) {
-      maquina( g, inicio, fn, r );
+      maquina( g, inicio, fn, f );
     } else {
-      new Emisor( g, inicio, fn ).emitir( inicio, "", r );
+      new Emisor( g, inicio, fn ).emitir( inicio, "", f );
+    }
+    boolean aborta = false;
+    for ( JobEntryCopy e : g.orden ) {
+      aborta |= e.getEntry() != null && "ABORT".equals( e.getEntry().getPluginId() );
+    }
+    if ( aborta ) { // Abort job corta todos los caminos: una excepción hasta aquí
+      r.add( "try:" );
+      for ( String l : f ) {
+        r.add( l.isEmpty() ? "" : "    " + l );
+      }
+      r.add( "except Abortar as e:" );
+      r.add( "    log.error(str(e))" );
+      r.add( "    return False" );
+    } else {
+      r.addAll( f );
     }
     return r;
   }
@@ -428,12 +453,15 @@ public final class TraductorJob {
       .nombreArchivo( archivo ) + c.t( "): su flujo, con sus entradas definidas arriba.", "): its flow, with its "
         + "entries defined above.", "): o seu fluxo, com as suas entradas definidas acima." );
     Map<String, String> valores = valoresParametros( x, b );
+    Node ps = XMLHandler.getSubNode( x, "parameters" );
+    boolean pasaTodos = ps == null || !"N".equalsIgnoreCase( XMLHandler.getTagValue( ps, "pass_all_parameters" ) );
     try {
+      List<String> delPadre = Arrays.asList( jm.listParameters() );
       for ( String p : sub.listParameters() ) {
         String d = sub.getParameterDefault( p );
         String k = CtxTrad.lit( p );
-        if ( !valores.containsKey( k ) && !c.vars.containsKey( p ) ) {
-          c.vars.put( p, "os.environ.get(" + k + ", " + CtxTrad.lit( d == null ? "" : d ) + ")" );
+        if ( !valores.containsKey( k ) && !( pasaTodos && delPadre.contains( p ) ) ) {
+          valores.put( k, CtxTrad.lit( d == null ? "" : d ) ); // PDI: el parámetro no pasado toma su valor por defecto
         }
       }
     } catch ( Exception ex ) {

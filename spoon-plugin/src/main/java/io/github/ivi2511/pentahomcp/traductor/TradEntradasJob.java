@@ -228,12 +228,12 @@ final class TradEntradasJob {
   }
 
   private void abortar() {
-    expl( "Abort job: termina el job con error.", "Abort job: ends the job with an error.",
-      "Abort job: termina o job com erro." );
+    expl( "Abort job: corta el job entero con error (ningún otro camino sigue).", "Abort job: stops the whole job "
+      + "with an error (no other path goes on).", "Abort job: interrompe o job inteiro com erro (nenhum outro caminho "
+        + "continua)." );
     String m = s( "message" );
-    b.l( "log.error(" + ( m.isEmpty() ? CtxTrad.lit( c.t( "Job abortado", "Job aborted", "Job abortado" ) )
+    b.l( "raise Abortar(" + ( m.isEmpty() ? CtxTrad.lit( c.t( "Job abortado", "Job aborted", "Job abortado" ) )
       : c.texto( m ) ) + ")" );
-    b.l( "return False" );
   }
 
   private void escribirLog() {
