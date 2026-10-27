@@ -94,6 +94,24 @@ final class TradEntradas {
   }
 
   /**
+   * Codificación de lectura para Python. UTF-8 pasa a "utf-8-sig" en pandas (quita el BOM si lo hay, como PDI);
+   * Windows-1252 e ISO-8859-1 se dejan con su nombre (Python y Java los entienden). Vacía: PDI usaría la del
+   * sistema; aquí se elige UTF-8 de forma explícita.
+   */
+  static String codificacion( String enc, CtxTrad ctx ) {
+    String e = enc == null ? "" : enc.trim();
+    if ( e.isEmpty() || e.equalsIgnoreCase( "utf-8" ) || e.equalsIgnoreCase( "utf8" ) ) {
+      return ctx.pandas() ? "utf-8-sig" : "UTF-8";
+    }
+    return e;
+  }
+
+  /** ¿La máscara numérica lleva símbolos además de # 0 . , (moneda, %, +, espacios)? */
+  static boolean conSimbolos( String fmt ) {
+    return fmt != null && !fmt.isEmpty() && !fmt.matches( "[#0.,;E-]*" ) && !fmt.matches( ".*[yMdHhms].*" );
+  }
+
+  /**
    * Líneas que convierten las columnas de texto del DataFrame a los tipos de PDI con sus máscaras: Integer → Int64 /
    * long, Number → float / double, BigNumber → Decimal, Date → datetime64 / timestamp, Boolean. Recorte (trim) antes.
    */
@@ -124,10 +142,14 @@ final class TradEntradas {
           || tipo.equals( "BigNumber" ) ) ) {
           num += ".str.replace(" + CtxTrad.lit( dec ) + ", \".\", regex=False)";
         }
+        boolean pct = fmt.contains( "%" );
+        if ( conSimbolos( fmt ) ) { // moneda, %, + u otros literales de la máscara: fuera antes de convertir
+          num += ".str.replace(r\"[^0-9eE.+-]\", \"\", regex=True)";
+        }
         String e;
         switch ( tipo ) {
           case "Integer": e = "pd.to_numeric(" + num + ").astype(\"Int64\")"; break;
-          case "Number": e = "pd.to_numeric(" + num + ").astype(\"float64\")"; break;
+          case "Number": e = "pd.to_numeric(" + num + ")" + ( pct ? ".div(100)" : "" ) + ".astype(\"float64\")"; break;
           case "BigNumber":
             ctx.importar( "from decimal import Decimal" );
             e = num + ".map(Decimal, na_action=\"ignore\")";
@@ -161,10 +183,13 @@ final class TradEntradas {
         if ( !dec.isEmpty() && !dec.equals( "." ) && ( tipo.equals( "Number" ) || tipo.equals( "BigNumber" ) ) ) {
           num = "F.regexp_replace(" + num + ", " + CtxTrad.lit( "[" + dec + "]" ) + ", \".\")";
         }
+        if ( conSimbolos( fmt ) ) {
+          num = "F.regexp_replace(" + num + ", \"[^0-9eE.+-]\", \"\")";
+        }
         String e;
         switch ( tipo ) {
           case "Integer": e = num + ".cast(\"long\")"; break;
-          case "Number": e = num + ".cast(\"double\")"; break;
+          case "Number": e = num + ".cast(\"double\")" + ( fmt.contains( "%" ) ? " / 100" : "" ); break;
           case "BigNumber": e = num + ".cast(\"decimal(38,18)\")"; break;
           case "Date": case "Timestamp":
             e = fmt.isEmpty() ? s + ".cast(\"timestamp\")" : "F.to_timestamp(" + s + ", " + CtxTrad.lit( fmt ) + ")";
@@ -241,7 +266,7 @@ final class TradEntradas {
       b.l( archivo + " = " + ruta( ctx, v( x, "filename" ) ) );
     }
     String sep = v( x, "separator" ).isEmpty() ? "," : v( x, "separator" );
-    String enc = v( x, "encoding" ).isEmpty() ? "utf-8" : v( x, "encoding" );
+    String enc = codificacion( v( x, "encoding" ), ctx );
     String encl = v( x, "enclosure" );
     leerSeparado( ctx, b, df, archivo, sep, encl, si( x, "header" ) ? 1 : 0, 0, enc, cs, -1 );
     tipar( ctx, b, df, cs, "name" );
@@ -284,8 +309,14 @@ final class TradEntradas {
       b.l( l.append( ",\n    encoding=" ).append( CtxTrad.lit( enc ) ).append( ", dtype=str, keep_default_na=False, "
         + "na_values=[\"\"])" ).toString() );
     } else {
+      if ( !enc.toLowerCase().matches( "utf-8|utf8|iso-8859-1|us-ascii|utf-16(be|le)?|utf-32" ) ) {
+        b.l( "spark.conf.set(\"spark.sql.legacy.javaCharsets\", \"true\")  # " + ctx.t( "Spark 4 sólo acepta "
+          + "UTF/ISO-8859-1 si no", "Spark 4 only accepts UTF/ISO-8859-1 otherwise", "o Spark 4 só aceita UTF/ISO-8859-1 "
+            + "sem isto" ) );
+      }
       StringBuilder l = new StringBuilder( df + " = spark.read.csv(" + archivo + ", sep=" + ctx.texto( sep )
-        + ", quote=" + CtxTrad.lit( encl ) + ", header=" + ( cabeceras > 0 ? "True" : "False" ) + ", encoding="
+        + ", quote=" + CtxTrad.lit( encl ) + ( encl.isEmpty() ? "" : ", escape=" + CtxTrad.lit( encl ) ) // "" dentro
+        + ", header=" + ( cabeceras > 0 ? "True" : "False" ) + ", encoding="
         + CtxTrad.lit( enc ) );
       if ( !cs.isEmpty() ) {
         l.append( ",\n    schema=" ).append( esquemaTexto( cs, "name" ) );
@@ -314,7 +345,7 @@ final class TradEntradas {
     Element f = uno( x, "file" );
     boolean fijo = "Fixed".equalsIgnoreCase( v( f, "type" ) );
     String sep = v( x, "separator" ).isEmpty() ? ";" : v( x, "separator" );
-    String enc = v( x, "encoding" ).isEmpty() ? "utf-8" : v( x, "encoding" );
+    String enc = codificacion( v( x, "encoding" ), ctx );
     int cab = si( x, "header" ) ? Math.max( 1, entero( v( x, "nr_headerlines" ), 1 ) ) : 0;
     int pie = si( x, "footer" ) ? Math.max( 1, entero( v( x, "nr_footerlines" ), 1 ) ) : 0;
     int limite = entero( v( x, "limit" ), 0 );
@@ -465,7 +496,7 @@ final class TradEntradas {
     Bloque b = nuevo( s, ctx );
     String df = ctx.df( s );
     List<Element> cs = campos( x );
-    String enc = v( x, "encoding" ).isEmpty() ? "utf-8" : v( x, "encoding" );
+    String enc = codificacion( v( x, "encoding" ), ctx );
     leerFijo( ctx, b, df, ruta( ctx, v( x, "filename" ) ), cs, si( x, "header" ) ? 1 : 0, enc );
     if ( ctx.pandas() ) {
       b.nota( ctx.t( "read_fwf recorta los espacios de cada campo.", "read_fwf trims the spaces of each field.",
@@ -1065,7 +1096,7 @@ final class TradEntradas {
     } else {
       listaArchivos( ctx, b, s, x, archivos );
     }
-    String enc = v( x, "encoding" ).isEmpty() ? "utf-8" : v( x, "encoding" );
+    String enc = codificacion( v( x, "encoding" ), ctx );
     StringBuilder d = new StringBuilder();
     for ( Element c : campos( x ) ) {
       String t = v( c, "element_type" ).toLowerCase();
