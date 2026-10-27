@@ -314,7 +314,9 @@ public class PruebaTradCampos {
     l.add( tmp );
     m.setCalculation( l.toArray( new CalculatorMetaFunction[ 0 ] ) );
     agregar( tm, "Calc", m, "Datos" );
-    casos.add( new Caso( "calculadora", tm, "Calc" ) );
+    Caso c = new Caso( "calculadora", tm, "Calc" );
+    c.sinSpark.add( "c_initcap" ); // F.initcap: APROXIMADO (anotado)
+    casos.add( c );
   }
 
   /** Steps de campos en cadena desde XML (como los guarda Spoon). */
@@ -580,7 +582,6 @@ public class PruebaTradCampos {
     "    s = str(v)",
     "    return '~' if s == '' else s",
     "os.environ['PYSPARK_PYTHON'] = sys.executable",
-    "os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable",
     "for caso, archivo, pares in CASOS:",
     "    g = {'__file__': archivo, '__name__': '__main__'}",
     "    try:",
@@ -588,11 +589,13 @@ public class PruebaTradCampos {
     "        for par in pares.split('|'):",
     "            paso, var = par.split('=')",
     "            df = g[var]",
-    "            if not isinstance(df, pd.DataFrame):",
-    "                df = df.toPandas()",
+    "            if isinstance(df, pd.DataFrame):",
+    "                filas = list(df.itertuples(index=False, name=None))",
+    "            else:",
+    "                filas = [tuple(r) for r in df.collect()]",
     "            with open(os.path.join(SAL, caso + '__' + paso + '.txt'), 'w', encoding='utf-8') as f:",
     "                f.write('\\x01'.join(map(str, df.columns)) + '\\n')",
-    "                for fila in df.itertuples(index=False, name=None):",
+    "                for fila in filas:",
     "                    f.write('\\x01'.join(norm(v) for v in fila) + '\\n')",
     "    except Exception:",
     "        with open(os.path.join(SAL, caso + '__ERROR.txt'), 'w', encoding='utf-8') as f:",
@@ -617,6 +620,7 @@ public class PruebaTradCampos {
       r.add( "})" );
     } else {
       r.add( "import datetime" );
+      r.add( "import pandas as pd" );
       List<String> filas = new ArrayList<>();
       for ( String[] f : FILAS ) {
         List<String> v = new ArrayList<>();
@@ -630,8 +634,19 @@ public class PruebaTradCampos {
         esquema.add( CAMPOS[ i ] + " " + ( TIPOS[ i ].equals( "Integer" ) ? "long" : TIPOS[ i ].equals( "Number" )
           ? "double" : TIPOS[ i ].equals( "Date" ) ? "timestamp" : "string" ) );
       }
-      r.add( "df_datos = spark.createDataFrame([" + String.join( ", ", filas ) + "], " + CtxTrad.lit( String.join( ", ",
-        esquema ) ) + ")" );
+      // con Arrow y desde pandas: sin workers de Python (en Windows son muy lentos)
+      r.add( "spark.conf.set(\"spark.sql.execution.arrow.pyspark.enabled\", \"true\")" );
+      r.add( "df_datos = spark.createDataFrame(pd.DataFrame.from_records([" + String.join( ", ", filas ) + "], columns="
+        + "[" + String.join( ", ", nombresPy() ) + "]).astype({\"id\": \"Int64\", \"b\": \"Int64\"}), "
+        + CtxTrad.lit( String.join( ", ", esquema ) ) + ")" );
+    }
+    return r;
+  }
+
+  private static List<String> nombresPy() {
+    List<String> r = new ArrayList<>();
+    for ( String c : CAMPOS ) {
+      r.add( CtxTrad.lit( c ) );
     }
     return r;
   }
@@ -713,7 +728,7 @@ public class PruebaTradCampos {
         } else if ( b.paso.equals( "Dos" ) ) {
           b.codigo.clear();
           b.codigo.add( d == Destino.PANDAS ? "df_dos = pd.DataFrame({\"k\": pd.Series([1, 3], dtype=\"Int64\")})"
-            : "df_dos = spark.createDataFrame([(1,), (3,)], \"k long\")" );
+            : "df_dos = spark.createDataFrame(pd.DataFrame({\"k\": [1, 3]}), \"k long\")" );
         }
       }
       for ( String paso : c.capturas ) {
@@ -786,6 +801,10 @@ public class PruebaTradCampos {
       py.add( b.toString() );
     }
     List<String> k = new ArrayList<>( c.kettle.get( paso ) );
+    if ( d == Destino.PYSPARK && !c.sinSpark.isEmpty() ) {
+      k = tapar( k, cabK, c.sinSpark );
+      py = tapar( py, cabK, c.sinSpark );
+    }
     if ( d == Destino.PYSPARK ) {
       Collections.sort( k );
       Collections.sort( py );
@@ -803,6 +822,20 @@ public class PruebaTradCampos {
       }
     }
     return r.toString();
+  }
+
+  private static List<String> tapar( List<String> filas, List<String> cab, List<String> cols ) {
+    List<String> r = new ArrayList<>();
+    for ( String f : filas ) {
+      String[] v = f.split( "", -1 );
+      for ( int i = 0; i < v.length && i < cab.size(); i++ ) {
+        if ( cols.contains( cab.get( i ) ) ) {
+          v[ i ] = "*";
+        }
+      }
+      r.add( String.join( "", v ) );
+    }
+    return r;
   }
 
   public void pruebaPandas() throws Exception {

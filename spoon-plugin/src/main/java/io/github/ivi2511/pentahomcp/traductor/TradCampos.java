@@ -717,6 +717,11 @@ final class TradCampos {
       case CalculatorMetaFunction.CALC_LOWER_CASE:
         return r( pd ? sa + ".lower()" : "F.lower(" + a + ")", 'S' );
       case CalculatorMetaFunction.CALC_INITCAP:
+        if ( !pd ) {
+          b.aproximado( ctx.t( "F.initcap sólo pone mayúscula tras un espacio; PDI, tras cualquier carácter que no "
+            + "sea letra.", "F.initcap only capitalizes after a space; PDI after any non-letter.", "F.initcap só põe "
+              + "maiúscula após um espaço; o PDI, após qualquer carácter que não seja letra." ) );
+        }
         return r( pd ? sa + ".title()" : "F.initcap(" + a + ")", 'S' );
       case CalculatorMetaFunction.CALC_STRING_LEN:
         return r( pd ? sa + ".len().fillna(0)" : "F.coalesce(F.length(" + a + "), F.lit(0))", 'I' );
@@ -859,7 +864,10 @@ final class TradCampos {
         ? "pd.Timedelta(minutes=1)" : seg == 3600 ? "pd.Timedelta(hours=1)" : "pd.Timedelta(days=1)";
       return r( "np.trunc((" + a + " - " + b + ") / " + u + ")", 'I' );
     }
-    String dif = "(" + a + ".cast(\"double\") - " + b + ".cast(\"double\"))";
+    // PDI resta las horas de reloj (corrige el cambio de hora): se pasan las dos a «hora local como UTC»
+    String tz = "spark.conf.get(\"spark.sql.session.timeZone\")";
+    String dif = "(F.from_utc_timestamp(" + a + ", " + tz + ").cast(\"double\") - F.from_utc_timestamp(" + b + ", "
+      + tz + ").cast(\"double\"))";
     return r( seg == 0 ? "(" + dif + " * 1000).cast(\"long\")" : seg == 1 ? dif + ".cast(\"long\")" : "(" + dif
       + " / " + seg + ").cast(\"long\")", 'I' );
   }
@@ -1172,11 +1180,11 @@ final class TradCampos {
       return e + ".astype(\"string\")";
     }
     String e = agrupa ? "F.format_number(" + x + ", " + decs + ")" : "F.format_string(" + CtxTrad.lit( "%." + decs
-      + "f" ) + ", " + x + ")";
+      + "f" ) + ", F.bround(" + x + ", " + decs + "))"; // DecimalFormat de Java redondea HALF_EVEN
     if ( !d.equals( "." ) || ( agrupa && !g.equals( "," ) ) ) {
       e = "F.translate(" + e + ", \",.\", " + CtxTrad.lit( ( agrupa ? g : "," ) + d ) + ")";
     }
-    return e;
+    return "F.when(" + x + ".isNotNull(), " + e + ")";
   }
 
   /** Conversión de tipo de Select values / Metadata (de → a), con máscaras. */
