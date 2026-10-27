@@ -63,7 +63,8 @@ public class PruebaIdcMenu {
   public void pruebaA_Transformacion() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( IdcMenu.TRANSFORMACION, false, "001-spoon-jobs",
       "001-spoon-jobs", "Data Integration", "pentaho-live-reports", "Informes", "pentaho-live-grader", "Corrector" ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "lesson", "design", "mapping", "project",
+    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "translate",
+      "lesson", "design", "mapping", "project",
       "---",
       "perspective:001-spoon-jobs",
       "perspective:pentaho-live-reports", "perspective:pentaho-live-grader", "---", "about" ), ids( l ),
@@ -74,6 +75,7 @@ public class PruebaIdcMenu {
     igual( "Revisar calidad…", de( l, "quality" ).texto, "texto calidad" );
     igual( "Robustecer…", de( l, "harden" ).texto, "texto robustecer" );
     igual( "Pruebas…", de( l, "tests" ).texto, "texto pruebas (0.7.0)" );
+    igual( "Traducir a Python…", de( l, "translate" ).texto, "texto traducir (0.8.0)" );
     igual( "Ordenar lienzo", de( l, "arrange" ).texto, "texto ordenar" );
     igual( "Comparar…", de( l, "compare" ).texto, "texto comparar" );
     contiene( de( l, "compare" ).ayuda, "revisión de git", "ayuda de comparar" );
@@ -93,6 +95,7 @@ public class PruebaIdcMenu {
     cierto( de( l, "quality" ).habilitada, "calidad sirve para jobs" );
     falso( de( l, "harden" ).habilitada, "robustecer solo transformaciones" );
     cierto( de( l, "tests" ).habilitada, "pruebas tambien de jobs (0.7.1)" );
+    cierto( de( l, "translate" ).habilitada, "traducir tambien jobs (0.8.0)" );
     igual( "Robustecer… (solo transformaciones)", de( l, "harden" ).texto, "lo dice" );
     contiene( de( l, "harden" ).ayuda, "job_guard", "y por qué" );
     cierto( de( l, "arrange" ).habilitada, "ordenar sirve para jobs" );
@@ -103,13 +106,15 @@ public class PruebaIdcMenu {
   /** Nada abierto: solo Lección, perspectivas y Acerca habilitadas. Sin perspectivas, un solo separador. */
   public void pruebaC_SinDocumento() {
     List<Entrada> l = IdcMenu.modelo( es, contexto( null, false, null ) );
-    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "lesson", "design", "mapping", "project",
+    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "translate",
+      "lesson", "design", "mapping", "project",
       "---", "about" ), ids( l ),
       "sin perspectivas no hay bloque ni separador de más" );
     falso( de( l, "quality" ).habilitada, "calidad" );
     falso( de( l, "harden" ).habilitada, "robustecer" );
     falso( de( l, "arrange" ).habilitada, "ordenar" );
     falso( de( l, "compare" ).habilitada, "comparar" );
+    falso( de( l, "translate" ).habilitada, "traducir" );
     cierto( de( l, "lesson" ).habilitada, "lección explica cómo empezar una" );
     cierto( de( l, "about" ).habilitada, "acerca" );
     igual( es.s( "no_document" ), de( l, "quality" ).ayuda, "ayuda: abre un documento" );
@@ -122,7 +127,8 @@ public class PruebaIdcMenu {
     Contexto c = contexto( IdcMenu.TRANSFORMACION, false, null );
     c.boceto = es.f( "menu_sketch", 7, 12 );
     List<Entrada> l = IdcMenu.modelo( es, c );
-    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "lesson", "design", "mapping", "sketch",
+    igual( Arrays.asList( "quality", "harden", "arrange", "compare", "tests", "translate",
+      "lesson", "design", "mapping", "sketch",
       "project", "---", "about" ),
       ids( l ), "el progreso va después de Hoja de mapeo" );
     igual( "Boceto: 7 de 12 piezas construidas", de( l, "sketch" ).texto, "texto del progreso" );

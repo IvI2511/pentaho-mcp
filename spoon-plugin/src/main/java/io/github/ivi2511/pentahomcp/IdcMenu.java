@@ -83,6 +83,8 @@ final class IdcMenu {
   static final String ROBUSTECER = "harden";
   /** «Pruebas…» (0.7.0): PruebasDialogo; sus textos estan en el area de las pruebas. */
   static final String PRUEBAS = "tests";
+  /** Traducir a Python… (0.8.0): transformaciones y jobs. */
+  static final String TRADUCIR = "translate";
   static final String ORDENAR = "arrange";
   /** «Comparar…»: el diff semántico (IdcComparar); sus textos están en diff_*.properties. */
   static final String COMPARAR = "compare";
@@ -173,6 +175,9 @@ final class IdcMenu {
     Rotulos rp = Rotulos.de( PruebasDialogo.AREA, r.idioma() );
     l.add( new Entrada( Tipo.ACCION, PRUEBAS, rp.s( "menu_tests" ), hay, false, hay ? rp.s( "menu_tests_tip" )
       : r.s( "no_document" ) ) );
+    Rotulos rt = Rotulos.de( TraducirDialogo.AREA, r.idioma() );
+    l.add( new Entrada( Tipo.ACCION, TRADUCIR, rt.s( "menu_translate" ), hay, false, hay
+      ? rt.s( "menu_translate_tip" ) : r.s( "no_document" ) ) );
     l.add( new Entrada( Tipo.ACCION, LECCION, c.leccion ? r.s( "menu_lesson_show" ) : r.s( "menu_lesson" ), true,
       false, null ) );
     l.add( new Entrada( Tipo.ACCION, DISENO, r.s( "menu_design" ), true, false, r.s( "menu_design_tip" ) ) );
@@ -495,6 +500,8 @@ final class IdcMenu {
         IdcCalidad.abrir( sp.getShell(), m, r );
       } else if ( PRUEBAS.equals( id ) ) {
         PruebasDialogo.abrir( sp.getShell(), m, PruebasDialogo.rotulos() ); // transformaciones y jobs (0.7.1)
+      } else if ( TRADUCIR.equals( id ) ) {
+        TraducirDialogo.abrir( sp.getShell(), m, TraducirDialogo.rotulos() ); // transformaciones y jobs (0.8.0)
       } else if ( MAPEO.equals( id ) ) {
         if ( m instanceof TransMeta ) {
           IdcMapeo.abrir( sp.getShell(), (TransMeta) m, Rotulos.de( PlanoInforme.AREA, r.idioma() ) );
