@@ -583,6 +583,7 @@ public final class TradExpresion {
   String emitir( Nodo n ) throws NoTraducible {
     switch ( n.k ) {
       case "lit":
+      case "crudo": // código ya traducido (p. ej. el join de un array de JavaScript)
         return n.v;
       case "campo":
         return TradCondicion.columna( n.v, df, ctx );

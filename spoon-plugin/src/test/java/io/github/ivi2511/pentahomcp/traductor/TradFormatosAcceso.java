@@ -18,4 +18,9 @@ public final class TradFormatosAcceso {
   public static String aFecha( String x, String mascara, CtxTrad ctx ) {
     return TradCampos.aFecha( x, mascara, ctx );
   }
+
+  /** El ayudante _tipos_sql del Table input (tipos de PDI en lo leído de la base). */
+  public static String tiposSql() {
+    return TradEntradas.TIPOS_SQL;
+  }
 }

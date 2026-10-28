@@ -617,6 +617,7 @@ final class TradEntradas {
       if ( limite > 0 ) {
         b.l( df + " = " + df + ".head(" + limite + ")" );
       }
+      tiposSql( s, ctx, b, df );
     } else {
       b.l( df + " = (spark.read.format(\"jdbc\").options(**" + con + ")" );
       b.l( "    .option(\"query\", " + q + ").load())" );
@@ -634,6 +635,49 @@ final class TradEntradas {
       "Types are decided by the Python/JDBC driver: they may differ slightly from PDI's.",
       "Os tipos são decididos pelo driver Python/JDBC: podem diferir um pouco dos do PDI." ) );
     return b;
+  }
+
+  static final String TIPOS_SQL = String.join( "\n",
+    "def _tipos_sql(df, fechas=(), grandes=()):",
+    "    \"\"\"Los tipos de PDI en lo leído de la base: las fechas como datetime64 (según el driver llegan como",
+    "    date de Python o como texto) y los DECIMAL (Decimal de Python) como float, salvo los BigNumber.\"\"\"",
+    "    import decimal",
+    "    for c in df.columns:",
+    "        if c in fechas:",
+    "            df[c] = pd.to_datetime(df[c])",
+    "        elif c not in grandes and df[c].dtype == object:",
+    "            v = df[c].dropna()",
+    "            if len(v) and v.map(lambda x: isinstance(x, decimal.Decimal)).all():",
+    "                df[c] = df[c].astype(float)",
+    "    return df" );
+
+  /**
+   * pandas: lleva lo leído a los tipos de PDI. Las fechas (según los metadatos de la consulta) llegan como date de
+   * Python (MySQL) o como texto (SQLite) y sin esto «.dt» falla más adelante; los DECIMAL llegan como Decimal y no se
+   * pueden sumar con los float de otra rama.
+   */
+  private static void tiposSql( StepMeta s, CtxTrad ctx, Bloque b, String df ) {
+    List<String> fechas = new ArrayList<>();
+    List<String> grandes = new ArrayList<>();
+    org.pentaho.di.core.row.RowMetaInterface rm = ctx.campos( s );
+    for ( org.pentaho.di.core.row.ValueMetaInterface vm : rm.getValueMetaList() ) {
+      if ( vm.isDate() ) {
+        fechas.add( vm.getName() );
+      } else if ( vm.getType() == org.pentaho.di.core.row.ValueMetaInterface.TYPE_BIGNUMBER ) {
+        grandes.add( vm.getName() );
+      }
+    }
+    ctx.ayudante( "_tipos_sql", TIPOS_SQL );
+    b.l( df + " = _tipos_sql(" + df + ( fechas.isEmpty() ? "" : ", fechas=" + lista( fechas ) ) + ( grandes.isEmpty()
+      ? "" : ", grandes=" + lista( grandes ) ) + ")" );
+  }
+
+  private static String lista( List<String> l ) {
+    StringBuilder r = new StringBuilder( "[" );
+    for ( String x : l ) {
+      r.append( r.length() == 1 ? "" : ", " ).append( CtxTrad.lit( x ) );
+    }
+    return r.append( "]" ).toString();
   }
 
   // ================================================================ Excel, JSON, XML

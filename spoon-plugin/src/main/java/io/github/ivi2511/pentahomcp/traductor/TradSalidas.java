@@ -8,6 +8,7 @@ import java.util.Map;
 import org.pentaho.di.core.database.DatabaseMeta;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.row.ValueMetaInterface;
+import org.pentaho.di.trans.step.StepErrorMeta;
 import org.pentaho.di.trans.step.StepMeta;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -303,7 +304,8 @@ final class TradSalidas {
     String op1 = "sep=" + ctx.texto( sep ) + ", encierro=" + ctx.texto( encl ) + ( si( x, "enclosure_forced" )
       ? ", forzar=True" : "" ) + ( si( x, "header" ) ? "" : ", cabecera=False" ) + ( si( f, "append" )
         ? ", anexar=True" : "" ) + ", fin=\"" + fin + "\",";
-    String op2 = "codificacion=" + CtxTrad.lit( enc ) + ", textos=" + fm[ 1 ] + ")";
+    String op2 = "codificacion=" + CtxTrad.lit( enc ) + ", textos=" + fm[ 1 ] + ( si( x, "create_parent_folder" )
+      ? ", carpeta=True" : "" ) + ( si( f, "do_not_open_new_file_init" ) ? ", vacio=False" : "" ) + ")";
     int partes = entero( v( f, "splitevery" ), 0 );
     if ( si( x, "fileNameInField" ) && !v( x, "fileNameField" ).isEmpty() ) {
       String campo = CtxTrad.lit( v( x, "fileNameField" ) );
@@ -688,7 +690,10 @@ final class TradSalidas {
               + "ajudante para cada grupo." ) );
         }
     }
-    b.l( "_sincronizar(" + motor( ctx, db ) + ", " + ctx.texto( v( lk, "table" ) ) + ", " + pdf + "," );
+    boolean errores = CtxTrad.tieneError( s );
+    String fallos = errores ? ctx.nuevo( "fallos_" + CtxTrad.ident( s.getName() ) ) : null;
+    b.l( ( errores ? fallos + " = " : "" ) + "_sincronizar(" + motor( ctx, db ) + ", " + ctx.texto( v( lk,
+      "table" ) ) + ", " + pdf + "," );
     b.l( "             claves=" + claves + "," );
     if ( !valores.isEmpty() ) {
       b.l( "             valores=" + dict( valores ) + "," );
@@ -697,7 +702,10 @@ final class TradSalidas {
       b.l( "             actualizar=" + lista( actualizar ) + "," );
     }
     b.l( "             modo=" + CtxTrad.lit( modo ) + extra + ( v( lk, "schema" ).isEmpty() ? "" : ", esquema="
-      + ctx.texto( v( lk, "schema" ) ) ) + ")" );
+      + ctx.texto( v( lk, "schema" ) ) ) + ( errores ? ", errores=True" : "" ) + ")" );
+    if ( errores ) {
+      filasConError( s, ctx, b, io, pdf, fallos );
+    }
     b.nota( ctx.t( "Va fila a fila como PDI (buscar y luego insertar, actualizar o borrar), en una sola transacción.",
       "Goes row by row like PDI (look up, then insert, update or delete), in a single transaction.", "Vai linha a "
         + "linha como o PDI (procurar e depois inserir, atualizar ou apagar), numa só transação." ) );
@@ -708,6 +716,41 @@ final class TradSalidas {
             + "a pandas e escreve-se com SQLAlchemy (é preciso o driver Python)." ) );
     }
     return b;
+  }
+
+  /**
+   * Hop de error de Insert / update, Update o Delete: las filas que la base rechazó ({índice: mensaje} de
+   * _sincronizar) van al hop de error con los campos de error de PDI (código ISU001) y no siguen por la salida.
+   */
+  private static void filasConError( StepMeta s, CtxTrad ctx, Bloque b, String[] io, String pdf, String fallos ) {
+    String err = ctx.dfError( s );
+    StepErrorMeta em = s.getStepErrorMeta();
+    String malas = "list(" + fallos + ")";
+    String ok = pdf + ".drop(index=" + malas + ").reset_index(drop=True)";
+    String errPd = ctx.pandas() ? err : ctx.nuevo( "pdf_" + CtxTrad.ident( s.getName() ) + "_error" );
+    b.l( errPd + " = " + pdf + ".loc[" + malas + "].reset_index(drop=True)" );
+    String[][] campos = { { em.getNrErrorsValuename(), "1" }, { em.getErrorDescriptionsValuename(), "list("
+      + fallos + ".values())" }, { em.getErrorFieldsValuename(), "None" }, { em.getErrorCodesValuename(),
+        "\"ISU001\"" } };
+    for ( String[] c : campos ) {
+      if ( c[ 0 ] != null && !c[ 0 ].trim().isEmpty() ) {
+        b.l( errPd + "[" + CtxTrad.lit( c[ 0 ] ) + "] = " + c[ 1 ] );
+      }
+    }
+    if ( ctx.pandas() ) {
+      b.l( io[ 1 ] + " = " + ok + "  # " + ctx.t( "sigue lo que la base aceptó", "what the database accepted goes "
+        + "on", "segue o que a base aceitou" ) );
+    } else {
+      b.l( err + " = spark.createDataFrame(" + errPd + ".astype(object).where(" + errPd + ".notna(), None)) if len("
+        + errPd + ") else " + io[ 0 ] + ".limit(0)" );
+      b.l( io[ 1 ] + " = spark.createDataFrame(" + ok + ", schema=" + io[ 0 ] + ".schema)" );
+    }
+    ctx.ponerSalidaError( s, err );
+    b.nota( ctx.t( "Las filas que la base rechaza van al hop de error (como en PDI) con el mensaje de la base, que no "
+      + "es el mismo texto que el de PDI (el de JDBC).", "Rows the database rejects go to the error hop (as in PDI) "
+        + "with the database message, which is not the same text as PDI's (the JDBC one).", "As linhas que a base "
+          + "rejeita vão para o hop de erro (como no PDI) com a mensagem da base, que não é o mesmo texto do PDI (o "
+          + "do JDBC)." ) );
   }
 
   /** Dimension lookup/update → ayudante _dimension (SCD 1 y 2, o sólo búsqueda), que agrega la clave técnica. */
@@ -944,10 +987,17 @@ final class TradSalidas {
 
   static final String ESCRIBIR_TEXTO = String.join( "\n",
     "def _escribir_texto(df, ruta, sep=\";\", encierro='\"', forzar=False, cabecera=True, anexar=False,",
-    "                    codificacion=\"utf-8\", fin=\"\\r\\n\", textos=()):",
+    "                    codificacion=\"utf-8\", fin=\"\\r\\n\", textos=(), carpeta=False, vacio=True):",
     "    \"\"\"Escribe df como el Text file output de PDI: encierra los campos de texto (siempre si forzar;",
     "    si no, sólo los que llevan el separador, el encierro o un salto de línea) y pone la cabecera si el",
-    "    archivo es nuevo.\"\"\"",
+    "    archivo es nuevo. carpeta: crea la carpeta si falta. Sin filas, PDI no escribe ni la cabecera: deja el",
+    "    archivo vacío (o no lo crea, si vacio=False).\"\"\"",
+    "    if carpeta:",
+    "        os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)",
+    "    if len(df) == 0:",
+    "        if vacio:",
+    "            open(ruta, \"a\" if anexar else \"w\", encoding=codificacion).close()",
+    "        return",
     "    nuevo = not (anexar and os.path.exists(ruta) and os.path.getsize(ruta) > 0)",
     "    columnas = []",
     "    for c in df.columns:",
@@ -1059,38 +1109,52 @@ final class TradSalidas {
 
   static final String SINCRONIZAR = String.join( "\n",
     "def _sincronizar(engine, tabla, df, claves, valores=None, actualizar=(), modo=\"insertar_o_actualizar\",",
-    "                 esquema=None, sin_clave_falla=True, campo_operacion=None, ops=None):",
+    "                 esquema=None, sin_clave_falla=True, campo_operacion=None, ops=None, errores=False):",
     "    \"\"\"Insert / update, Update, Delete y Synchronize after merge de PDI, fila a fila en una transacción.",
     "    claves: [(columna, condición, campo[, campo2])]; valores: {columna: campo}; actualizar: columnas que se",
-    "    actualizan si cambian (las demás de valores sólo se insertan).\"\"\"",
+    "    actualizan si cambian (las demás de valores sólo se insertan). errores=True (hay hop de error): la fila",
+    "    que la base rechaza se deshace sola (savepoint), sigue la siguiente y se devuelve en {índice: mensaje}.\"\"\"",
     "    t = Table(tabla, MetaData(), schema=esquema, autoload_with=engine)",
     "    valores = valores or {}",
-    "    filas = [{k: _nativo(v) for k, v in r.items()} for r in df.astype(object).to_dict(\"records\")]",
+    "    fallos = {}",
+    "",
+    "    def una(con, fila):",
+    "        m = modo",
+    "        if campo_operacion:",
+    "            op = fila.get(campo_operacion)",
+    "            m = next((k for k, v in ops.items() if v == op), None)",
+    "            if m is None:",
+    "                return",
+    "        cond = _condicion(t, claves, fila)",
+    "        if m == \"borrar\":",
+    "            con.execute(t.delete().where(cond))",
+    "            return",
+    "        if m == \"insertar\":",
+    "            con.execute(t.insert().values({c: fila[k] for c, k in valores.items()}))",
+    "            return",
+    "        cols = [t.c[c] for c in actualizar] or [t.c[claves[0][0]]]",
+    "        actual = con.execute(select(*cols).where(cond)).first()",
+    "        if actual is None:",
+    "            if m == \"actualizar\":",
+    "                if sin_clave_falla:",
+    "                    raise ValueError(f\"{tabla}: no se encontró la fila a actualizar: {fila}\")",
+    "                return",
+    "            con.execute(t.insert().values({c: fila[k] for c, k in valores.items()}))",
+    "        elif actualizar and any(actual[i] != fila[valores[c]] for i, c in enumerate(actualizar)):",
+    "            con.execute(t.update().where(cond).values({c: fila[valores[c]] for c in actualizar}))",
+    "",
     "    with engine.begin() as con:",
-    "        for fila in filas:",
-    "            m = modo",
-    "            if campo_operacion:",
-    "                op = fila.get(campo_operacion)",
-    "                m = next((k for k, v in ops.items() if v == op), None)",
-    "                if m is None:",
-    "                    continue",
-    "            cond = _condicion(t, claves, fila)",
-    "            if m == \"borrar\":",
-    "                con.execute(t.delete().where(cond))",
+    "        for i, r in zip(df.index, df.astype(object).to_dict(\"records\")):",
+    "            fila = {k: _nativo(v) for k, v in r.items()}",
+    "            if not errores:",
+    "                una(con, fila)",
     "                continue",
-    "            if m == \"insertar\":",
-    "                con.execute(t.insert().values({c: fila[k] for c, k in valores.items()}))",
-    "                continue",
-    "            cols = [t.c[c] for c in actualizar] or [t.c[claves[0][0]]]",
-    "            actual = con.execute(select(*cols).where(cond)).first()",
-    "            if actual is None:",
-    "                if m == \"actualizar\":",
-    "                    if sin_clave_falla:",
-    "                        raise ValueError(f\"{tabla}: no se encontró la fila a actualizar: {fila}\")",
-    "                    continue",
-    "                con.execute(t.insert().values({c: fila[k] for c, k in valores.items()}))",
-    "            elif actualizar and any(actual[i] != fila[valores[c]] for i, c in enumerate(actualizar)):",
-    "                con.execute(t.update().where(cond).values({c: fila[valores[c]] for c in actualizar}))" );
+    "            try:",
+    "                with con.begin_nested():",
+    "                    una(con, fila)",
+    "            except Exception as e:  # lo que la base rechaza va al hop de error, como en PDI",
+    "                fallos[i] = f\"{type(e).__name__}: {getattr(e, 'orig', None) or e}\"",
+    "    return fallos" );
 
   static final String DIMENSION = String.join( "\n",
     "def _dimension(engine, tabla, df, claves, campos, tipos, tk, tk_salida, version, desde, hasta, campo_fecha=None,",

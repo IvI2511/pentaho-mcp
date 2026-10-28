@@ -664,34 +664,34 @@ final class TradCampos {
         }
         return r( "(" + a + " + F.make_ym_interval(months=" + bb + "))", 'T' );
       case CalculatorMetaFunction.CALC_YEAR_OF_DATE:
-        return r( pd ? a + ".dt.year" : "F.year(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.year" : "F.year(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_MONTH_OF_DATE:
-        return r( pd ? a + ".dt.month" : "F.month(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.month" : "F.month(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_DAY_OF_YEAR:
-        return r( pd ? a + ".dt.dayofyear" : "F.dayofyear(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.dayofyear" : "F.dayofyear(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_DAY_OF_MONTH:
-        return r( pd ? a + ".dt.day" : "F.dayofmonth(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.day" : "F.dayofmonth(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_DAY_OF_WEEK: // PDI: domingo = 1 ... sábado = 7
-        return r( pd ? "((" + a + ".dt.dayofweek + 1) % 7 + 1)" : "F.dayofweek(" + a + ")", 'I' );
+        return r( pd ? "((" + fechaPd( a ) + ".dt.dayofweek + 1) % 7 + 1)" : "F.dayofweek(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_WEEK_OF_YEAR:
         b.aproximado( ctx.t( "La semana del año de PDI depende del idioma de Java; se usa la ISO 8601 (la de España).",
           "PDI's week of year depends on the Java locale; ISO 8601 is used.", "A semana do ano do PDI depende do "
             + "idioma do Java; usa-se a ISO 8601." ) );
-        return r( pd ? a + ".dt.isocalendar().week" : "F.weekofyear(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.isocalendar().week" : "F.weekofyear(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_WEEK_OF_YEAR_ISO8601:
-        return r( pd ? a + ".dt.isocalendar().week" : "F.weekofyear(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.isocalendar().week" : "F.weekofyear(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_YEAR_OF_DATE_ISO8601:
-        return r( pd ? a + ".dt.isocalendar().year" : "F.extract(F.lit(\"YEAROFWEEK\"), " + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.isocalendar().year" : "F.extract(F.lit(\"YEAROFWEEK\"), " + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_QUARTER_OF_DATE:
-        return r( pd ? a + ".dt.quarter" : "F.quarter(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.quarter" : "F.quarter(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_HOUR_OF_DAY:
-        return r( pd ? a + ".dt.hour" : "F.hour(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.hour" : "F.hour(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_MINUTE_OF_HOUR:
-        return r( pd ? a + ".dt.minute" : "F.minute(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.minute" : "F.minute(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_SECOND_OF_MINUTE:
-        return r( pd ? a + ".dt.second" : "F.second(" + a + ")", 'I' );
+        return r( pd ? fechaPd( a ) + ".dt.second" : "F.second(" + a + ")", 'I' );
       case CalculatorMetaFunction.CALC_REMOVE_TIME_FROM_DATE:
-        return r( pd ? a + ".dt.normalize()" : "F.date_trunc(\"day\", " + a + ")", 'T' );
+        return r( pd ? fechaPd( a ) + ".dt.normalize()" : "F.date_trunc(\"day\", " + a + ")", 'T' );
       case CalculatorMetaFunction.CALC_DATE_DIFF:
         return difFechas( a, bb, 86400, ctx );
       case CalculatorMetaFunction.CALC_DATE_DIFF_MSEC:
@@ -969,10 +969,11 @@ final class TradCampos {
     TradExpresion t = new TradExpresion( TradExpresion.Dialecto.JAVASCRIPT, ctx.pandas() ? out : in, campos, ctx );
     Columnas cols = new Columnas();
     try {
-      for ( String sentencia : script.toString().replaceAll( "(?s)/\\*.*?\\*/", "" ).replaceAll( "//[^\\n]*", "" )
-        .split( "[;\\n]" ) ) {
+      ArraysJs arrays = new ArraysJs( t, ctx, ctx.pandas() ? out : in );
+      for ( String sentencia : sentenciasJs( script.toString().replaceAll( "(?s)/\\*.*?\\*/", "" ).replaceAll(
+        "//[^\\n]*", "" ) ) ) {
         String st = sentencia.trim();
-        if ( st.isEmpty() ) {
+        if ( st.isEmpty() || arrays.sentencia( st ) ) {
           continue;
         }
         java.util.regex.Matcher mm = java.util.regex.Pattern.compile( "^(?:var\\s+)?([A-Za-z_$][\\w$]*)\\s*=(?!=)"
@@ -980,7 +981,7 @@ final class TradCampos {
         if ( !mm.find() ) {
           throw new TradExpresion.NoTraducible( st );
         }
-        t.locales.put( mm.group( 1 ), t.arbol( mm.group( 2 ) ) );
+        t.locales.put( mm.group( 1 ), t.arbol( arrays.unir( mm.group( 2 ) ) ) );
       }
       for ( String[] o : salidas ) {
         TradExpresion.Nodo n = t.locales.get( o[ 0 ] );
@@ -1026,6 +1027,200 @@ final class TradCampos {
     }
     b.vista = out;
     return b;
+  }
+
+  /**
+   * La columna como fecha para «.dt»: pd.to_datetime no cambia una columna datetime64 y convierte la que llega como
+   * object (date de Python que da MySQL, o una unión de ramas con tipos distintos).
+   */
+  static String fechaPd( String col ) {
+    return col.startsWith( "pd.to_datetime(" ) ? col : "pd.to_datetime(" + col + ")";
+  }
+
+  /** Las sentencias del script: corta en «;» y saltos de línea fuera de textos y paréntesis. */
+  static List<String> sentenciasJs( String s ) {
+    List<String> r = new ArrayList<>();
+    StringBuilder b = new StringBuilder();
+    char comilla = 0;
+    int nivel = 0;
+    for ( int i = 0; i < s.length(); i++ ) {
+      char c = s.charAt( i );
+      if ( comilla != 0 ) {
+        b.append( c );
+        if ( c == '\\' && i + 1 < s.length() ) {
+          b.append( s.charAt( ++i ) );
+        } else if ( c == comilla ) {
+          comilla = 0;
+        }
+        continue;
+      }
+      if ( c == '"' || c == '\'' ) {
+        comilla = c;
+      } else if ( c == '(' || c == '[' ) {
+        nivel++;
+      } else if ( c == ')' || c == ']' ) {
+        nivel--;
+      } else if ( ( c == ';' || c == '\n' ) && nivel <= 0 ) {
+        r.add( b.toString() );
+        b.setLength( 0 );
+        continue;
+      }
+      b.append( c );
+    }
+    r.add( b.toString() );
+    return r;
+  }
+
+  static final String UNIR_SI = String.join( "\n",
+    "def _unir_si(indice, sep, pares):",
+    "    \"\"\"Un array de JavaScript llenado con push condicionales y unido con join(sep): fila a fila, une los",
+    "    textos de los pares (condición, texto) que se cumplen, en orden (condición None: siempre).\"\"\"",
+    "    r = pd.Series(\"\", index=indice, dtype=object)",
+    "    vacio = pd.Series(True, index=indice)",
+    "    for cond, texto in pares:",
+    "        si = pd.Series(True if cond is None else cond, index=indice).fillna(False).astype(bool)",
+    "        texto = pd.Series(texto, index=indice, dtype=object)",
+    "        texto = texto.where(texto.notna(), \"null\")  # JavaScript escribe null así",
+    "        r = r.where(~si, np.where(vacio, texto, r + sep + texto))",
+    "        vacio = vacio & ~si",
+    "    return r" );
+
+  /**
+   * Arrays de JavaScript que sólo se llenan con push (con o sin if / else if / else de una sentencia) y se usan con
+   * join: {@code var faltan = []; if (a == null) faltan.push("a"); var motivo = faltan.join(", ");}. Cada push es un
+   * par (condición, texto); el join se traduce vectorizado (pandas: _unir_si; Spark: concat_ws, que salta los nulos).
+   */
+  static final class ArraysJs {
+    private static final java.util.regex.Pattern NUEVO = java.util.regex.Pattern.compile(
+      "^(?:var\\s+)?([A-Za-z_$][\\w$]*)\\s*=\\s*\\[\\s*\\]$" );
+    private static final java.util.regex.Pattern PUSH = java.util.regex.Pattern.compile(
+      "^([A-Za-z_$][\\w$]*)\\s*\\.\\s*push\\s*\\((.*)\\)$", java.util.regex.Pattern.DOTALL );
+    private static final java.util.regex.Pattern JOIN = java.util.regex.Pattern.compile(
+      "([A-Za-z_$][\\w$]*)\\s*\\.\\s*join\\s*\\(\\s*(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')?\\s*\\)" );
+    private final TradExpresion t;
+    private final CtxTrad ctx;
+    private final String df;
+    private final Map<String, List<String[]>> pares = new LinkedHashMap<>();
+    /** Condiciones (Python) de la cadena if / else if en curso. */
+    private final List<String> cadena = new ArrayList<>();
+    private int unidos;
+
+    ArraysJs( TradExpresion t, CtxTrad ctx, String df ) {
+      this.t = t;
+      this.ctx = ctx;
+      this.df = df;
+    }
+
+    /** ¿La sentencia es de un array (creación o push)? Si es un if que no sabemos traducir: NoTraducible. */
+    boolean sentencia( String st ) throws TradExpresion.NoTraducible {
+      java.util.regex.Matcher m = NUEVO.matcher( st );
+      if ( m.find() ) {
+        pares.put( m.group( 1 ), new ArrayList<>() );
+        cadena.clear();
+        return true;
+      }
+      boolean sino = st.startsWith( "else" ) && ( st.length() == 4 || !Character.isJavaIdentifierPart( st.charAt(
+        4 ) ) );
+      String resto = sino ? st.substring( 4 ).trim() : st;
+      String cond = null;
+      if ( resto.startsWith( "if" ) && resto.substring( 2 ).trim().startsWith( "(" ) ) {
+        int a = resto.indexOf( '(' );
+        int c = cierre( resto, a );
+        cond = t.emitirCol( t.arbol( resto.substring( a + 1, c ) ) );
+        resto = resto.substring( c + 1 ).trim();
+      } else if ( !sino ) {
+        cadena.clear();
+      }
+      m = PUSH.matcher( resto );
+      if ( !m.find() || !pares.containsKey( m.group( 1 ) ) ) {
+        if ( sino || cond != null ) {
+          throw new TradExpresion.NoTraducible( st );
+        }
+        return false;
+      }
+      if ( sino && cadena.isEmpty() ) {
+        throw new TradExpresion.NoTraducible( st );
+      }
+      if ( !sino ) {
+        cadena.clear();
+      }
+      StringBuilder total = new StringBuilder();
+      for ( String previa : cadena ) {
+        total.append( total.length() == 0 ? "" : " & " ).append( "~(" ).append( previa ).append( ")" );
+      }
+      if ( cond != null ) {
+        total.append( total.length() == 0 ? "" : " & " ).append( "(" ).append( cond ).append( ")" );
+        cadena.add( cond );
+      } else {
+        cadena.clear(); // un else final cierra la cadena
+      }
+      TradExpresion.Nodo valor = t.arbol( m.group( 2 ) );
+      String texto = t.emitirCol( valor );
+      if ( valor.t != 'S' && !valor.k.equals( "lit" ) ) {
+        texto = ctx.pandas() ? texto + ".astype(\"string\")" : texto + ".cast(\"string\")";
+      }
+      pares.get( m.group( 1 ) ).add( new String[] { total.length() == 0 ? null : total.toString(), texto } );
+      return true;
+    }
+
+    /** Cambia cada arr.join(sep) de la expresión por una variable local con su traducción. */
+    String unir( String expr ) {
+      java.util.regex.Matcher m = JOIN.matcher( expr );
+      StringBuffer r = new StringBuffer();
+      while ( m.find() ) {
+        List<String[]> l = pares.get( m.group( 1 ) );
+        if ( l == null ) {
+          continue;
+        }
+        String sep = m.group( 2 ) == null ? "," : m.group( 2 ).substring( 1, m.group( 2 ).length() - 1 ).replaceAll(
+          "\\\\(.)", "$1" );
+        String nombre = "__join_" + ( ++unidos );
+        StringBuilder py = new StringBuilder();
+        if ( ctx.pandas() ) {
+          ctx.importar( "import numpy as np" );
+          ctx.ayudante( "_unir_si", UNIR_SI );
+          py.append( "_unir_si(" ).append( df ).append( ".index, " ).append( CtxTrad.lit( sep ) ).append( ", [" );
+          for ( int i = 0; i < l.size(); i++ ) {
+            py.append( i == 0 ? "" : ", " ).append( "(" ).append( l.get( i )[ 0 ] == null ? "None" : l.get( i )[ 0 ] )
+              .append( ", " ).append( l.get( i )[ 1 ] ).append( ")" );
+          }
+          py.append( "])" );
+        } else {
+          py.append( "F.concat_ws(" ).append( CtxTrad.lit( sep ) );
+          for ( String[] p : l ) {
+            py.append( ", F.when(" ).append( p[ 0 ] == null ? "F.lit(True)" : p[ 0 ] ).append( ", " ).append( p[ 1 ] )
+              .append( ")" );
+          }
+          py.append( ")" );
+        }
+        t.locales.put( nombre, new TradExpresion.Nodo( "crudo", py.toString(), 'S' ) );
+        m.appendReplacement( r, nombre );
+      }
+      m.appendTail( r );
+      return r.toString();
+    }
+
+    private static int cierre( String s, int abre ) throws TradExpresion.NoTraducible {
+      int nivel = 0;
+      char comilla = 0;
+      for ( int i = abre; i < s.length(); i++ ) {
+        char c = s.charAt( i );
+        if ( comilla != 0 ) {
+          if ( c == '\\' ) {
+            i++;
+          } else if ( c == comilla ) {
+            comilla = 0;
+          }
+        } else if ( c == '"' || c == '\'' ) {
+          comilla = c;
+        } else if ( c == '(' ) {
+          nivel++;
+        } else if ( c == ')' && --nivel == 0 ) {
+          return i;
+        }
+      }
+      throw new TradExpresion.NoTraducible( "paréntesis sin cerrar" );
+    }
   }
 
   // ================================================================ formatos
