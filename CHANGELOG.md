@@ -74,6 +74,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   row, no longer stops the pandas script with "Can only use .str accessor with string values".
 - PySpark scripts start Spark's workers with the same Python that runs them (with two Pythons installed, Spark failed
   with "Python in worker has different version").
+- A real data-warehouse load translated end to end gives the same tables as PDI: DATE and DECIMAL columns read from
+  MySQL keep PDI's types (they came back as Python `date` / `Decimal` objects, and a later date function or sum
+  failed), rows the database rejects in Table output / Insert-update go to the error hop with the database's message
+  instead of stopping the script, reasons built with a JavaScript array (`push` + `join`) are translated, and a
+  rejects file goes to a new folder or stays empty (0 bytes) as in PDI.
+- The connection password is asked for (hidden; once per server, only in memory) when `PDI_PASSWORD_<CONNECTION>` is
+  not set, in a notebook or a terminal; `lxml` is only required when the XML code needs it.
 
 ## [0.7.1] - 2026-10-26
 
