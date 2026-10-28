@@ -224,7 +224,7 @@ public final class EscritorPy {
     if ( c.contains( "excel(" ) || c.contains( "ExcelWriter" ) ) {
       r.add( "openpyxl" );
     }
-    if ( c.contains( "read_xml(" ) || c.contains( "to_xml(" ) ) {
+    if ( ( c.contains( "read_xml(" ) || c.contains( "to_xml(" ) ) && !c.contains( "parser=\"etree\"" ) ) {
       r.add( "lxml" );
     }
     if ( c.contains( "parquet(" ) && p.destino() == Destino.PANDAS ) {
@@ -310,6 +310,7 @@ public final class EscritorPy {
     r.add( "}" );
     if ( !con.isEmpty() ) {
       r.add( "" );
+      r.addAll( Conexiones.ayudanteClave( con, c ) );
       r.addAll( con );
     }
     for ( String a : c.ayudantes.values() ) {

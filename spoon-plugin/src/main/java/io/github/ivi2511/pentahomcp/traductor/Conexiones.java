@@ -19,6 +19,57 @@ public final class Conexiones {
     return "PDI_PASSWORD_" + CtxTrad.ident( db.getName() ).toUpperCase();
   }
 
+  private static boolean vacia( String s ) {
+    return s == null || s.trim().isEmpty();
+  }
+
+  /** ¿La conexión lleva contraseña? (un servidor con usuario o con contraseña; no un archivo SQLite / H2 sin usuario) */
+  static boolean pideClave( DatabaseMeta db, String tipo ) {
+    if ( "SQLITE".equals( tipo ) ) {
+      return false;
+    }
+    return !vacia( db.getUsername() ) || !vacia( db.getPassword() );
+  }
+
+  /**
+   * La función _clave, si alguna de las líneas de conexión la usa: la contraseña sale de la variable de entorno o,
+   * si no está, se pide sin mostrarla (en un notebook, un cuadro; en una terminal, por consola) y no queda escrita en
+   * ningún archivo. Sin terminal ni notebook (un proceso en segundo plano) no pide nada.
+   */
+  public static List<String> ayudanteClave( List<String> lineasConexion, CtxTrad ctx ) {
+    List<String> r = new ArrayList<>();
+    if ( !String.join( "\n", lineasConexion ).contains( "_clave(" ) ) {
+      return r;
+    }
+    r.add( "_CLAVES = {}  # " + ctx.t( "servidor → contraseña ya pedida (dos conexiones al mismo servidor: una vez)",
+      "server → password already asked (two connections to the same server: once)", "servidor → senha já pedida (duas "
+        + "conexões ao mesmo servidor: uma vez)" ) );
+    r.add( "" );
+    r.add( "" );
+    r.add( "def _clave(variable, conexion, servidor):" );
+    r.add( "    \"\"\"" + ctx.t( "Contraseña de una conexión: de la variable de entorno o, si no está, se pide sin "
+      + "mostrarla (no queda en ningún archivo).", "Password of a connection: from the environment variable or, if it "
+        + "is not set, asked without showing it (it is not saved in any file).", "Senha de uma conexão: da variável de "
+          + "ambiente ou, se não estiver definida, pedida sem a mostrar (não fica em nenhum arquivo)." ) + "\"\"\"" );
+    r.add( "    valor = os.environ.get(variable, _CLAVES.get(servidor))" );
+    r.add( "    if valor is None:" );
+    r.add( "        import getpass, sys" );
+    r.add( "        try:" );
+    r.add( "            interactivo = get_ipython() is not None  # " + ctx.t( "notebook", "notebook", "notebook" ) );
+    r.add( "        except NameError:" );
+    r.add( "            interactivo = sys.stdin is not None and sys.stdin.isatty()" );
+    r.add( "        if not interactivo:" );
+    r.add( "            return \"\"" );
+    r.add( "        valor = getpass.getpass(" + CtxTrad.lit( ctx.t( "Contraseña de ", "Password of ", "Senha de " ) )
+      + " + (servidor or conexion) + \" (\" + conexion + \"; \" + variable + \"): \")" );
+    r.add( "        _CLAVES[servidor] = valor  # " + ctx.t( "sólo en memoria, para esta sesión", "only in memory, for "
+      + "this session", "só na memória, para esta sessão" ) );
+    r.add( "    return valor" );
+    r.add( "" );
+    r.add( "" );
+    return r;
+  }
+
   public static List<String> crear( DatabaseMeta db, CtxTrad ctx ) {
     List<String> r = new ArrayList<>();
     String v = ctx.conexion( db );
@@ -27,7 +78,11 @@ public final class Conexiones {
     String puerto = ctx.texto( db.getDatabasePortNumberString() );
     String base = ctx.texto( db.getDatabaseName() );
     String usuario = ctx.texto( db.getUsername() );
-    String clave = "os.environ.get(" + CtxTrad.lit( variableClave( db ) ) + ", \"\")";
+    String servidor = ( vacia( db.getUsername() ) ? "" : db.getUsername() + "@" ) + ( vacia( db.getHostname() ) ? ""
+      : db.getHostname() ) + ( vacia( db.getDatabasePortNumberString() ) ? "" : ":" + db.getDatabasePortNumberString() );
+    String clave = pideClave( db, tipo ) ? "_clave(" + CtxTrad.lit( variableClave( db ) ) + ", " + CtxTrad.lit(
+      db.getName() ) + ", " + CtxTrad.lit( servidor ) + ")" : "os.environ.get(" + CtxTrad.lit( variableClave( db ) )
+        + ", \"\")";
     if ( ctx.pandas() ) {
       ctx.importar( "from sqlalchemy import create_engine, text" );
       ctx.importar( "from sqlalchemy.engine import URL" );

@@ -180,6 +180,7 @@ public final class EscritorJob {
     r.add( "RESULT = {}" );
     if ( !con.isEmpty() ) {
       r.add( "" );
+      r.addAll( Conexiones.ayudanteClave( con, c ) );
       r.addAll( con );
     }
     for ( String a : c.ayudantes.values() ) {
